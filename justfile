@@ -67,6 +67,53 @@ seed:
 loadpostal src country='US':
     cd api && go run ./cmd/server loadpostal --src {{src}} --country {{country}}
 
+# ── pg: dev postgres lifecycle (docker-based) ─────────
+# Local dev Postgres runs in a named docker container with a
+# persistent volume on port 55432 (non-default to avoid clashing
+# with any system Postgres on :5432). Same image
+# (postgres:17-alpine) as the integration test suite, so the wire
+# is identical.
+#
+# Credentials and DB name are dev-only and match what
+# mise.development.toml hands to URBANIST_DB_URL:
+#   user: urbanist  pass: urbanist  db: urbanist_atlas_dev
+
+# start the dev postgres container (creates on first run, starts on subsequent), then wait for it to accept connections
+pg-up:
+    @if ! docker container inspect urbanist-atlas-pg >/dev/null 2>&1; then \
+        docker run -d --name urbanist-atlas-pg \
+            -p 55432:5432 \
+            -e POSTGRES_USER=urbanist \
+            -e POSTGRES_PASSWORD=urbanist \
+            -e POSTGRES_DB=urbanist_atlas_dev \
+            -v urbanist-atlas-pg-data:/var/lib/postgresql/data \
+            postgres:17-alpine >/dev/null; \
+    else \
+        docker start urbanist-atlas-pg >/dev/null; \
+    fi
+    @until docker exec urbanist-atlas-pg pg_isready -U urbanist -d urbanist_atlas_dev >/dev/null 2>&1; do sleep 0.5; done
+    @echo "dev postgres ready on :55432 (db: urbanist_atlas_dev)"
+
+# stop the dev postgres container (keeps the data volume so a later pg-up is instant)
+pg-down:
+    @docker stop urbanist-atlas-pg >/dev/null 2>&1 || true
+    @echo "dev postgres stopped (data volume kept; pg-reset to nuke)"
+
+# nuke the container AND the data volume — start completely fresh
+pg-reset:
+    @docker rm -f urbanist-atlas-pg >/dev/null 2>&1 || true
+    @docker volume rm urbanist-atlas-pg-data >/dev/null 2>&1 || true
+    @echo "dev postgres container + data volume removed; run 'just pg-up' to recreate"
+
+# open a psql shell into the dev database (via TCP — the alpine
+# image puts its socket at /var/run/postgresql, not psql's default /tmp)
+pg-shell:
+    docker exec -it urbanist-atlas-pg psql -h localhost -U urbanist urbanist_atlas_dev
+
+# tail the dev postgres container logs (Ctrl-C to detach)
+pg-logs:
+    docker logs -f urbanist-atlas-pg
+
 # ── api: live curl helpers (server must be running) ───
 
 # curl /healthz against localhost

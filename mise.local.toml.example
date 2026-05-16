@@ -8,10 +8,13 @@
 #   - mise.ci.toml does the same for CI when MISE_ENV=ci
 #
 # Use mise.local.toml for things like:
+#   - using a system Postgres instead of the docker-managed dev DB
+#     (the default in mise.development.toml is the :55432 docker
+#     container — see `just pg-up`)
 #   - alternate local DB URL (different host / port / credentials)
 #   - a personal admin token for the admin queue
 #   - testing against a staging API
 
 # [env]
-# URBANIST_DB_URL      = "postgres://urbanist:secret@127.0.0.1:5433/atlas?sslmode=disable"
+# URBANIST_DB_URL      = "postgres://urbanist@localhost:5432/atlas?sslmode=disable"
 # URBANIST_ADMIN_TOKEN = "my-personal-dev-token"

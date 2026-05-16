@@ -12,9 +12,13 @@
 # Human-friendly logs in dev; production stays JSON via mise.toml's default.
 URBANIST_LOG_FORMAT = "text"
 
-# Sane local Postgres defaults. Override in mise.local.toml if your
-# local Postgres lives elsewhere or uses different credentials.
-URBANIST_DB_URL = "postgres://localhost:5432/urbanist_atlas_dev?sslmode=disable"
+# Points at the docker-managed dev Postgres on :55432 (see the
+# pg-* recipes in the justfile). The non-default port keeps the
+# dev DB from clashing with any system Postgres on :5432.
+# Credentials/db match what `just pg-up` provisions on first run.
+# Override in mise.local.toml if you'd rather use a system Postgres
+# or different credentials.
+URBANIST_DB_URL = "postgres://urbanist:urbanist@localhost:55432/urbanist_atlas_dev?sslmode=disable"
 
 # Dev-only admin token. Do not deploy this value anywhere. The real
 # production token lives in Fly secrets, not in this repo.
