@@ -19,7 +19,7 @@ type MemStore struct {
 	mu         sync.RWMutex
 	regions    map[int64]Region
 	orgs       []Org
-	orgRegions map[int64][]int64           // orgID → regionIDs the org serves
+	orgRegions map[int64][]int64             // orgID → regionIDs the org serves
 	postal     map[string]ResolvedPostalCode // key: postalKey(country, code)
 }
 

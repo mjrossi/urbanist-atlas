@@ -35,12 +35,45 @@ api-vet:
 api-test:
     cd api && go test ./... -race -count=1
 
-# vet + test — the CI gate for api/, run locally
-api-check: api-vet api-test
+# vet + test + gen-no-diff — the CI gate for api/, run locally
+api-check: api-vet api-test api-gen-check
 
 # go mod tidy
 api-tidy:
     cd api && go mod tidy
+
+# regenerate sqlc Go bindings from internal/store/postgres/queries/*.sql.
+# Wrapped in `mise exec --` so the pinned sqlc version is used even
+# when the shell doesn't have mise activated.
+api-sqlc-gen:
+    cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
+
+# regenerate oapi-codegen Go types AND refresh the embedded copy of
+# openapi.yaml next to the handler that serves it. Both flow through
+# `go generate ./...` so adding a new generated artifact is just a
+# matter of dropping a //go:generate directive on the right file.
+api-oapi-gen:
+    cd api && mise exec -- go generate ./...
+
+# run the postgres-backed integration tests under the `integration`
+# build tag (requires Docker). Cheap default test suite stays
+# tag-free so `just api-test` keeps running on machines without
+# Docker.
+api-test-integration:
+    cd api && go test -tags=integration -race -count=1 ./internal/store/postgres/...
+
+# fail if any generated file would change. Regenerates oapi-codegen
+# and the embedded spec copy via `go generate`, then regenerates sqlc,
+# then asks git if anything moved. Used inside api-check so `just ci`
+# rejects commits that forgot to regenerate.
+api-gen-check:
+    @cd api && mise exec -- go generate ./...
+    @cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
+    @cd api && git diff --exit-code -- \
+        internal/httpapi/oapi/types.gen.go \
+        internal/httpapi/openapi.yaml \
+        internal/store/postgres/gen/ \
+        || (echo "generated files drifted; run \`just api-oapi-gen && just api-sqlc-gen\` and commit." && exit 1)
 
 # ── api: operational subcommands ──────────────────────
 # These wrap the server binary's urfave/cli subcommands.

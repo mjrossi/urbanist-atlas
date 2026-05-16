@@ -14,7 +14,13 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
+	"github.com/mjrossi/urbanist-atlas/api/internal/store/postgres"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
+)
+
+const (
+	storeKindPostgres = "postgres"
+	storeKindMemory   = "memory"
 )
 
 func serveCommand() *cli.Command {
@@ -40,9 +46,17 @@ func serveCommand() *cli.Command {
 				Value:   "http://localhost:5173,http://localhost:3000",
 				Sources: cli.EnvVars("URBANIST_CORS_ORIGINS"),
 			},
-			// Postgres store wiring lands in a later commit. For now the
-			// server always uses the in-memory store seeded with
-			// LoadDevFixtures so /api/v1/lookup returns something useful.
+			&cli.StringFlag{
+				Name:    "store",
+				Usage:   "store backing: postgres or memory",
+				Value:   storeKindPostgres,
+				Sources: cli.EnvVars("URBANIST_STORE"),
+			},
+			&cli.StringFlag{
+				Name:    "db-url",
+				Usage:   "Postgres connection string (required when --store=postgres)",
+				Sources: cli.EnvVars("URBANIST_DB_URL"),
+			},
 		},
 		Action: runServe,
 	}
@@ -51,16 +65,18 @@ func serveCommand() *cli.Command {
 func runServe(ctx context.Context, c *cli.Command) error {
 	logger := buildLogger(c.String("log-format"))
 
-	store := atlas.NewMemStore()
-	atlas.LoadDevFixtures(store)
-	logger.Info("store initialized", "kind", "memory", "fixtures", "dev")
+	store, closeStore, err := buildStore(ctx, c, logger)
+	if err != nil {
+		return err
+	}
+	defer closeStore()
 
 	origins := splitCSV(c.String("cors-origins"))
 	handler := httpapi.New(httpapi.Config{
-		Store:        store,
-		Logger:       logger,
-		CORSOrigins:  origins,
-		APIVersion:   "v1",
+		Store:       store,
+		Logger:      logger,
+		CORSOrigins: origins,
+		APIVersion:  "v1",
 	})
 
 	addr := net.JoinHostPort("", c.String("port"))
@@ -99,6 +115,35 @@ func runServe(ctx context.Context, c *cli.Command) error {
 			return fmt.Errorf("listen: %w", err)
 		}
 		return nil
+	}
+}
+
+// buildStore returns an atlas.Store backed by either Postgres or the
+// in-memory MemStore, depending on --store. Memory is opt-in (for
+// tests and offline use); the default is Postgres so production
+// configurations are accidentally-correct rather than accidentally-
+// fixture-backed.
+func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas.Store, func(), error) {
+	kind := strings.ToLower(strings.TrimSpace(c.String("store")))
+	switch kind {
+	case storeKindMemory:
+		s := atlas.NewMemStore()
+		atlas.LoadDevFixtures(s)
+		logger.Info("store initialized", "kind", storeKindMemory, "fixtures", "dev")
+		return s, func() {}, nil
+	case storeKindPostgres, "":
+		dbURL := c.String("db-url")
+		if dbURL == "" {
+			return nil, nil, errors.New("serve: --db-url or URBANIST_DB_URL is required when --store=postgres")
+		}
+		s, closeFn, err := postgres.Open(ctx, dbURL)
+		if err != nil {
+			return nil, nil, err
+		}
+		logger.Info("store initialized", "kind", storeKindPostgres)
+		return s, closeFn, nil
+	default:
+		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindPostgres, storeKindMemory)
 	}
 }
 

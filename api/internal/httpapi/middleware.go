@@ -49,7 +49,9 @@ func newRequestID() string {
 }
 
 // recovererMiddleware turns panics into 500s without taking the
-// process down. The panic is logged with the request ID and path.
+// process down. The panic is logged with the request ID and path,
+// and the client receives an RFC 9457 problem document so error
+// responses are uniformly machine-readable.
 func recovererMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,13 +63,15 @@ func recovererMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 					if rec == http.ErrAbortHandler {
 						panic(rec)
 					}
+					rid := requestIDFromContext(r.Context())
 					logger.ErrorContext(r.Context(), "panic",
 						"err", rec,
 						"path", r.URL.Path,
 						"method", r.Method,
-						"rid", requestIDFromContext(r.Context()),
+						"rid", rid,
 					)
-					http.Error(w, "internal server error", http.StatusInternalServerError)
+					writeProblem(w, r, http.StatusInternalServerError,
+						problemInternal, "Internal Server Error", "internal error", rid)
 				}
 			}()
 			next.ServeHTTP(w, r)

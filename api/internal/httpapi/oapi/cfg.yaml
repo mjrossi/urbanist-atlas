@@ -1,0 +1,27 @@
+# oapi-codegen configuration.
+#
+# We only want the schema types (Org, Region, LookupResult,
+# ProblemDetails, ...) — not the chi handler stubs. Handlers stay
+# hand-written in internal/httpapi/*.go so they can remain ~10 lines
+# each and so the routing wiring is visible at a glance. The spec is
+# served by openapi_handler.go directly, not by oapi-codegen.
+#
+# `always-prefix-enum-values: true` is required because we have an
+# enum value `country` (a RegionKind) that would otherwise collide
+# with the `Country` schema (US/CA). The prefix yields stable names
+# like `RegionKindCountry` vs the `Country` type.
+#
+# `output` is resolved relative to the directory `oapi-codegen` is
+# invoked from. The committed invocation paths are:
+#
+#   - go:generate in doc.go runs from internal/httpapi/oapi/, producing
+#     types.gen.go alongside cfg.yaml (correct).
+#   - `just api-oapi-gen` invokes `go generate ./...` from api/, which
+#     does the chdir-per-package for us — see the justfile recipe.
+
+package: oapi
+output: types.gen.go
+generate:
+  models: true
+compatibility:
+  always-prefix-enum-values: true

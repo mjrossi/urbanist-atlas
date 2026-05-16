@@ -1,37 +1,40 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 // lookupHandler answers GET /api/v1/lookup?postal_code=…&country=….
 //
-// Responses:
-//   - 200: a LookupResult JSON body.
-//   - 400: missing or invalid query parameters.
-//   - 404: postal code not found in our data.
-//   - 500: anything else (logged with the request ID).
+// The response body is the generated oapi.LookupResult (so the wire
+// types stay in lockstep with `api/openapi.yaml`). Business logic and
+// the source-of-truth Go types live in pkg/atlas; this handler only
+// parses, calls into atlas.Lookup, and adapts the result onto the
+// OpenAPI shape.
+//
+// Error responses are RFC 9457 problem documents (see problem.go).
 func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		rid := requestIDFromContext(r.Context())
 		postal := strings.TrimSpace(r.URL.Query().Get("postal_code"))
 		country := atlas.Country(strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("country"))))
 
 		if postal == "" {
-			writeError(w, http.StatusBadRequest, "postal_code is required")
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "postal_code is required", rid)
 			return
 		}
 		if country == "" {
-			writeError(w, http.StatusBadRequest, "country is required (US or CA)")
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country is required (US or CA)", rid)
 			return
 		}
 		if country != atlas.CountryUS && country != atlas.CountryCA {
-			writeError(w, http.StatusBadRequest, "country must be US or CA")
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country must be US or CA", rid)
 			return
 		}
 
@@ -41,33 +44,77 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, atlas.ErrPostalCodeNotFound) {
-				writeError(w, http.StatusNotFound, "postal code not found — try a nearby code, or submit an organization for your area")
+				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Not Found",
+					"postal code not found — try a nearby code, or submit an organization for your area", rid)
 				return
 			}
 			logger.ErrorContext(r.Context(), "lookup failed",
 				"err", err,
 				"postal_code", postal,
 				"country", country,
-				"rid", requestIDFromContext(r.Context()),
+				"rid", rid,
 			)
-			writeError(w, http.StatusInternalServerError, "internal error")
+			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)
 			return
 		}
 
-		writeJSON(w, http.StatusOK, result)
+		writeJSON(w, http.StatusOK, toOAPILookupResult(result))
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+// toOAPILookupResult adapts the atlas package's native result type
+// onto the oapi-generated wire type. The JSON shapes are identical;
+// this adapter is a typed conversion so the handler signature is
+// "returns oapi.LookupResult", which keeps the wire contract front and
+// center in code review.
+func toOAPILookupResult(in atlas.LookupResult) oapi.LookupResult {
+	return oapi.LookupResult{
+		Query: oapi.LookupQuery{
+			PostalCode: in.Query.PostalCode,
+			Country:    oapi.Country(in.Query.Country),
+		},
+		ResolvedPlaceLabel: in.ResolvedPlaceLabel,
+		Local:              toOAPIOrgs(in.Local),
+		Regional:           toOAPIOrgs(in.Regional),
+	}
 }
 
-type errorBody struct {
-	Error string `json:"error"`
+func toOAPIOrgs(orgs []atlas.Org) []oapi.Org {
+	out := make([]oapi.Org, 0, len(orgs))
+	for _, o := range orgs {
+		out = append(out, toOAPIOrg(o))
+	}
+	return out
 }
 
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, errorBody{Error: msg})
+func toOAPIOrg(o atlas.Org) oapi.Org {
+	tags := make([]string, len(o.Tags))
+	for i, t := range o.Tags {
+		tags[i] = string(t)
+	}
+	regions := make([]oapi.Region, 0, len(o.Regions))
+	for _, r := range o.Regions {
+		regions = append(regions, oapi.Region{
+			Id:        r.ID,
+			Kind:      oapi.RegionKind(r.Kind),
+			Name:      r.Name,
+			Slug:      r.Slug,
+			Country:   oapi.Country(r.Country),
+			ScopeTier: oapi.ScopeTier(r.ScopeTier),
+		})
+	}
+	out := oapi.Org{
+		Id:         o.ID,
+		Slug:       o.Slug,
+		Name:       o.Name,
+		ShortDesc:  o.ShortDesc,
+		WebsiteUrl: o.WebsiteURL,
+		Tags:       tags,
+		Regions:    regions,
+	}
+	if o.ContactURL != "" {
+		cu := o.ContactURL
+		out.ContactUrl = &cu
+	}
+	return out
 }
