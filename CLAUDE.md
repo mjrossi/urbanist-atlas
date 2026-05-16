@@ -28,8 +28,8 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
 
 Language runtimes and project tools are managed by
 [mise](https://mise.jdx.dev). Install mise once, then `mise install` at
-the repo root provisions everything (Go, Node, and later sqlc / goose /
-staticcheck — pinned in `mise.toml`).
+the repo root provisions everything pinned in `mise.toml`: Go, Node,
+sqlc, goose, staticcheck, oapi-codegen.
 
 - **`mise.toml`** — base: tool versions + production-default env.
 - **`mise.development.toml`** — local dev overrides; activate with
@@ -43,6 +43,12 @@ contributors to `brew install` things. The goal: a contributor with mise
 and a clone of the repo has everything they need to run tests and the dev
 server.
 
+Postgres for the dev loop runs in a docker container, lifecycled by
+`just pg-up` / `pg-down` / `pg-reset` / `pg-shell` / `pg-logs` on port
+`55432`. Same `postgres:17-alpine` image as the testcontainers-based
+integration suite, so the wire is identical. Docker is the only dev
+dependency that isn't installed by mise.
+
 ## Tech conventions
 
 ### Go (`api/`)
@@ -54,8 +60,10 @@ server.
   - `github.com/jackc/pgx/v5` — Postgres driver (used via sqlc)
   - `github.com/sqlc-dev/sqlc` — type-safe SQL codegen
   - `github.com/pressly/goose/v3` — migrations, embedded as a library
+  - `github.com/oapi-codegen/oapi-codegen/v2` — Go types generated from `api/openapi.yaml` (types-only; no chi-server stubs)
   - `gopkg.in/yaml.v3` — YAML loading for seed data
   - `github.com/google/go-cmp/cmp` — diff-friendly test assertions
+  - `github.com/testcontainers/testcontainers-go` — Postgres integration tests (test-only, under `//go:build integration`)
 - **Logging:** `log/slog` (stdlib). JSON in prod, text in dev.
 - **Errors:** stdlib `errors` + `fmt.Errorf("...: %w", err)`. No third-party
   errors libraries.
@@ -72,6 +80,10 @@ and `cmd/server` is a thin urfave/cli wrapper around it. A future
 support it. Handlers in `internal/httpapi/` should be ~10 lines each:
 parse request → call a `pkg/atlas` function → encode response. No
 business logic in handlers.
+
+`serve` accepts `--store=memory|postgres` (postgres default) and
+`--db-url` (with `URBANIST_DB_URL` env fallback). The memory store
+stays available for tests and offline CLI use.
 
 ### React (`web/`)
 
@@ -91,7 +103,12 @@ before adding any library not in this list.**
 - **Fonts:** Fraunces (display), Source Serif 4 (body), Inter (UI), all via
   `@fontsource-variable/*`. Self-hosted, no external font requests.
 - **Tests:** Vitest + React Testing Library.
-- **Lint/format:** ESLint (official React + TS configs) + Prettier.
+- **Lint/format:** ESLint (flat config: `@eslint/js` + `typescript-eslint` +
+  `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh`) + Prettier
+  (config inline in `package.json`'s `"prettier"` key).
+- **Codegen:** `openapi-typescript` generates `src/lib/api.gen.ts` from
+  `../api/openapi.yaml` via the `generate:api` npm script. All wire
+  types in `src/lib/api.ts` import from there — **never hand-rolled**.
 - **Package manager:** `npm`.
 
 ## Design language
@@ -127,11 +144,37 @@ See the plan for the full schema, but at a glance:
 - `submissions` for the public submission queue, with bearer-token-gated
   admin endpoints to approve/reject.
 
+## Wire contract
+
+`api/openapi.yaml` is the source of truth for every request/response
+shape, the error envelope, and admin-endpoint auth. Both halves
+generate types from it:
+
+- **Go:** `oapi-codegen` → `api/internal/httpapi/oapi/types.gen.go`
+  (committed, regenerated via `just api-oapi-gen`). The spec is
+  embedded into the binary via `//go:embed` and served at
+  `GET /api/v1/openapi.yaml` (content-type `application/yaml`) so
+  external consumers can discover the contract at runtime. Because
+  `//go:embed` can't reach across package directories, a synchronized
+  copy lives at `api/internal/httpapi/openapi.yaml`; a `//go:generate`
+  directive keeps it in sync and `just api-check` fails if either
+  copy drifts.
+- **TS:** `openapi-typescript` → `web/src/lib/api.gen.ts` (committed,
+  regenerated via `npm run generate:api`).
+
+Spec edits are committed in their own PRs; both halves regenerate from
+the new spec before the next feature commit.
+
 ## API surface
 
-All under `/api/v1/`. JSON only. CORS allows `urbanistatlas.com`,
-`*.pages.dev`, and `localhost:5173`. Admin endpoints use a bearer token
-from env.
+All under `/api/v1/` (with `/healthz` at the root). Success responses
+are `application/json`; error responses are
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
+`application/problem+json` with stable `type` URIs under
+`https://urbanistatlas.com/problems/{slug}` and a `request_id`
+extension echoing the `X-Request-ID` header. CORS allows
+`urbanistatlas.com`, `*.pages.dev`, and `localhost:5173`. Admin
+endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 
 ## Hosting
 

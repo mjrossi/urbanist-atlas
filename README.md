@@ -27,11 +27,36 @@ reasoning behind tech choices.
 
 ## Status
 
-Scaffolding in progress. The approved design lives at
-`~/.claude/plans/we-are-planning-a-smooth-candy.md` (local to the
-maintainer; the salient pieces are mirrored into [`CLAUDE.md`](./CLAUDE.md)).
-The remaining implementation work is broken into ~23 slices in
-[`docs/roadmap.md`](./docs/roadmap.md).
+Foundation in. Both halves are scaffolded, the v1 wire contract is
+committed at [`api/openapi.yaml`](./api/openapi.yaml) (served at
+runtime from `GET /api/v1/openapi.yaml`), Go and TS types are
+generated from it, the backend has a real Postgres-backed store with
+embedded migrations, and the frontend renders the broadsheet
+masthead shell. Errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
+`application/problem+json`.
+
+Remaining slices to v1 — postal-code data, seed orgs, submissions +
+admin queue, the actual pages, deployment — are tracked in
+[`docs/roadmap.md`](./docs/roadmap.md). The full architectural plan
+lives at `~/.claude/plans/we-are-planning-a-smooth-candy.md` (local
+to the maintainer); the load-bearing pieces are mirrored into
+[`CLAUDE.md`](./CLAUDE.md).
+
+### Quick start
+
+One-time setup: install [mise](https://mise.jdx.dev) and add
+`MISE_ENV=development` to your shell rc (see
+[`mise.development.toml`](./mise.development.toml) for the exact line).
+
+```sh
+mise install                  # provision Go, Node, sqlc, goose, staticcheck, oapi-codegen
+just pg-up                    # start the dev Postgres in a docker container on :55432
+just migrate-up               # apply migrations against the dev DB
+just api-run                  # API on :8080 (text logs)
+
+# in another shell:
+cd web && npm install && npm run dev    # SPA on :5173
+```
 
 ## Contributing organizations
 

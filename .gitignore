@@ -40,7 +40,8 @@ web/node_modules/
 web/dist/
 web/.vite/
 web/coverage/
-web/.tsbuildinfo
+web/**/*.tsbuildinfo
+web/.eslintcache
 web/*.log
 web/npm-debug.log*
 web/.cache/
@@ -52,5 +53,8 @@ api/.fly/
 .superpowers/
 .claude/
 
-# ── Misc build artifacts ────────────────────────────
+# ── Misc build / edit artifacts ─────────────────────
 *.log
+*.bak
+*.orig
+*.rej
