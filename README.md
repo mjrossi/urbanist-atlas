@@ -40,4 +40,23 @@ submissions are reviewed by a human before going live.
 
 ## License
 
-TBD.
+Urbanist Atlas is a multi-license project; different parts of the
+repository are governed by different licenses appropriate to their type.
+
+| Component | License | File |
+| --- | --- | --- |
+| Source code (`api/`, `web/`, build tooling) | [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) | [`LICENSE`](./LICENSE) |
+| Organization directory dataset | [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/) | [`LICENSE-DATA`](./LICENSE-DATA) |
+| Documentation and prose content | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | [`LICENSE-CONTENT`](./LICENSE-CONTENT) |
+
+Commercial use is permitted under all three licenses. The dataset and
+content licenses require share-alike on derivative works; the code license
+does not.
+
+### Contributing organizations
+
+By submitting an organization through the `/submit` flow on
+[urbanistatlas.com](https://urbanistatlas.com), you confirm the information
+is accurate to your knowledge and agree to license your contribution under
+the Open Database License (ODbL) 1.0.
+

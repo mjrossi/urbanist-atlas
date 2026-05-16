@@ -1,0 +1,48 @@
+Urbanist Atlas — Documentation and Prose Content
+=================================================
+
+Copyright 2026 Matt Rossi and contributors.
+
+The documentation, written prose, editorial content, and other
+non-code, non-database textual content of Urbanist Atlas is licensed
+under the Creative Commons Attribution-ShareAlike 4.0 International
+License (CC BY-SA 4.0).
+
+  Full license text: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+  Human-readable:    https://creativecommons.org/licenses/by-sa/4.0/
+  SPDX identifier:   CC-BY-SA-4.0
+
+Summary of obligations
+----------------------
+
+If you share or adapt this content, you must:
+
+  - Attribute Urbanist Atlas as the source, provide a link to the
+    license, and indicate if changes were made.
+  - Share alike: distribute any adapted version under the same
+    CC BY-SA 4.0 license (or a later compatible version).
+  - Not apply legal terms or technological measures that legally
+    restrict others from doing anything the license permits.
+
+Commercial use is explicitly permitted.
+
+This summary has no legal force. The full CC BY-SA 4.0 text at the
+URL above is the binding agreement.
+
+Suggested attribution
+---------------------
+
+When reusing content, please include a notice substantially as follows:
+
+  "[Title of content]" by Urbanist Atlas (https://urbanistatlas.com),
+  licensed under CC BY-SA 4.0
+  (https://creativecommons.org/licenses/by-sa/4.0/).
+
+Scope
+-----
+
+This license applies to documentation, written prose, and editorial
+content only. The software in this repository (the Go API and React
+web application) is licensed separately under the Apache License 2.0;
+see LICENSE. The organization directory dataset is licensed under the
+Open Database License (ODbL) 1.0; see LICENSE-DATA.
