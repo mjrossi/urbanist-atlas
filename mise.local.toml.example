@@ -1,0 +1,17 @@
+# Optional machine-local mise overrides — copy to mise.local.toml
+# (gitignored) only if you need to override what's already committed.
+#
+# In practice you probably don't need this file:
+#   - mise.toml pins the language runtimes and project tooling
+#   - mise.development.toml provides committed dev defaults
+#     (DB URL, dev admin token, log format) when MISE_ENV=development
+#   - mise.ci.toml does the same for CI when MISE_ENV=ci
+#
+# Use mise.local.toml for things like:
+#   - alternate local DB URL (different host / port / credentials)
+#   - a personal admin token for the admin queue
+#   - testing against a staging API
+
+# [env]
+# URBANIST_DB_URL      = "postgres://urbanist:secret@127.0.0.1:5433/atlas?sslmode=disable"
+# URBANIST_ADMIN_TOKEN = "my-personal-dev-token"

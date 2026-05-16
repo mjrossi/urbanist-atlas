@@ -1,0 +1,21 @@
+# Local development environment for mise.
+#
+# Activated when MISE_ENV=development (configure once in your shell: e.g.
+# `set -gx MISE_ENV development` in ~/.config/fish/config.fish, or
+# `export MISE_ENV=development` in ~/.zshrc / ~/.bashrc).
+#
+# Committed by design: every contributor gets the same dev defaults
+# automatically. Use `mise.local.toml` (gitignored) for machine-specific
+# overrides on top of this.
+
+[env]
+# Human-friendly logs in dev; production stays JSON via mise.toml's default.
+URBANIST_LOG_FORMAT = "text"
+
+# Sane local Postgres defaults. Override in mise.local.toml if your
+# local Postgres lives elsewhere or uses different credentials.
+URBANIST_DB_URL = "postgres://localhost:5432/urbanist_atlas_dev?sslmode=disable"
+
+# Dev-only admin token. Do not deploy this value anywhere. The real
+# production token lives in Fly secrets, not in this repo.
+URBANIST_ADMIN_TOKEN = "dev-admin-token-not-secret"
