@@ -3,30 +3,32 @@
 React + Vite SPA for [urbanistatlas.com](https://urbanistatlas.com). Deployed
 to Cloudflare Pages.
 
-## Layout (once scaffolded)
+## Layout
 
 ```
 web/
 ├── src/
-│   ├── main.tsx        # createRoot + RouterProvider + QueryClientProvider
+│   ├── main.tsx        # createRoot + QueryClientProvider + RouterProvider
 │   ├── router.tsx      # react-router v7 route table
-│   ├── routes/         # one file per route (Home, Results, Submit, …)
-│   ├── components/     # Masthead, Dateline, EntryList, SearchBox, TagChip…
+│   ├── App.tsx         # layout shell: Masthead + Outlet + Footer
+│   ├── routes/         # one file per route (Home, …)
+│   ├── components/     # Masthead, BroadsheetNav, Footer, …
 │   ├── styles/         # global.css ported from mjrossi.com
 │   └── lib/
 │       ├── api.ts      # typed client for /api/v1
+│       ├── api.gen.ts  # ← generated; do not edit
 │       └── queryKeys.ts
-└── public/             # static assets (favicon, etc.)
+└── public/             # static assets (favicon, noise.webp)
 ```
 
 ## Conventions
 
 See the root `CLAUDE.md` and the approved plan. In short:
 
-- TypeScript, strict mode.
+- TypeScript, strict mode (`strict` + `noUncheckedIndexedAccess`).
 - Routing: `react-router` v7 (SPA / data mode).
 - Server state: `@tanstack/react-query` v5. No global client state lib.
-- Forms: `react-hook-form` for the submission form.
+- Forms: `react-hook-form` for the submission form (lands with slice #13).
 - Styling: plain CSS via `src/styles/global.css`. No Tailwind, no CSS-in-JS.
 - Fonts: Fraunces + Source Serif 4 + Inter via `@fontsource-variable/*`.
 - Tests: Vitest + React Testing Library.
@@ -34,11 +36,39 @@ See the root `CLAUDE.md` and the approved plan. In short:
 
 **Before adding any new dependency, confirm with the maintainer.**
 
-## Local dev (once scaffolded)
+## Local dev
 
 ```
 npm install
-npm run dev      # Vite on http://localhost:5173
-npm test
+npm run dev       # Vite on http://localhost:5173
+npm test          # Vitest, watch mode (use `-- --run` for one-shot)
+npm run lint
 npm run build
 ```
+
+Point the SPA at a non-default API base by setting `VITE_API_BASE` in
+`.env.local` (e.g. `VITE_API_BASE=https://api.urbanistatlas.com`). The
+default is `http://localhost:8080`, which matches `cd ../api && just api-run`.
+
+## API client and types
+
+`src/lib/api.gen.ts` is **machine-generated** from
+[`api/openapi.yaml`](../api/openapi.yaml) — never edit by hand. Whenever
+the spec changes upstream, regenerate it:
+
+```
+npm run generate:api
+```
+
+`src/lib/api.ts` imports the wire shapes (`LookupResult`, `Org`,
+`Region`, `ProblemDetails`, etc.) from `api.gen.ts`, so they stay in
+lockstep with the contract. It exposes:
+
+- `apiFetch<T>(path, init?)` — low-level fetch wrapper that throws
+  `ApiError` on non-2xx responses, parsing `application/problem+json`
+  bodies into a typed `ProblemDetails`.
+- `lookup(postal_code, country)` — typed wrapper for
+  `GET /api/v1/lookup`.
+
+`src/lib/queryKeys.ts` centralizes the `@tanstack/react-query` keys so
+cache invalidation has a single source of truth.
