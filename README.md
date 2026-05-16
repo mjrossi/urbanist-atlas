@@ -29,7 +29,9 @@ reasoning behind tech choices.
 
 Scaffolding in progress. The approved design lives at
 `~/.claude/plans/we-are-planning-a-smooth-candy.md` (local to the
-maintainer; the salient pieces are mirrored into `CLAUDE.md`).
+maintainer; the salient pieces are mirrored into [`CLAUDE.md`](./CLAUDE.md)).
+The remaining implementation work is broken into ~23 slices in
+[`docs/roadmap.md`](./docs/roadmap.md).
 
 ## Contributing organizations
 
