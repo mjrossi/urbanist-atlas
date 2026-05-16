@@ -28,8 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - id: check
+        shell: bash
         run: |
-          if compgen -G "api/**/*.go" > /dev/null; then
+          set -euo pipefail
+          # `find -print -quit` exits on the first match, so this is
+          # fast even as the tree grows. compgen's "**" globbing
+          # needs `shopt -s globstar`, which isn't on by default in
+          # Actions' bash — find sidesteps the issue.
+          if [ -n "$(find api -name '*.go' -type f -print -quit 2>/dev/null)" ]; then
             echo "api=true" >> "$GITHUB_OUTPUT"
           else
             echo "api=false" >> "$GITHUB_OUTPUT"
