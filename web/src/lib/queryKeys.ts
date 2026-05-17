@@ -12,7 +12,4 @@ import type { Country } from './api.ts';
 export const queryKeys = {
   lookup: (postal_code: string, country: Country) =>
     ['lookup', postal_code, country] as const,
-  metros: () => ['metros'] as const,
-  metro: (slug: string) => ['metro', slug] as const,
-  recent: () => ['recent'] as const,
 } as const;

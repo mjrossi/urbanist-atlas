@@ -16,7 +16,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -369,8 +368,8 @@ func TestStore_AncestorRegions_NYC(t *testing.T) {
 		got[i] = r.Slug
 	}
 	want := []string{"brooklyn", "nyc", "nyc-metro", "ny", "nyc-tristate"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("ancestor order:\n  got  %v\n  want %v", got, want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("ancestor order (-want +got):\n%s", diff)
 	}
 
 	// Spot-check parent_slugs hydration on the diamond-junction "nyc" node.
@@ -379,8 +378,8 @@ func TestStore_AncestorRegions_NYC(t *testing.T) {
 			gotParents := append([]string(nil), r.ParentSlugs...)
 			sort.Strings(gotParents)
 			wantParents := []string{"ny", "nyc-metro"}
-			if !reflect.DeepEqual(gotParents, wantParents) {
-				t.Errorf("nyc.parent_slugs = %v, want %v", gotParents, wantParents)
+			if diff := cmp.Diff(wantParents, gotParents); diff != "" {
+				t.Errorf("nyc.parent_slugs (-want +got):\n%s", diff)
 			}
 		}
 	}

@@ -2,8 +2,9 @@ package atlas
 
 import (
 	"context"
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // TestMemStore_GraphWalk constructs a small NYC subset and verifies
@@ -37,8 +38,8 @@ func TestMemStore_GraphWalk(t *testing.T) {
 	}
 	// BFS from brooklyn → nyc → {nyc-metro, ny} → nyc-tristate.
 	want := []string{"brooklyn", "nyc", "nyc-metro", "ny", "nyc-tristate"}
-	if !reflect.DeepEqual(gotSlugs, want) {
-		t.Errorf("ancestor order:\n  got  %v\n  want %v", gotSlugs, want)
+	if diff := cmp.Diff(want, gotSlugs); diff != "" {
+		t.Errorf("ancestor order (-want +got):\n%s", diff)
 	}
 }
 

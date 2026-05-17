@@ -10,10 +10,16 @@ import (
 // specific truncation (CA → FSA, UK → outward code). Unknown countries
 // get the generic uppercase/strip pass.
 //
-// Used by every consumer that needs to compare or store a postal code
-// canonically: MemStore, the Postgres adapter, the seed loader, the
-// loadpostal CSV reader, and the HTTP handler when normalizing query
-// params.
+// Call sites:
+//   - internal/httpapi/lookup.go — once at the handler boundary so
+//     logs and error details show the canonical form.
+//   - internal/store/postgres/store.go — defensive re-normalization
+//     before the SQL lookup; idempotent if the handler already
+//     normalized.
+//   - pkg/atlas/memstore.go (via postalKey) — same defense-in-depth
+//     on the in-memory store.
+//   - internal/loadpostal/csv.go — applied to every CSV row before
+//     upserting, so the table holds the canonical form.
 func NormalizePostalCode(country Country, raw string) string {
 	s := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(raw), " ", ""))
 	switch country {

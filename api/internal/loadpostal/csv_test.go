@@ -1,9 +1,10 @@
 package loadpostal
 
 import (
-	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
@@ -23,8 +24,8 @@ func TestParseCSV_HappyPath(t *testing.T) {
 		{PostalCode: "11215", Country: atlas.CountryUS, LeafRegionSlug: "brooklyn"},
 		{PostalCode: "10001", Country: atlas.CountryUS, LeafRegionSlug: "manhattan"},
 	}
-	if !reflect.DeepEqual(rows, want) {
-		t.Errorf("rows mismatch:\n  got  %+v\n  want %+v", rows, want)
+	if diff := cmp.Diff(want, rows); diff != "" {
+		t.Errorf("rows mismatch (-want +got):\n%s", diff)
 	}
 }
 
