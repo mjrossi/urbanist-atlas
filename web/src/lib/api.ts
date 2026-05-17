@@ -28,6 +28,21 @@ export type SubmissionPayload = components['schemas']['SubmissionPayload'];
 export type NewSubmissionRequest = components['schemas']['NewSubmissionRequest'];
 export type ProblemDetails = components['schemas']['ProblemDetails'];
 
+/**
+ * Countries the SPA actively exposes to users. The wire `Country`
+ * type is open (just `string` — the API accepts any code seed data
+ * defines), but the UI is gated on this narrower set so a stray
+ * `?country=…` value renders an error instead of silently coercing.
+ * Bump this and SearchBox.tsx's `<select>` options together when a
+ * new country goes user-facing.
+ */
+export const SUPPORTED_COUNTRIES = ['US', 'CA'] as const satisfies readonly Country[];
+
+/** True if `raw` is one of {@link SUPPORTED_COUNTRIES}. */
+export function isSupportedCountry(raw: string): raw is Country {
+  return (SUPPORTED_COUNTRIES as readonly string[]).includes(raw);
+}
+
 const DEFAULT_API_BASE = 'http://localhost:8080';
 
 /** Where the API lives. Set `VITE_API_BASE` to override at build time. */

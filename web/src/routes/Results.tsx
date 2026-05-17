@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router';
 import { Dateline } from '../components/Dateline.tsx';
 import { EntryList } from '../components/EntryList.tsx';
-import { ApiError, lookup } from '../lib/api.ts';
+import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
 import type { Country, LookupOrg, LookupResult, Region } from '../lib/api.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
@@ -14,8 +14,16 @@ import { queryKeys } from '../lib/queryKeys.ts';
  * (defaults to `US`); the SearchBox always supplies one explicitly.
  */
 
-function parseCountry(raw: string | null): Country {
-  return raw === 'CA' ? 'CA' : 'US';
+/**
+ * Map the raw `?country=` search param onto a supported `Country`.
+ * Missing param falls back to US (the SearchBox always sets one
+ * explicitly; this default just keeps a hand-typed `/r/11217` URL
+ * working). An unsupported value returns `null` so the caller can
+ * render an error instead of silently coercing.
+ */
+function parseCountry(raw: string | null): Country | null {
+  if (raw === null) return 'US';
+  return isSupportedCountry(raw) ? raw : null;
 }
 
 /**
@@ -46,12 +54,13 @@ export function Results() {
   const params = useParams<{ postalCode: string }>();
   const [search] = useSearchParams();
   const postalCode = normalizePostal(params.postalCode ?? '');
-  const country = parseCountry(search.get('country'));
+  const rawCountry = search.get('country');
+  const country = parseCountry(rawCountry);
 
   const query = useQuery<LookupResult, ApiError>({
-    queryKey: queryKeys.lookup(postalCode, country),
-    queryFn: ({ signal }) => lookup(postalCode, country, { signal }),
-    enabled: postalCode.length > 0,
+    queryKey: queryKeys.lookup(postalCode, country ?? 'US'),
+    queryFn: ({ signal }) => lookup(postalCode, country as Country, { signal }),
+    enabled: postalCode.length > 0 && country !== null,
   });
 
   const placeLabel = query.data?.resolved_place_label;
@@ -61,11 +70,16 @@ export function Results() {
     <div className="page">
       <Dateline
         postalCode={postalCode || '—'}
-        country={country}
+        country={country ?? 'US'}
         placeLabel={placeLabel}
         ancestry={ancestry}
       />
-      <ResultsBody query={query} postalCode={postalCode} />
+      <ResultsBody
+        query={query}
+        postalCode={postalCode}
+        country={country}
+        rawCountry={rawCountry}
+      />
     </div>
   );
 }
@@ -73,12 +87,24 @@ export function Results() {
 function ResultsBody({
   query,
   postalCode,
+  country,
+  rawCountry,
 }: {
   query: ReturnType<typeof useQuery<LookupResult, ApiError>>;
   postalCode: string;
+  country: Country | null;
+  rawCountry: string | null;
 }) {
   if (postalCode.length === 0) {
     return <p className="results-state">No postal code in the URL.</p>;
+  }
+  if (country === null) {
+    return (
+      <p className="results-state error" role="alert">
+        Country <code>{rawCountry}</code> isn’t supported yet. Try{' '}
+        <code>?country=US</code> or <code>?country=CA</code>.
+      </p>
+    );
   }
   if (query.isPending) {
     return (
