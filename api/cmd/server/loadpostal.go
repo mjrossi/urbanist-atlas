@@ -74,9 +74,7 @@ func runLoadpostal(ctx context.Context, c *cli.Command) error {
 	logger.Info("loadpostal complete",
 		"src", src,
 		"country", string(country),
-		"rows", summary.RowsParsed,
 		"postal_codes", summary.PostalCodes,
-		"regions_touched", summary.RegionsTouched,
 	)
 	return nil
 }

@@ -52,7 +52,7 @@ func TestLookup_HappyPath_ReturnsOAPIShape(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got.Query.PostalCode != "11217" || got.Query.Country != oapi.CountryUS {
+	if got.Query.PostalCode != "11217" || got.Query.Country != "US" {
 		t.Errorf("query: %+v", got.Query)
 	}
 	if len(got.Local) == 0 {

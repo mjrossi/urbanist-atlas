@@ -1,4 +1,4 @@
-import type { Org } from '../lib/api.ts';
+import type { LookupOrg } from '../lib/api.ts';
 import { Entry } from './Entry.tsx';
 
 /**
@@ -7,14 +7,28 @@ import { Entry } from './Entry.tsx';
  * section renders its own small-caps label even when empty so the
  * reader sees which tier turned up nothing.
  */
-export function EntryList({ local, regional }: { local: Org[]; regional: Org[] }) {
+export function EntryList({
+  local,
+  regional,
+  regionNameBySlug,
+}: {
+  local: LookupOrg[];
+  regional: LookupOrg[];
+  regionNameBySlug: Map<string, string>;
+}) {
   return (
     <div className="entry-list-wrap">
-      <Section label="Local" orgs={local} emptyHint="No local groups indexed yet." />
+      <Section
+        label="Local"
+        orgs={local}
+        emptyHint="No local groups indexed yet."
+        regionNameBySlug={regionNameBySlug}
+      />
       <Section
         label="Regional"
         orgs={regional}
         emptyHint="No regional groups indexed yet."
+        regionNameBySlug={regionNameBySlug}
       />
     </div>
   );
@@ -24,10 +38,12 @@ function Section({
   label,
   orgs,
   emptyHint,
+  regionNameBySlug,
 }: {
   label: string;
-  orgs: Org[];
+  orgs: LookupOrg[];
   emptyHint: string;
+  regionNameBySlug: Map<string, string>;
 }) {
   return (
     <section className="results-section" aria-labelledby={`section-${label.toLowerCase()}`}>
@@ -39,7 +55,7 @@ function Section({
       ) : (
         <ul className="entry-list">
           {orgs.map((org) => (
-            <Entry key={org.id} org={org} />
+            <Entry key={org.id} org={org} regionNameBySlug={regionNameBySlug} />
           ))}
         </ul>
       )}

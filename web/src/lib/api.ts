@@ -18,6 +18,7 @@ import type { components } from './api.gen.ts';
 export type Country = components['schemas']['Country'];
 export type Region = components['schemas']['Region'];
 export type Org = components['schemas']['Org'];
+export type LookupOrg = components['schemas']['LookupOrg'];
 export type LookupQuery = components['schemas']['LookupQuery'];
 export type LookupResult = components['schemas']['LookupResult'];
 export type MetroSummary = components['schemas']['MetroSummary'];

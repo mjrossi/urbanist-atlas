@@ -3,8 +3,8 @@
 // Integration test for the loadpostal → seed → /lookup pipeline. Uses
 // the same testcontainers Postgres harness as store_test.go.
 //
-// The bundled api/seed/test_postal_us.csv + api/seed/test_postal_ca.csv
-// + api/seed/orgs.yaml are loaded end-to-end and the resulting state
+// The bundled api/seed/postal_codes_us.csv + api/seed/postal_codes_ca.csv
+// + api/seed/orgs.toml are loaded end-to-end and the resulting state
 // is exercised through atlas.Lookup, the same entry point the HTTP
 // handler calls. The test also re-runs each loader a second time and
 // asserts that no rows changed — the idempotence guarantee that
@@ -14,6 +14,8 @@ package postgres
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/loadpostal"
+	"github.com/mjrossi/urbanist-atlas/api/internal/loadregions"
 	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
@@ -33,9 +36,19 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
-	usCSV := repoFile(t, "seed", "test_postal_us.csv")
-	caCSV := repoFile(t, "seed", "test_postal_ca.csv")
-	orgsYAML := repoFile(t, "seed", "orgs.yaml")
+	usRegions := repoFile(t, "seed", "regions_us.toml")
+	caRegions := repoFile(t, "seed", "regions_ca.toml")
+	usCSV := repoFile(t, "seed", "postal_codes_us.csv")
+	caCSV := repoFile(t, "seed", "postal_codes_ca.csv")
+	orgsYAML := repoFile(t, "seed", "orgs.toml")
+
+	// loadpostal requires regions to be present (leaf slug lookup).
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
+		t.Fatalf("loadregions US: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
+		t.Fatalf("loadregions CA: %v", err)
+	}
 
 	usSum, err := loadpostal.LoadFile(ctx, store.Pool(), nil, usCSV, atlas.CountryUS)
 	if err != nil {
@@ -88,6 +101,12 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	// counts. Snapshot row counts → run again → compare.
 	before := snapshotCounts(ctx, t, store)
 
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
+		t.Fatalf("loadregions US (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
+		t.Fatalf("loadregions CA (2nd): %v", err)
+	}
 	if _, err := loadpostal.LoadFile(ctx, store.Pool(), nil, usCSV, atlas.CountryUS); err != nil {
 		t.Fatalf("loadpostal US (2nd): %v", err)
 	}
@@ -181,4 +200,107 @@ func repoFile(t *testing.T, parts ...string) string {
 	}
 	t.Fatalf("repoFile: did not find go.mod walking up from cwd")
 	return ""
+}
+
+func TestPipeline_WorkedCities(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
+	must(err)
+	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_us.csv"), atlas.CountryUS)
+	must(err)
+	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_ca.csv"), atlas.CountryCA)
+	must(err)
+	_, err = seed.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "orgs.toml"))
+	must(err)
+
+	cases := []struct {
+		name         string
+		postal       string
+		country      atlas.Country
+		mustLocal    []string
+		mustRegional []string
+		mustNotLocal []string
+		mustNotAny   []string
+	}{
+		{
+			name:         "NYC 11217 (Brooklyn)",
+			postal:       "11217",
+			country:      atlas.CountryUS,
+			mustLocal:    []string{"transportation-alternatives"},
+			mustRegional: []string{"transitcenter", "tri-state-transportation-campaign"},
+			mustNotLocal: []string{"tri-state-transportation-campaign"},
+		},
+		{
+			name:         "Hoboken 07302",
+			postal:       "07302",
+			country:      atlas.CountryUS,
+			mustRegional: []string{"transitcenter", "tri-state-transportation-campaign"},
+			mustNotAny:   []string{"transportation-alternatives"},
+		},
+		{
+			name:         "Vancouver V6B",
+			postal:       "V6B",
+			country:      atlas.CountryCA,
+			mustRegional: []string{"hub-cycling", "movement-metro-vancouver"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: c.postal, Country: c.country})
+			if err != nil {
+				t.Fatalf("Lookup: %v", err)
+			}
+			localSlugs := slugSet(got.Local)
+			regionalSlugs := slugSet(got.Regional)
+			for _, s := range c.mustLocal {
+				if !localSlugs[s] {
+					t.Errorf("expected %q in Local; got %v", s, keysOf(localSlugs))
+				}
+			}
+			for _, s := range c.mustRegional {
+				if !regionalSlugs[s] {
+					t.Errorf("expected %q in Regional; got %v", s, keysOf(regionalSlugs))
+				}
+			}
+			for _, s := range c.mustNotLocal {
+				if localSlugs[s] {
+					t.Errorf("expected %q NOT in Local", s)
+				}
+			}
+			for _, s := range c.mustNotAny {
+				if localSlugs[s] || regionalSlugs[s] {
+					t.Errorf("expected %q NOT in any bucket", s)
+				}
+			}
+		})
+	}
+}
+
+func slugSet(orgs []atlas.Org) map[string]bool {
+	out := make(map[string]bool, len(orgs))
+	for _, o := range orgs {
+		out[o.Slug] = true
+	}
+	return out
+}
+
+func keysOf(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

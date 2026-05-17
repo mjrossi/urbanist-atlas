@@ -27,22 +27,24 @@ type OrganizationRegion struct {
 }
 
 type PostalCode struct {
-	PostalCode     string
-	Country        string
-	CityRegionID   pgtype.Int8
-	CountyRegionID pgtype.Int8
-	MetroRegionID  pgtype.Int8
-	StateRegionID  pgtype.Int8
+	PostalCode   string
+	Country      string
+	LeafRegionID int64
 }
 
 type Region struct {
-	ID        int64
-	Kind      string
-	Name      string
-	Slug      string
-	Country   string
-	ParentID  pgtype.Int8
-	ScopeTier string
+	ID           int64
+	Country      string
+	Kind         string
+	Name         string
+	Slug         string
+	ScopeTier    string
+	SortPriority int32
+}
+
+type RegionParent struct {
+	RegionID       int64
+	ParentRegionID int64
 }
 
 type Submission struct {

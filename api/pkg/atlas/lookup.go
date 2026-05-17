@@ -9,136 +9,138 @@ import (
 // Lookup is the core search operation: given a postal code, return the
 // local + regional organizations advocating in that area.
 //
-// Algorithm:
-//  1. Resolve the postal code to its geographic regions
-//     (city / county / metro / state). 404 if unknown.
-//  2. Fetch all approved orgs joined to any of those region IDs.
-//  3. For each matched org, bucket it as Local if any of its matching
-//     regions has ScopeTier=local; otherwise Regional. An org is never
-//     shown in both buckets.
-//  4. Within each bucket, sort by the most-specific region kind the
-//     org serves (city → county → metro → state/province →
-//     multi-state), with alphabetical name as the tiebreaker.
+// Algorithm (per docs/superpowers/specs/2026-05-16-region-graph-design.md):
+//  1. ResolveLeafRegion(country, code) → leaf Region; 404 if unknown.
+//  2. AncestorRegions(leafID) → []Region (leaf + all transitive parents).
+//  3. OrgsForRegions(ancestorIDs) → []Org with each org's full
+//     attachment list populated.
+//  4. For each org, intersect its regions with the ancestor set. If any
+//     matched region has scope_tier=local, bucket as Local; else Regional.
+//     Compute the org's sort key as the minimum sort_priority across
+//     its matched regions.
+//  5. Within each bucket, sort by (sortKey asc, org.Name asc).
 func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, error) {
-	rpc, err := store.ResolvePostalCode(ctx, query.Country, query.PostalCode)
+	leaf, err := store.ResolveLeafRegion(ctx, query.Country, query.PostalCode)
 	if err != nil {
 		return LookupResult{}, err
 	}
 
-	regionIDs := rpc.RegionIDs()
-	orgs, err := store.OrgsForRegions(ctx, regionIDs)
+	ancestry, err := store.AncestorRegions(ctx, leaf.ID)
+	if err != nil {
+		return LookupResult{}, fmt.Errorf("atlas: ancestor regions: %w", err)
+	}
+
+	ancestorIDs := make([]int64, len(ancestry))
+	ancestorByID := make(map[int64]Region, len(ancestry))
+	for i, r := range ancestry {
+		ancestorIDs[i] = r.ID
+		ancestorByID[r.ID] = r
+	}
+
+	orgs, err := store.OrgsForRegions(ctx, ancestorIDs)
 	if err != nil {
 		return LookupResult{}, fmt.Errorf("atlas: orgs lookup: %w", err)
 	}
 
-	matched := make(map[int64]bool, len(regionIDs))
-	for _, id := range regionIDs {
-		matched[id] = true
-	}
-
-	local := []Org{}
-	regional := []Org{}
+	var local, regional []bucketed
 	for _, org := range orgs {
-		if hasLocalMatch(org, matched) {
-			local = append(local, org)
+		matched := make([]Region, 0)
+		for _, r := range org.Regions {
+			if _, ok := ancestorByID[r.ID]; ok {
+				matched = append(matched, ancestorByID[r.ID])
+			}
+		}
+		if len(matched) == 0 {
+			continue
+		}
+		hasLocal := false
+		bestSort := matched[0].SortPriority
+		matchedSlugs := make([]string, 0, len(matched))
+		for _, r := range matched {
+			if r.ScopeTier == ScopeLocal {
+				hasLocal = true
+			}
+			if r.SortPriority < bestSort {
+				bestSort = r.SortPriority
+			}
+			matchedSlugs = append(matchedSlugs, r.Slug)
+		}
+		org.MatchedRegionSlugs = matchedSlugs
+		b := bucketed{org: org, sortKey: bestSort}
+		if hasLocal {
+			local = append(local, b)
 		} else {
-			regional = append(regional, org)
+			regional = append(regional, b)
 		}
 	}
 
-	sortOrgs(local)
-	sortOrgs(regional)
+	sortBucket(local)
+	sortBucket(regional)
 
 	return LookupResult{
 		Query:              query,
-		ResolvedPlaceLabel: placeLabel(rpc),
-		Local:              local,
-		Regional:           regional,
+		ResolvedPlaceLabel: placeLabel(ancestry),
+		ResolvedAncestry:   ancestry,
+		Local:              extractOrgs(local),
+		Regional:           extractOrgs(regional),
 	}, nil
 }
 
-// hasLocalMatch is true when any of the org's regions both matched the
-// postal code AND is classified as local.
-func hasLocalMatch(org Org, matched map[int64]bool) bool {
-	for _, r := range org.Regions {
-		if matched[r.ID] && r.ScopeTier == ScopeLocal {
-			return true
-		}
-	}
-	return false
+// bucketed is a private result-row type used by Lookup for sorting.
+type bucketed struct {
+	org     Org
+	sortKey int
 }
 
-// regionKindRank gives a sort key for region granularity — lower means
-// more specific (i.e. should appear higher in results).
-func regionKindRank(k RegionKind) int {
-	switch k {
-	case RegionCity:
-		return 0
-	case RegionCounty:
-		return 1
-	case RegionMetro:
-		return 2
-	case RegionState, RegionProvince:
-		return 3
-	case RegionMultiState:
-		return 4
-	case RegionCountry:
-		return 5
-	}
-	return 99
-}
-
-func mostSpecificRank(org Org) int {
-	best := 99
-	for _, r := range org.Regions {
-		if rk := regionKindRank(r.Kind); rk < best {
-			best = rk
+func sortBucket(b []bucketed) {
+	sort.SliceStable(b, func(i, j int) bool {
+		if b[i].sortKey != b[j].sortKey {
+			return b[i].sortKey < b[j].sortKey
 		}
-	}
-	return best
-}
-
-func sortOrgs(orgs []Org) {
-	sort.SliceStable(orgs, func(i, j int) bool {
-		ri := mostSpecificRank(orgs[i])
-		rj := mostSpecificRank(orgs[j])
-		if ri != rj {
-			return ri < rj
-		}
-		return orgs[i].Name < orgs[j].Name
+		return b[i].org.Name < b[j].org.Name
 	})
 }
 
-// placeLabel renders a human-readable header like
-// "Brooklyn, NY — New York Metro" using whichever region pointers the
-// postal code resolved.
-func placeLabel(rpc ResolvedPostalCode) string {
-	var city, state, metro string
-	if rpc.City != nil {
-		city = rpc.City.Name
+func extractOrgs(b []bucketed) []Org {
+	if len(b) == 0 {
+		return []Org{}
 	}
-	if rpc.State != nil {
-		state = rpc.State.Name
+	out := make([]Org, len(b))
+	for i, x := range b {
+		out[i] = x.org
 	}
-	if rpc.Metro != nil {
-		metro = rpc.Metro.Name
-	}
+	return out
+}
 
-	head := ""
-	switch {
-	case city != "" && state != "":
-		head = city + ", " + state
-	case city != "":
-		head = city
-	case state != "":
-		head = state
+// placeLabel returns a human-readable header derived from the ancestry.
+// Format: "<leaf>, <most-specific-local-ancestor-different-from-leaf> — <most-specific-regional-ancestor>".
+// Segments without content are dropped; the SPA can roll its own from
+// ResolvedAncestry if it wants something different.
+func placeLabel(ancestry []Region) string {
+	if len(ancestry) == 0 {
+		return ""
 	}
-
-	if metro != "" && metro != head {
-		if head == "" {
-			return metro
+	leaf := ancestry[0]
+	var localAncestor, regionalAncestor *Region
+	for i := 1; i < len(ancestry); i++ {
+		r := ancestry[i]
+		if r.ScopeTier == ScopeLocal && localAncestor == nil && r.Slug != leaf.Slug {
+			cp := r
+			localAncestor = &cp
 		}
-		return head + " — " + metro
+		if r.ScopeTier == ScopeRegional && regionalAncestor == nil {
+			cp := r
+			regionalAncestor = &cp
+		}
 	}
-	return head
+	switch {
+	case localAncestor != nil && regionalAncestor != nil:
+		return leaf.Name + ", " + localAncestor.Name + " — " + regionalAncestor.Name
+	case regionalAncestor != nil:
+		return leaf.Name + " — " + regionalAncestor.Name
+	case localAncestor != nil:
+		return leaf.Name + ", " + localAncestor.Name
+	default:
+		return leaf.Name
+	}
 }

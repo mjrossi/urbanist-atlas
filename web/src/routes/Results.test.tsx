@@ -37,6 +37,7 @@ function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {
   return {
     query: { postal_code: '11217', country: 'US' },
     resolved_place_label: 'Brooklyn, NY',
+    resolved_ancestry: [],
     local: [
       {
         id: 1,
@@ -46,6 +47,7 @@ function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {
         website_url: 'https://www.transalt.org',
         tags: ['transit'],
         regions: [],
+        matched_region_slugs: [],
       },
     ],
     regional: [
@@ -57,6 +59,7 @@ function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {
         website_url: 'https://www.ridersny.org',
         tags: ['transit', 'policy'],
         regions: [],
+        matched_region_slugs: [],
       },
     ],
     ...overrides,

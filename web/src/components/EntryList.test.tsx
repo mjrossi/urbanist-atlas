@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { EntryList } from './EntryList.tsx';
-import type { Org } from '../lib/api.ts';
+import type { LookupOrg } from '../lib/api.ts';
 
-function makeOrg(id: number, name: string, tags: string[] = []): Org {
+function makeOrg(id: number, name: string, tags: string[] = []): LookupOrg {
   return {
     id,
     slug: `org-${id}`,
@@ -12,12 +12,15 @@ function makeOrg(id: number, name: string, tags: string[] = []): Org {
     website_url: `https://example.com/${id}`,
     tags,
     regions: [],
+    matched_region_slugs: [],
   };
 }
 
+const emptyMap = new Map<string, string>();
+
 describe('EntryList', () => {
   it('renders both Local and Regional section labels', () => {
-    render(<EntryList local={[]} regional={[]} />);
+    render(<EntryList local={[]} regional={[]} regionNameBySlug={emptyMap} />);
     expect(screen.getByText('Local')).toBeDefined();
     expect(screen.getByText('Regional')).toBeDefined();
   });
@@ -27,6 +30,7 @@ describe('EntryList', () => {
       <EntryList
         local={[makeOrg(1, 'Local Org A'), makeOrg(2, 'Local Org B')]}
         regional={[makeOrg(3, 'Regional Org C')]}
+        regionNameBySlug={emptyMap}
       />,
     );
     expect(screen.getByRole('link', { name: 'Local Org A' })).toBeDefined();
@@ -35,7 +39,9 @@ describe('EntryList', () => {
   });
 
   it('shows a per-section empty hint when a tier is empty', () => {
-    render(<EntryList local={[]} regional={[makeOrg(1, 'Only Regional')]} />);
+    render(
+      <EntryList local={[]} regional={[makeOrg(1, 'Only Regional')]} regionNameBySlug={emptyMap} />,
+    );
     expect(screen.getByText('No local groups indexed yet.')).toBeDefined();
     expect(screen.queryByText('No regional groups indexed yet.')).toBeNull();
   });

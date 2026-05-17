@@ -92,13 +92,28 @@ migrate-down:
 migrate-status:
     cd api && go run ./cmd/server migrate status
 
-# load curated org seed data (api/seed/orgs.yaml) into the DB
+# load curated org seed data (api/seed/orgs.toml) into the DB
 seed:
     cd api && go run ./cmd/server seed
 
-# ingest postal-code → region CSVs into the DB
+# load region taxonomy (toml -> regions + region_parents)
+# usage: just loadregions seed/regions_us.toml US
+loadregions src country='US':
+    cd api && go run ./cmd/server loadregions --src {{src}} --country {{country}}
+
+# map postal codes to leaf regions (csv -> postal_codes)
+# usage: just loadpostal seed/postal_codes_us.csv US
 loadpostal src country='US':
     cd api && go run ./cmd/server loadpostal --src {{src}} --country {{country}}
+
+# load all bundled fixtures in the right order:
+# regions first (so leaf slugs resolve), then postal codes, then orgs.
+loaddata:
+    just loadregions seed/regions_us.toml US
+    just loadpostal  seed/postal_codes_us.csv US
+    just loadregions seed/regions_ca.toml CA
+    just loadpostal  seed/postal_codes_ca.csv CA
+    just seed
 
 # ── pg: dev postgres lifecycle (docker-based) ─────────
 # Local dev Postgres runs in a named docker container with a

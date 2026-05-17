@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router';
 import { Dateline } from '../components/Dateline.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { ApiError, lookup } from '../lib/api.ts';
-import type { Country, LookupResult } from '../lib/api.ts';
+import type { Country, LookupOrg, LookupResult, Region } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 /**
@@ -22,6 +22,30 @@ function normalizePostal(raw: string | undefined): string {
   return raw.replace(/\s+/g, '').toUpperCase();
 }
 
+/**
+ * Build a slug→name map from the resolved ancestry plus any regions
+ * embedded in each org. The ancestry covers the common case; the org
+ * regions handle the edge case where a matched_region_slug belongs to
+ * a sibling region not in the ancestry chain.
+ */
+function buildRegionNameMap(
+  ancestry: Region[],
+  orgs: LookupOrg[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const region of ancestry) {
+    map.set(region.slug, region.name);
+  }
+  for (const org of orgs) {
+    for (const region of org.regions) {
+      if (!map.has(region.slug)) {
+        map.set(region.slug, region.name);
+      }
+    }
+  }
+  return map;
+}
+
 export function Results() {
   const params = useParams<{ postalCode: string }>();
   const [search] = useSearchParams();
@@ -35,6 +59,7 @@ export function Results() {
   });
 
   const placeLabel = query.data?.resolved_place_label;
+  const ancestry = query.data?.resolved_ancestry ?? [];
 
   return (
     <div className="page">
@@ -42,6 +67,7 @@ export function Results() {
         postalCode={postalCode || '—'}
         country={country}
         placeLabel={placeLabel}
+        ancestry={ancestry}
       />
       <ResultsBody query={query} postalCode={postalCode} />
     </div>
@@ -76,7 +102,7 @@ function ResultsBody({
       </p>
     );
   }
-  const { local, regional } = query.data;
+  const { local, regional, resolved_ancestry } = query.data;
   if (local.length === 0 && regional.length === 0) {
     return (
       <p className="results-state">
@@ -85,5 +111,6 @@ function ResultsBody({
       </p>
     );
   }
-  return <EntryList local={local} regional={regional} />;
+  const regionNameBySlug = buildRegionNameMap(resolved_ancestry, [...local, ...regional]);
+  return <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />;
 }

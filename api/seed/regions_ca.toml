@@ -1,0 +1,96 @@
+# Region taxonomy for Canada. No county tier (CA uses regional
+# districts instead); no country tier (per v1 scope).
+
+# --- Provinces ---
+
+[[region]]
+slug = "bc"
+kind = "ca:province"
+name = "British Columbia"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "on"
+kind = "ca:province"
+name = "Ontario"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "qc"
+kind = "ca:province"
+name = "Québec"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+# --- Regional districts (BC) / CMAs (StatsCan) ---
+
+[[region]]
+slug = "metro-vancouver"
+kind = "ca:regional-district"
+name = "Metro Vancouver"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+
+[[region]]
+slug = "toronto-cma"
+kind = "ca:cma"
+name = "Greater Toronto Area"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+
+[[region]]
+slug = "montreal-cma"
+kind = "ca:cma"
+name = "Greater Montréal"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+
+# --- Cities ---
+
+[[region]]
+slug = "vancouver"
+kind = "ca:city"
+name = "Vancouver"
+scope_tier = "local"
+sort_priority = 10
+parents = ["metro-vancouver"]
+
+[[region]]
+slug = "burnaby"
+kind = "ca:city"
+name = "Burnaby"
+scope_tier = "local"
+sort_priority = 10
+parents = ["metro-vancouver"]
+
+[[region]]
+slug = "richmond"
+kind = "ca:city"
+name = "Richmond"
+scope_tier = "local"
+sort_priority = 10
+parents = ["metro-vancouver"]
+
+[[region]]
+slug = "toronto"
+kind = "ca:city"
+name = "Toronto"
+scope_tier = "local"
+sort_priority = 10
+parents = ["toronto-cma"]
+
+[[region]]
+slug = "montreal"
+kind = "ca:city"
+name = "Montréal"
+scope_tier = "local"
+sort_priority = 10
+parents = ["montreal-cma"]

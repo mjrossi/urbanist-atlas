@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Entry } from './Entry.tsx';
-import type { Org } from '../lib/api.ts';
+import type { LookupOrg } from '../lib/api.ts';
 
-function makeOrg(overrides: Partial<Org> = {}): Org {
+function makeOrg(overrides: Partial<LookupOrg> = {}): LookupOrg {
   return {
     id: 1,
     slug: 'transalt',
@@ -12,15 +12,18 @@ function makeOrg(overrides: Partial<Org> = {}): Org {
     website_url: 'https://www.transalt.org',
     tags: ['transit', 'safe-streets'],
     regions: [],
+    matched_region_slugs: [],
     ...overrides,
   };
 }
+
+const emptyMap = new Map<string, string>();
 
 describe('Entry', () => {
   it('renders name as an external link with rel=noopener', () => {
     render(
       <ul>
-        <Entry org={makeOrg()} />
+        <Entry org={makeOrg()} regionNameBySlug={emptyMap} />
       </ul>,
     );
     const link = screen.getByRole('link', { name: 'Transportation Alternatives' });
@@ -32,7 +35,7 @@ describe('Entry', () => {
   it('strips the leading www. when displaying the domain', () => {
     render(
       <ul>
-        <Entry org={makeOrg()} />
+        <Entry org={makeOrg()} regionNameBySlug={emptyMap} />
       </ul>,
     );
     expect(screen.getByText('transalt.org')).toBeDefined();
@@ -41,7 +44,10 @@ describe('Entry', () => {
   it('renders each tag as a TagChip', () => {
     render(
       <ul>
-        <Entry org={makeOrg({ tags: ['cycling', 'policy', 'grassroots'] })} />
+        <Entry
+          org={makeOrg({ tags: ['cycling', 'policy', 'grassroots'] })}
+          regionNameBySlug={emptyMap}
+        />
       </ul>,
     );
     expect(screen.getByText('cycling')).toBeDefined();
@@ -52,7 +58,7 @@ describe('Entry', () => {
   it('omits the tags list when the org has no tags', () => {
     const { container } = render(
       <ul>
-        <Entry org={makeOrg({ tags: [] })} />
+        <Entry org={makeOrg({ tags: [] })} regionNameBySlug={emptyMap} />
       </ul>,
     );
     expect(container.querySelector('.entry-tags')).toBeNull();
@@ -61,9 +67,28 @@ describe('Entry', () => {
   it('gracefully drops the domain hint when website_url is malformed', () => {
     const { container } = render(
       <ul>
-        <Entry org={makeOrg({ website_url: 'not a url' })} />
+        <Entry org={makeOrg({ website_url: 'not a url' })} regionNameBySlug={emptyMap} />
       </ul>,
     );
     expect(container.querySelector('.entry-domain')).toBeNull();
+  });
+
+  it('renders "via X" subtitle when matched_region_slugs is non-empty', () => {
+    const slugMap = new Map([['brooklyn', 'Brooklyn']]);
+    render(
+      <ul>
+        <Entry org={makeOrg({ matched_region_slugs: ['brooklyn'] })} regionNameBySlug={slugMap} />
+      </ul>,
+    );
+    expect(screen.getByText('via Brooklyn')).toBeDefined();
+  });
+
+  it('omits the "via" subtitle when matched_region_slugs is empty', () => {
+    const { container } = render(
+      <ul>
+        <Entry org={makeOrg({ matched_region_slugs: [] })} regionNameBySlug={emptyMap} />
+      </ul>,
+    );
+    expect(container.querySelector('.entry-via')).toBeNull();
   });
 });

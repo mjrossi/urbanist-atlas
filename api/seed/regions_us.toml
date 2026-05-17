@@ -1,0 +1,344 @@
+# Region taxonomy for the United States.
+# Each [[region]] entry creates one row in `regions`; the `parents`
+# array creates rows in `region_parents`. A region may appear before
+# its parents in the file — loadregions resolves slugs after parsing.
+#
+# See docs/region-graph.md for modeling conventions, including:
+#   - State edges live on the leaf (city), not on the metro.
+#   - Multi-state/federation regions parent the metro or the leaf,
+#     not the state.
+#   - Transit federations are siblings of states, parented under the
+#     leaves they serve.
+#
+# Recommended sort_priority ranges:
+#   10  borough / neighborhood
+#   15  consolidated city
+#   20  county
+#   40  metro
+#   50  transit federation / RTA-style region
+#   60  state / province
+#   80  multi-state / multi-province
+
+# --- States (parents of nothing in v1; national tier excluded) ---
+
+[[region]]
+slug = "ny"
+kind = "us:state"
+name = "New York"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nj"
+kind = "us:state"
+name = "New Jersey"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ct"
+kind = "us:state"
+name = "Connecticut"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "il"
+kind = "us:state"
+name = "Illinois"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "in"
+kind = "us:state"
+name = "Indiana"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "wi"
+kind = "us:state"
+name = "Wisconsin"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ca-state"
+kind = "us:state"
+name = "California"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ma"
+kind = "us:state"
+name = "Massachusetts"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "fl"
+kind = "us:state"
+name = "Florida"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "wa"
+kind = "us:state"
+name = "Washington"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+# --- Multi-state and federation regions ---
+
+[[region]]
+slug = "nyc-tristate"
+kind = "us:multi-state"
+name = "Tri-State Region (NY/NJ/CT)"
+scope_tier = "regional"
+sort_priority = 80
+parents = []
+
+[[region]]
+slug = "chicagoland-multistate"
+kind = "us:multi-state"
+name = "Chicagoland (IL/IN/WI)"
+scope_tier = "regional"
+sort_priority = 80
+parents = []
+
+[[region]]
+slug = "rta-service-area"
+kind = "us:transit-federation"
+name = "RTA Service Area (Cook + 5 collar)"
+scope_tier = "regional"
+sort_priority = 50
+parents = ["il"]
+
+# --- Metros (parented under multi-state where applicable) ---
+
+[[region]]
+slug = "nyc-metro"
+kind = "us:metro"
+name = "New York Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nyc-tristate"]
+
+[[region]]
+slug = "chicago-metro"
+kind = "us:metro"
+name = "Chicago Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["chicagoland-multistate"]
+
+[[region]]
+slug = "sf-bay-area"
+kind = "us:metro"
+name = "San Francisco Bay Area"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+
+[[region]]
+slug = "greater-boston"
+kind = "us:metro"
+name = "Greater Boston"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+
+[[region]]
+slug = "greater-miami"
+kind = "us:metro"
+name = "Greater Miami"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+
+[[region]]
+slug = "seattle-metro"
+kind = "us:metro"
+name = "Seattle Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+
+[[region]]
+slug = "greater-la"
+kind = "us:metro"
+name = "Greater Los Angeles"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+
+# --- Counties (where they matter for advocacy reach) ---
+
+[[region]]
+slug = "cook-county"
+kind = "us:county"
+name = "Cook County"
+scope_tier = "local"
+sort_priority = 20
+parents = ["chicago-metro", "rta-service-area"]
+
+[[region]]
+slug = "lake-county-in"
+kind = "us:county"
+name = "Lake County, IN"
+scope_tier = "local"
+sort_priority = 20
+parents = ["chicago-metro", "in"]
+
+# --- Consolidated cities (NYC is the only weird one in v1) ---
+
+[[region]]
+slug = "nyc"
+kind = "us:city"
+name = "New York City"
+scope_tier = "local"
+sort_priority = 15
+parents = ["nyc-metro", "ny"]
+
+# --- Boroughs (NYC) and cities ---
+
+[[region]]
+slug = "brooklyn"
+kind = "us:borough"
+name = "Brooklyn"
+scope_tier = "local"
+sort_priority = 10
+parents = ["nyc"]
+
+[[region]]
+slug = "manhattan"
+kind = "us:borough"
+name = "Manhattan"
+scope_tier = "local"
+sort_priority = 10
+parents = ["nyc"]
+
+[[region]]
+slug = "queens"
+kind = "us:borough"
+name = "Queens"
+scope_tier = "local"
+sort_priority = 10
+parents = ["nyc"]
+
+[[region]]
+slug = "bronx"
+kind = "us:borough"
+name = "The Bronx"
+scope_tier = "local"
+sort_priority = 10
+parents = ["nyc"]
+
+[[region]]
+slug = "staten-island"
+kind = "us:borough"
+name = "Staten Island"
+scope_tier = "local"
+sort_priority = 10
+parents = ["nyc"]
+
+[[region]]
+slug = "hoboken"
+kind = "us:city"
+name = "Hoboken"
+scope_tier = "local"
+sort_priority = 10
+parents = ["nyc-metro", "nj"]
+
+[[region]]
+slug = "bridgeport"
+kind = "us:city"
+name = "Bridgeport"
+scope_tier = "local"
+sort_priority = 10
+parents = ["nyc-metro", "ct"]
+
+[[region]]
+slug = "chicago"
+kind = "us:city"
+name = "Chicago"
+scope_tier = "local"
+sort_priority = 10
+parents = ["cook-county"]
+
+[[region]]
+slug = "oak-park"
+kind = "us:city"
+name = "Oak Park"
+scope_tier = "local"
+sort_priority = 10
+parents = ["cook-county"]
+
+[[region]]
+slug = "gary"
+kind = "us:city"
+name = "Gary"
+scope_tier = "local"
+sort_priority = 10
+parents = ["lake-county-in"]
+
+[[region]]
+slug = "sf"
+kind = "us:city"
+name = "San Francisco"
+scope_tier = "local"
+sort_priority = 10
+parents = ["sf-bay-area", "ca-state"]
+
+[[region]]
+slug = "cambridge-ma"
+kind = "us:city"
+name = "Cambridge"
+scope_tier = "local"
+sort_priority = 10
+parents = ["greater-boston", "ma"]
+
+[[region]]
+slug = "boston"
+kind = "us:city"
+name = "Boston"
+scope_tier = "local"
+sort_priority = 10
+parents = ["greater-boston", "ma"]
+
+[[region]]
+slug = "miami"
+kind = "us:city"
+name = "Miami"
+scope_tier = "local"
+sort_priority = 10
+parents = ["greater-miami", "fl"]
+
+[[region]]
+slug = "seattle"
+kind = "us:city"
+name = "Seattle"
+scope_tier = "local"
+sort_priority = 10
+parents = ["seattle-metro", "wa"]
+
+[[region]]
+slug = "los-angeles"
+kind = "us:city"
+name = "Los Angeles"
+scope_tier = "local"
+sort_priority = 10
+parents = ["greater-la", "ca-state"]

@@ -53,13 +53,21 @@ the plan is the *design* view.
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadpostal`, `ci`.
+- **Region-graph refactor (slice #4.5):** regions become a multi-parent
+  DAG; postal_codes point at the leaf; `scope_tier` is editorial;
+  `RegionKind`/`Country` open to free-form strings; loaders move to
+  TOML (`regions_<cc>.toml`, `orgs.toml`). See
+  [`docs/region-graph.md`](./region-graph.md) for the user-facing
+  reference and `docs/superpowers/specs/2026-05-16-region-graph-design.md`
+  for the design rationale.
 
 ## Backend (Go)
 
 | # | Slice | What lands |
 |---|-------|------------|
 | 3 | **`loadpostal` for real** | Pick free sources (US Census ZCTA→CBSA crosswalk; StatsCan FSA), write the CSV ingester, populate `regions` + `postal_codes`. |
-| 4 | **`seed` for real** | Generate `api/seed/orgs.yaml` (~30–50 LLM-drafted-then-human-reviewed orgs), write the YAML loader (`gopkg.in/yaml.v3`), wire the subcommand to upsert into Postgres. |
+| 4 | **`seed` for real** | Generate `api/seed/orgs.toml` (~30–50 LLM-drafted-then-human-reviewed orgs), write the TOML loader (`github.com/pelletier/go-toml/v2`), wire the subcommand to upsert into Postgres. |
+| 4.6 | **First EU country trial** | Write `regions_<cc>.toml`, `postal_codes_<cc>.csv`, and curated orgs for one European country (Germany or France). Validates the graph model against city-states, federations, and overlapping metros before Phase 2 cutover. |
 | 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. |
 | 6 | **Browse / recent endpoints** | `GET /api/v1/metros`, `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — feeds the homepage strip and `/browse`. |
 | 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. |

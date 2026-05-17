@@ -573,6 +573,24 @@ em {
   margin-left: auto;
 }
 
+.dateline-ancestry {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-top: 0.25rem;
+}
+
+.dateline-ancestry-crumb {
+  color: var(--muted);
+}
+
+.dateline-ancestry-sep {
+  color: var(--border);
+  user-select: none;
+}
+
 /* ── Entries (results page) ─────────────────────────── */
 
 .entry-list {
@@ -631,6 +649,15 @@ em {
   color: var(--muted);
   letter-spacing: 0.02em;
   white-space: nowrap;
+}
+
+.entry-via {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+  letter-spacing: 0.01em;
+  margin: 0.2rem 0 0.4rem;
 }
 
 .entry-desc {

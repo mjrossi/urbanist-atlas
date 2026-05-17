@@ -11,19 +11,19 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
 )
 
-// seedCommand loads api/seed/orgs.yaml into organizations +
+// seedCommand loads api/seed/orgs.toml into organizations +
 // organization_regions. Region linkage resolves each org's
-// postal_codes through the already-populated postal_codes table, so
-// loadpostal must run first.
+// region_slugs through the already-populated regions table, so
+// loadregions must run first.
 func seedCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "seed",
-		Usage: "Load curated org seed data (api/seed/orgs.yaml) into the database",
+		Usage: "Load curated org seed data (api/seed/orgs.toml) into the database",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "src",
-				Usage: "path to seed YAML",
-				Value: "./seed/orgs.yaml",
+				Usage: "path to seed TOML",
+				Value: "./seed/orgs.toml",
 			},
 			&cli.StringFlag{
 				Name:    "db-url",

@@ -11,77 +11,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const orgsForRegionsAndAllRegionIDs = `-- name: OrgsForRegionsAndAllRegionIDs :many
-
-SELECT
-    o.id,
-    o.slug,
-    o.name,
-    o.short_desc,
-    o.website_url,
-    o.contact_url,
-    o.tags,
-    ARRAY(
-        SELECT orr.region_id
-        FROM organization_regions orr
-        WHERE orr.organization_id = o.id
-        ORDER BY orr.region_id
-    )::bigint[] AS region_ids
-FROM organizations o
-WHERE o.status = 'approved'
-  AND EXISTS (
-      SELECT 1
-      FROM organization_regions orr
-      WHERE orr.organization_id = o.id
-        AND orr.region_id = ANY($1::bigint[])
-  )
-ORDER BY o.id
+const deleteOrganizationRegions = `-- name: DeleteOrganizationRegions :exec
+DELETE FROM organization_regions WHERE organization_id = $1
 `
 
-type OrgsForRegionsAndAllRegionIDsRow struct {
-	ID         int64
-	Slug       string
-	Name       string
-	ShortDesc  string
-	WebsiteUrl string
-	ContactUrl pgtype.Text
-	Tags       []string
-	RegionIds  []int64
+func (q *Queries) DeleteOrganizationRegions(ctx context.Context, organizationID int64) error {
+	_, err := q.db.Exec(ctx, deleteOrganizationRegions, organizationID)
+	return err
 }
 
-// Queries against organizations + organization_regions for the lookup
-// pipeline.
-//
-// Only approved orgs are ever returned; rejected/pending/archived
-// statuses are filtered server-side rather than relying on calling code
-// to remember.
-// Return the distinct approved organizations that serve any of the
-// supplied region IDs, together with the full list of region IDs each
-// org serves (not just the ones that matched). The adapter joins those
-// region IDs against the regions table to materialize Org.Regions.
-//
-// Returning region_ids as a column lets us answer the lookup with two
-// round-trips total (this + one GetRegionsByIDs), regardless of how
-// many orgs match.
-func (q *Queries) OrgsForRegionsAndAllRegionIDs(ctx context.Context, dollar_1 []int64) ([]OrgsForRegionsAndAllRegionIDsRow, error) {
-	rows, err := q.db.Query(ctx, orgsForRegionsAndAllRegionIDs, dollar_1)
+const insertOrganizationRegion = `-- name: InsertOrganizationRegion :exec
+INSERT INTO organization_regions (organization_id, region_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type InsertOrganizationRegionParams struct {
+	OrganizationID int64
+	RegionID       int64
+}
+
+func (q *Queries) InsertOrganizationRegion(ctx context.Context, arg InsertOrganizationRegionParams) error {
+	_, err := q.db.Exec(ctx, insertOrganizationRegion, arg.OrganizationID, arg.RegionID)
+	return err
+}
+
+const regionIDsBySlugs = `-- name: RegionIDsBySlugs :many
+SELECT id, slug FROM regions WHERE slug = ANY($1::text[])
+`
+
+type RegionIDsBySlugsRow struct {
+	ID   int64
+	Slug string
+}
+
+func (q *Queries) RegionIDsBySlugs(ctx context.Context, dollar_1 []string) ([]RegionIDsBySlugsRow, error) {
+	rows, err := q.db.Query(ctx, regionIDsBySlugs, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []OrgsForRegionsAndAllRegionIDsRow
+	var items []RegionIDsBySlugsRow
 	for rows.Next() {
-		var i OrgsForRegionsAndAllRegionIDsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Slug,
-			&i.Name,
-			&i.ShortDesc,
-			&i.WebsiteUrl,
-			&i.ContactUrl,
-			&i.Tags,
-			&i.RegionIds,
-		); err != nil {
+		var i RegionIDsBySlugsRow
+		if err := rows.Scan(&i.ID, &i.Slug); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -90,4 +63,39 @@ func (q *Queries) OrgsForRegionsAndAllRegionIDs(ctx context.Context, dollar_1 []
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertOrganization = `-- name: UpsertOrganization :one
+INSERT INTO organizations (slug, name, short_desc, website_url, contact_url, tags, status, approved_at)
+VALUES ($1, $2, $3, $4, $5, $6, 'approved', NOW())
+ON CONFLICT (slug) DO UPDATE
+SET name = EXCLUDED.name,
+    short_desc = EXCLUDED.short_desc,
+    website_url = EXCLUDED.website_url,
+    contact_url = EXCLUDED.contact_url,
+    tags = EXCLUDED.tags
+RETURNING id
+`
+
+type UpsertOrganizationParams struct {
+	Slug       string
+	Name       string
+	ShortDesc  string
+	WebsiteUrl string
+	ContactUrl pgtype.Text
+	Tags       []string
+}
+
+func (q *Queries) UpsertOrganization(ctx context.Context, arg UpsertOrganizationParams) (int64, error) {
+	row := q.db.QueryRow(ctx, upsertOrganization,
+		arg.Slug,
+		arg.Name,
+		arg.ShortDesc,
+		arg.WebsiteUrl,
+		arg.ContactUrl,
+		arg.Tags,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }

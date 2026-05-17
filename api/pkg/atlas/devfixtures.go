@@ -11,40 +11,31 @@ package atlas
 //nolint:funlen // long but flat; readability beats decomposition for a fixture loader.
 func LoadDevFixtures(s *MemStore) {
 	// ── Regions ────────────────────────────────────────────────
-	// NYC area
-	s.AddRegion(Region{ID: 1, Kind: RegionCity, Name: "Brooklyn", Slug: "brooklyn-ny", Country: CountryUS, ScopeTier: ScopeLocal})
-	s.AddRegion(Region{ID: 2, Kind: RegionCounty, Name: "Kings County, NY", Slug: "kings-county-ny", Country: CountryUS, ScopeTier: ScopeLocal})
-	s.AddRegion(Region{ID: 3, Kind: RegionMetro, Name: "New York Metro", Slug: "nyc-metro", Country: CountryUS, ScopeTier: ScopeRegional})
-	s.AddRegion(Region{ID: 4, Kind: RegionState, Name: "NY", Slug: "ny", Country: CountryUS, ScopeTier: ScopeRegional})
+	// Add parents before children so AddRegion can resolve slug→id.
 
-	// SF Bay
-	s.AddRegion(Region{ID: 10, Kind: RegionCity, Name: "San Francisco", Slug: "san-francisco-ca", Country: CountryUS, ScopeTier: ScopeLocal})
-	s.AddRegion(Region{ID: 11, Kind: RegionCounty, Name: "San Francisco County", Slug: "san-francisco-county-ca", Country: CountryUS, ScopeTier: ScopeLocal})
-	s.AddRegion(Region{ID: 12, Kind: RegionMetro, Name: "SF Bay Area", Slug: "sf-bay-area", Country: CountryUS, ScopeTier: ScopeRegional})
-	s.AddRegion(Region{ID: 13, Kind: RegionState, Name: "CA", Slug: "ca", Country: CountryUS, ScopeTier: ScopeRegional})
+	// NYC area (chain: Brooklyn → Kings County → NYC Metro → NY)
+	s.AddRegion(Region{ID: 4, Kind: "us:state", Name: "NY", Slug: "ny", Country: CountryUS, ScopeTier: ScopeRegional, SortPriority: 70})
+	s.AddRegion(Region{ID: 3, Kind: "us:metro", Name: "New York Metro", Slug: "nyc-metro", Country: CountryUS, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ny"}})
+	s.AddRegion(Region{ID: 2, Kind: "us:county", Name: "Kings County, NY", Slug: "kings-county-ny", Country: CountryUS, ScopeTier: ScopeLocal, SortPriority: 30, ParentSlugs: []string{"nyc-metro", "ny"}})
+	s.AddRegion(Region{ID: 1, Kind: "us:city", Name: "Brooklyn", Slug: "brooklyn-ny", Country: CountryUS, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"kings-county-ny"}})
 
-	// Toronto
-	s.AddRegion(Region{ID: 20, Kind: RegionCity, Name: "Toronto", Slug: "toronto-on", Country: CountryCA, ScopeTier: ScopeLocal})
-	s.AddRegion(Region{ID: 21, Kind: RegionMetro, Name: "Toronto CMA", Slug: "toronto-cma", Country: CountryCA, ScopeTier: ScopeRegional})
-	s.AddRegion(Region{ID: 22, Kind: RegionProvince, Name: "Ontario", Slug: "ontario", Country: CountryCA, ScopeTier: ScopeRegional})
+	// SF Bay (chain: San Francisco → SF County → SF Bay Area → CA)
+	s.AddRegion(Region{ID: 13, Kind: "us:state", Name: "CA", Slug: "ca", Country: CountryUS, ScopeTier: ScopeRegional, SortPriority: 70})
+	s.AddRegion(Region{ID: 12, Kind: "us:metro", Name: "SF Bay Area", Slug: "sf-bay-area", Country: CountryUS, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ca"}})
+	s.AddRegion(Region{ID: 11, Kind: "us:county", Name: "San Francisco County", Slug: "san-francisco-county-ca", Country: CountryUS, ScopeTier: ScopeLocal, SortPriority: 30, ParentSlugs: []string{"sf-bay-area", "ca"}})
+	s.AddRegion(Region{ID: 10, Kind: "us:city", Name: "San Francisco", Slug: "san-francisco-ca", Country: CountryUS, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"san-francisco-county-ca"}})
+
+	// Toronto (chain: Toronto → Toronto CMA → Ontario)
+	s.AddRegion(Region{ID: 22, Kind: "ca:province", Name: "Ontario", Slug: "ontario", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 70})
+	s.AddRegion(Region{ID: 21, Kind: "ca:metro", Name: "Toronto CMA", Slug: "toronto-cma", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ontario"}})
+	s.AddRegion(Region{ID: 20, Kind: "ca:city", Name: "Toronto", Slug: "toronto-on", Country: CountryCA, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"toronto-cma"}})
 
 	// ── Postal codes ───────────────────────────────────────────
-	bk := s.regions[1]
-	kings := s.regions[2]
-	nycMetro := s.regions[3]
-	ny := s.regions[4]
-	sf := s.regions[10]
-	sfCo := s.regions[11]
-	bay := s.regions[12]
-	ca := s.regions[13]
-	tor := s.regions[20]
-	torCMA := s.regions[21]
-	ont := s.regions[22]
-
-	s.AddPostalCode(ResolvedPostalCode{Code: "11217", Country: CountryUS, City: &bk, County: &kings, Metro: &nycMetro, State: &ny})
-	s.AddPostalCode(ResolvedPostalCode{Code: "11215", Country: CountryUS, City: &bk, County: &kings, Metro: &nycMetro, State: &ny})
-	s.AddPostalCode(ResolvedPostalCode{Code: "94110", Country: CountryUS, City: &sf, County: &sfCo, Metro: &bay, State: &ca})
-	s.AddPostalCode(ResolvedPostalCode{Code: "M5V", Country: CountryCA, City: &tor, Metro: &torCMA, State: &ont})
+	// Each code maps to the leaf (most-specific) region.
+	s.AddPostalCode(CountryUS, "11217", 1) // Brooklyn
+	s.AddPostalCode(CountryUS, "11215", 1) // Brooklyn
+	s.AddPostalCode(CountryUS, "94110", 10) // San Francisco
+	s.AddPostalCode(CountryCA, "M5V", 20) // Toronto
 
 	// ── Organizations ──────────────────────────────────────────
 	// NYC

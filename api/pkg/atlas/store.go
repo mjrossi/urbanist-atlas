@@ -5,31 +5,34 @@ import (
 	"errors"
 )
 
-// ErrPostalCodeNotFound is returned by Store.ResolvePostalCode when no
+// ErrPostalCodeNotFound is returned by Store.ResolveLeafRegion when no
 // row exists for the (country, postal code) pair. The HTTP layer maps
-// this to a 404 with a helpful body so the SPA can suggest a nearby
-// code or a submission.
+// this to a 404 with a helpful problem document so the SPA can suggest
+// a nearby code or a submission.
 var ErrPostalCodeNotFound = errors.New("atlas: postal code not found")
 
 // Store is the persistence seam between pkg/atlas and the rest of the
-// system. The interface is intentionally minimal — two operations
-// compose to satisfy Lookup. Postgres-backed implementations can
-// optimize internally (e.g. a single query with joins) without
-// changing the contract.
+// system. Three operations compose to satisfy Lookup; Postgres-backed
+// implementations can optimize internally (e.g. fold AncestorRegions
+// + OrgsForRegions into a single CTE) without changing the contract.
 //
 // All implementations must be safe for concurrent use.
 type Store interface {
-	// ResolvePostalCode returns the geographic regions a postal code
-	// belongs to. The code argument should be the user's input; the
-	// implementation normalizes (uppercase, whitespace removed,
-	// Canadian postal codes truncated to FSA). Returns
+	// ResolveLeafRegion returns the leaf region a postal code points at.
+	// The code argument should be the user's raw input; implementations
+	// normalize via NormalizePostalCode before querying. Returns
 	// ErrPostalCodeNotFound if no match exists.
-	ResolvePostalCode(ctx context.Context, country Country, postalCode string) (ResolvedPostalCode, error)
+	ResolveLeafRegion(ctx context.Context, country Country, postalCode string) (Region, error)
 
-	// OrgsForRegions returns all approved organizations tagged with
-	// any of the given region IDs. Each returned Org has its full
-	// Regions slice populated (the regions the org serves, not just
-	// the ones that matched). Order is unspecified — Lookup sorts the
-	// results.
+	// AncestorRegions returns the leaf region followed by all transitive
+	// ancestors in the region graph, ordered most-specific first
+	// (leaf, then immediate parents, then their parents, etc.).
+	// Includes the leaf itself; deduplicates DAG diamonds.
+	AncestorRegions(ctx context.Context, leafRegionID int64) ([]Region, error)
+
+	// OrgsForRegions returns all approved organizations attached to any
+	// of the given region IDs. Each returned Org has its full Regions
+	// slice populated (every region the org serves, not just the ones
+	// that matched). Order is unspecified — Lookup buckets and sorts.
 	OrgsForRegions(ctx context.Context, regionIDs []int64) ([]Org, error)
 }
