@@ -9,9 +9,9 @@
 #                              (see mise.local.toml.example)
 
 [tools]
-# Language runtimes.
-go = "1.26"
-node = "22"
+# Language runtimes — patch-pinned so reproducibility > convenience.
+go   = "1.26.3"
+node = "22.22.3"
 
 # Project tooling. Pinned versions because reproducibility > convenience.
 # These get added/bumped as they're introduced into the codebase.
