@@ -16,6 +16,7 @@ const (
 // Defines values for ScopeTier.
 const (
 	ScopeTierLocal    ScopeTier = "local"
+	ScopeTierNational ScopeTier = "national"
 	ScopeTierRegional ScopeTier = "regional"
 )
 
@@ -23,6 +24,8 @@ const (
 func (e ScopeTier) Valid() bool {
 	switch e {
 	case ScopeTierLocal:
+		return true
+	case ScopeTierNational:
 		return true
 	case ScopeTierRegional:
 		return true
@@ -236,7 +239,10 @@ type Region struct {
 	// vocabulary uses country-prefixed values: `us:city`, `us:borough`,
 	// `us:county`, `us:metro`, `us:state`, `us:multi-state`,
 	// `us:transit-federation`, `ca:province`, `ca:regional-district`,
-	// `ca:city`, `de:land`, `de:bezirk`, `de:kreisfreie-stadt`,
+	// `ca:city`, `ca:cma`, `pt:freguesia`, `pt:municipio`,
+	// `pt:cim`, `pt:area-metropolitana`, `pt:distrito`,
+	// `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional`,
+	// `de:land`, `de:bezirk`, `de:kreisfreie-stadt`,
 	// `de:transit-federation`, `fr:commune`, `fr:departement`,
 	// `fr:region`, `fr:metropole`. Clients should treat unknown kinds
 	// gracefully (e.g. fall back to displaying `name`).
@@ -248,7 +254,20 @@ type Region struct {
 	ParentSlugs []string `json:"parent_slugs"`
 
 	// ScopeTier Drives result grouping in `/lookup`. `local` for city/county
-	// regions; `regional` for metro/state/province/multi-state.
+	// regions; `regional` for metro/state/province/multi-state;
+	// `national` for country-wide umbrellas (federations, advocacy
+	// groups operating across an entire country).
+	//
+	// `national` regions are filtered from the default `/lookup`
+	// ancestor walk — they're present in the schema so that
+	// national-scope orgs (e.g. MUBi for Portugal, Living Streets
+	// for the UK) can be modeled without distorting local-first
+	// defaults. A future opt-in surface for national orgs is
+	// anticipated; until then, `national`-tier regions are hidden.
+	//
+	// See `docs/region-graph.md` for the per-country editorial
+	// policy on when to use `national` vs modeling state/regional
+	// chapters instead.
 	ScopeTier ScopeTier `json:"scope_tier"`
 
 	// Slug Globally unique across countries.
@@ -259,7 +278,10 @@ type Region struct {
 // vocabulary uses country-prefixed values: `us:city`, `us:borough`,
 // `us:county`, `us:metro`, `us:state`, `us:multi-state`,
 // `us:transit-federation`, `ca:province`, `ca:regional-district`,
-// `ca:city`, `de:land`, `de:bezirk`, `de:kreisfreie-stadt`,
+// `ca:city`, `ca:cma`, `pt:freguesia`, `pt:municipio`,
+// `pt:cim`, `pt:area-metropolitana`, `pt:distrito`,
+// `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional`,
+// `de:land`, `de:bezirk`, `de:kreisfreie-stadt`,
 // `de:transit-federation`, `fr:commune`, `fr:departement`,
 // `fr:region`, `fr:metropole`. Clients should treat unknown kinds
 // gracefully (e.g. fall back to displaying `name`).
@@ -272,7 +294,20 @@ type RejectSubmissionRequest struct {
 }
 
 // ScopeTier Drives result grouping in `/lookup`. `local` for city/county
-// regions; `regional` for metro/state/province/multi-state.
+// regions; `regional` for metro/state/province/multi-state;
+// `national` for country-wide umbrellas (federations, advocacy
+// groups operating across an entire country).
+//
+// `national` regions are filtered from the default `/lookup`
+// ancestor walk — they're present in the schema so that
+// national-scope orgs (e.g. MUBi for Portugal, Living Streets
+// for the UK) can be modeled without distorting local-first
+// defaults. A future opt-in surface for national orgs is
+// anticipated; until then, `national`-tier regions are hidden.
+//
+// See `docs/region-graph.md` for the per-country editorial
+// policy on when to use `national` vs modeling state/regional
+// chapters instead.
 type ScopeTier string
 
 // Submission A queued or processed public submission.

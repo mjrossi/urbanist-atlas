@@ -32,8 +32,9 @@ type Region struct {
 }
 
 // Parse decodes a regions TOML document from r and runs structural
-// validation: required fields present, scope_tier is local|regional,
-// no duplicate slugs. Cycle detection is in validate.go.
+// validation: required fields present, scope_tier is one of
+// local|regional|national, no duplicate slugs. Cycle detection is in
+// validate.go.
 func Parse(r io.Reader) (File, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -74,8 +75,8 @@ func validateStructural(f File) error {
 		if r.Name == "" {
 			return fmt.Errorf("%s: name required", ctx)
 		}
-		if r.ScopeTier != "local" && r.ScopeTier != "regional" {
-			return fmt.Errorf("%s: scope_tier must be 'local' or 'regional' (got %q)", ctx, r.ScopeTier)
+		if r.ScopeTier != "local" && r.ScopeTier != "regional" && r.ScopeTier != "national" {
+			return fmt.Errorf("%s: scope_tier must be 'local', 'regional', or 'national' (got %q)", ctx, r.ScopeTier)
 		}
 		if r.SortPriority < 0 {
 			return fmt.Errorf("%s: sort_priority must be non-negative", ctx)

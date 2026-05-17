@@ -30,6 +30,12 @@ func NormalizePostalCode(country Country, raw string) string {
 			return s[:len(s)-3]
 		}
 		return s
+	case "PT":
+		// PT postal codes are 7-digit NNNN-NNN (e.g. 1100-001 in Lisboa).
+		// Strip the hyphen so storage is 7 raw digits; lookups apply the
+		// same normalization, so "1100-001" and "1100001" resolve
+		// identically.
+		return strings.ReplaceAll(s, "-", "")
 	default:
 		return s
 	}
@@ -76,6 +82,16 @@ func ValidatePostalCode(country Country, code string) error {
 		for _, r := range code {
 			if r < '0' || r > '9' {
 				return fmt.Errorf("AU postcode %q: non-digit character", code)
+			}
+		}
+	case "PT":
+		// PT codes are 7-digit after NormalizePostalCode strips the hyphen.
+		if len(code) != 7 {
+			return fmt.Errorf("PT postal code %q: want 7 digits (after stripping hyphen)", code)
+		}
+		for _, r := range code {
+			if r < '0' || r > '9' {
+				return fmt.Errorf("PT postal code %q: non-digit character", code)
 			}
 		}
 	}

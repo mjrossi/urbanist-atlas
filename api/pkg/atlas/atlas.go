@@ -21,12 +21,19 @@ const (
 
 // ScopeTier drives result grouping in Lookup. Regions classified as
 // "local" cause their orgs to appear in the Local bucket; "regional"
-// regions cause their orgs to appear in the Regional bucket.
+// regions cause their orgs to appear in the Regional bucket;
+// "national" regions are filtered from the default Lookup ancestor
+// walk (see internal/store/postgres/queries/lookup.sql) so their orgs
+// don't surface in default results. The national tier exists so that
+// national-scope advocacy orgs (e.g. MUBi for PT, Living Streets for
+// UK, Fietsersbond for NL) can be modeled without distorting the
+// local-first defaults; surfacing them is a future opt-in.
 type ScopeTier string
 
 const (
 	ScopeLocal    ScopeTier = "local"
 	ScopeRegional ScopeTier = "regional"
+	ScopeNational ScopeTier = "national"
 )
 
 // RegionKind is the granularity of a region. It's an opaque string;

@@ -14,12 +14,14 @@ import (
 const ancestorRegions = `-- name: AncestorRegions :many
 WITH RECURSIVE ancestors(id, country, kind, name, slug, scope_tier, sort_priority, depth) AS (
     SELECT r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, 0
-    FROM regions r WHERE r.id = $1
+    FROM regions r
+    WHERE r.id = $1 AND r.scope_tier <> 'national'
     UNION
     SELECT r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, a.depth + 1
     FROM regions r
     JOIN region_parents rp ON rp.parent_region_id = r.id
     JOIN ancestors a       ON rp.region_id = a.id
+    WHERE r.scope_tier <> 'national'
 )
 SELECT id, country, kind, name, slug, scope_tier, sort_priority
 FROM ancestors
@@ -39,6 +41,14 @@ type AncestorRegionsRow struct {
 // Returns the leaf followed by all transitive ancestors, ordered
 // most-specific first (BFS layer order). UNION (not UNION ALL)
 // deduplicates DAG diamonds and gives Postgres the termination signal.
+//
+// Excludes scope_tier='national' regions from both branches: national
+// regions are filtered out of the default lookup surface (see
+// docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md
+// §2). This is defense-in-depth — the data shape intentionally avoids
+// parent edges from the leaf chain into national regions, but the
+// filter ensures national-tier orgs stay hidden even if an edge is
+// added in error.
 func (q *Queries) AncestorRegions(ctx context.Context, id int64) ([]AncestorRegionsRow, error) {
 	rows, err := q.db.Query(ctx, ancestorRegions, id)
 	if err != nil {

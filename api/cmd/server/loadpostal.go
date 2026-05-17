@@ -27,7 +27,7 @@ func loadpostalCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "country",
-				Usage: "country of the source data: US or CA",
+				Usage: "ISO-style country code of the source data (e.g. US, CA, PT)",
 				Value: "US",
 			},
 			&cli.StringFlag{
@@ -52,11 +52,27 @@ func runLoadpostal(ctx context.Context, c *cli.Command) error {
 		return errors.New("loadpostal: --db-url or URBANIST_DB_URL is required")
 	}
 	country := atlas.Country(c.String("country"))
-	if country != atlas.CountryUS && country != atlas.CountryCA {
-		return fmt.Errorf("loadpostal: --country must be US or CA (got %q)", country)
+	if country == "" {
+		return errors.New("loadpostal: --country is required")
 	}
 	src := c.String("src")
 	logger := buildLogger(c.String("log-format"))
+
+	// Country is an opaque string per pkg/atlas/atlas.go; the loader is
+	// country-agnostic, but per-country postal validation lives in
+	// atlas.ValidatePostalCode. Warn (don't fail) if the country isn't
+	// in the recognized validator set — loading still proceeds, but
+	// operators see they're in uncharted territory. To add validation
+	// for a new country, extend the switch in api/pkg/atlas/postal.go.
+	switch country {
+	case atlas.CountryUS, atlas.CountryCA, "DE", "FR", "MX", "UK", "AU", "PT":
+		// recognized; no warning.
+	default:
+		logger.Warn("loadpostal: country has no postal-code validator; loading without per-row format checks",
+			"country", string(country),
+			"hint", "add a case to api/pkg/atlas/postal.go to validate this country's codes",
+		)
+	}
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {

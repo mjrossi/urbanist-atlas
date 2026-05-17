@@ -142,11 +142,46 @@ Berlin is `kind='de:land'` (formally correct) but `scope_tier='local'`
 (functionally correct — Berliners experience it as a city). The
 maintainer makes this judgment per region.
 
-### 5. No country regions in v1
+The rule of thumb:
 
-National orgs are out of scope. The graph stops at state/Land/
-multi-state/federation tier — no `us`, `ca`, `de` rows. National orgs
-literally have no v1 region to attach to.
+> Local = what a resident calls their city or neighborhood.
+> Regional = what they call their region, metro, or state.
+> National = a country-wide umbrella that doesn't fit into any
+> single regional unit.
+
+### 5. The `national` tier exists, but the default lookup filters it
+
+`scope_tier='national'` is a third bucket alongside `local` and
+`regional`. National-tier regions are filtered from the default
+`/api/v1/lookup` ancestor walk so they don't surface in postal-code
+results.
+
+**Per-country editorial policy** (load-bearing — please read before
+adding a national region):
+
+- **US / CA: do NOT create `us:national` or `ca:national` regions in
+  v1 seed data.** The local-first ethos is the prime directive for US
+  and Canadian results. National orgs that have state/provincial
+  chapters get modeled as their chapters (e.g. Rail Passengers
+  Association → state chapters). National orgs without local presence
+  are simply excluded.
+- **PT / UK / NL / MX / future countries: create `<cc>:nacional` (or
+  `<cc>:national`) only when an org genuinely operates nationally
+  without sufficient local presence.** Examples: MUBi national (PT
+  cycling federation), Fietsersbond (NL), Living Streets (UK).
+
+**National regions get no incoming parent edges from the leaf chain.**
+They live as standalone attachment targets. The default lookup never
+reaches them through the ancestor walk; the SQL-level filter in
+`AncestorRegions` is defense-in-depth.
+
+**Scale calibration.** The semantic weight of "national" varies by
+country scale. A PT-national org (~10M-person country) is closer in
+*effective scope and influence* to a US state-level org than to a
+hypothetical US-national one. Schema treats `national` uniformly;
+editorial judgment about how to *frame* national orgs is per-country.
+This informs future UX (a PT user's "national umbrella" feels close,
+a US user's would feel distant), not the default display rules.
 
 ### 6. Abstract regions don't need postal codes pointing at them
 
@@ -161,13 +196,15 @@ specific = sorts earlier. Recommended ranges:
 
 | Range | Tier |
 |---|---|
-| 10 | borough, neighborhood |
-| 15 | consolidated city (NYC), city-state acting as city (Berlin) |
+| 10 | borough, neighborhood, freguesia |
+| 15 | consolidated city (NYC), município, city-state acting as city (Berlin) |
 | 20 | county |
-| 40 | metro |
-| 50 | transit federation, RTA-style |
-| 60 | state, province, Land |
+| 30 | CIM, regional district |
+| 40 | metro, área metropolitana, CMA |
+| 50 | transit federation, distrito, RTA-style |
+| 60 | state, province, Land, NUTS-II, região autónoma |
 | 80 | multi-state, multi-province, multi-Land |
+| 90 | national umbrella (only surfaced via opt-in) |
 
 These are guidelines. The lookup doesn't care about the specific
 numbers — only their relative order.
@@ -243,6 +280,69 @@ walks `mitte → berlin → vbb-region`. A Potsdam lookup walks
 `potsdam → brandenburg → vbb-region`. VBB-attached orgs surface for
 both; berlin-attached orgs only surface for Berlin lookups.
 
+### Lisboa (multi-parent município + cross-distrito metro)
+
+```mermaid
+graph BT
+  smm[Santa Maria Maior<br/>local · 10]
+  lisboa[Lisboa<br/>local · 15<br/>kind: pt:municipio]
+  setubal[Setúbal<br/>local · 15<br/>kind: pt:municipio]
+  aml[Área Met. de Lisboa<br/>regional · 40]
+  dlx[Distrito de Lisboa<br/>regional · 50]
+  dst[Distrito de Setúbal<br/>regional · 50]
+  gl[Grande Lisboa<br/>regional · 60<br/>NUTS-II]
+  ps[Península de Setúbal<br/>regional · 60<br/>NUTS-II]
+
+  smm --> lisboa
+  lisboa --> aml
+  lisboa --> dlx
+  setubal --> aml
+  setubal --> dst
+  aml --> gl
+  aml --> ps
+  dlx --> gl
+  dst --> ps
+```
+
+AML is the **first metro in our data that multi-parents into two
+top-tier admin regions** — both NUTS-II Grande Lisboa AND NUTS-II
+Península de Setúbal. Setúbal-município is in Distrito de Setúbal but
+also belongs to AML, so its lookup picks up *both* NUTS-II regions via
+AML — even though Setúbal isn't geographically in Distrito de Lisboa.
+This is the same pattern Zona Metropolitana del Valle de México will
+use when MX is added; it scales.
+
+### Madeira (autonomous region as parallel hierarchy)
+
+```mermaid
+graph BT
+  funchal[Funchal<br/>local · 15<br/>kind: pt:municipio]
+  madeira[Região Aut. Madeira<br/>regional · 60]
+
+  funchal --> madeira
+```
+
+Madeira has no NUTS-II parent — it parallels the NUTS-II tier rather
+than living inside it. The graph naturally accommodates: just no
+outgoing parent edge from the autonomous region. Funchal lookup walks
+`funchal → madeira` and stops.
+
+### Portugal national umbrella (default-filtered)
+
+```mermaid
+graph BT
+  ptn[Portugal<br/>NATIONAL · 90<br/>kind: pt:nacional]
+
+  ptn -.->|attached via region_slugs:<br/>mubi-nacional| ptn
+```
+
+`pt-nacional` has **no incoming parent edges** from the geographic
+chain — it's a standalone attachment target for `mubi-nacional` and
+similar national-scope orgs. The default `/lookup` filter excludes
+`scope_tier='national'` from the ancestor walk, so a Lisboa postal
+code lookup never reaches this region. A future opt-in surface can
+explicitly query for national-tier orgs.
+
 ---
 
 ## Adding a new country
@@ -305,15 +405,42 @@ recommended vocabulary uses country-prefixed values:
 |---|---|
 | US | `us:borough`, `us:city`, `us:county`, `us:metro`, `us:state`, `us:multi-state`, `us:transit-federation` |
 | CA | `ca:city`, `ca:regional-district`, `ca:cma`, `ca:province` |
+| PT | `pt:freguesia`, `pt:municipio`, `pt:cim`, `pt:area-metropolitana`, `pt:distrito`, `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional` |
 | DE | `de:bezirk`, `de:kreisfreie-stadt`, `de:kreis`, `de:land`, `de:transit-federation` |
 | FR | `fr:commune`, `fr:departement`, `fr:region`, `fr:metropole` |
-| UK | `uk:town`, `uk:unitary-authority`, `uk:county`, `uk:region`, `uk:nation` |
+| UK | `uk:town`, `uk:unitary-authority`, `uk:county`, `uk:region`, `uk:nation`, `uk:national` |
 | AU | `au:suburb`, `au:lga`, `au:gccsa`, `au:state` |
 
 Clients should treat unknown kinds gracefully — fall back to
 displaying `name`.
 
-`scope_tier` is the only closed enum on the wire: exactly `'local'` or
-`'regional'`. This is load-bearing for the two-bucket API contract; if
-a third tier is ever needed (national, neighborhood) that's a major
-version event.
+`scope_tier` is a closed enum on the wire: exactly `'local'`,
+`'regional'`, or `'national'`. The default `/lookup` surface buckets
+results into Local + Regional; `national` regions are filtered out of
+the ancestor walk so they don't surface for postal-code queries. A
+future opt-in path (query param or separate endpoint) is anticipated
+for the national tier; until then, national-tier orgs exist in the
+schema but are not visible through the default API.
+
+---
+
+## Locked-in conventions
+
+These are documented here so that adding a new country is mechanical —
+contributors don't need to re-decide them.
+
+1. **Slug**: bare (`brooklyn`, `lisboa-municipio`, `metro-vancouver`).
+   Suffix on collision (`lake-county-in`, `ca-state`). Don't
+   country-prefix unless forced.
+2. **Kind**: always country-prefixed (`pt:municipio`, `us:state`,
+   `ca:province`).
+3. **`sort_priority`**: use the bands documented in §7 above. New
+   country fits or documents a deviation in its design spec.
+4. **`scope_tier`**: editorial per rule §4 (local = city/neighborhood;
+   regional = region/metro/state; national = country-wide umbrella per
+   the per-country policy in §5).
+
+The full validation report for the PT model probe (which exercised
+each of these conventions against a non-US/CA admin geography) lives
+at
+[`docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md`](./superpowers/specs/2026-05-17-region-graph-pt-validation-design.md).

@@ -24,6 +24,9 @@ func TestNormalizePostalCode(t *testing.T) {
 		{"uk lower coerced", "UK", "sw1a 1aa", "SW1A"},
 		{"au four digit", "AU", "2000", "2000"},
 		{"mx five digit", "MX", "06600", "06600"},
+		{"pt with hyphen", "PT", "1100-001", "1100001"},
+		{"pt without hyphen", "PT", "1100001", "1100001"},
+		{"pt whitespace + hyphen", "PT", " 1100-001 ", "1100001"},
 		{"unknown country passthrough", "ZZ", "abc123", "ABC123"},
 	}
 	for _, c := range cases {
@@ -56,6 +59,10 @@ func TestValidatePostalCode(t *testing.T) {
 		{"uk too short", "UK", "S", true},
 		{"au valid", "AU", "2000", false},
 		{"au three digit", "AU", "200", true},
+		{"pt valid normalized", "PT", "1100001", false},
+		{"pt six digit invalid", "PT", "110000", true},
+		{"pt eight digit invalid", "PT", "11000010", true},
+		{"pt non-digit invalid", "PT", "1100A01", true},
 		{"unknown country passes", "ZZ", "anything", false},
 	}
 	for _, c := range cases {
@@ -74,5 +81,8 @@ func TestPostalKey(t *testing.T) {
 	}
 	if got := postalKey("CA", "m5v 3a8"); got != "CA:M5V" {
 		t.Errorf("postalKey CA: got %q", got)
+	}
+	if got := postalKey("PT", "1100-001"); got != "PT:1100001" {
+		t.Errorf("postalKey PT: got %q", got)
 	}
 }

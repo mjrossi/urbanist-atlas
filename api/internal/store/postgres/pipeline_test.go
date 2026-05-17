@@ -38,16 +38,24 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 
 	usRegions := repoFile(t, "seed", "regions_us.toml")
 	caRegions := repoFile(t, "seed", "regions_ca.toml")
+	ptRegions := repoFile(t, "seed", "regions_pt.toml")
 	usCSV := repoFile(t, "seed", "postal_codes_us.csv")
 	caCSV := repoFile(t, "seed", "postal_codes_ca.csv")
+	ptCSV := repoFile(t, "seed", "postal_codes_pt.csv")
 	orgsYAML := repoFile(t, "seed", "orgs.toml")
 
 	// loadpostal requires regions to be present (leaf slug lookup).
+	// orgs.toml has US/CA/PT entries — all three countries' regions must
+	// be present before seed, or the seed loader fails on missing
+	// region_slugs.
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US: %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, ptRegions, "PT"); err != nil {
+		t.Fatalf("loadregions PT: %v", err)
 	}
 
 	usSum, err := loadpostal.LoadFile(ctx, store.Pool(), nil, usCSV, atlas.CountryUS)
@@ -63,6 +71,13 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	}
 	if caSum.PostalCodes == 0 {
 		t.Fatal("CA load wrote zero postal codes")
+	}
+	ptSum, err := loadpostal.LoadFile(ctx, store.Pool(), nil, ptCSV, atlas.Country("PT"))
+	if err != nil {
+		t.Fatalf("loadpostal PT: %v", err)
+	}
+	if ptSum.PostalCodes == 0 {
+		t.Fatal("PT load wrote zero postal codes")
 	}
 
 	seedSum, err := seed.LoadFile(ctx, store.Pool(), nil, orgsYAML)
@@ -107,11 +122,17 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA (2nd): %v", err)
 	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, ptRegions, "PT"); err != nil {
+		t.Fatalf("loadregions PT (2nd): %v", err)
+	}
 	if _, err := loadpostal.LoadFile(ctx, store.Pool(), nil, usCSV, atlas.CountryUS); err != nil {
 		t.Fatalf("loadpostal US (2nd): %v", err)
 	}
 	if _, err := loadpostal.LoadFile(ctx, store.Pool(), nil, caCSV, atlas.CountryCA); err != nil {
 		t.Fatalf("loadpostal CA (2nd): %v", err)
+	}
+	if _, err := loadpostal.LoadFile(ctx, store.Pool(), nil, ptCSV, atlas.Country("PT")); err != nil {
+		t.Fatalf("loadpostal PT (2nd): %v", err)
 	}
 	if _, err := seed.LoadFile(ctx, store.Pool(), nil, orgsYAML); err != nil {
 		t.Fatalf("seed (2nd): %v", err)
@@ -215,13 +236,18 @@ func TestPipeline_WorkedCities(t *testing.T) {
 		}
 	}
 
+	// orgs.toml has US/CA/PT entries; PT regions must exist before seed.
 	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
 	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_pt.toml"), "PT")
+	must(err)
 	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_us.csv"), atlas.CountryUS)
 	must(err)
 	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_ca.csv"), atlas.CountryCA)
+	must(err)
+	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_pt.csv"), atlas.Country("PT"))
 	must(err)
 	_, err = seed.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "orgs.toml"))
 	must(err)
@@ -303,4 +329,144 @@ func keysOf(m map[string]bool) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// TestPipeline_PT_ValidationFixture exercises the slice #4.6 PT seed
+// data end-to-end and asserts the validation invariants the spec
+// promised: multi-parent walks, AML's cross-NUTS-II span, autonomous
+// region as parallel hierarchy, and the national-tier filter in the
+// default lookup.
+//
+// See docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md
+// for the design and expected behavior.
+func TestPipeline_PT_ValidationFixture(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Load all three countries' regions before seeding orgs — orgs.toml
+	// references US/CA region slugs that must exist or the org seed
+	// loader fails. The PT-specific assertions below only inspect PT
+	// state, so the additional US/CA load is just a no-op precondition.
+	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_pt.toml"), "PT")
+	must(err)
+	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_pt.csv"), atlas.Country("PT"))
+	must(err)
+	_, err = seed.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "orgs.toml"))
+	must(err)
+
+	t.Run("national tier filtered from default lookup", func(t *testing.T) {
+		// A Lisboa postal-code lookup must NOT surface mubi-nacional
+		// (attached to pt-nacional, scope_tier='national'), and the
+		// resolved_ancestry must not include the pt-nacional region.
+		res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "1100-001", Country: atlas.Country("PT")})
+		if err != nil {
+			t.Fatalf("Lookup 1100-001: %v", err)
+		}
+		all := slugSet(res.Local)
+		for k := range slugSet(res.Regional) {
+			all[k] = true
+		}
+		if all["mubi-nacional"] {
+			t.Errorf("default Lisboa lookup surfaced mubi-nacional (should be filtered as scope_tier='national')")
+		}
+		for _, r := range res.ResolvedAncestry {
+			if r.Slug == "pt-nacional" {
+				t.Errorf("resolved_ancestry includes pt-nacional (should be filtered): %+v", res.ResolvedAncestry)
+			}
+			if r.ScopeTier == atlas.ScopeNational {
+				t.Errorf("resolved_ancestry includes a national-tier region %q (filter failed)", r.Slug)
+			}
+		}
+	})
+
+	t.Run("Lisboa Baixa hits local chapters", func(t *testing.T) {
+		// 1100-001 → santa-maria-maior → lisboa-municipio. Local-bucket
+		// orgs attached to lisboa-municipio (mubi-lisboa,
+		// lisboa-para-pessoas) must surface in Local.
+		res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "1100-001", Country: atlas.Country("PT")})
+		if err != nil {
+			t.Fatalf("Lookup 1100-001: %v", err)
+		}
+		local := slugSet(res.Local)
+		for _, want := range []string{"mubi-lisboa", "lisboa-para-pessoas"} {
+			if !local[want] {
+				t.Errorf("expected %q in Local; got %v", want, keysOf(local))
+			}
+		}
+	})
+
+	t.Run("Setúbal multi-parent walks both NUTS-II via AML", func(t *testing.T) {
+		// 2900-001 → setubal-municipio → {distrito-setubal, aml}.
+		// Through aml's multi-NUTS-II parent edges, the ancestor walk
+		// must reach BOTH nuts-ii-grande-lisboa AND
+		// nuts-ii-peninsula-setubal. Distrito-lisboa must NOT appear
+		// (Setúbal isn't in that distrito).
+		res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "2900-001", Country: atlas.Country("PT")})
+		if err != nil {
+			t.Fatalf("Lookup 2900-001: %v", err)
+		}
+		ancestrySlugs := map[string]bool{}
+		for _, r := range res.ResolvedAncestry {
+			ancestrySlugs[r.Slug] = true
+		}
+		for _, want := range []string{"setubal-municipio", "aml", "distrito-setubal", "nuts-ii-grande-lisboa", "nuts-ii-peninsula-setubal"} {
+			if !ancestrySlugs[want] {
+				t.Errorf("Setúbal ancestry missing %q; got %v", want, keysOf(ancestrySlugs))
+			}
+		}
+		if ancestrySlugs["distrito-lisboa"] {
+			t.Errorf("Setúbal ancestry incorrectly includes distrito-lisboa")
+		}
+	})
+
+	t.Run("Funchal autonomous region stops at Madeira", func(t *testing.T) {
+		// 9000-001 → funchal-concelho → regiao-autonoma-madeira and
+		// stops. No NUTS-II parent. No mainland regions.
+		res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "9000-001", Country: atlas.Country("PT")})
+		if err != nil {
+			t.Fatalf("Lookup 9000-001: %v", err)
+		}
+		ancestrySlugs := map[string]bool{}
+		for _, r := range res.ResolvedAncestry {
+			ancestrySlugs[r.Slug] = true
+		}
+		for _, want := range []string{"funchal-concelho", "regiao-autonoma-madeira"} {
+			if !ancestrySlugs[want] {
+				t.Errorf("Funchal ancestry missing %q; got %v", want, keysOf(ancestrySlugs))
+			}
+		}
+		for _, mainland := range []string{"distrito-lisboa", "distrito-porto", "nuts-ii-norte", "nuts-ii-centro", "aml", "amp"} {
+			if ancestrySlugs[mainland] {
+				t.Errorf("Funchal ancestry incorrectly includes mainland region %q", mainland)
+			}
+		}
+	})
+
+	t.Run("hyphen-stripped postal code normalization round-trips", func(t *testing.T) {
+		// Both "1100-001" and "1100001" must resolve to the same leaf.
+		withHyphen, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "1100-001", Country: atlas.Country("PT")})
+		if err != nil {
+			t.Fatalf("Lookup 1100-001: %v", err)
+		}
+		withoutHyphen, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "1100001", Country: atlas.Country("PT")})
+		if err != nil {
+			t.Fatalf("Lookup 1100001: %v", err)
+		}
+		if diff := cmp.Diff(orgSlugList(withHyphen.Local), orgSlugList(withoutHyphen.Local)); diff != "" {
+			t.Errorf("hyphen vs no-hyphen produced different Local orgs (-with +without):\n%s", diff)
+		}
+	})
 }

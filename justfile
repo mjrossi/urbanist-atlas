@@ -113,6 +113,8 @@ loaddata:
     just loadpostal  seed/postal_codes_us.csv US
     just loadregions seed/regions_ca.toml CA
     just loadpostal  seed/postal_codes_ca.csv CA
+    just loadregions seed/regions_pt.toml PT
+    just loadpostal  seed/postal_codes_pt.csv PT
     just seed
 
 # ── pg: dev postgres lifecycle (docker-based) ─────────

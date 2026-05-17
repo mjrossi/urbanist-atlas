@@ -30,13 +30,13 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 		if country == "" {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country is required (US or CA)", rid)
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country is required", rid)
 			return
 		}
-		if country != atlas.CountryUS && country != atlas.CountryCA {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country must be US or CA", rid)
-			return
-		}
+		// Country is an opaque string per pkg/atlas/atlas.go; the handler
+		// doesn't gate on a known-country list. Unknown countries fall
+		// through to atlas.Lookup which returns ErrPostalCodeNotFound
+		// (→ 404) when no matching postal code exists.
 
 		result, err := atlas.Lookup(r.Context(), store, atlas.LookupQuery{
 			PostalCode: postal,

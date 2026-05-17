@@ -77,3 +77,22 @@ func TestParse_RejectsEmpty(t *testing.T) {
 		t.Fatal("expected error for empty file")
 	}
 }
+
+func TestParse_AcceptsNationalScopeTier(t *testing.T) {
+	src := `
+[[region]]
+slug = "pt-nacional"
+kind = "pt:nacional"
+name = "Portugal"
+scope_tier = "national"
+sort_priority = 90
+parents = []
+`
+	f, err := Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(f.Regions) != 1 || f.Regions[0].ScopeTier != "national" {
+		t.Errorf("national scope_tier not parsed: %+v", f.Regions)
+	}
+}

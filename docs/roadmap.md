@@ -67,6 +67,16 @@ the plan is the *design* view.
   [`docs/region-graph.md`](./region-graph.md) for the user-facing
   reference and `docs/superpowers/specs/2026-05-16-region-graph-design.md`
   for the design rationale.
+- **Region-graph validation via Portugal (slice #4.6):** added
+  `scope_tier='national'` (migration 0003), per-country editorial
+  policy (US/CA local-first preserved; PT/UK/NL/MX use national tier
+  for genuine country-wide umbrellas), 7-digit PT postal-code support
+  in `loadpostal`, removal of the US|CA hardcoded country whitelist,
+  and a 22-region / 7-postal-code / 4-org PT validation fixture that
+  exercises multi-parent municípios, AML's cross-NUTS-II span,
+  autonomous-region parallel hierarchy, and uniões de freguesias.
+  See `docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md`
+  for the validation findings and forward-looking analysis for MX/NL/UK.
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
@@ -76,7 +86,7 @@ the plan is the *design* view.
 
 | # | Slice | What lands |
 |---|-------|------------|
-| 4.6 | **First EU country trial** | Write `regions_<cc>.toml`, `postal_codes_<cc>.csv`, and curated orgs for one European country (Germany or France). Validates the graph model against city-states, federations, and overlapping metros before Phase 2 cutover. Per [`docs/region-graph.md`](./region-graph.md). |
+| 4.7 | **Second EU country validation (Spain)** | Repeat the validation exercise for Spain. Adds `regions_es.toml`, `postal_codes_es.csv`, ~5 ES orgs. Specifically validates: autonomous communities (Catalonia, Basque Country with their own transit authorities), the comarca layer in some communities, and Ceuta/Melilla as the analogue of Açores/Madeira. Should be mostly mechanical given #4.6's conventions and loader changes. |
 | 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. |
 | 6 | **Browse / recent endpoints** | `GET /api/v1/metros`, `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — feeds the homepage strip and `/browse`. |
 | 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. |
