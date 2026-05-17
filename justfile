@@ -171,6 +171,40 @@ pg-shell:
 pg-logs:
     docker logs -f urbanist-atlas-pg
 
+# ── web: build & verify ───────────────────────────────
+
+# install JS deps with the lockfile (matches CI)
+web-deps:
+    cd web && npm ci
+
+# run eslint
+web-lint:
+    cd web && npm run lint
+
+# vitest --run (no watch, matches CI)
+web-test:
+    cd web && npm test -- --run
+
+# production-mode bundle build
+web-build:
+    cd web && npm run build
+
+# regenerate the TS wire types from api/openapi.yaml
+web-oapi-gen:
+    cd web && npm run generate:api
+
+# fail if api.gen.ts would change after a regen against the
+# current openapi.yaml. Mirrors api-gen-check; the wire contract
+# can't drift silently between the two halves.
+web-gen-check:
+    @cd web && npm run generate:api
+    @git diff --exit-code -- web/src/lib/api.gen.ts \
+        || (echo "TS wire types drifted; run \`just web-oapi-gen\` and commit." && exit 1)
+
+# deps + lint + test + build + gen-no-diff — the CI gate for web/,
+# run locally
+web-check: web-deps web-lint web-test web-build web-gen-check
+
 # ── api: live curl helpers (server must be running) ───
 
 # curl /healthz against localhost
@@ -185,4 +219,4 @@ lookup code country='US' port='8080':
 # ── ci-equivalent ─────────────────────────────────────
 
 # run every check CI would run today against the current tree
-ci: api-check
+ci: api-check web-check
