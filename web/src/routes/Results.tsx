@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router';
 import { Dateline } from '../components/Dateline.tsx';
@@ -95,6 +96,18 @@ function ResultsBody({
   country: Country | null;
   rawCountry: string | null;
 }) {
+  // Hooks must run unconditionally before any early return, hence the
+  // optional-chain into query.data and the empty-array fallbacks. When
+  // query.data is undefined the memo result is a fresh empty Map; cheap
+  // and discarded because we early-return before rendering EntryList.
+  const ancestry = query.data?.resolved_ancestry;
+  const local = query.data?.local;
+  const regional = query.data?.regional;
+  const regionNameBySlug = useMemo(
+    () => buildRegionNameMap(ancestry ?? [], [...(local ?? []), ...(regional ?? [])]),
+    [ancestry, local, regional],
+  );
+
   if (postalCode.length === 0) {
     return <p className="results-state">No postal code in the URL.</p>;
   }
@@ -124,8 +137,7 @@ function ResultsBody({
       </p>
     );
   }
-  const { local, regional, resolved_ancestry } = query.data;
-  if (local.length === 0 && regional.length === 0) {
+  if (query.data.local.length === 0 && query.data.regional.length === 0) {
     return (
       <p className="results-state">
         No groups indexed yet for {postalCode}. Know one?{' '}
@@ -133,6 +145,11 @@ function ResultsBody({
       </p>
     );
   }
-  const regionNameBySlug = buildRegionNameMap(resolved_ancestry, [...local, ...regional]);
-  return <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />;
+  return (
+    <EntryList
+      local={query.data.local}
+      regional={query.data.regional}
+      regionNameBySlug={regionNameBySlug}
+    />
+  );
 }
