@@ -20,9 +20,18 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
 ## Scope (v1)
 
 - Transit + safe-streets organizations only. Housing/YIMBY is out of scope.
-- US + Canada from day one.
+- US + Canada are the primary shipping decision. Additional countries
+  (PT first, ES queued, MX/NL/UK over time) are added editorially as
+  the maintainer's interest and data availability allow — see
+  [`docs/region-graph.md`](./docs/region-graph.md) for the per-country
+  conventions.
 - Results return **local** (city/county) + **regional** (metro/state/
-  province/multi-state) orgs. No national orgs in the default lookup.
+  province/multi-state) orgs. The schema supports a third
+  `scope_tier='national'` tier (slice #4.6) for country-wide umbrellas
+  like Portugal's MUBi; the default `/lookup` filters national-tier
+  orgs out so the surface stays local-first. US/CA editorial policy
+  forbids creating national regions in v1 seed data, preserving the
+  no-national-orgs default behavior for those countries.
 
 ## Tooling: mise
 
@@ -137,10 +146,13 @@ here, port the relevant slice rather than reinventing.
 See the plan for the full schema, but at a glance:
 
 - `regions` form a directed acyclic graph (multi-parent allowed) with
-  `scope_tier ∈ {local, regional}` driving result grouping. The
-  taxonomy (kind, sort_priority, edges) is curated in
-  `api/seed/regions_<cc>.toml`. See [`docs/region-graph.md`](./docs/region-graph.md)
-  for modeling conventions and worked examples.
+  `scope_tier ∈ {local, regional, national}` driving result grouping.
+  `national` is filtered from the default `/lookup` (see
+  [`docs/region-graph.md`](./docs/region-graph.md) §5 for the
+  per-country editorial policy). The taxonomy (kind, sort_priority,
+  edges) is curated in `api/seed/regions_<cc>.toml`. See
+  [`docs/region-graph.md`](./docs/region-graph.md) for modeling
+  conventions and worked examples.
 - `postal_codes` map postal codes to a single leaf region; ancestors
   are walked at lookup time via recursive CTE.
 - `organizations` join many-to-many to `regions` via

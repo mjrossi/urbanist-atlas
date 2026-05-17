@@ -8,7 +8,7 @@ Go service powering [urbanistatlas.com](https://urbanistatlas.com). Public JSON 
 api/
 ├── cmd/server/         # urfave/cli entry point. Subcommands:
 │                       #   serve, migrate {up|down|status},
-│                       #   loadpostal, seed
+│                       #   loadregions, loadpostal, seed
 ├── pkg/atlas/          # Public, importable library. Pure Go.
 │                       # Org/Region/LookupResult types, the lookup
 │                       # algorithm, the Store interface, and an
@@ -19,7 +19,10 @@ api/
 ├── internal/httpapi/   # chi handlers. Thin wrappers over pkg/atlas.
 ├── migrations/         # goose-style SQL migrations, embedded into
 │                       # the binary.
-└── seed/               # Human-reviewed seed data (orgs.yaml).
+└── seed/               # Human-reviewed seed data:
+                        #   regions_<cc>.toml (taxonomy + DAG edges)
+                        #   postal_codes_<cc>.csv (postal → leaf)
+                        #   orgs.toml (curated org directory)
 ```
 
 ## Conventions
@@ -77,25 +80,30 @@ export URBANIST_DB_URL=postgres://localhost:5432/urbanist_atlas_dev?sslmode=disa
 just migrate-up
 just migrate-status
 
-# 3. load bundled postal-code crosswalks (idempotent — re-runnable).
-#    The justfile recipe runs the binary with --src interpreted
-#    relative to api/, so a repo-root invocation looks like:
-just loadpostal seed/test_postal_us.csv US
-just loadpostal seed/test_postal_ca.csv CA
+# 3. load the bundled fixtures — regions first (so leaf slugs resolve),
+#    then postal-code crosswalks, then orgs. `just loaddata` does all
+#    three countries in the right order:
+just loaddata
 
-# 4. load the curated orgs.yaml (idempotent — re-runnable).
+# … or step-by-step (idempotent — each recipe is re-runnable):
+just loadregions seed/regions_us.toml US
+just loadpostal  seed/postal_codes_us.csv US
+just loadregions seed/regions_ca.toml CA
+just loadpostal  seed/postal_codes_ca.csv CA
+just loadregions seed/regions_pt.toml PT
+just loadpostal  seed/postal_codes_pt.csv PT
 just seed
 
-# 5. serve. Defaults to --store=postgres so dev configurations
+# 4. serve. Defaults to --store=postgres so dev configurations
 #    fail loudly on a missing DB rather than silently feeding back
 #    fixture data.
 just api-run
 ```
 
-The bundled CSVs and `orgs.yaml` live under [`api/seed/`](./seed); see
-[`api/seed/README.md`](./seed/README.md) for the CSV column layout and
-the documented upstream sources (US Census ZCTA, StatsCan FSA) if you
-want to scale beyond the fixture-sized dataset.
+The bundled TOMLs and CSVs live under [`api/seed/`](./seed); see
+[`api/seed/README.md`](./seed/README.md) for the file format and the
+documented upstream sources (US Census ZCTA, StatsCan FSA, OpenPLZ
+for PT) if you want to scale beyond the fixture-sized dataset.
 
 Pass `--store=memory` (or set `URBANIST_STORE=memory`) to use the
 fixture-backed in-memory store. Useful for the frontend devloop and

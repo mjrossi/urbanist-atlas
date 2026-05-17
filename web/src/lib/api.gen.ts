@@ -86,8 +86,10 @@ export interface paths {
         /**
          * List metros with approved organization counts.
          * @description Feeds the "Browse by metro" panel on the home page. Returns
-         *     every region of kind `metro` that has at least one approved
-         *     organization tagged to it, with a count.
+         *     every region whose kind is metro-equivalent (`us:metro`,
+         *     `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`, and
+         *     future country-prefixed equivalents) that has at least one
+         *     approved organization tagged to it, with a count.
          */
         get: operations["listMetros"];
         put?: never;
