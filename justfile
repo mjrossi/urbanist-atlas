@@ -124,7 +124,14 @@ pg-up:
     else \
         docker start urbanist-atlas-pg >/dev/null; \
     fi
-    @until docker exec urbanist-atlas-pg pg_isready -U urbanist -d urbanist_atlas_dev >/dev/null 2>&1; do sleep 0.5; done
+    @i=0; until docker exec urbanist-atlas-pg pg_isready -U urbanist -d urbanist_atlas_dev >/dev/null 2>&1; do \
+        i=$((i+1)); \
+        if [ "$i" -ge 120 ]; then \
+            echo "pg-up: postgres still not ready after ~60s; check 'docker logs urbanist-atlas-pg'" >&2; \
+            exit 1; \
+        fi; \
+        sleep 0.5; \
+    done
     @echo "dev postgres ready on :55432 (db: urbanist_atlas_dev)"
 
 # stop the dev postgres container (keeps the data volume so a later pg-up is instant)

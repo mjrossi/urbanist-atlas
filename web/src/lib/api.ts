@@ -86,7 +86,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
         // bare-status error.
       }
     }
-    const message = problem?.title ?? `HTTP ${response.status}`;
+    const message = problem?.title ?? problem?.detail ?? `HTTP ${response.status}`;
     throw new ApiError(response.status, message, problem, requestId);
   }
 
