@@ -54,6 +54,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v4
+      - name: Show mise version
+        # Surfaces the installed mise version in the job log so a
+        # future breaking change to `mise env --dotenv` (used below)
+        # is obvious at a glance rather than buried in a sed-like
+        # diff. jdx/mise-action doesn't pin a specific mise binary,
+        # so this is the cheapest visibility we get.
+        run: mise --version
       - name: Export mise [env] to GITHUB_ENV
         # jdx/mise-action installs mise but does NOT auto-propagate
         # [env] to subsequent steps. Re-export so URBANIST_* values
@@ -76,6 +83,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v4
+      - name: Show mise version
+        run: mise --version
       - name: Export mise [env] to GITHUB_ENV
         run: mise env --dotenv >> "$GITHUB_ENV"
       # `just web-check` = deps + lint + test + build + openapi-typescript

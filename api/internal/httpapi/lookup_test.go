@@ -164,6 +164,36 @@ func TestLookup_UnknownCountry_ReturnsNotFound(t *testing.T) {
 	}
 }
 
+// The handler canonicalizes the postal code at the boundary so logs,
+// problem-detail responses, and the echoed query in the success payload
+// all see the same form. The dev fixtures hold "M5V" (Toronto, CA) under
+// the canonical FSA; sending the full lowercase postal "m5v 3a8" must
+// resolve and echo back as "M5V" in query.postal_code.
+func TestLookup_NormalizesPostalCodeAtBoundary(t *testing.T) {
+	srv := newTestServer(t)
+
+	resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=m5v%203a8&country=ca")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status: want 200, got %d (%s)", resp.StatusCode, body)
+	}
+	var got oapi.LookupResult
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Query.PostalCode != "M5V" {
+		t.Errorf("query.postal_code: want %q (canonical FSA), got %q", "M5V", got.Query.PostalCode)
+	}
+	if got.Query.Country != "CA" {
+		t.Errorf("query.country: want %q, got %q", "CA", got.Query.Country)
+	}
+}
+
 func TestLookup_MissingCountry_ReturnsProblemJSON(t *testing.T) {
 	srv := newTestServer(t)
 
