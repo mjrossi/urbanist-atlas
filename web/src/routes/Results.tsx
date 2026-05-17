@@ -57,10 +57,17 @@ export function Results() {
   const postalCode = normalizePostal(params.postalCode ?? '');
   const rawCountry = search.get('country');
   const country = parseCountry(rawCountry);
+  // `country` is `null` when the param is an unsupported value; the
+  // `enabled` gate keeps the queryFn from running in that case, so the
+  // fallback to 'US' here is just to give useQuery a concrete key/arg.
+  // Keeping the gate as the single source of truth (rather than a cast)
+  // means a future change to `enabled` can't silently leak an
+  // unsupported-country fetch.
+  const effectiveCountry: Country = country ?? 'US';
 
   const query = useQuery<LookupResult, ApiError>({
-    queryKey: queryKeys.lookup(postalCode, country ?? 'US'),
-    queryFn: ({ signal }) => lookup(postalCode, country as Country, { signal }),
+    queryKey: queryKeys.lookup(postalCode, effectiveCountry),
+    queryFn: ({ signal }) => lookup(postalCode, effectiveCountry, { signal }),
     enabled: postalCode.length > 0 && country !== null,
   });
 

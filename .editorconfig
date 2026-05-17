@@ -25,7 +25,10 @@ indent_size = 4
 [Makefile]
 indent_style = tab
 
-# justfile recipes are bash; preserve tabs for heredoc safety.
+# justfile recipes use 4-space indentation (the project convention);
+# `set shell := ["bash", ...]` runs each recipe line through bash, and
+# spaces avoid the Makefile-style tab gotcha if a recipe ever grows a
+# heredoc.
 [justfile]
 indent_style = space
 indent_size = 4
