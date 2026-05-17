@@ -17,6 +17,12 @@ import { normalizePostal } from '../lib/postal.ts';
 
 type DetectedCountry = Country | null;
 
+// TODO(third-country): the digit→US, letter→CA heuristic only works
+// while the UI exposes exactly two countries. Before adding a third
+// (e.g. PT/ES going user-facing), either retire the auto-detect and
+// require an explicit country pick, or replace this with a per-country
+// regex map. The `<select>` options below and lib/api.ts'
+// SUPPORTED_COUNTRIES need updating in lockstep.
 function detectCountry(raw: string): DetectedCountry {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;
