@@ -1,9 +1,9 @@
 # urbanist-atlas — common dev commands.
 # Run `just` (no args) to list recipes.
 #
-# `just` itself is pinned via mise (see mise.toml in the user's global
-# tools — `aqua:casey/just`); a `mise install` at the repo root is
-# enough to provision it.
+# `just` itself is pinned in mise.toml (`aqua:casey/just`); a single
+# `mise install` at the repo root provisions it alongside go, node,
+# sqlc, goose, oapi-codegen, and staticcheck.
 
 set shell := ["bash", "-cu"]
 

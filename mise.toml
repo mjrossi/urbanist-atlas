@@ -17,6 +17,7 @@ node = "22.22.3"
 # These get added/bumped as they're introduced into the codebase.
 "aqua:sqlc-dev/sqlc"    = "1.28.0"
 "aqua:pressly/goose"    = "3.24.0"
+"aqua:casey/just"       = "1.51.0"
 "go:honnef.co/go/tools/cmd/staticcheck" = "2025.1.1"
 "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" = "2.7.0"
 
