@@ -123,14 +123,6 @@ func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
 	return out
 }
 
-func toOAPIOrgs(orgs []atlas.Org) []oapi.Org {
-	out := make([]oapi.Org, 0, len(orgs))
-	for _, o := range orgs {
-		out = append(out, toOAPIOrg(o))
-	}
-	return out
-}
-
 func toOAPIRegion(r atlas.Region) oapi.Region {
 	parentSlugs := r.ParentSlugs
 	if parentSlugs == nil {
@@ -147,27 +139,3 @@ func toOAPIRegion(r atlas.Region) oapi.Region {
 	}
 }
 
-func toOAPIOrg(o atlas.Org) oapi.Org {
-	tags := make([]string, len(o.Tags))
-	for i, t := range o.Tags {
-		tags[i] = string(t)
-	}
-	regions := make([]oapi.Region, 0, len(o.Regions))
-	for _, r := range o.Regions {
-		regions = append(regions, toOAPIRegion(r))
-	}
-	out := oapi.Org{
-		Id:         o.ID,
-		Slug:       o.Slug,
-		Name:       o.Name,
-		ShortDesc:  o.ShortDesc,
-		WebsiteUrl: o.WebsiteURL,
-		Tags:       tags,
-		Regions:    regions,
-	}
-	if o.ContactURL != "" {
-		cu := o.ContactURL
-		out.ContactUrl = &cu
-	}
-	return out
-}
