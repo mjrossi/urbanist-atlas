@@ -60,9 +60,13 @@ jobs:
       - name: Export mise [env] to GITHUB_ENV
         # jdx/mise-action installs mise but does NOT auto-propagate
         # [env] to subsequent steps. Re-export so URBANIST_* values
-        # from mise.toml + mise.ci.toml are visible to go test.
+        # from mise.toml + mise.ci.toml are visible to the steps below.
+        # `mise env --dotenv` emits raw KEY=VALUE pairs (no quoting,
+        # no `export`), which is exactly the format $GITHUB_ENV
+        # expects — avoids a fragile sed regex over `mise env`'s
+        # bash output.
         working-directory: ${{ github.workspace }}
-        run: mise env --shell=bash | sed -E 's/^export ([^=]+)="?([^"]*)"?$/\1=\2/' >> "$GITHUB_ENV"
+        run: mise env --dotenv >> "$GITHUB_ENV"
       - run: go vet ./...
       - run: go test ./... -race -count=1
 
