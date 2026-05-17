@@ -77,15 +77,26 @@ the plan is the *design* view.
 | 17 | **Web CI tests (partial)** | `lint` / `test` / `build` already run in CI; pending pieces are dedicated `lib/api.ts` tests and the form-validation tests that land with slice #13. |
 | 18 | **Web recipes in justfile** | `web-dev`, `web-build`, `web-test`, `web-lint`. |
 
-## Deployment & ops
+## Gatekeeping, licensing & ops
+
+The API ships in two phases (per
+[launch strategy](../CLAUDE.md#hosting)): **Phase 1** is locked-down
+dogfooding — only the project's own frontend can call it — and **Phase 2**
+opens the API to the public behind a free-key + rate-limit model. ODbL
+attribution travels in every response in both phases.
 
 | # | Slice | What lands |
 |---|-------|------------|
 | 19 | **Dockerfile + fly.toml** | Multi-stage Go build (binary embeds migrations); `fly launch`; `release_command = "urbanist-atlas-server migrate up"`. |
 | 20 | **Fly Managed Postgres** | Provision MPG, attach to the app, set `URBANIST_DB_URL` + `URBANIST_ADMIN_TOKEN` in Fly secrets. |
 | 21 | **Cloudflare Pages** | Connect Pages to `web/`; production domain `urbanistatlas.com` + DNS; `api.urbanistatlas.com` → Fly. |
-| 22 | **Production CORS** | Add `https://urbanistatlas.com` and `*.pages.dev` to `URBANIST_CORS_ORIGINS` in Fly secrets. |
-| 23 | **End-to-end smoke** | Hit prod `/healthz` and `/api/v1/lookup`; submit a real org via `/submit`; approve via `/admin/queue`; confirm it appears in subsequent lookups. |
+| 22 | **Production CORS (Phase 1 lockdown)** | Set `URBANIST_CORS_ORIGINS` to **only** `https://urbanistatlas.com` + `*.pages.dev`. No wildcard. |
+| 23 | **Shared-secret gate (Phase 1)** | New middleware checking an `X-Atlas-Client` header against a server-side secret (`URBANIST_CLIENT_SECRET`); reject with RFC 9457 `unauthorized` problem if missing/wrong. Frontend build embeds the secret via `VITE_API_CLIENT_SECRET`. Cheap, defeats casual scrapers/bots. Bypassed for `/healthz` and `/api/v1/openapi.yaml`. |
+| 24 | **ODbL attribution in responses** | Every `/api/v1/**` success response carries `X-Data-License: ODbL-1.0` + `X-Data-Attribution: https://urbanistatlas.com` headers, and a `meta` envelope on collection responses with `license`, `attribution_url`, `generated_at`. Document the requirement in the OpenAPI spec. Wraps the existing handlers via a single response middleware. |
+| 25 | **End-to-end smoke (Phase 1)** | Hit prod `/healthz` + `/api/v1/lookup` (with shared secret) + `/submit` flow + admin approve. Confirm attribution headers + meta envelope are present. Confirm anonymous (no-secret) calls are rejected. |
+| 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. |
+| 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. |
+| 28 | **Phase 2 cutover** | Loosen CORS to allow any origin; remove the shared-secret middleware; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. |
 
 ## Deferred (v1.1+)
 

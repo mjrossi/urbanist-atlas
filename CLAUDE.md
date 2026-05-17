@@ -181,3 +181,27 @@ endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 - **API:** Fly.io. Single Dockerfile, single binary, Fly Managed Postgres.
 - **Web:** Cloudflare Pages connected to `web/`. PR preview deploys per
   branch.
+
+## Launch strategy
+
+The API ships in two phases — see roadmap slices #22–#28 for the
+implementation slices.
+
+- **Phase 1 — locked-down dogfooding (launch state).** CORS allowlist
+  is restricted to `urbanistatlas.com` + `*.pages.dev`. A shared
+  `X-Atlas-Client` secret header (bundled into the frontend build via
+  `VITE_API_CLIENT_SECRET`, checked by the backend against
+  `URBANIST_CLIENT_SECRET`) keeps casual scrapers out. Only `/healthz`
+  and `/api/v1/openapi.yaml` are exempt. Goal: shake out schema +
+  query bugs in a low-stakes window.
+- **Phase 2 — public free-key (target state).** Self-serve free API
+  keys (`api_keys` table, email-verified registration), tiered
+  rate-limiting (tight for anonymous IP, generous for keyed),
+  telemetry on key usage. CORS opens up, shared-secret middleware
+  comes off.
+- **Ongoing — ODbL attribution.** Every `/api/v1/**` success response
+  carries `X-Data-License: ODbL-1.0` + `X-Data-Attribution` headers
+  *and* a `meta` envelope on collection responses (`license`,
+  `attribution_url`, `generated_at`) so downstream consumers see the
+  share-alike obligation in-band. Source of truth for the dataset
+  license is `LICENSE-DATA` at the repo root.
