@@ -77,15 +77,25 @@ export URBANIST_DB_URL=postgres://localhost:5432/urbanist_atlas_dev?sslmode=disa
 just migrate-up
 just migrate-status
 
-# 3. (slices #3 + #4, not yet implemented) load postal codes + seed orgs.
-# go run ./cmd/server loadpostal --src ./data/postal_us.csv
-# go run ./cmd/server seed
+# 3. load bundled postal-code crosswalks (idempotent — re-runnable).
+#    The justfile recipe runs the binary with --src interpreted
+#    relative to api/, so a repo-root invocation looks like:
+just loadpostal seed/test_postal_us.csv US
+just loadpostal seed/test_postal_ca.csv CA
 
-# 4. serve. Defaults to --store=postgres so dev configurations
+# 4. load the curated orgs.yaml (idempotent — re-runnable).
+just seed
+
+# 5. serve. Defaults to --store=postgres so dev configurations
 #    fail loudly on a missing DB rather than silently feeding back
 #    fixture data.
 just api-run
 ```
+
+The bundled CSVs and `orgs.yaml` live under [`api/seed/`](./seed); see
+[`api/seed/README.md`](./seed/README.md) for the CSV column layout and
+the documented upstream sources (US Census ZCTA, StatsCan FSA) if you
+want to scale beyond the fixture-sized dataset.
 
 Pass `--store=memory` (or set `URBANIST_STORE=memory`) to use the
 fixture-backed in-memory store. Useful for the frontend devloop and

@@ -1,0 +1,161 @@
+# Hand-curated initial dataset for Urbanist Atlas.
+#
+# Schema: see internal/seed/orgs.go. Each org lists the postal codes
+# it serves; the `seed` subcommand resolves those through the
+# postal_codes table (populated by `loadpostal`) into region IDs.
+#
+# Inclusion criteria: transit and/or safe-streets advocacy in the US
+# or Canada. Housing-only / YIMBY-only orgs are out of scope per
+# CLAUDE.md. URLs are real and were last spot-checked on 2026-05-16.
+#
+# Bias: this is a starter set; expansion happens via the submission
+# queue (slice #5) once that lands.
+
+orgs:
+  - slug: transportation-alternatives
+    name: Transportation Alternatives
+    short_desc: NYC's largest streets-and-mobility advocacy organization, pushing for safer streets, better transit, and protected bike infrastructure.
+    website_url: https://transalt.org
+    contact_url: https://transalt.org/contact
+    tags: [advocacy, safe-streets, cycling, walking, vision-zero]
+    regions:
+      - country: US
+        postal_codes: [11217, 11215, 10001, 10013]
+
+  - slug: riders-alliance
+    name: Riders Alliance
+    short_desc: Grassroots organization of NYC transit riders fighting for more reliable, affordable, and accessible subways and buses.
+    website_url: https://www.ridersny.org
+    tags: [transit, grassroots]
+    regions:
+      - country: US
+        postal_codes: [11217, 10001]
+
+  - slug: streetspac
+    name: StreetsPAC
+    short_desc: Political action committee endorsing candidates for NYC offices based on their record on safe streets and transit.
+    website_url: https://streetspac.org
+    tags: [political, safe-streets]
+    regions:
+      - country: US
+        postal_codes: [11217, 10001]
+
+  - slug: tri-state-transportation-campaign
+    name: Tri-State Transportation Campaign
+    short_desc: Policy coalition advocating for sustainable transportation across New York, New Jersey, and Connecticut.
+    website_url: https://tstc.org
+    tags: [transit, policy, regional]
+    regions:
+      - country: US
+        postal_codes: [11217, 10001]
+
+  - slug: transitcenter
+    name: TransitCenter
+    short_desc: Foundation and research outfit working to improve public transit in cities across the United States; NYC-based with national reach.
+    website_url: https://transitcenter.org
+    tags: [transit, policy, research]
+    regions:
+      - country: US
+        postal_codes: [10013]
+
+  - slug: sf-transit-riders
+    name: San Francisco Transit Riders
+    short_desc: Member-driven advocacy organization fighting for excellent public transit in San Francisco.
+    website_url: https://www.sftransitriders.org
+    tags: [transit, grassroots]
+    regions:
+      - country: US
+        postal_codes: [94110, 94103]
+
+  - slug: walk-sf
+    name: Walk San Francisco
+    short_desc: Pedestrian advocacy organization working to make San Francisco's streets safer for people walking.
+    website_url: https://walksf.org
+    contact_url: https://walksf.org/contact-us/
+    tags: [walking, safe-streets, vision-zero]
+    regions:
+      - country: US
+        postal_codes: [94110, 94103]
+
+  - slug: streets-for-all
+    name: Streets For All
+    short_desc: Los Angeles-based advocacy organization for safer, more sustainable streets and transit across the LA region.
+    website_url: https://www.streetsforall.org
+    tags: [advocacy, safe-streets, transit, cycling]
+    regions:
+      - country: US
+        postal_codes: [90013]
+
+  - slug: transitmatters
+    name: TransitMatters
+    short_desc: Boston-area advocacy and research organization pushing for fast, frequent, reliable, and equitable public transit across Greater Boston.
+    website_url: https://transitmatters.org
+    contact_url: https://transitmatters.org/contact
+    tags: [transit, advocacy, research]
+    regions:
+      - country: US
+        postal_codes: [02139, 02116]
+
+  - slug: livablestreets-alliance
+    name: LivableStreets Alliance
+    short_desc: Cambridge-based nonprofit advocating for innovative transportation solutions and complete streets across Greater Boston.
+    website_url: https://www.livablestreets.info
+    tags: [safe-streets, transit, cycling, walking]
+    regions:
+      - country: US
+        postal_codes: [02139]
+
+  - slug: transit-alliance-miami
+    name: Transit Alliance Miami
+    short_desc: Grassroots advocacy organization working to make Miami a more walkable, bikeable, transit-friendly community.
+    website_url: https://transitalliance.miami
+    tags: [transit, advocacy, safe-streets]
+    regions:
+      - country: US
+        postal_codes: [33130]
+
+  - slug: seattle-subway
+    name: Seattle Subway
+    short_desc: Volunteer advocacy group pushing for an expanded, faster-built rail transit network across the Seattle region.
+    website_url: https://seattlesubway.org
+    tags: [transit, grassroots, rail]
+    regions:
+      - country: US
+        postal_codes: [98101]
+
+  - slug: ttcriders
+    name: TTCriders
+    short_desc: Grassroots membership organization advocating for better public transit in Toronto.
+    website_url: https://ttcriders.ca
+    contact_url: https://ttcriders.ca/contact/
+    tags: [transit, grassroots]
+    regions:
+      - country: CA
+        postal_codes: [M5V, M4W, M6J]
+
+  - slug: walk-toronto
+    name: Walk Toronto
+    short_desc: Volunteer pedestrian advocacy group working for safer, more walkable streets across Toronto.
+    website_url: https://walktoronto.ca
+    tags: [walking, safe-streets]
+    regions:
+      - country: CA
+        postal_codes: [M5V, M4W]
+
+  - slug: movement-metro-vancouver
+    name: Movement — Metro Vancouver Transit Riders
+    short_desc: Volunteer-run organization advocating for better, more affordable transit across Metro Vancouver.
+    website_url: https://movementvancouver.ca
+    tags: [transit, grassroots]
+    regions:
+      - country: CA
+        postal_codes: [V6B]
+
+  - slug: trajectoire-quebec
+    name: Trajectoire Québec
+    short_desc: Québec association representing public-transit users and advocating for expanded service across the province.
+    website_url: https://trajectoire.quebec
+    tags: [transit, advocacy]
+    regions:
+      - country: CA
+        postal_codes: [H2X]

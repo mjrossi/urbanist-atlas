@@ -1,0 +1,184 @@
+//go:build integration
+
+// Integration test for the loadpostal → seed → /lookup pipeline. Uses
+// the same testcontainers Postgres harness as store_test.go.
+//
+// The bundled api/seed/test_postal_us.csv + api/seed/test_postal_ca.csv
+// + api/seed/orgs.yaml are loaded end-to-end and the resulting state
+// is exercised through atlas.Lookup, the same entry point the HTTP
+// handler calls. The test also re-runs each loader a second time and
+// asserts that no rows changed — the idempotence guarantee that
+// roadmap slice #3 + #4 are required to provide.
+
+package postgres
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/mjrossi/urbanist-atlas/api/internal/loadpostal"
+	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
+)
+
+func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	usCSV := repoFile(t, "seed", "test_postal_us.csv")
+	caCSV := repoFile(t, "seed", "test_postal_ca.csv")
+	orgsYAML := repoFile(t, "seed", "orgs.yaml")
+
+	usSum, err := loadpostal.LoadFile(ctx, store.Pool(), nil, usCSV, atlas.CountryUS)
+	if err != nil {
+		t.Fatalf("loadpostal US: %v", err)
+	}
+	if usSum.PostalCodes == 0 {
+		t.Fatal("US load wrote zero postal codes")
+	}
+	caSum, err := loadpostal.LoadFile(ctx, store.Pool(), nil, caCSV, atlas.CountryCA)
+	if err != nil {
+		t.Fatalf("loadpostal CA: %v", err)
+	}
+	if caSum.PostalCodes == 0 {
+		t.Fatal("CA load wrote zero postal codes")
+	}
+
+	seedSum, err := seed.LoadFile(ctx, store.Pool(), nil, orgsYAML)
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if seedSum.OrgsUpserted < 10 {
+		t.Errorf("expected >=10 orgs upserted, got %d", seedSum.OrgsUpserted)
+	}
+
+	// /lookup against a Brooklyn ZIP: must surface Transportation
+	// Alternatives in Local and Tri-State / Riders Alliance in
+	// Regional (Riders Alliance attaches to NYC Metro, Tri-State to
+	// NY state — both regional).
+	res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "11217", Country: atlas.CountryUS})
+	if err != nil {
+		t.Fatalf("Lookup 11217: %v", err)
+	}
+	if !containsSlug(res.Local, "transportation-alternatives") {
+		t.Errorf("11217 local: missing transportation-alternatives; got %v", orgSlugList(res.Local))
+	}
+	if len(res.Regional) == 0 {
+		t.Errorf("11217 regional: want >=1 org, got 0")
+	}
+
+	// /lookup against a Toronto FSA: TTCriders is local.
+	caRes, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "M5V", Country: atlas.CountryCA})
+	if err != nil {
+		t.Fatalf("Lookup M5V: %v", err)
+	}
+	if !containsSlug(caRes.Local, "ttcriders") {
+		t.Errorf("M5V local: missing ttcriders; got %v", orgSlugList(caRes.Local))
+	}
+
+	// Idempotence: re-running the loaders must produce identical row
+	// counts. Snapshot row counts → run again → compare.
+	before := snapshotCounts(ctx, t, store)
+
+	if _, err := loadpostal.LoadFile(ctx, store.Pool(), nil, usCSV, atlas.CountryUS); err != nil {
+		t.Fatalf("loadpostal US (2nd): %v", err)
+	}
+	if _, err := loadpostal.LoadFile(ctx, store.Pool(), nil, caCSV, atlas.CountryCA); err != nil {
+		t.Fatalf("loadpostal CA (2nd): %v", err)
+	}
+	if _, err := seed.LoadFile(ctx, store.Pool(), nil, orgsYAML); err != nil {
+		t.Fatalf("seed (2nd): %v", err)
+	}
+
+	after := snapshotCounts(ctx, t, store)
+	if diff := cmp.Diff(before, after); diff != "" {
+		t.Errorf("row counts changed after re-run (loaders not idempotent) (-before +after):\n%s", diff)
+	}
+
+	// And the same lookup must still produce the same Local org set.
+	resAfter, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "11217", Country: atlas.CountryUS})
+	if err != nil {
+		t.Fatalf("Lookup 11217 (after re-run): %v", err)
+	}
+	if diff := cmp.Diff(orgSlugList(res.Local), orgSlugList(resAfter.Local)); diff != "" {
+		t.Errorf("11217 local orgs changed after re-run (-before +after):\n%s", diff)
+	}
+}
+
+type tableCounts struct {
+	Regions             int64
+	PostalCodes         int64
+	Organizations       int64
+	OrganizationRegions int64
+}
+
+func snapshotCounts(ctx context.Context, t *testing.T, store *Store) tableCounts {
+	t.Helper()
+	pool := store.Pool()
+	var c tableCounts
+	queries := []struct {
+		sql  string
+		dest *int64
+	}{
+		{`SELECT COUNT(*) FROM regions`, &c.Regions},
+		{`SELECT COUNT(*) FROM postal_codes`, &c.PostalCodes},
+		{`SELECT COUNT(*) FROM organizations`, &c.Organizations},
+		{`SELECT COUNT(*) FROM organization_regions`, &c.OrganizationRegions},
+	}
+	for _, q := range queries {
+		if err := pool.QueryRow(ctx, q.sql).Scan(q.dest); err != nil {
+			t.Fatalf("count %s: %v", q.sql, err)
+		}
+	}
+	return c
+}
+
+func containsSlug(orgs []atlas.Org, slug string) bool {
+	for _, o := range orgs {
+		if o.Slug == slug {
+			return true
+		}
+	}
+	return false
+}
+
+func orgSlugList(orgs []atlas.Org) []string {
+	out := make([]string, len(orgs))
+	for i, o := range orgs {
+		out[i] = o.Slug
+	}
+	return out
+}
+
+// repoFile resolves a path under the repo's api/ tree by walking up
+// from the test's cwd. pipeline_test.go runs from
+// api/internal/store/postgres, so api/ is three parents up — but
+// walking up to find a directory that contains a "go.mod" is more
+// robust against future package moves.
+func repoFile(t *testing.T, parts ...string) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("repoFile cwd: %v", err)
+	}
+	for i := 0; i < 8; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			candidate := filepath.Join(append([]string{dir}, parts...)...)
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate
+			}
+			t.Fatalf("repoFile: found go.mod at %s but no %v", dir, parts)
+		}
+		dir = filepath.Dir(dir)
+	}
+	t.Fatalf("repoFile: did not find go.mod walking up from cwd")
+	return ""
+}

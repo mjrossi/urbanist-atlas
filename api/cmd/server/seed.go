@@ -1,10 +1,20 @@
 package main
 
-import "github.com/urfave/cli/v3"
+import (
+	"context"
+	"errors"
+	"fmt"
 
-// seedCommand is a placeholder. Once the Postgres store lands, this
-// subcommand loads api/seed/orgs.yaml into the organizations and
-// organization_regions tables.
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/urfave/cli/v3"
+
+	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
+)
+
+// seedCommand loads api/seed/orgs.yaml into organizations +
+// organization_regions. Region linkage resolves each org's
+// postal_codes through the already-populated postal_codes table, so
+// loadpostal must run first.
 func seedCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "seed",
@@ -15,7 +25,47 @@ func seedCommand() *cli.Command {
 				Usage: "path to seed YAML",
 				Value: "./seed/orgs.yaml",
 			},
+			&cli.StringFlag{
+				Name:    "db-url",
+				Usage:   "Postgres connection string",
+				Sources: cli.EnvVars("URBANIST_DB_URL"),
+			},
+			&cli.StringFlag{
+				Name:    "log-format",
+				Usage:   "log output format: json or text",
+				Value:   "text",
+				Sources: cli.EnvVars("URBANIST_LOG_FORMAT"),
+			},
 		},
-		Action: notImplemented("seed"),
+		Action: runSeed,
 	}
+}
+
+func runSeed(ctx context.Context, c *cli.Command) error {
+	dbURL := c.String("db-url")
+	if dbURL == "" {
+		return errors.New("seed: --db-url or URBANIST_DB_URL is required")
+	}
+	src := c.String("src")
+	logger := buildLogger(c.String("log-format"))
+
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		return fmt.Errorf("seed: open pool: %w", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("seed: ping: %w", err)
+	}
+
+	summary, err := seed.LoadFile(ctx, pool, logger, src)
+	if err != nil {
+		return err
+	}
+	logger.Info("seed complete",
+		"src", src,
+		"orgs", summary.OrgsUpserted,
+		"region_links", summary.RegionLinks,
+	)
+	return nil
 }
