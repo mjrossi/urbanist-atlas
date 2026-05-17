@@ -47,6 +47,7 @@ func newRootCommand() *cli.Command {
 		Commands: []*cli.Command{
 			serveCommand(),
 			migrateCommand(),
+			loadregionsCommand(),
 			loadpostalCommand(),
 			seedCommand(),
 		},

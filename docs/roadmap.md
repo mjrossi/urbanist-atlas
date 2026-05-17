@@ -44,32 +44,59 @@ the plan is the *design* view.
   - `openapi-typescript` → `src/lib/api.gen.ts`; `src/lib/api.ts`
     provides `apiFetch<T>`, an `ApiError` carrying the RFC 9457
     body, and a `lookup()` wrapper — all types from `api.gen.ts`.
-  - Broadsheet CSS port from mjrossi.com (the layout-shell slice
-    only) + variable fonts via `@fontsource-variable/*`.
+  - Broadsheet CSS port from mjrossi.com + variable fonts via
+    `@fontsource-variable/*`.
   - Layout shell: `Masthead` (amber "Atlas" + italic tagline
-    between rules), `BroadsheetNav`, `Footer`; placeholder Home
-    route. TanStack Query + React Router wired (no live `useQuery`
-    callers yet).
+    between rules), `BroadsheetNav`, `Footer`. TanStack Query +
+    React Router wired.
+- **Data pipeline foundation (slices #3 + #4):** `loadpostal` CSV
+  ingester + `seed` TOML loader + bundled fixtures. Original v0
+  shape (4-tier postal + YAML orgs) was reshaped by slice #4.5;
+  the current shape is documented in [`api/seed/README.md`](../api/seed/README.md).
+- **Home + Results pages (slices #11 + #12):** Two-column broadsheet
+  home with `SearchBox` + drop-cap lede; `/r/:postalCode` results
+  with `Dateline` header + `EntryList` Local/Regional classified
+  layout against `/api/v1/lookup`. Right-column placeholders for
+  "Browse by metro" / "Recently added" until slice #6 lands the
+  backing endpoints.
+- **Region-graph refactor (slice #4.5):** regions become a multi-parent
+  DAG; postal_codes point at the leaf; `scope_tier` is editorial;
+  `RegionKind`/`Country` open to free-form strings; loaders move to
+  TOML (`regions_<cc>.toml`, `orgs.toml`); SPA renders ancestry
+  breadcrumb + "via X" subtitles. See
+  [`docs/region-graph.md`](./region-graph.md) for the user-facing
+  reference and `docs/superpowers/specs/2026-05-16-region-graph-design.md`
+  for the design rationale.
+- **Region-graph validation via Portugal (slice #4.6):** added
+  `scope_tier='national'` (migration 0003), per-country editorial
+  policy (US/CA local-first preserved; PT/UK/NL/MX use national tier
+  for genuine country-wide umbrellas), 7-digit PT postal-code support
+  in `loadpostal`, removal of the US|CA hardcoded country whitelist,
+  and a 22-region / 7-postal-code / 4-org PT validation fixture that
+  exercises multi-parent municípios, AML's cross-NUTS-II span,
+  autonomous-region parallel hierarchy, and uniões de freguesias.
+  See `docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md`
+  for the validation findings and forward-looking analysis for MX/NL/UK.
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
-  `healthz`, `lookup`, `seed`, `loadpostal`, `ci`.
+  `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
+  `loaddata`, `ci`.
 
 ## Backend (Go)
 
 | # | Slice | What lands |
 |---|-------|------------|
-| 3 | **`loadpostal` for real** | Pick free sources (US Census ZCTA→CBSA crosswalk; StatsCan FSA), write the CSV ingester, populate `regions` + `postal_codes`. |
-| 4 | **`seed` for real** | Generate `api/seed/orgs.yaml` (~30–50 LLM-drafted-then-human-reviewed orgs), write the YAML loader (`gopkg.in/yaml.v3`), wire the subcommand to upsert into Postgres. |
-| 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. |
-| 6 | **Browse / recent endpoints** | `GET /api/v1/metros`, `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — feeds the homepage strip and `/browse`. |
-| 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. |
+| 4.7 | **Second EU country validation (Spain)** | Repeat the validation exercise for Spain. Adds `regions_es.toml`, `postal_codes_es.csv`, ~5 ES orgs. Specifically validates: autonomous communities (Catalonia, Basque Country with their own transit authorities), the comarca layer in some communities, and Ceuta/Melilla as the analogue of Açores/Madeira. Should be mostly mechanical given #4.6's conventions and loader changes. |
+| 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. Region attachment uses the same `region_slugs` machinery as `orgs.toml`, so submitted orgs can target any region kind in any supported country. |
+| 6 | **Browse / recent endpoints** | `GET /api/v1/metros`, `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — feeds the homepage strip and `/browse`. "Metro" matches the country-prefixed metro-equivalent kinds (`us:metro`, `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`, future siblings); the handler should derive the set from a stable kind suffix rather than a hardcoded enum. |
+| 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. Lookup coverage should include: the national-tier filter (orgs attached to `scope_tier='national'` regions must NOT appear in default results) and the unknown-country fall-through (`country=ZZ` with an unknown postal code returns 404, not 400) — both shipped in slice #4.6 with light coverage in `pipeline_test.go`. |
+| 7.5 | **Full-country postal data ingest** | Replace the bundled fixture CSVs (~30 ZIPs) with real Census ZCTA / StatsCan PCCF reshapes (and OpenPLZ for PT when the directory expands). Out-of-band ETL → 3-column CSVs in the format `loadpostal` already consumes. Documented in [`api/seed/README.md`](../api/seed/README.md). |
+| 7.6 | **Seed data growth** | Expand `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to the planned ~30–50 across the supported countries. Editorial work, not engineering. |
 
 ## Frontend (React + Vite)
 
 | # | Slice | What lands |
 |---|-------|------------|
-| 11 | **Home page** | Two-column broadsheet — `SearchBox` + drop-cap lede on the left; "Browse by metro" + "Recently added" on the right (TanStack Query against #6). |
-| 12 | **Results page** | `/r/:postalCode` route; `Dateline` header treatment; `EntryList` rendering the "Local" / "Regional" classified-section layout against `/api/v1/lookup`. |
 | 13 | **Submit form** | `/submit` with `react-hook-form`, broadsheet-style fieldsets, optional Turnstile, POSTs to `/api/v1/submissions`. |
 | 14 | **Browse + metro pages** | `/browse` list of metros; `/m/:metroSlug` reusing the results layout. |
 | 15 | **About + 404** | Single-column `.page` treatment; mission/methodology/criteria copy. |

@@ -30,13 +30,13 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 		if country == "" {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country is required (US or CA)", rid)
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country is required", rid)
 			return
 		}
-		if country != atlas.CountryUS && country != atlas.CountryCA {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country must be US or CA", rid)
-			return
-		}
+		// Country is an opaque string per pkg/atlas/atlas.go; the handler
+		// doesn't gate on a known-country list. Unknown countries fall
+		// through to atlas.Lookup which returns ErrPostalCodeNotFound
+		// (→ 404) when no matching postal code exists.
 
 		result, err := atlas.Lookup(r.Context(), store, atlas.LookupQuery{
 			PostalCode: postal,
@@ -68,15 +68,59 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 // "returns oapi.LookupResult", which keeps the wire contract front and
 // center in code review.
 func toOAPILookupResult(in atlas.LookupResult) oapi.LookupResult {
+	ancestry := make([]oapi.Region, 0, len(in.ResolvedAncestry))
+	for _, r := range in.ResolvedAncestry {
+		ancestry = append(ancestry, toOAPIRegion(r))
+	}
 	return oapi.LookupResult{
 		Query: oapi.LookupQuery{
 			PostalCode: in.Query.PostalCode,
 			Country:    oapi.Country(in.Query.Country),
 		},
 		ResolvedPlaceLabel: in.ResolvedPlaceLabel,
-		Local:              toOAPIOrgs(in.Local),
-		Regional:           toOAPIOrgs(in.Regional),
+		ResolvedAncestry:   ancestry,
+		Local:              toOAPILookupOrgs(in.Local),
+		Regional:           toOAPILookupOrgs(in.Regional),
 	}
+}
+
+func toOAPILookupOrgs(orgs []atlas.Org) []oapi.LookupOrg {
+	out := make([]oapi.LookupOrg, 0, len(orgs))
+	for _, o := range orgs {
+		out = append(out, toOAPILookupOrg(o))
+	}
+	return out
+}
+
+func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
+	tags := make([]string, len(o.Tags))
+	for i, t := range o.Tags {
+		tags[i] = string(t)
+	}
+	regions := make([]oapi.Region, 0, len(o.Regions))
+	for _, r := range o.Regions {
+		regions = append(regions, toOAPIRegion(r))
+	}
+
+	matched := o.MatchedRegionSlugs
+	if matched == nil {
+		matched = []string{}
+	}
+	out := oapi.LookupOrg{
+		Id:                 o.ID,
+		Slug:               o.Slug,
+		Name:               o.Name,
+		ShortDesc:          o.ShortDesc,
+		WebsiteUrl:         o.WebsiteURL,
+		Tags:               tags,
+		Regions:            regions,
+		MatchedRegionSlugs: matched,
+	}
+	if o.ContactURL != "" {
+		cu := o.ContactURL
+		out.ContactUrl = &cu
+	}
+	return out
 }
 
 func toOAPIOrgs(orgs []atlas.Org) []oapi.Org {
@@ -87,6 +131,22 @@ func toOAPIOrgs(orgs []atlas.Org) []oapi.Org {
 	return out
 }
 
+func toOAPIRegion(r atlas.Region) oapi.Region {
+	parentSlugs := r.ParentSlugs
+	if parentSlugs == nil {
+		parentSlugs = []string{}
+	}
+	return oapi.Region{
+		Id:          r.ID,
+		Kind:        oapi.RegionKind(r.Kind),
+		Name:        r.Name,
+		Slug:        r.Slug,
+		Country:     oapi.Country(r.Country),
+		ScopeTier:   oapi.ScopeTier(r.ScopeTier),
+		ParentSlugs: parentSlugs,
+	}
+}
+
 func toOAPIOrg(o atlas.Org) oapi.Org {
 	tags := make([]string, len(o.Tags))
 	for i, t := range o.Tags {
@@ -94,14 +154,7 @@ func toOAPIOrg(o atlas.Org) oapi.Org {
 	}
 	regions := make([]oapi.Region, 0, len(o.Regions))
 	for _, r := range o.Regions {
-		regions = append(regions, oapi.Region{
-			Id:        r.ID,
-			Kind:      oapi.RegionKind(r.Kind),
-			Name:      r.Name,
-			Slug:      r.Slug,
-			Country:   oapi.Country(r.Country),
-			ScopeTier: oapi.ScopeTier(r.ScopeTier),
-		})
+		regions = append(regions, toOAPIRegion(r))
 	}
 	out := oapi.Org{
 		Id:         o.ID,

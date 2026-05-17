@@ -13,60 +13,10 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "BearerAuth.Scopes"
 )
 
-// Defines values for Country.
-const (
-	CountryCA Country = "CA"
-	CountryUS Country = "US"
-)
-
-// Valid indicates whether the value is a known member of the Country enum.
-func (e Country) Valid() bool {
-	switch e {
-	case CountryCA:
-		return true
-	case CountryUS:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for RegionKind.
-const (
-	RegionKindCity       RegionKind = "city"
-	RegionKindCountry    RegionKind = "country"
-	RegionKindCounty     RegionKind = "county"
-	RegionKindMetro      RegionKind = "metro"
-	RegionKindMultiState RegionKind = "multi-state"
-	RegionKindProvince   RegionKind = "province"
-	RegionKindState      RegionKind = "state"
-)
-
-// Valid indicates whether the value is a known member of the RegionKind enum.
-func (e RegionKind) Valid() bool {
-	switch e {
-	case RegionKindCity:
-		return true
-	case RegionKindCountry:
-		return true
-	case RegionKindCounty:
-		return true
-	case RegionKindMetro:
-		return true
-	case RegionKindMultiState:
-		return true
-	case RegionKindProvince:
-		return true
-	case RegionKindState:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ScopeTier.
 const (
 	ScopeTierLocal    ScopeTier = "local"
+	ScopeTierNational ScopeTier = "national"
 	ScopeTierRegional ScopeTier = "regional"
 )
 
@@ -74,6 +24,8 @@ const (
 func (e ScopeTier) Valid() bool {
 	switch e {
 	case ScopeTierLocal:
+		return true
+	case ScopeTierNational:
 		return true
 	case ScopeTierRegional:
 		return true
@@ -103,37 +55,77 @@ func (e SubmissionStatus) Valid() bool {
 	}
 }
 
-// Country ISO-style country code. Only `US` and `CA` are supported in v1.
-type Country string
+// Country ISO-style country code. v1 ships with `US` and `CA`; additional
+// countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
+// changes as data is loaded.
+type Country = string
+
+// LookupOrg defines model for LookupOrg.
+type LookupOrg struct {
+	// ContactUrl Optional. URL of the org's contact page.
+	ContactUrl *string `json:"contact_url,omitempty"`
+	Id         int64   `json:"id"`
+
+	// MatchedRegionSlugs Slugs of the regions whose membership caused this org
+	// to surface for the current lookup. A non-empty subset
+	// of the org's `regions[*].slug`. Useful for
+	// explainability and debugging.
+	MatchedRegionSlugs []string `json:"matched_region_slugs"`
+	Name               string   `json:"name"`
+	Regions            []Region `json:"regions"`
+	ShortDesc          string   `json:"short_desc"`
+	Slug               string   `json:"slug"`
+
+	// Tags Open-ended labels. The canonical set is documented in
+	// `CLAUDE.md` (transit, safe-streets, cycling, walking,
+	// vision-zero, policy, grassroots, political, neighborhood);
+	// new labels may be introduced via seed data.
+	Tags       []string `json:"tags"`
+	WebsiteUrl string   `json:"website_url"`
+}
 
 // LookupQuery defines model for LookupQuery.
 type LookupQuery struct {
-	// Country ISO-style country code. Only `US` and `CA` are supported in v1.
+	// Country ISO-style country code. v1 ships with `US` and `CA`; additional
+	// countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
+	// changes as data is loaded.
 	Country    Country `json:"country"`
 	PostalCode string  `json:"postal_code"`
 }
 
 // LookupResult Response shape of `GET /api/v1/lookup`. `local` and `regional`
-// are always present (possibly empty arrays). `resolved_place_label`
-// is a human-readable description of where the postal code was
-// resolved (e.g. "Brooklyn, NY").
+// are always present (possibly empty arrays).
+// `resolved_ancestry` is the postal code's leaf region followed
+// by all ancestors, ordered most-specific first — clients can use
+// it to render breadcrumbs without walking the graph themselves.
 type LookupResult struct {
-	Local              []Org       `json:"local"`
+	Local              []LookupOrg `json:"local"`
 	Query              LookupQuery `json:"query"`
-	Regional           []Org       `json:"regional"`
+	Regional           []LookupOrg `json:"regional"`
+	ResolvedAncestry   []Region    `json:"resolved_ancestry"`
 	ResolvedPlaceLabel string      `json:"resolved_place_label"`
 }
 
 // MetroDetail A metro region with the approved organizations that serve it.
 type MetroDetail struct {
-	Orgs   []Org  `json:"orgs"`
+	Orgs []Org `json:"orgs"`
+
+	// Region A geographic unit an organization can serve. Regions form a
+	// directed acyclic graph; `parent_slugs` lists the direct parents
+	// (not transitive). Empty for top-of-hierarchy regions (states,
+	// multi-state regions, transit federations).
 	Region Region `json:"region"`
 }
 
 // MetroSummary A metro region plus its approved-org count, for the browse-by-metro panel.
 type MetroSummary struct {
-	OrgCount int32  `json:"org_count"`
-	Region   Region `json:"region"`
+	OrgCount int32 `json:"org_count"`
+
+	// Region A geographic unit an organization can serve. Regions form a
+	// directed acyclic graph; `parent_slugs` lists the direct parents
+	// (not transitive). Empty for top-of-hierarchy regions (states,
+	// multi-state regions, transit federations).
+	Region Region `json:"region"`
 }
 
 // NewSubmissionRequest Request body for `POST /api/v1/submissions`.
@@ -232,24 +224,68 @@ type ProblemDetails struct {
 	Type string `json:"type"`
 }
 
-// Region defines model for Region.
+// Region A geographic unit an organization can serve. Regions form a
+// directed acyclic graph; `parent_slugs` lists the direct parents
+// (not transitive). Empty for top-of-hierarchy regions (states,
+// multi-state regions, transit federations).
 type Region struct {
-	// Country ISO-style country code. Only `US` and `CA` are supported in v1.
+	// Country ISO-style country code. v1 ships with `US` and `CA`; additional
+	// countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
+	// changes as data is loaded.
 	Country Country `json:"country"`
 	Id      int64   `json:"id"`
 
-	// Kind Granularity of a region.
+	// Kind Free-form taxonomy for region granularity. The recommended
+	// vocabulary uses country-prefixed values: `us:city`, `us:borough`,
+	// `us:county`, `us:metro`, `us:state`, `us:multi-state`,
+	// `us:transit-federation`, `ca:province`, `ca:regional-district`,
+	// `ca:city`, `ca:cma`, `pt:freguesia`, `pt:municipio`,
+	// `pt:cim`, `pt:area-metropolitana`, `pt:distrito`,
+	// `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional`,
+	// `de:land`, `de:bezirk`, `de:kreisfreie-stadt`,
+	// `de:transit-federation`, `fr:commune`, `fr:departement`,
+	// `fr:region`, `fr:metropole`. Clients should treat unknown kinds
+	// gracefully (e.g. fall back to displaying `name`).
 	Kind RegionKind `json:"kind"`
 	Name string     `json:"name"`
 
+	// ParentSlugs Direct parents in the region graph. Clients can walk these
+	// to render breadcrumbs without a second request.
+	ParentSlugs []string `json:"parent_slugs"`
+
 	// ScopeTier Drives result grouping in `/lookup`. `local` for city/county
-	// regions; `regional` for metro/state/province/multi-state.
+	// regions; `regional` for metro/state/province/multi-state;
+	// `national` for country-wide umbrellas (federations, advocacy
+	// groups operating across an entire country).
+	//
+	// `national` regions are filtered from the default `/lookup`
+	// ancestor walk — they're present in the schema so that
+	// national-scope orgs (e.g. MUBi for Portugal, Living Streets
+	// for the UK) can be modeled without distorting local-first
+	// defaults. A future opt-in surface for national orgs is
+	// anticipated; until then, `national`-tier regions are hidden.
+	//
+	// See `docs/region-graph.md` for the per-country editorial
+	// policy on when to use `national` vs modeling state/regional
+	// chapters instead.
 	ScopeTier ScopeTier `json:"scope_tier"`
-	Slug      string    `json:"slug"`
+
+	// Slug Globally unique across countries.
+	Slug string `json:"slug"`
 }
 
-// RegionKind Granularity of a region.
-type RegionKind string
+// RegionKind Free-form taxonomy for region granularity. The recommended
+// vocabulary uses country-prefixed values: `us:city`, `us:borough`,
+// `us:county`, `us:metro`, `us:state`, `us:multi-state`,
+// `us:transit-federation`, `ca:province`, `ca:regional-district`,
+// `ca:city`, `ca:cma`, `pt:freguesia`, `pt:municipio`,
+// `pt:cim`, `pt:area-metropolitana`, `pt:distrito`,
+// `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional`,
+// `de:land`, `de:bezirk`, `de:kreisfreie-stadt`,
+// `de:transit-federation`, `fr:commune`, `fr:departement`,
+// `fr:region`, `fr:metropole`. Clients should treat unknown kinds
+// gracefully (e.g. fall back to displaying `name`).
+type RegionKind = string
 
 // RejectSubmissionRequest Request body for `POST /api/v1/admin/submissions/{id}/reject`.
 type RejectSubmissionRequest struct {
@@ -258,7 +294,20 @@ type RejectSubmissionRequest struct {
 }
 
 // ScopeTier Drives result grouping in `/lookup`. `local` for city/county
-// regions; `regional` for metro/state/province/multi-state.
+// regions; `regional` for metro/state/province/multi-state;
+// `national` for country-wide umbrellas (federations, advocacy
+// groups operating across an entire country).
+//
+// `national` regions are filtered from the default `/lookup`
+// ancestor walk — they're present in the schema so that
+// national-scope orgs (e.g. MUBi for Portugal, Living Streets
+// for the UK) can be modeled without distorting local-first
+// defaults. A future opt-in surface for national orgs is
+// anticipated; until then, `national`-tier regions are hidden.
+//
+// See `docs/region-graph.md` for the per-country editorial
+// policy on when to use `national` vs modeling state/regional
+// chapters instead.
 type ScopeTier string
 
 // Submission A queued or processed public submission.
@@ -303,7 +352,9 @@ type SubmissionPayload struct {
 // SubmissionStatus Lifecycle state of a public submission.
 type SubmissionStatus string
 
-// CountryQuery ISO-style country code. Only `US` and `CA` are supported in v1.
+// CountryQuery ISO-style country code. v1 ships with `US` and `CA`; additional
+// countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
+// changes as data is loaded.
 type CountryQuery = Country
 
 // MetroSlug defines model for MetroSlug.

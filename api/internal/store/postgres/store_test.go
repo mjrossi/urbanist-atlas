@@ -16,6 +16,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/store/postgres/gen"
 	"github.com/mjrossi/urbanist-atlas/api/migrations"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
@@ -95,8 +98,12 @@ func applyMigrations(ctx context.Context, dbURL string) error {
 
 // seedFixture inserts a small NYC fixture so the adapter has something
 // to find. Uses the pgx pool directly to avoid coupling the test to
-// any sqlc-generated write helpers (we don't ship those yet — slices
-// #3 and #4 add seed loaders).
+// any sqlc-generated write helpers.
+//
+// Region graph for the NYC fixture (leaf → parents):
+//
+//	brooklyn-ny → kings-county-ny → nyc-metro → ny
+//	                                            (also sf-bay-area for off-topic org)
 func seedFixture(t *testing.T, store *Store) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -104,19 +111,23 @@ func seedFixture(t *testing.T, store *Store) {
 	pool := store.Pool()
 
 	stmts := []string{
-		// Insert every region we'll reference, including the dummy SF
-		// region (99) that the off-topic org needs as an FK target. All
-		// regions up front so subsequent organization_regions inserts
-		// don't trip the FK constraint.
-		`INSERT INTO regions (id, kind, name, slug, country, scope_tier) VALUES
-			(1,  'city',   'Brooklyn',         'brooklyn-ny',     'US', 'local'),
-			(2,  'county', 'Kings County, NY', 'kings-county-ny', 'US', 'local'),
-			(3,  'metro',  'New York Metro',   'nyc-metro',       'US', 'regional'),
-			(4,  'state',  'NY',               'ny',              'US', 'regional'),
-			(99, 'metro',  'SF Bay Area',      'sf-bay-area',     'US', 'regional')`,
+		// Insert every region we'll reference. All regions up front so
+		// subsequent FK references don't trip the constraint.
+		`INSERT INTO regions (id, kind, name, slug, country, scope_tier, sort_priority) VALUES
+			(1,  'city',   'Brooklyn',         'brooklyn-ny',     'US', 'local',    10),
+			(2,  'county', 'Kings County, NY', 'kings-county-ny', 'US', 'local',    20),
+			(3,  'metro',  'New York Metro',   'nyc-metro',       'US', 'regional', 40),
+			(4,  'state',  'NY',               'ny',              'US', 'regional', 60),
+			(99, 'metro',  'SF Bay Area',      'sf-bay-area',     'US', 'regional', 40)`,
 		`SELECT setval(pg_get_serial_sequence('regions','id'), 99)`,
-		`INSERT INTO postal_codes (postal_code, country, city_region_id, county_region_id, metro_region_id, state_region_id) VALUES
-			('11217', 'US', 1, 2, 3, 4)`,
+		// Region DAG edges: brooklyn-ny → kings-county-ny → nyc-metro → ny
+		`INSERT INTO region_parents (region_id, parent_region_id) VALUES
+			(1, 2),
+			(2, 3),
+			(3, 4)`,
+		// postal_codes: single leaf pointer (region-graph schema)
+		`INSERT INTO postal_codes (postal_code, country, leaf_region_id) VALUES
+			('11217', 'US', 1)`,
 		`INSERT INTO organizations (id, slug, name, short_desc, website_url, contact_url, tags, status, approved_at) VALUES
 			(1, 'transalt-brooklyn', 'Transportation Alternatives — Brooklyn',
 				'The Brooklyn committee.', 'https://www.transalt.org', NULL,
@@ -131,8 +142,8 @@ func seedFixture(t *testing.T, store *Store) {
 				'Not yet approved.', 'https://example.org', NULL,
 				ARRAY['transit']::text[], 'pending', NULL)`,
 		`SELECT setval(pg_get_serial_sequence('organizations','id'), 4)`,
-		// org 1 → regions 1, 2 (Brooklyn, Kings)
-		// org 2 → region 3 (NYC Metro)
+		// org 1 → regions 1, 2 (Brooklyn leaf + Kings county; both local)
+		// org 2 → region 3 (NYC Metro; regional)
 		// org 3 → region 99 (SF Bay Area; out of scope for an NYC lookup)
 		// org 4 → region 1 (pending; status filter must exclude it)
 		`INSERT INTO organization_regions (organization_id, region_id) VALUES
@@ -148,59 +159,47 @@ func seedFixture(t *testing.T, store *Store) {
 	}
 }
 
-func TestPostgresStore_ResolvePostalCode_NormalizesAndHydrates(t *testing.T) {
+func TestPostgresStore_ResolveLeafRegion_NormalizesAndReturnsLeaf(t *testing.T) {
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	seedFixture(t, store)
 
-	// Lowercase input with whitespace; the adapter should normalize
-	// before querying. The DB only holds "11217".
-	rpc, err := store.ResolvePostalCode(context.Background(), atlas.CountryUS, " 11217 ")
+	// Whitespace around the code; the adapter must strip it.
+	// The DB holds "11217" mapped to the brooklyn-ny leaf region.
+	leaf, err := store.ResolveLeafRegion(context.Background(), atlas.CountryUS, " 11217 ")
 	if err != nil {
-		t.Fatalf("ResolvePostalCode: %v", err)
+		t.Fatalf("ResolveLeafRegion: %v", err)
 	}
-	if rpc.Code != "11217" {
-		t.Errorf("code: want %q, got %q", "11217", rpc.Code)
+	if leaf.Slug != "brooklyn-ny" {
+		t.Errorf("leaf slug: want %q, got %q", "brooklyn-ny", leaf.Slug)
 	}
-	if rpc.City == nil || rpc.City.Slug != "brooklyn-ny" {
-		t.Errorf("city: %+v", rpc.City)
-	}
-	if rpc.County == nil || rpc.County.ScopeTier != atlas.ScopeLocal {
-		t.Errorf("county scope: %+v", rpc.County)
-	}
-	if rpc.Metro == nil || rpc.Metro.ScopeTier != atlas.ScopeRegional {
-		t.Errorf("metro scope: %+v", rpc.Metro)
-	}
-	if rpc.State == nil || rpc.State.Name != "NY" {
-		t.Errorf("state: %+v", rpc.State)
-	}
-	if diff := cmp.Diff([]int64{1, 2, 3, 4}, rpc.RegionIDs()); diff != "" {
-		t.Errorf("region IDs (-want +got):\n%s", diff)
+	if leaf.ScopeTier != atlas.ScopeLocal {
+		t.Errorf("leaf scope_tier: want local, got %q", leaf.ScopeTier)
 	}
 }
 
-func TestPostgresStore_ResolvePostalCode_NotFound(t *testing.T) {
+func TestPostgresStore_ResolveLeafRegion_NotFound(t *testing.T) {
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	seedFixture(t, store)
 
-	_, err := store.ResolvePostalCode(context.Background(), atlas.CountryUS, "99999")
+	_, err := store.ResolveLeafRegion(context.Background(), atlas.CountryUS, "99999")
 	if err != atlas.ErrPostalCodeNotFound {
 		t.Errorf("want ErrPostalCodeNotFound, got %v", err)
 	}
 }
 
-func TestPostgresStore_ResolvePostalCode_CanadianFSANormalization(t *testing.T) {
+func TestPostgresStore_ResolveLeafRegion_CanadianFSANormalization(t *testing.T) {
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	seedFixture(t, store)
 
 	ctx := context.Background()
-	// Seed a single Canadian postal code mapping; just the city.
+	// Seed a single Canadian leaf region and postal code.
 	_, err := store.Pool().Exec(ctx, `
 		INSERT INTO regions (id, kind, name, slug, country, scope_tier) VALUES
 			(200, 'city', 'Toronto', 'toronto-on', 'CA', 'local');
-		INSERT INTO postal_codes (postal_code, country, city_region_id) VALUES
+		INSERT INTO postal_codes (postal_code, country, leaf_region_id) VALUES
 			('M5V', 'CA', 200);
 	`)
 	if err != nil {
@@ -208,13 +207,13 @@ func TestPostgresStore_ResolvePostalCode_CanadianFSANormalization(t *testing.T) 
 	}
 
 	// Full postal code with whitespace + lowercase: adapter must
-	// truncate to "M5V" before querying.
-	rpc, err := store.ResolvePostalCode(ctx, atlas.CountryCA, "m5v 3a8")
+	// truncate to "M5V" (3-char FSA) before querying.
+	leaf, err := store.ResolveLeafRegion(ctx, atlas.CountryCA, "m5v 3a8")
 	if err != nil {
-		t.Fatalf("ResolvePostalCode: %v", err)
+		t.Fatalf("ResolveLeafRegion: %v", err)
 	}
-	if rpc.Code != "M5V" {
-		t.Errorf("normalized code: want %q, got %q", "M5V", rpc.Code)
+	if leaf.Slug != "toronto-on" {
+		t.Errorf("leaf slug: want %q, got %q", "toronto-on", leaf.Slug)
 	}
 }
 
@@ -271,7 +270,7 @@ func TestPostgresStore_EndToEndLookup(t *testing.T) {
 	if len(res.Regional) != 1 || res.Regional[0].Slug != "riders-alliance" {
 		t.Errorf("regional: %v", orgSlugs(res.Regional))
 	}
-	if res.ResolvedPlaceLabel != "Brooklyn, NY — New York Metro" {
+	if res.ResolvedPlaceLabel != "Brooklyn, Kings County, NY — New York Metro" {
 		t.Errorf("place label: %q", res.ResolvedPlaceLabel)
 	}
 }
@@ -303,6 +302,88 @@ func regionIDs(regions []atlas.Region) []int64 {
 		out[i] = r.ID
 	}
 	return out
+}
+
+// TestStore_AncestorRegions_NYC builds the spec's NYC subset against a
+// real testcontainers Postgres and verifies the recursive-CTE walk:
+// brooklyn → nyc → {nyc-metro, ny} → nyc-tristate.
+func TestStore_AncestorRegions_NYC(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+
+	rid := map[string]int64{}
+	upsert := func(slug, name, kind, scope string, sort int32, parents ...string) {
+		t.Helper()
+		id, err := store.q.UpsertRegion(ctx, gen.UpsertRegionParams{
+			Country: "US", Kind: kind, Name: name, Slug: slug,
+			ScopeTier: scope, SortPriority: sort,
+		})
+		if err != nil {
+			t.Fatalf("UpsertRegion %s: %v", slug, err)
+		}
+		rid[slug] = id
+		if err := store.q.DeleteRegionParents(ctx, id); err != nil {
+			t.Fatalf("DeleteRegionParents %s: %v", slug, err)
+		}
+		for _, ps := range parents {
+			pid, ok := rid[ps]
+			if !ok {
+				t.Fatalf("parent %q not seeded before %q", ps, slug)
+			}
+			if err := store.q.InsertRegionParent(ctx, gen.InsertRegionParentParams{
+				RegionID:       id,
+				ParentRegionID: pid,
+			}); err != nil {
+				t.Fatalf("InsertRegionParent %s->%s: %v", slug, ps, err)
+			}
+		}
+	}
+
+	upsert("nyc-tristate", "Tri-State Region", "us:multi-state", "regional", 80)
+	upsert("ny", "New York", "us:state", "regional", 60)
+	upsert("nyc-metro", "New York Metro", "us:metro", "regional", 40, "nyc-tristate")
+	upsert("nyc", "New York City", "us:city", "local", 15, "nyc-metro", "ny")
+	upsert("brooklyn", "Brooklyn", "us:borough", "local", 10, "nyc")
+
+	if err := store.q.UpsertPostalCode(ctx, gen.UpsertPostalCodeParams{
+		Country: "US", PostalCode: "11217", LeafRegionID: rid["brooklyn"],
+	}); err != nil {
+		t.Fatalf("UpsertPostalCode: %v", err)
+	}
+
+	leaf, err := store.ResolveLeafRegion(ctx, atlas.CountryUS, "11217")
+	if err != nil {
+		t.Fatalf("ResolveLeafRegion: %v", err)
+	}
+	if leaf.Slug != "brooklyn" {
+		t.Fatalf("leaf = %q, want brooklyn", leaf.Slug)
+	}
+
+	ancestry, err := store.AncestorRegions(ctx, leaf.ID)
+	if err != nil {
+		t.Fatalf("AncestorRegions: %v", err)
+	}
+	got := make([]string, len(ancestry))
+	for i, r := range ancestry {
+		got[i] = r.Slug
+	}
+	want := []string{"brooklyn", "nyc", "nyc-metro", "ny", "nyc-tristate"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ancestor order:\n  got  %v\n  want %v", got, want)
+	}
+
+	// Spot-check parent_slugs hydration on the diamond-junction "nyc" node.
+	for _, r := range ancestry {
+		if r.Slug == "nyc" {
+			gotParents := append([]string(nil), r.ParentSlugs...)
+			sort.Strings(gotParents)
+			wantParents := []string{"ny", "nyc-metro"}
+			if !reflect.DeepEqual(gotParents, wantParents) {
+				t.Errorf("nyc.parent_slugs = %v, want %v", gotParents, wantParents)
+			}
+		}
+	}
 }
 
 // Ensure sql import is exercised so the file doesn't trip an unused

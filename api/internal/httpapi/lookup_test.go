@@ -52,7 +52,7 @@ func TestLookup_HappyPath_ReturnsOAPIShape(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got.Query.PostalCode != "11217" || got.Query.Country != oapi.CountryUS {
+	if got.Query.PostalCode != "11217" || got.Query.Country != "US" {
 		t.Errorf("query: %+v", got.Query)
 	}
 	if len(got.Local) == 0 {
@@ -138,10 +138,36 @@ func TestLookup_PostalCodeNotFound_ReturnsProblemJSON(t *testing.T) {
 	}
 }
 
-func TestLookup_InvalidCountry_ReturnsProblemJSON(t *testing.T) {
+func TestLookup_UnknownCountry_ReturnsNotFound(t *testing.T) {
+	// Per the slice #4.6 loader-engineering work, the handler no longer
+	// gates on a known-country whitelist (Country is opaque per
+	// pkg/atlas/atlas.go). An unknown country with an unknown postal
+	// code falls through to atlas.Lookup → ErrPostalCodeNotFound → 404.
 	srv := newTestServer(t)
 
-	resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=11217&country=UK")
+	resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=11217&country=ZZ")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status: want 404, got %d", resp.StatusCode)
+	}
+
+	var prob oapi.ProblemDetails
+	if err := json.NewDecoder(resp.Body).Decode(&prob); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if prob.Type != problemNotFound {
+		t.Errorf("type: want %q, got %q", problemNotFound, prob.Type)
+	}
+}
+
+func TestLookup_MissingCountry_ReturnsProblemJSON(t *testing.T) {
+	srv := newTestServer(t)
+
+	resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=11217")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -155,7 +181,7 @@ func TestLookup_InvalidCountry_ReturnsProblemJSON(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&prob); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if prob.Detail == nil || *prob.Detail != "country must be US or CA" {
+	if prob.Detail == nil || *prob.Detail != "country is required" {
 		t.Errorf("detail: %v", prob.Detail)
 	}
 }

@@ -2,138 +2,151 @@ package atlas
 
 import (
 	"context"
-	"errors"
+	"reflect"
+	"strings"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
-// fixture builds a small, deterministic MemStore for lookup tests:
-//
-//   - Brooklyn (city, local) ─┐
-//   - Kings County (county, local)
-//   - NYC Metro (metro, regional)
-//   - NY (state, regional)
-//
-// Orgs:
-//   - TransAlt Brooklyn  → regions: Brooklyn, Kings  (local match expected)
-//   - Brooklyn Spoke     → regions: Brooklyn        (local match expected)
-//   - Riders Alliance    → regions: NYC Metro       (regional)
-//   - StreetsPAC         → regions: NYC Metro       (regional)
-//   - Tri-State          → regions: NY              (regional)
-//   - Off-Topic SF       → regions: SF Bay Area     (no match for 11217)
-//
-// Postal code 11217 maps to city=Brooklyn, county=Kings, metro=NYC Metro, state=NY.
-func fixture(t *testing.T) *MemStore {
+func nycFixture(t *testing.T) *MemStore {
 	t.Helper()
 	s := NewMemStore()
+	addRegions(s,
+		Region{ID: 1, Slug: "nyc-tristate", Kind: "us:multi-state", Name: "Tri-State Region", Country: "US", ScopeTier: ScopeRegional, SortPriority: 80},
+		Region{ID: 2, Slug: "ny", Kind: "us:state", Name: "New York", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60},
+		Region{ID: 3, Slug: "nj", Kind: "us:state", Name: "New Jersey", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60},
+		Region{ID: 4, Slug: "nyc-metro", Kind: "us:metro", Name: "New York Metro", Country: "US", ScopeTier: ScopeRegional, SortPriority: 40, ParentSlugs: []string{"nyc-tristate"}},
+		Region{ID: 5, Slug: "nyc", Kind: "us:city", Name: "New York City", Country: "US", ScopeTier: ScopeLocal, SortPriority: 15, ParentSlugs: []string{"nyc-metro", "ny"}},
+		Region{ID: 6, Slug: "brooklyn", Kind: "us:borough", Name: "Brooklyn", Country: "US", ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"nyc"}},
+		Region{ID: 7, Slug: "hoboken", Kind: "us:city", Name: "Hoboken", Country: "US", ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"nyc-metro", "nj"}},
+	)
+	s.AddPostalCode("US", "11217", 6)
+	s.AddPostalCode("US", "07302", 7)
 
-	s.AddRegion(Region{ID: 1, Kind: RegionCity, Name: "Brooklyn", Slug: "brooklyn", Country: CountryUS, ScopeTier: ScopeLocal})
-	s.AddRegion(Region{ID: 2, Kind: RegionCounty, Name: "Kings County", Slug: "kings", Country: CountryUS, ScopeTier: ScopeLocal})
-	s.AddRegion(Region{ID: 3, Kind: RegionMetro, Name: "NYC Metro", Slug: "nyc-metro", Country: CountryUS, ScopeTier: ScopeRegional})
-	s.AddRegion(Region{ID: 4, Kind: RegionState, Name: "NY", Slug: "ny", Country: CountryUS, ScopeTier: ScopeRegional})
-	s.AddRegion(Region{ID: 99, Kind: RegionMetro, Name: "SF Bay Area", Slug: "sf-bay", Country: CountryUS, ScopeTier: ScopeRegional})
-
-	bk := s.regions[1]
-	kings := s.regions[2]
-	metro := s.regions[3]
-	ny := s.regions[4]
-	s.AddPostalCode(ResolvedPostalCode{Code: "11217", Country: CountryUS, City: &bk, County: &kings, Metro: &metro, State: &ny})
-
-	s.AddOrg(Org{ID: 1, Slug: "transalt-bk", Name: "TransAlt Brooklyn"}, []int64{1, 2})
-	s.AddOrg(Org{ID: 2, Slug: "bk-spoke", Name: "Brooklyn Spoke"}, []int64{1})
-	s.AddOrg(Org{ID: 3, Slug: "riders", Name: "Riders Alliance"}, []int64{3})
-	s.AddOrg(Org{ID: 4, Slug: "streetspac", Name: "StreetsPAC"}, []int64{3})
-	s.AddOrg(Org{ID: 5, Slug: "tri-state", Name: "Tri-State Transportation Campaign"}, []int64{4})
-	s.AddOrg(Org{ID: 6, Slug: "off-topic-sf", Name: "Off-Topic SF"}, []int64{99})
-
+	s.AddOrg(Org{ID: 100, Slug: "brooklyn-spoke", Name: "Brooklyn Spoke", ShortDesc: "Park Slope cycling.", WebsiteURL: "https://example.org/bks"}, []int64{6})
+	s.AddOrg(Org{ID: 101, Slug: "transalt", Name: "Transportation Alternatives", ShortDesc: "NYC streets.", WebsiteURL: "https://transalt.org"}, []int64{5})
+	s.AddOrg(Org{ID: 102, Slug: "transitcenter", Name: "TransitCenter", ShortDesc: "NYC metro foundation.", WebsiteURL: "https://transitcenter.org"}, []int64{4})
+	s.AddOrg(Org{ID: 103, Slug: "ny-lcv", Name: "NY LCV Transportation", ShortDesc: "State-wide.", WebsiteURL: "https://example.org/nylcv"}, []int64{2})
+	s.AddOrg(Org{ID: 104, Slug: "tri-state", Name: "Tri-State Transportation Campaign", ShortDesc: "Tri-state policy.", WebsiteURL: "https://tstc.org"}, []int64{1})
 	return s
 }
 
-func TestLookup_BucketsAndOrders(t *testing.T) {
-	s := fixture(t)
-
-	got, err := Lookup(context.Background(), s, LookupQuery{PostalCode: "11217", Country: CountryUS})
-	if err != nil {
-		t.Fatalf("Lookup: unexpected error: %v", err)
-	}
-
-	// Local: TransAlt (city+county) sorts before Brooklyn Spoke (city
-	// only) only if their kinds differ. Both have a city region, so the
-	// tiebreaker is alphabetical Name — "Brooklyn Spoke" < "TransAlt
-	// Brooklyn". Verifies the sort tiebreaker is wired.
-	wantLocalNames := []string{"Brooklyn Spoke", "TransAlt Brooklyn"}
-	gotLocalNames := names(got.Local)
-	if diff := cmp.Diff(wantLocalNames, gotLocalNames); diff != "" {
-		t.Errorf("local bucket names mismatch (-want +got):\n%s", diff)
-	}
-
-	// Regional: Riders Alliance & StreetsPAC are metro (rank 2);
-	// Tri-State is state (rank 3). Metro before state, alphabetical
-	// within metro.
-	wantRegionalNames := []string{"Riders Alliance", "StreetsPAC", "Tri-State Transportation Campaign"}
-	gotRegionalNames := names(got.Regional)
-	if diff := cmp.Diff(wantRegionalNames, gotRegionalNames); diff != "" {
-		t.Errorf("regional bucket names mismatch (-want +got):\n%s", diff)
-	}
-
-	// Off-topic SF org must not appear in either bucket.
-	for _, o := range append(got.Local, got.Regional...) {
-		if o.Slug == "off-topic-sf" {
-			t.Errorf("off-topic org leaked into results: %+v", o)
-		}
-	}
-
-	if got.ResolvedPlaceLabel != "Brooklyn, NY — NYC Metro" {
-		t.Errorf("place label: want %q, got %q", "Brooklyn, NY — NYC Metro", got.ResolvedPlaceLabel)
+func addRegions(s *MemStore, rs ...Region) {
+	for _, r := range rs {
+		s.AddRegion(r)
 	}
 }
 
-func TestLookup_PostalCodeNotFound(t *testing.T) {
-	s := fixture(t)
-
-	_, err := Lookup(context.Background(), s, LookupQuery{PostalCode: "00000", Country: CountryUS})
-	if !errors.Is(err, ErrPostalCodeNotFound) {
-		t.Fatalf("want ErrPostalCodeNotFound, got %v", err)
-	}
-}
-
-func TestLookup_EmptyResultSet(t *testing.T) {
-	// A postal code that resolves to regions no org serves.
-	s := NewMemStore()
-	s.AddRegion(Region{ID: 50, Kind: RegionCity, Name: "Nowhere", Country: CountryUS, ScopeTier: ScopeLocal})
-	nowhere := Region{ID: 50, Kind: RegionCity, Name: "Nowhere", Country: CountryUS, ScopeTier: ScopeLocal}
-	s.AddPostalCode(ResolvedPostalCode{Code: "00001", Country: CountryUS, City: &nowhere})
-
-	got, err := Lookup(context.Background(), s, LookupQuery{PostalCode: "00001", Country: CountryUS})
-	if err != nil {
-		t.Fatalf("Lookup: unexpected error: %v", err)
-	}
-	if len(got.Local) != 0 || len(got.Regional) != 0 {
-		t.Errorf("want empty buckets, got local=%d regional=%d", len(got.Local), len(got.Regional))
-	}
-}
-
-func TestMemStore_CanadianPostalCodeNormalization(t *testing.T) {
-	s := NewMemStore()
-	tor := Region{ID: 20, Kind: RegionCity, Name: "Toronto", Country: CountryCA, ScopeTier: ScopeLocal}
-	s.AddRegion(tor)
-	s.AddPostalCode(ResolvedPostalCode{Code: "M5V 3A8", Country: CountryCA, City: &tor})
-
-	// User inputs the full postal code with a space; we should match.
-	rpc, err := s.ResolvePostalCode(context.Background(), CountryCA, "m5v 3a8")
-	if err != nil {
-		t.Fatalf("ResolvePostalCode: %v", err)
-	}
-	if rpc.Code != "M5V" {
-		t.Errorf("want normalized code %q, got %q", "M5V", rpc.Code)
-	}
-}
-
-func names(orgs []Org) []string {
+func slugs(orgs []Org) []string {
 	out := make([]string, len(orgs))
 	for i, o := range orgs {
-		out[i] = o.Name
+		out[i] = o.Slug
 	}
 	return out
+}
+
+func TestLookup_NYC_Brooklyn(t *testing.T) {
+	got, err := Lookup(context.Background(), nycFixture(t), LookupQuery{PostalCode: "11217", Country: "US"})
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	wantLocal := []string{"brooklyn-spoke", "transalt"}
+	wantRegional := []string{"transitcenter", "ny-lcv", "tri-state"}
+	if !reflect.DeepEqual(slugs(got.Local), wantLocal) {
+		t.Errorf("Local:\n  got  %v\n  want %v", slugs(got.Local), wantLocal)
+	}
+	if !reflect.DeepEqual(slugs(got.Regional), wantRegional) {
+		t.Errorf("Regional:\n  got  %v\n  want %v", slugs(got.Regional), wantRegional)
+	}
+}
+
+func TestLookup_NYC_Hoboken_NoCrossStateLocalLeak(t *testing.T) {
+	got, err := Lookup(context.Background(), nycFixture(t), LookupQuery{PostalCode: "07302", Country: "US"})
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	for _, o := range got.Local {
+		if o.Slug == "transalt" || o.Slug == "brooklyn-spoke" {
+			t.Errorf("Local leak: %q should not appear for Hoboken", o.Slug)
+		}
+	}
+	regionalSlugs := slugs(got.Regional)
+	mustContain(t, regionalSlugs, "transitcenter")
+	mustContain(t, regionalSlugs, "tri-state")
+	mustNotContain(t, regionalSlugs, "ny-lcv")
+}
+
+func TestLookup_NotFound(t *testing.T) {
+	_, err := Lookup(context.Background(), nycFixture(t), LookupQuery{PostalCode: "00000", Country: "US"})
+	if err != ErrPostalCodeNotFound {
+		t.Errorf("err = %v, want ErrPostalCodeNotFound", err)
+	}
+}
+
+func TestLookup_MatchedRegionSlugs(t *testing.T) {
+	got, err := Lookup(context.Background(), nycFixture(t), LookupQuery{PostalCode: "11217", Country: "US"})
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	for _, o := range append(got.Local, got.Regional...) {
+		if len(o.MatchedRegionSlugs) == 0 {
+			t.Errorf("org %q has empty MatchedRegionSlugs", o.Slug)
+		}
+	}
+}
+
+func TestLookup_ResolvedAncestry(t *testing.T) {
+	got, err := Lookup(context.Background(), nycFixture(t), LookupQuery{PostalCode: "11217", Country: "US"})
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	wantOrder := []string{"brooklyn", "nyc", "nyc-metro", "ny", "nyc-tristate"}
+	gotOrder := make([]string, len(got.ResolvedAncestry))
+	for i, r := range got.ResolvedAncestry {
+		gotOrder[i] = r.Slug
+	}
+	if !reflect.DeepEqual(gotOrder, wantOrder) {
+		t.Errorf("ResolvedAncestry:\n  got  %v\n  want %v", gotOrder, wantOrder)
+	}
+}
+
+func TestLookup_PlaceLabel_NYC(t *testing.T) {
+	got, _ := Lookup(context.Background(), nycFixture(t), LookupQuery{PostalCode: "11217", Country: "US"})
+	want := "Brooklyn, New York City — New York Metro"
+	if got.ResolvedPlaceLabel != want {
+		t.Errorf("ResolvedPlaceLabel = %q, want %q", got.ResolvedPlaceLabel, want)
+	}
+}
+
+func mustContain(t *testing.T, ss []string, want string) {
+	t.Helper()
+	for _, s := range ss {
+		if s == want {
+			return
+		}
+	}
+	t.Errorf("missing %q in %v", want, ss)
+}
+
+func mustNotContain(t *testing.T, ss []string, bad string) {
+	t.Helper()
+	for _, s := range ss {
+		if s == bad {
+			t.Errorf("unexpected %q in %v", bad, ss)
+			return
+		}
+	}
+}
+
+func TestLookup_OrgWithNoMatchedRegions(t *testing.T) {
+	s := nycFixture(t)
+	s.AddRegion(Region{ID: 999, Slug: "wyoming", Kind: "us:state", Name: "Wyoming", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60})
+	s.AddOrg(Org{ID: 999, Slug: "wyoming-streets", Name: "Wyoming Streets", ShortDesc: "x", WebsiteURL: "https://example.org/wy"}, []int64{999})
+	got, _ := Lookup(context.Background(), s, LookupQuery{PostalCode: "11217", Country: "US"})
+	all := append([]Org{}, got.Local...)
+	all = append(all, got.Regional...)
+	for _, o := range all {
+		if strings.Contains(o.Slug, "wyoming") {
+			t.Errorf("wyoming-streets surfaced for 11217: %v", o.Slug)
+		}
+	}
 }

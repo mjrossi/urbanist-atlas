@@ -135,8 +135,10 @@ paths:
       summary: List metros with approved organization counts.
       description: |
         Feeds the "Browse by metro" panel on the home page. Returns
-        every region of kind `metro` that has at least one approved
-        organization tagged to it, with a count.
+        every region whose kind is metro-equivalent (`us:metro`,
+        `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`, and
+        future country-prefixed equivalents) that has at least one
+        approved organization tagged to it, with a count.
       operationId: listMetros
       responses:
         '200':
@@ -431,20 +433,47 @@ components:
 
     Country:
       type: string
-      enum: [US, CA]
-      description: ISO-style country code. Only `US` and `CA` are supported in v1.
+      description: |
+        ISO-style country code. v1 ships with `US` and `CA`; additional
+        countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
+        changes as data is loaded.
+      example: US
 
     ScopeTier:
       type: string
-      enum: [local, regional]
+      enum: [local, regional, national]
       description: |
         Drives result grouping in `/lookup`. `local` for city/county
-        regions; `regional` for metro/state/province/multi-state.
+        regions; `regional` for metro/state/province/multi-state;
+        `national` for country-wide umbrellas (federations, advocacy
+        groups operating across an entire country).
+
+        `national` regions are filtered from the default `/lookup`
+        ancestor walk — they're present in the schema so that
+        national-scope orgs (e.g. MUBi for Portugal, Living Streets
+        for the UK) can be modeled without distorting local-first
+        defaults. A future opt-in surface for national orgs is
+        anticipated; until then, `national`-tier regions are hidden.
+
+        See `docs/region-graph.md` for the per-country editorial
+        policy on when to use `national` vs modeling state/regional
+        chapters instead.
 
     RegionKind:
       type: string
-      enum: [city, county, metro, state, province, country, multi-state]
-      description: Granularity of a region.
+      description: |
+        Free-form taxonomy for region granularity. The recommended
+        vocabulary uses country-prefixed values: `us:city`, `us:borough`,
+        `us:county`, `us:metro`, `us:state`, `us:multi-state`,
+        `us:transit-federation`, `ca:province`, `ca:regional-district`,
+        `ca:city`, `ca:cma`, `pt:freguesia`, `pt:municipio`,
+        `pt:cim`, `pt:area-metropolitana`, `pt:distrito`,
+        `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional`,
+        `de:land`, `de:bezirk`, `de:kreisfreie-stadt`,
+        `de:transit-federation`, `fr:commune`, `fr:departement`,
+        `fr:region`, `fr:metropole`. Clients should treat unknown kinds
+        gracefully (e.g. fall back to displaying `name`).
+      example: us:metro
 
     SubmissionStatus:
       type: string
@@ -453,23 +482,28 @@ components:
 
     Region:
       type: object
-      required: [id, kind, name, slug, country, scope_tier]
+      description: |
+        A geographic unit an organization can serve. Regions form a
+        directed acyclic graph; `parent_slugs` lists the direct parents
+        (not transitive). Empty for top-of-hierarchy regions (states,
+        multi-state regions, transit federations).
+      required: [id, kind, name, slug, country, scope_tier, parent_slugs]
       properties:
-        id:
-          type: integer
-          format: int64
-        kind:
-          $ref: '#/components/schemas/RegionKind'
-        name:
-          type: string
-          example: Brooklyn
+        id: { type: integer, format: int64 }
+        kind: { $ref: '#/components/schemas/RegionKind' }
+        name: { type: string, example: Brooklyn }
         slug:
           type: string
-          example: brooklyn-ny
-        country:
-          $ref: '#/components/schemas/Country'
-        scope_tier:
-          $ref: '#/components/schemas/ScopeTier'
+          example: brooklyn
+          description: Globally unique across countries.
+        country: { $ref: '#/components/schemas/Country' }
+        scope_tier: { $ref: '#/components/schemas/ScopeTier' }
+        parent_slugs:
+          type: array
+          items: { type: string }
+          description: |
+            Direct parents in the region graph. Clients can walk these
+            to render breadcrumbs without a second request.
 
     Org:
       type: object
@@ -514,6 +548,26 @@ components:
           items:
             $ref: '#/components/schemas/Region'
 
+    LookupOrg:
+      description: |
+        An `Org` augmented with the per-lookup `matched_region_slugs`
+        field. Returned only by `/api/v1/lookup`; other endpoints that
+        return organizations use the base `Org` schema.
+      allOf:
+        - $ref: '#/components/schemas/Org'
+        - type: object
+          required: [matched_region_slugs]
+          properties:
+            matched_region_slugs:
+              type: array
+              minItems: 1
+              items: { type: string }
+              description: |
+                Slugs of the regions whose membership caused this org
+                to surface for the current lookup. A non-empty subset
+                of the org's `regions[*].slug`. Useful for
+                explainability and debugging.
+
     LookupQuery:
       type: object
       required: [postal_code, country]
@@ -528,24 +582,26 @@ components:
       type: object
       description: |
         Response shape of `GET /api/v1/lookup`. `local` and `regional`
-        are always present (possibly empty arrays). `resolved_place_label`
-        is a human-readable description of where the postal code was
-        resolved (e.g. "Brooklyn, NY").
-      required: [query, resolved_place_label, local, regional]
+        are always present (possibly empty arrays).
+        `resolved_ancestry` is the postal code's leaf region followed
+        by all ancestors, ordered most-specific first — clients can use
+        it to render breadcrumbs without walking the graph themselves.
+      required: [query, resolved_place_label, resolved_ancestry, local, regional]
       properties:
         query:
           $ref: '#/components/schemas/LookupQuery'
         resolved_place_label:
           type: string
-          example: "Brooklyn, NY"
+          example: "Brooklyn, NYC — New York Metro"
+        resolved_ancestry:
+          type: array
+          items: { $ref: '#/components/schemas/Region' }
         local:
           type: array
-          items:
-            $ref: '#/components/schemas/Org'
+          items: { $ref: '#/components/schemas/LookupOrg' }
         regional:
           type: array
-          items:
-            $ref: '#/components/schemas/Org'
+          items: { $ref: '#/components/schemas/LookupOrg' }
 
     MetroSummary:
       type: object

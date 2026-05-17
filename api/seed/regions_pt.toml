@@ -1,0 +1,217 @@
+# Region taxonomy for Portugal.
+#
+# This is a *validation fixture*, not a full directory. The intent is to
+# exercise every model edge the DAG is expected to handle for non-US/CA
+# admin geographies — multi-parent municípios, metros spanning two
+# top-tier admin regions, autonomous-region parallel hierarchies,
+# uniões de freguesias, and the new national tier.
+#
+# See docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md
+# for the design rationale and editorial conventions.
+#
+# Modeling decisions specific to PT:
+#   - Município = scope_tier 'local' (Lisboa-município ≈ Lisboa city).
+#   - Distrito = scope_tier 'regional' (vestigial since 2003 reform but
+#     still formal; included so AML can multi-parent into two distritos).
+#   - Área Metropolitana (AML, AMP) = inter-municipal metro; multi-parent
+#     across the NUTS-II layer when applicable.
+#   - NUTS-II reflects the post-2024 reorganization (Grande Lisboa +
+#     Península de Setúbal as separate NUTS-II covering AML).
+#   - Região Autónoma (Madeira) parallels NUTS-II — no NUTS-II parent.
+#   - União de freguesias uses the same kind as freguesia
+#     (`pt:freguesia`); no structural distinction is needed.
+#   - pt-nacional has NO parent edges from the leaf chain. National-scope
+#     orgs (MUBi nacional) attach to it via region_slugs; the default
+#     /lookup filters it out of the ancestor walk.
+
+# --- NUTS-II statistical regions (top-level, no parents) ---
+
+[[region]]
+slug = "nuts-ii-norte"
+kind = "pt:nuts-ii"
+name = "Norte"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nuts-ii-centro"
+kind = "pt:nuts-ii"
+name = "Centro"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nuts-ii-grande-lisboa"
+kind = "pt:nuts-ii"
+name = "Grande Lisboa"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nuts-ii-peninsula-setubal"
+kind = "pt:nuts-ii"
+name = "Península de Setúbal"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+# --- Autonomous region (parallel to NUTS-II; no NUTS-II parent) ---
+
+[[region]]
+slug = "regiao-autonoma-madeira"
+kind = "pt:regiao-autonoma"
+name = "Região Autónoma da Madeira"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+# --- National umbrella (no parents; default lookup filters this tier) ---
+
+[[region]]
+slug = "pt-nacional"
+kind = "pt:nacional"
+name = "Portugal"
+scope_tier = "national"
+sort_priority = 90
+parents = []
+
+# --- Distritos (parented under NUTS-II) ---
+
+[[region]]
+slug = "distrito-lisboa"
+kind = "pt:distrito"
+name = "Distrito de Lisboa"
+scope_tier = "regional"
+sort_priority = 50
+parents = ["nuts-ii-grande-lisboa"]
+
+[[region]]
+slug = "distrito-setubal"
+kind = "pt:distrito"
+name = "Distrito de Setúbal"
+scope_tier = "regional"
+sort_priority = 50
+parents = ["nuts-ii-peninsula-setubal"]
+
+[[region]]
+slug = "distrito-porto"
+kind = "pt:distrito"
+name = "Distrito do Porto"
+scope_tier = "regional"
+sort_priority = 50
+parents = ["nuts-ii-norte"]
+
+[[region]]
+slug = "distrito-aveiro"
+kind = "pt:distrito"
+name = "Distrito de Aveiro"
+scope_tier = "regional"
+sort_priority = 50
+parents = ["nuts-ii-centro"]
+
+# --- Áreas Metropolitanas (inter-municipal metros; AML is multi-NUTS-II) ---
+
+[[region]]
+slug = "aml"
+kind = "pt:area-metropolitana"
+name = "Área Metropolitana de Lisboa"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nuts-ii-grande-lisboa", "nuts-ii-peninsula-setubal"]
+
+[[region]]
+slug = "amp"
+kind = "pt:area-metropolitana"
+name = "Área Metropolitana do Porto"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nuts-ii-norte"]
+
+# --- CIM (non-metro inter-municipal community) ---
+
+[[region]]
+slug = "cim-regiao-aveiro"
+kind = "pt:cim"
+name = "Comunidade Intermunicipal da Região de Aveiro"
+scope_tier = "regional"
+sort_priority = 30
+parents = ["nuts-ii-centro"]
+
+# --- Municípios (multi-parent: distrito + metro/CIM/autonomous region) ---
+
+[[region]]
+slug = "lisboa-municipio"
+kind = "pt:municipio"
+name = "Lisboa"
+scope_tier = "local"
+sort_priority = 15
+parents = ["distrito-lisboa", "aml"]
+
+[[region]]
+slug = "setubal-municipio"
+kind = "pt:municipio"
+name = "Setúbal"
+scope_tier = "local"
+sort_priority = 15
+parents = ["distrito-setubal", "aml"]
+
+[[region]]
+slug = "porto-municipio"
+kind = "pt:municipio"
+name = "Porto"
+scope_tier = "local"
+sort_priority = 15
+parents = ["distrito-porto", "amp"]
+
+[[region]]
+slug = "aveiro-municipio"
+kind = "pt:municipio"
+name = "Aveiro"
+scope_tier = "local"
+sort_priority = 15
+parents = ["distrito-aveiro", "cim-regiao-aveiro"]
+
+[[region]]
+slug = "funchal-concelho"
+kind = "pt:municipio"
+name = "Funchal"
+scope_tier = "local"
+sort_priority = 15
+parents = ["regiao-autonoma-madeira"]
+
+# --- Freguesias (leaf-level; uniões treated as same kind) ---
+
+[[region]]
+slug = "santa-maria-maior"
+kind = "pt:freguesia"
+name = "Santa Maria Maior"
+scope_tier = "local"
+sort_priority = 10
+parents = ["lisboa-municipio"]
+
+[[region]]
+slug = "alvalade"
+kind = "pt:freguesia"
+name = "Alvalade"
+scope_tier = "local"
+sort_priority = 10
+parents = ["lisboa-municipio"]
+
+[[region]]
+slug = "ribeira-porto"
+kind = "pt:freguesia"
+name = "Sé (Ribeira)"
+scope_tier = "local"
+sort_priority = 10
+parents = ["porto-municipio"]
+
+[[region]]
+slug = "lordelo-massarelos"
+kind = "pt:freguesia"
+name = "União das Freguesias de Lordelo do Ouro e Massarelos"
+scope_tier = "local"
+sort_priority = 10
+parents = ["porto-municipio"]

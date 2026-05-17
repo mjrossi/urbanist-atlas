@@ -2,75 +2,114 @@ package atlas
 
 import (
 	"context"
-	"strings"
 	"sync"
 )
 
-// MemStore is an in-memory Store implementation. It exists for two
-// audiences:
-//
-//   - Unit tests in pkg/atlas (and in any consumer that wants to test
-//     against a real Store without spinning up Postgres).
-//   - Local development before the Postgres store is wired up — see
-//     LoadDevFixtures for a populated demo set.
+// MemStore is an in-memory Store implementation for tests, fixtures,
+// and offline CLI use. It models the region graph as adjacency lists:
+// a region->parents map and a postal_code->leaf-region-id map.
 //
 // MemStore is safe for concurrent use.
 type MemStore struct {
-	mu         sync.RWMutex
-	regions    map[int64]Region
-	orgs       []Org
-	orgRegions map[int64][]int64             // orgID → regionIDs the org serves
-	postal     map[string]ResolvedPostalCode // key: postalKey(country, code)
+	mu            sync.RWMutex
+	regionsByID   map[int64]Region
+	regionsBySlug map[string]int64
+	parents       map[int64][]int64 // region id -> direct parent region ids
+	orgs          []Org
+	orgRegions    map[int64][]int64 // org id -> region ids it serves
+	postalToLeaf  map[string]int64  // postalKey -> leaf region id
 }
 
-// NewMemStore returns an empty MemStore. Use AddRegion / AddPostalCode
-// / AddOrg to populate it, or call LoadDevFixtures to install the
-// built-in demo data.
+// NewMemStore returns an empty MemStore. Populate via AddRegion,
+// AddParent, AddPostalCode, AddOrg — or call LoadDevFixtures for the
+// built-in demo set.
 func NewMemStore() *MemStore {
 	return &MemStore{
-		regions:    map[int64]Region{},
-		orgRegions: map[int64][]int64{},
-		postal:     map[string]ResolvedPostalCode{},
+		regionsByID:   map[int64]Region{},
+		regionsBySlug: map[string]int64{},
+		parents:       map[int64][]int64{},
+		orgRegions:    map[int64][]int64{},
+		postalToLeaf:  map[string]int64{},
 	}
 }
 
-// AddRegion registers a region. Later calls with the same ID overwrite
-// the earlier value.
+// AddRegion registers a region. Later calls with the same ID overwrite.
+// ParentSlugs on the supplied region is used to populate the parents
+// map; referenced parent slugs must already be registered (call order
+// matters: add parents before children).
 func (s *MemStore) AddRegion(r Region) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.regions[r.ID] = r
+	s.regionsByID[r.ID] = r
+	s.regionsBySlug[r.Slug] = r.ID
+	if len(r.ParentSlugs) > 0 {
+		parentIDs := make([]int64, 0, len(r.ParentSlugs))
+		for _, ps := range r.ParentSlugs {
+			if pid, ok := s.regionsBySlug[ps]; ok {
+				parentIDs = append(parentIDs, pid)
+			}
+		}
+		s.parents[r.ID] = parentIDs
+	}
 }
 
-// AddOrg registers an organization along with the IDs of the regions
-// it serves. The org's Regions field is ignored (and overwritten on
-// read); pass the region IDs explicitly.
+// AddOrg registers an organization with the IDs of the regions it
+// serves. The org's Regions field is overwritten on read.
 func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	org.Regions = nil
+	org.MatchedRegionSlugs = nil
 	s.orgs = append(s.orgs, org)
 	s.orgRegions[org.ID] = append([]int64(nil), regionIDs...)
 }
 
-// AddPostalCode registers a postal-code → regions mapping. The Code
-// field is normalized using the same rules ResolvePostalCode uses.
-func (s *MemStore) AddPostalCode(rpc ResolvedPostalCode) {
+// AddPostalCode registers a (country, postal code) → leaf region id
+// mapping. The code is normalized via NormalizePostalCode.
+func (s *MemStore) AddPostalCode(country Country, code string, leafRegionID int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rpc.Code = normalizePostalCode(rpc.Country, rpc.Code)
-	s.postal[postalKey(rpc.Country, rpc.Code)] = rpc
+	s.postalToLeaf[postalKey(country, code)] = leafRegionID
 }
 
-// ResolvePostalCode implements Store.
-func (s *MemStore) ResolvePostalCode(_ context.Context, country Country, postalCode string) (ResolvedPostalCode, error) {
+// ResolveLeafRegion implements Store.
+func (s *MemStore) ResolveLeafRegion(_ context.Context, country Country, postalCode string) (Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	rpc, ok := s.postal[postalKey(country, postalCode)]
+	id, ok := s.postalToLeaf[postalKey(country, postalCode)]
 	if !ok {
-		return ResolvedPostalCode{}, ErrPostalCodeNotFound
+		return Region{}, ErrPostalCodeNotFound
 	}
-	return rpc, nil
+	r, ok := s.regionsByID[id]
+	if !ok {
+		return Region{}, ErrPostalCodeNotFound
+	}
+	return r, nil
+}
+
+// AncestorRegions implements Store. Returns the leaf followed by all
+// transitive ancestors via BFS, dedupes via a visited set.
+func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Region, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	visited := map[int64]struct{}{}
+	out := []Region{}
+	queue := []int64{leafRegionID}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if _, seen := visited[id]; seen {
+			continue
+		}
+		visited[id] = struct{}{}
+		r, ok := s.regionsByID[id]
+		if !ok {
+			continue
+		}
+		out = append(out, r)
+		queue = append(queue, s.parents[id]...)
+	}
+	return out, nil
 }
 
 // OrgsForRegions implements Store.
@@ -87,19 +126,19 @@ func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, 
 	var out []Org
 	for _, org := range s.orgs {
 		orgRegionIDs := s.orgRegions[org.ID]
-		matched := false
+		match := false
 		for _, rid := range orgRegionIDs {
 			if wanted[rid] {
-				matched = true
+				match = true
 				break
 			}
 		}
-		if !matched {
+		if !match {
 			continue
 		}
 		regions := make([]Region, 0, len(orgRegionIDs))
 		for _, rid := range orgRegionIDs {
-			if r, ok := s.regions[rid]; ok {
+			if r, ok := s.regionsByID[rid]; ok {
 				regions = append(regions, r)
 			}
 		}
@@ -107,19 +146,4 @@ func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, 
 		out = append(out, org)
 	}
 	return out, nil
-}
-
-// normalizePostalCode applies the canonicalization rules used by both
-// AddPostalCode and ResolvePostalCode so the two stay in sync.
-// Canadian inputs are truncated to the first three characters (FSA).
-func normalizePostalCode(country Country, code string) string {
-	c := strings.ToUpper(strings.ReplaceAll(code, " ", ""))
-	if country == CountryCA && len(c) > 3 {
-		c = c[:3]
-	}
-	return c
-}
-
-func postalKey(country Country, code string) string {
-	return string(country) + ":" + normalizePostalCode(country, code)
 }
