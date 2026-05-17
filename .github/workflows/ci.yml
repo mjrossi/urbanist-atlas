@@ -1,0 +1,86 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Activates mise.ci.toml's [env] overlay on top of mise.toml's
+  # [tools] + [env]. Mirrors the pattern in mjrossi-portfolio-website.
+  MISE_ENV: ci
+
+jobs:
+  # api/ and web/ each gate on their own scaffolding state so CI passes
+  # cleanly on the initial bones commit (when neither half has real code
+  # yet) and lights up automatically as each side is filled in.
+
+  detect:
+    name: detect scaffolded halves
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.check.outputs.api }}
+      web: ${{ steps.check.outputs.web }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `find -print -quit` exits on the first match, so this is
+          # fast even as the tree grows. compgen's "**" globbing
+          # needs `shopt -s globstar`, which isn't on by default in
+          # Actions' bash — find sidesteps the issue.
+          if [ -n "$(find api -name '*.go' -type f -print -quit 2>/dev/null)" ]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f web/package.json ]; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  api:
+    name: api (go)
+    needs: detect
+    if: needs.detect.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v4
+      - name: Export mise [env] to GITHUB_ENV
+        # jdx/mise-action installs mise but does NOT auto-propagate
+        # [env] to subsequent steps. Re-export so URBANIST_* values
+        # from mise.toml + mise.ci.toml are visible to go test.
+        working-directory: ${{ github.workspace }}
+        run: mise env --shell=bash | sed -E 's/^export ([^=]+)="?([^"]*)"?$/\1=\2/' >> "$GITHUB_ENV"
+      - run: go vet ./...
+      - run: go test ./... -race -count=1
+
+  web:
+    name: web (vite)
+    needs: detect
+    if: needs.detect.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v4
+      - name: Export mise [env] to GITHUB_ENV
+        working-directory: ${{ github.workspace }}
+        run: mise env --shell=bash | sed -E 's/^export ([^=]+)="?([^"]*)"?$/\1=\2/' >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm test --if-present -- --run
+      - run: npm run build --if-present

@@ -1,0 +1,26 @@
+# Pin the language runtimes and tooling for both halves of the monorepo.
+# Contributors install mise (https://mise.jdx.dev), then `mise install`
+# at the repo root provisions everything below.
+#
+# Per-environment overlays:
+#   - mise.development.toml  → MISE_ENV=development (local dev)
+#   - mise.ci.toml           → MISE_ENV=ci (GitHub Actions)
+#   - mise.local.toml        → uncommitted, machine-specific overrides
+#                              (see mise.local.toml.example)
+
+[tools]
+# Language runtimes.
+go = "1.26"
+node = "22"
+
+# Project tooling. Pinned versions because reproducibility > convenience.
+# These get added/bumped as they're introduced into the codebase.
+"aqua:sqlc-dev/sqlc"    = "1.28.0"
+"aqua:pressly/goose"    = "3.24.0"
+"go:honnef.co/go/tools/cmd/staticcheck" = "2025.1.1"
+"go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" = "2.7.0"
+
+[env]
+# Defaults that apply everywhere. Per-env files override these.
+URBANIST_PORT       = "8080"
+URBANIST_LOG_FORMAT = "json"

@@ -1,0 +1,310 @@
+//go:build integration
+
+// Integration tests for the Postgres store. Build-tagged so the
+// default `go test ./...` run stays fast and doesn't require Docker;
+// run via `just api-test-integration` or
+// `go test ./... -tags=integration`.
+//
+// Uses testcontainers-go's postgres module to spin up an ephemeral
+// 17-alpine container per test binary, applies the embedded
+// migrations via goose against database/sql, then exercises the
+// adapter end-to-end through the same atlas.Store interface the
+// production server uses.
+
+package postgres
+
+import (
+	"context"
+	"database/sql"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
+	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/mjrossi/urbanist-atlas/api/migrations"
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
+)
+
+// startPostgres provisions a fresh Postgres container, applies the
+// embedded migrations, and returns a connection string plus a t.Cleanup
+// hook that terminates the container.
+func startPostgres(t *testing.T) (*Store, func()) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	container, err := tcpostgres.Run(ctx,
+		"postgres:17-alpine",
+		tcpostgres.WithDatabase("urbanist_test"),
+		tcpostgres.WithUsername("test"),
+		tcpostgres.WithPassword("test"),
+		tcpostgres.BasicWaitStrategies(),
+		tcpostgres.WithSQLDriver("pgx"),
+	)
+	if err != nil {
+		t.Fatalf("start postgres container: %v", err)
+	}
+	t.Cleanup(func() {
+		shutdown, c := context.WithTimeout(context.Background(), 30*time.Second)
+		defer c()
+		_ = container.Terminate(shutdown)
+	})
+
+	// Belt-and-suspenders: wait until the DB is actually accepting
+	// connections. The Run() above already waits for log readiness,
+	// but on slower hosts the listener can lag by a beat.
+	waitStrategy := wait.ForListeningPort("5432/tcp").WithStartupTimeout(60 * time.Second)
+	if err := waitStrategy.WaitUntilReady(ctx, container); err != nil {
+		t.Fatalf("wait for postgres: %v", err)
+	}
+
+	dbURL, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatalf("connection string: %v", err)
+	}
+
+	if err := applyMigrations(ctx, dbURL); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	store, closeFn, err := Open(ctx, dbURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	return store, closeFn
+}
+
+func applyMigrations(ctx context.Context, dbURL string) error {
+	cfg, err := pgx.ParseConfig(dbURL)
+	if err != nil {
+		return err
+	}
+	sqlDB := stdlib.OpenDB(*cfg)
+	defer func() { _ = sqlDB.Close() }()
+	if err := goose.SetDialect("postgres"); err != nil {
+		return err
+	}
+	goose.SetBaseFS(migrations.FS)
+	return goose.UpContext(ctx, sqlDB, ".")
+}
+
+// seedFixture inserts a small NYC fixture so the adapter has something
+// to find. Uses the pgx pool directly to avoid coupling the test to
+// any sqlc-generated write helpers (we don't ship those yet — slices
+// #3 and #4 add seed loaders).
+func seedFixture(t *testing.T, store *Store) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool := store.Pool()
+
+	stmts := []string{
+		// Insert every region we'll reference, including the dummy SF
+		// region (99) that the off-topic org needs as an FK target. All
+		// regions up front so subsequent organization_regions inserts
+		// don't trip the FK constraint.
+		`INSERT INTO regions (id, kind, name, slug, country, scope_tier) VALUES
+			(1,  'city',   'Brooklyn',         'brooklyn-ny',     'US', 'local'),
+			(2,  'county', 'Kings County, NY', 'kings-county-ny', 'US', 'local'),
+			(3,  'metro',  'New York Metro',   'nyc-metro',       'US', 'regional'),
+			(4,  'state',  'NY',               'ny',              'US', 'regional'),
+			(99, 'metro',  'SF Bay Area',      'sf-bay-area',     'US', 'regional')`,
+		`SELECT setval(pg_get_serial_sequence('regions','id'), 99)`,
+		`INSERT INTO postal_codes (postal_code, country, city_region_id, county_region_id, metro_region_id, state_region_id) VALUES
+			('11217', 'US', 1, 2, 3, 4)`,
+		`INSERT INTO organizations (id, slug, name, short_desc, website_url, contact_url, tags, status, approved_at) VALUES
+			(1, 'transalt-brooklyn', 'Transportation Alternatives — Brooklyn',
+				'The Brooklyn committee.', 'https://www.transalt.org', NULL,
+				ARRAY['safe-streets','cycling']::text[], 'approved', NOW()),
+			(2, 'riders-alliance', 'Riders Alliance',
+				'Grassroots transit advocacy.', 'https://www.ridersny.org', NULL,
+				ARRAY['transit','grassroots']::text[], 'approved', NOW()),
+			(3, 'off-topic-sf', 'Off-Topic SF',
+				'Should not appear for an NYC lookup.', 'https://example.org', NULL,
+				ARRAY['transit']::text[], 'approved', NOW()),
+			(4, 'pending-org', 'Pending Org',
+				'Not yet approved.', 'https://example.org', NULL,
+				ARRAY['transit']::text[], 'pending', NULL)`,
+		`SELECT setval(pg_get_serial_sequence('organizations','id'), 4)`,
+		// org 1 → regions 1, 2 (Brooklyn, Kings)
+		// org 2 → region 3 (NYC Metro)
+		// org 3 → region 99 (SF Bay Area; out of scope for an NYC lookup)
+		// org 4 → region 1 (pending; status filter must exclude it)
+		`INSERT INTO organization_regions (organization_id, region_id) VALUES
+			(1, 1), (1, 2),
+			(2, 3),
+			(3, 99),
+			(4, 1)`,
+	}
+	for _, s := range stmts {
+		if _, err := pool.Exec(ctx, s); err != nil {
+			t.Fatalf("seed: %v\nstmt: %s", err, s)
+		}
+	}
+}
+
+func TestPostgresStore_ResolvePostalCode_NormalizesAndHydrates(t *testing.T) {
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	seedFixture(t, store)
+
+	// Lowercase input with whitespace; the adapter should normalize
+	// before querying. The DB only holds "11217".
+	rpc, err := store.ResolvePostalCode(context.Background(), atlas.CountryUS, " 11217 ")
+	if err != nil {
+		t.Fatalf("ResolvePostalCode: %v", err)
+	}
+	if rpc.Code != "11217" {
+		t.Errorf("code: want %q, got %q", "11217", rpc.Code)
+	}
+	if rpc.City == nil || rpc.City.Slug != "brooklyn-ny" {
+		t.Errorf("city: %+v", rpc.City)
+	}
+	if rpc.County == nil || rpc.County.ScopeTier != atlas.ScopeLocal {
+		t.Errorf("county scope: %+v", rpc.County)
+	}
+	if rpc.Metro == nil || rpc.Metro.ScopeTier != atlas.ScopeRegional {
+		t.Errorf("metro scope: %+v", rpc.Metro)
+	}
+	if rpc.State == nil || rpc.State.Name != "NY" {
+		t.Errorf("state: %+v", rpc.State)
+	}
+	if diff := cmp.Diff([]int64{1, 2, 3, 4}, rpc.RegionIDs()); diff != "" {
+		t.Errorf("region IDs (-want +got):\n%s", diff)
+	}
+}
+
+func TestPostgresStore_ResolvePostalCode_NotFound(t *testing.T) {
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	seedFixture(t, store)
+
+	_, err := store.ResolvePostalCode(context.Background(), atlas.CountryUS, "99999")
+	if err != atlas.ErrPostalCodeNotFound {
+		t.Errorf("want ErrPostalCodeNotFound, got %v", err)
+	}
+}
+
+func TestPostgresStore_ResolvePostalCode_CanadianFSANormalization(t *testing.T) {
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	seedFixture(t, store)
+
+	ctx := context.Background()
+	// Seed a single Canadian postal code mapping; just the city.
+	_, err := store.Pool().Exec(ctx, `
+		INSERT INTO regions (id, kind, name, slug, country, scope_tier) VALUES
+			(200, 'city', 'Toronto', 'toronto-on', 'CA', 'local');
+		INSERT INTO postal_codes (postal_code, country, city_region_id) VALUES
+			('M5V', 'CA', 200);
+	`)
+	if err != nil {
+		t.Fatalf("seed CA: %v", err)
+	}
+
+	// Full postal code with whitespace + lowercase: adapter must
+	// truncate to "M5V" before querying.
+	rpc, err := store.ResolvePostalCode(ctx, atlas.CountryCA, "m5v 3a8")
+	if err != nil {
+		t.Fatalf("ResolvePostalCode: %v", err)
+	}
+	if rpc.Code != "M5V" {
+		t.Errorf("normalized code: want %q, got %q", "M5V", rpc.Code)
+	}
+}
+
+func TestPostgresStore_OrgsForRegions_OnlyApprovedAndPopulatesFullRegions(t *testing.T) {
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	seedFixture(t, store)
+
+	orgs, err := store.OrgsForRegions(context.Background(), []int64{1, 2, 3, 4})
+	if err != nil {
+		t.Fatalf("OrgsForRegions: %v", err)
+	}
+	gotSlugs := make([]string, 0, len(orgs))
+	for _, o := range orgs {
+		gotSlugs = append(gotSlugs, o.Slug)
+	}
+	// "off-topic-sf" only serves region 99 → not in the input set.
+	// "pending-org" tagged to region 1 but status=pending → filtered.
+	wantSlugs := []string{"transalt-brooklyn", "riders-alliance"}
+	if diff := cmp.Diff(wantSlugs, gotSlugs); diff != "" {
+		t.Errorf("returned org slugs (-want +got):\n%s", diff)
+	}
+
+	// transalt-brooklyn serves regions 1 and 2; both must appear in
+	// Org.Regions, in id order (the SQL ORDERS BY region_id).
+	for _, o := range orgs {
+		if o.Slug != "transalt-brooklyn" {
+			continue
+		}
+		if len(o.Regions) != 2 {
+			t.Errorf("transalt-brooklyn regions: want 2, got %d (%+v)", len(o.Regions), o.Regions)
+		}
+		if o.Regions[0].ID != 1 || o.Regions[1].ID != 2 {
+			t.Errorf("transalt-brooklyn region order: want [1,2], got %v", regionIDs(o.Regions))
+		}
+	}
+}
+
+func TestPostgresStore_EndToEndLookup(t *testing.T) {
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	seedFixture(t, store)
+
+	res, err := atlas.Lookup(context.Background(), store, atlas.LookupQuery{
+		PostalCode: "11217",
+		Country:    atlas.CountryUS,
+	})
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if len(res.Local) != 1 || res.Local[0].Slug != "transalt-brooklyn" {
+		t.Errorf("local: %v", orgSlugs(res.Local))
+	}
+	if len(res.Regional) != 1 || res.Regional[0].Slug != "riders-alliance" {
+		t.Errorf("regional: %v", orgSlugs(res.Regional))
+	}
+	if res.ResolvedPlaceLabel != "Brooklyn, NY — New York Metro" {
+		t.Errorf("place label: %q", res.ResolvedPlaceLabel)
+	}
+}
+
+func TestPostgresStore_OrgsForRegions_EmptyInput(t *testing.T) {
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+
+	orgs, err := store.OrgsForRegions(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("OrgsForRegions(nil): %v", err)
+	}
+	if len(orgs) != 0 {
+		t.Errorf("want empty, got %d", len(orgs))
+	}
+}
+
+func orgSlugs(orgs []atlas.Org) []string {
+	out := make([]string, len(orgs))
+	for i, o := range orgs {
+		out[i] = o.Slug
+	}
+	return out
+}
+
+func regionIDs(regions []atlas.Region) []int64 {
+	out := make([]int64, len(regions))
+	for i, r := range regions {
+		out[i] = r.ID
+	}
+	return out
+}
+
+// Ensure sql import is exercised so the file doesn't trip an unused
+// import lint when the build tag is on but the helper is stripped.
+var _ = sql.ErrNoRows

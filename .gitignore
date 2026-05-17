@@ -1,0 +1,60 @@
+# ── OS ──────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ── Editors / IDEs ──────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.fleet/
+.zed/
+
+# ── Env / secrets ───────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── mise: machine-local overrides ───────────────────
+mise.local.toml
+
+# ── Go (api/) ───────────────────────────────────────
+api/vendor/
+api/bin/
+api/tmp/
+api/coverage.out
+api/coverage.html
+*.test
+*.out
+*.prof
+
+# Built server binary (matches likely names)
+api/urbanist-atlas-server
+api/server
+api/cmd/server/server
+
+# ── Node / Vite (web/) ──────────────────────────────
+web/node_modules/
+web/dist/
+web/.vite/
+web/coverage/
+web/**/*.tsbuildinfo
+web/.eslintcache
+web/*.log
+web/npm-debug.log*
+web/.cache/
+
+# ── Fly.io ──────────────────────────────────────────
+api/.fly/
+
+# ── Brainstorming / Claude scratch ──────────────────
+.superpowers/
+.claude/
+
+# ── Misc build / edit artifacts ─────────────────────
+*.log
+*.bak
+*.orig
+*.rej

@@ -1,0 +1,744 @@
+openapi: 3.0.3
+
+info:
+  title: Urbanist Atlas API
+  version: 1.0.0
+  description: |
+    Urbanist Atlas is a US + Canada directory of transit and
+    safe-streets advocacy organizations. Enter a ZIP or Canadian
+    postal code and get back the local and regional organizations
+    working in your area.
+
+    This document is the wire contract for the public v1 API. The
+    canonical copy is checked in at `api/openapi.yaml` and served by
+    the API itself at `GET /api/v1/openapi.yaml` so external consumers
+    can discover it.
+
+    ## Conventions
+
+    - All request and response bodies are JSON (`application/json`),
+      except `/healthz` (plain text) and `/api/v1/openapi.yaml` (YAML).
+    - All error responses use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457.html)
+      with content-type `application/problem+json`. See the
+      `ProblemDetails` schema for the field list and the catalog of
+      stable `type` URIs.
+    - Every response includes an `X-Request-ID` header; error response
+      bodies also echo it as the `request_id` extension field so
+      clients can quote it when reporting bugs.
+    - Admin endpoints require an `Authorization: Bearer <token>`
+      header; the token is configured via the `URBANIST_ADMIN_TOKEN`
+      environment variable on the server.
+
+    Companion to the maintainer's publication, *Urbanist Lexicon*
+    (https://mjrossi.com).
+  contact:
+    name: Urbanist Atlas
+    url: https://urbanistatlas.com
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://api.urbanistatlas.com
+    description: Production
+
+# Default security on every operation is "none" (public endpoints).
+# Admin endpoints individually declare `security: [{BearerAuth: []}]`
+# to require the moderator bearer token.
+security: []
+
+tags:
+  - name: meta
+    description: Service-level endpoints (health, contract discovery).
+  - name: lookup
+    description: Postal-code → organizations search.
+  - name: browse
+    description: Metros and recently-added organizations.
+  - name: submissions
+    description: Public submissions of new organizations.
+  - name: admin
+    description: Moderator-only endpoints. Require a bearer token.
+
+paths:
+  /healthz:
+    get:
+      tags: [meta]
+      summary: Liveness probe.
+      description: |
+        Used by Fly's health checks. Deliberately does not touch any
+        downstream dependency (database, etc.) so it stays cheap and
+        predictable.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is running.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "ok\n"
+
+  /api/v1/openapi.yaml:
+    get:
+      tags: [meta]
+      summary: Returns this OpenAPI specification.
+      description: |
+        Lets external consumers discover the wire contract at runtime.
+        The body is identical to the `api/openapi.yaml` file checked
+        into the repo at the running binary's release.
+      operationId: getOpenAPISpec
+      responses:
+        '200':
+          description: The OpenAPI 3 specification, in YAML.
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /api/v1/lookup:
+    get:
+      tags: [lookup]
+      summary: Look up advocacy organizations for a postal code.
+      description: |
+        Resolves the postal code to a set of geographic regions, then
+        returns all approved organizations that serve any of those
+        regions. Results are bucketed into `local` (city/county-level)
+        and `regional` (metro/state/province/multi-state) groups, in
+        that order of geographic specificity within each bucket.
+
+        Canadian postal codes are normalized to the 3-character FSA
+        (e.g. `M5V 3A8` → `M5V`) server-side; clients may pass either
+        form.
+      operationId: lookup
+      parameters:
+        - $ref: '#/components/parameters/PostalCodeQuery'
+        - $ref: '#/components/parameters/CountryQuery'
+      responses:
+        '200':
+          description: Lookup succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/metros:
+    get:
+      tags: [browse]
+      summary: List metros with approved organization counts.
+      description: |
+        Feeds the "Browse by metro" panel on the home page. Returns
+        every region of kind `metro` that has at least one approved
+        organization tagged to it, with a count.
+      operationId: listMetros
+      responses:
+        '200':
+          description: Metros with counts, ordered by org count descending.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetroSummary'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/metros/{slug}:
+    get:
+      tags: [browse]
+      summary: List approved organizations in a single metro.
+      operationId: getMetro
+      parameters:
+        - $ref: '#/components/parameters/MetroSlug'
+      responses:
+        '200':
+          description: The metro region and its organizations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetroDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/recent:
+    get:
+      tags: [browse]
+      summary: Recently approved organizations.
+      description: |
+        Feeds the "Recently added" strip on the home page. Returns the
+        most-recently-approved organizations across the whole atlas,
+        newest first.
+      operationId: listRecent
+      responses:
+        '200':
+          description: Recently approved organizations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Org'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/submissions:
+    post:
+      tags: [submissions]
+      summary: Submit a new organization for review.
+      description: |
+        Anyone can submit an organization. The submission lands in the
+        moderation queue with `status: pending` and is reviewed by a
+        maintainer before becoming visible in lookups. Rate-limited
+        per source IP.
+      operationId: createSubmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewSubmissionRequest'
+      responses:
+        '201':
+          description: Submission accepted into the queue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Submission'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/submissions:
+    get:
+      tags: [admin]
+      summary: List pending submissions.
+      description: |
+        Returns submissions in the moderation queue. By default returns
+        only `pending` submissions; pass `status=approved` or
+        `status=rejected` to view history.
+      operationId: listSubmissions
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            $ref: '#/components/schemas/SubmissionStatus'
+          description: Filter by submission status. Defaults to `pending`.
+      responses:
+        '200':
+          description: Submissions matching the filter, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Submission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/submissions/{id}/approve:
+    post:
+      tags: [admin]
+      summary: Approve a submission and promote it to a real organization.
+      description: |
+        Atomically: creates an `organizations` row (status `approved`)
+        from the submission payload, links it to the submitted region
+        slugs via `organization_regions`, sets
+        `submissions.promoted_org_id`, and marks the submission
+        `approved`.
+      operationId: approveSubmission
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SubmissionID'
+      responses:
+        '200':
+          description: Submission approved; returns the updated submission with `promoted_org_id` set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Submission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Submission is not in `pending` state.
+            Response body is an RFC 9457 problem document with
+            `type` `https://urbanistatlas.com/problems/conflict`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/submissions/{id}/reject:
+    post:
+      tags: [admin]
+      summary: Reject a submission with a reason.
+      operationId: rejectSubmission
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SubmissionID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectSubmissionRequest'
+      responses:
+        '200':
+          description: Submission rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Submission'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Submission is not in `pending` state.
+            Response body is an RFC 9457 problem document with
+            `type` `https://urbanistatlas.com/problems/conflict`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        A single shared moderator token, configured via the
+        `URBANIST_ADMIN_TOKEN` environment variable on the server.
+        Multi-moderator auth is deferred to a future version.
+
+  parameters:
+    PostalCodeQuery:
+      in: query
+      name: postal_code
+      required: true
+      schema:
+        type: string
+      description: |
+        US ZIP code (e.g. `11217`) or Canadian postal code or FSA
+        (e.g. `M5V` or `M5V 3A8`). Whitespace is trimmed; CA codes are
+        truncated to their 3-character FSA server-side.
+    CountryQuery:
+      in: query
+      name: country
+      required: true
+      schema:
+        $ref: '#/components/schemas/Country'
+      description: ISO-style country code. Case-insensitive.
+    MetroSlug:
+      in: path
+      name: slug
+      required: true
+      schema:
+        type: string
+      description: The metro region's slug (e.g. `nyc-metro`).
+    SubmissionID:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: The submission's numeric ID.
+
+  responses:
+    BadRequest:
+      description: |
+        Request was malformed or missing required parameters.
+        Response body is an RFC 9457 problem document with
+        `type` typically `https://urbanistatlas.com/problems/validation`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Unauthorized:
+      description: |
+        Missing or invalid bearer token.
+        Response body is an RFC 9457 problem document with
+        `type` `https://urbanistatlas.com/problems/unauthorized`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: |
+        The requested resource was not found.
+        Response body is an RFC 9457 problem document with
+        `type` `https://urbanistatlas.com/problems/not-found`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    TooManyRequests:
+      description: |
+        Rate limit exceeded. Includes a `Retry-After` header.
+        Response body is an RFC 9457 problem document with
+        `type` `https://urbanistatlas.com/problems/rate-limited`.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds the client should wait before retrying.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    InternalError:
+      description: |
+        An unexpected server error occurred. The `request_id`
+        extension field (and the `X-Request-ID` response header)
+        identify the request in server logs.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+
+    Country:
+      type: string
+      enum: [US, CA]
+      description: ISO-style country code. Only `US` and `CA` are supported in v1.
+
+    ScopeTier:
+      type: string
+      enum: [local, regional]
+      description: |
+        Drives result grouping in `/lookup`. `local` for city/county
+        regions; `regional` for metro/state/province/multi-state.
+
+    RegionKind:
+      type: string
+      enum: [city, county, metro, state, province, country, multi-state]
+      description: Granularity of a region.
+
+    SubmissionStatus:
+      type: string
+      enum: [pending, approved, rejected]
+      description: Lifecycle state of a public submission.
+
+    Region:
+      type: object
+      required: [id, kind, name, slug, country, scope_tier]
+      properties:
+        id:
+          type: integer
+          format: int64
+        kind:
+          $ref: '#/components/schemas/RegionKind'
+        name:
+          type: string
+          example: Brooklyn
+        slug:
+          type: string
+          example: brooklyn-ny
+        country:
+          $ref: '#/components/schemas/Country'
+        scope_tier:
+          $ref: '#/components/schemas/ScopeTier'
+
+    Org:
+      type: object
+      description: |
+        A single advocacy organization. `regions` is denormalized onto
+        the organization for ergonomic JSON output — it lists every
+        region the org serves, not just the regions that matched the
+        current query.
+      required: [id, slug, name, short_desc, website_url, tags, regions]
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+          example: transalt
+        name:
+          type: string
+          example: Transportation Alternatives
+        short_desc:
+          type: string
+          example: NYC-wide advocacy for walking, biking, and public transit.
+        website_url:
+          type: string
+          format: uri
+          example: https://www.transalt.org
+        contact_url:
+          type: string
+          format: uri
+          description: Optional. URL of the org's contact page.
+        tags:
+          type: array
+          items:
+            type: string
+          description: |
+            Open-ended labels. The canonical set is documented in
+            `CLAUDE.md` (transit, safe-streets, cycling, walking,
+            vision-zero, policy, grassroots, political, neighborhood);
+            new labels may be introduced via seed data.
+        regions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Region'
+
+    LookupQuery:
+      type: object
+      required: [postal_code, country]
+      properties:
+        postal_code:
+          type: string
+          example: "11217"
+        country:
+          $ref: '#/components/schemas/Country'
+
+    LookupResult:
+      type: object
+      description: |
+        Response shape of `GET /api/v1/lookup`. `local` and `regional`
+        are always present (possibly empty arrays). `resolved_place_label`
+        is a human-readable description of where the postal code was
+        resolved (e.g. "Brooklyn, NY").
+      required: [query, resolved_place_label, local, regional]
+      properties:
+        query:
+          $ref: '#/components/schemas/LookupQuery'
+        resolved_place_label:
+          type: string
+          example: "Brooklyn, NY"
+        local:
+          type: array
+          items:
+            $ref: '#/components/schemas/Org'
+        regional:
+          type: array
+          items:
+            $ref: '#/components/schemas/Org'
+
+    MetroSummary:
+      type: object
+      description: A metro region plus its approved-org count, for the browse-by-metro panel.
+      required: [region, org_count]
+      properties:
+        region:
+          $ref: '#/components/schemas/Region'
+        org_count:
+          type: integer
+          format: int32
+          minimum: 0
+
+    MetroDetail:
+      type: object
+      description: A metro region with the approved organizations that serve it.
+      required: [region, orgs]
+      properties:
+        region:
+          $ref: '#/components/schemas/Region'
+        orgs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Org'
+
+    SubmissionPayload:
+      type: object
+      description: The proposed organization, as submitted by a member of the public.
+      required: [name, short_desc, website_url, tags, region_slugs]
+      properties:
+        name:
+          type: string
+        short_desc:
+          type: string
+        website_url:
+          type: string
+          format: uri
+        contact_url:
+          type: string
+          format: uri
+          description: Optional.
+        tags:
+          type: array
+          items:
+            type: string
+        region_slugs:
+          type: array
+          items:
+            type: string
+          description: |
+            Slugs of the regions this organization serves (e.g.
+            `["brooklyn-ny","nyc-metro"]`). The server resolves these
+            against the `regions` table at approval time.
+
+    NewSubmissionRequest:
+      type: object
+      description: Request body for `POST /api/v1/submissions`.
+      required: [payload]
+      properties:
+        payload:
+          $ref: '#/components/schemas/SubmissionPayload'
+        submitter_name:
+          type: string
+          description: Optional. The submitter's name.
+        submitter_email:
+          type: string
+          format: email
+          description: Optional. The submitter's contact email.
+        submitter_note:
+          type: string
+          description: Optional. Free-form note to the moderators.
+
+    Submission:
+      type: object
+      description: A queued or processed public submission.
+      required: [id, payload, status, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        payload:
+          $ref: '#/components/schemas/SubmissionPayload'
+        submitter_name:
+          type: string
+        submitter_email:
+          type: string
+          format: email
+        submitter_note:
+          type: string
+        status:
+          $ref: '#/components/schemas/SubmissionStatus'
+        created_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+          description: Set when status moves from `pending` to a terminal state.
+        promoted_org_id:
+          type: integer
+          format: int64
+          description: Set on approval to the ID of the created organization.
+        rejection_reason:
+          type: string
+          description: Set on rejection.
+
+    RejectSubmissionRequest:
+      type: object
+      description: Request body for `POST /api/v1/admin/submissions/{id}/reject`.
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          description: Free-form note shown to the submitter if email notifications are enabled, and persisted for audit.
+
+    ProblemDetails:
+      type: object
+      description: |
+        Standard [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
+        Problem Details object. Returned on every non-2xx response with
+        content-type `application/problem+json`.
+
+        The `type` field is a stable URI identifying the problem class.
+        The current v1 type values are:
+
+        - `https://urbanistatlas.com/problems/validation` — request was
+          malformed or missing a required field (HTTP 400).
+        - `https://urbanistatlas.com/problems/not-found` — the
+          requested resource does not exist (HTTP 404).
+        - `https://urbanistatlas.com/problems/unauthorized` — missing
+          or invalid bearer token on a protected endpoint (HTTP 401).
+        - `https://urbanistatlas.com/problems/conflict` — the requested
+          state transition is not valid given current state (e.g.
+          approving a non-pending submission) (HTTP 409).
+        - `https://urbanistatlas.com/problems/rate-limited` — too many
+          requests from this source (HTTP 429). A `Retry-After` header
+          is also returned.
+        - `https://urbanistatlas.com/problems/internal` — an
+          unexpected server error (HTTP 500).
+
+        These URIs are stable identifiers; they do not necessarily
+        dereference to a human-readable page yet.
+
+        Additional fields beyond the RFC's standard five are permitted
+        and consumers should ignore unknown fields. The `request_id`
+        extension is included on every error response and matches the
+        `X-Request-ID` response header so clients can quote it when
+        reporting bugs.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          default: "about:blank"
+          example: "https://urbanistatlas.com/problems/validation"
+          description: |
+            URI reference that identifies the problem type. When
+            absent or `about:blank`, the `title` alone identifies the
+            problem.
+        title:
+          type: string
+          example: "Bad Request"
+          description: |
+            Short, human-readable summary of the problem type. Should
+            not change between occurrences of the same problem type,
+            except for localization.
+        status:
+          type: integer
+          format: int32
+          minimum: 100
+          maximum: 599
+          example: 400
+          description: |
+            HTTP status code generated by the origin server. Mirrors
+            the response's status line; included in the body so it
+            survives proxies that mangle status codes.
+        detail:
+          type: string
+          example: "postal_code is required"
+          description: |
+            Human-readable explanation specific to this occurrence.
+            Safe to display to end users.
+        instance:
+          type: string
+          format: uri-reference
+          example: "/api/v1/lookup"
+          description: |
+            URI reference that identifies the specific occurrence of
+            the problem — typically the request path.
+        request_id:
+          type: string
+          example: "a1b2c3d4e5f6g7h8"
+          description: |
+            Extension field. The server-side request ID; matches the
+            `X-Request-ID` response header. Useful for users to quote
+            when reporting bugs.

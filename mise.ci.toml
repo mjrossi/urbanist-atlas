@@ -1,0 +1,9 @@
+# CI environment for GitHub Actions builds.
+#
+# Activated by setting MISE_ENV=ci in the workflow. Mirrors the pattern
+# used in mjrossi-portfolio-website: the workflow runs
+# `mise env >> $GITHUB_ENV` after `jdx/mise-action` so these values are
+# visible to subsequent steps.
+
+[env]
+URBANIST_LOG_FORMAT = "text"

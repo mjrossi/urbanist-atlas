@@ -1,0 +1,53 @@
+Urbanist Atlas — Organization Directory Dataset
+================================================
+
+Copyright 2026 Matt Rossi and contributors.
+
+The Urbanist Atlas organization directory dataset — the structured
+collection of transit and safe-streets advocacy organizations,
+including their geographic associations and curated metadata — is
+made available under the Open Database License (ODbL) version 1.0.
+
+  Full license text: https://opendatacommons.org/licenses/odbl/1-0/
+  SPDX identifier:   ODbL-1.0
+
+The individual factual contents of the dataset (organization names,
+addresses, websites, and similar publicly available facts) are not
+themselves copyrightable in most jurisdictions. The ODbL governs the
+database as a whole — its structure, curation, and arrangement — and
+any substantive original prose contained within entries (descriptions,
+editorial notes, and similar).
+
+Summary of obligations
+----------------------
+
+If you use this dataset, you must:
+
+  - Attribute Urbanist Atlas as the source.
+  - Share alike: publish any adapted version of the dataset under
+    the ODbL.
+  - Keep open: if you apply technological restrictions to a
+    redistributed version, also provide an unrestricted version.
+
+Commercial use is explicitly permitted.
+
+This summary has no legal force. The full ODbL 1.0 text at the URL
+above is the binding agreement.
+
+Attribution notice for downstream users
+---------------------------------------
+
+When using this dataset or any work produced from it, please include
+a notice substantially as follows:
+
+  Contains information from Urbanist Atlas (https://urbanistatlas.com),
+  made available under the Open Database License (ODbL) 1.0.
+
+Scope
+-----
+
+This license applies to the organization directory dataset only. The
+software in this repository (the Go API and React web application) is
+licensed separately under the Apache License 2.0; see LICENSE.
+Documentation and prose content is licensed under CC BY-SA 4.0; see
+LICENSE-CONTENT.
