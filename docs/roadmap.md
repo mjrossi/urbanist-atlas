@@ -44,40 +44,49 @@ the plan is the *design* view.
   - `openapi-typescript` → `src/lib/api.gen.ts`; `src/lib/api.ts`
     provides `apiFetch<T>`, an `ApiError` carrying the RFC 9457
     body, and a `lookup()` wrapper — all types from `api.gen.ts`.
-  - Broadsheet CSS port from mjrossi.com (the layout-shell slice
-    only) + variable fonts via `@fontsource-variable/*`.
+  - Broadsheet CSS port from mjrossi.com + variable fonts via
+    `@fontsource-variable/*`.
   - Layout shell: `Masthead` (amber "Atlas" + italic tagline
-    between rules), `BroadsheetNav`, `Footer`; placeholder Home
-    route. TanStack Query + React Router wired (no live `useQuery`
-    callers yet).
-- `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
-  oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
-  `healthz`, `lookup`, `seed`, `loadpostal`, `ci`.
+    between rules), `BroadsheetNav`, `Footer`. TanStack Query +
+    React Router wired.
+- **Data pipeline foundation (slices #3 + #4):** `loadpostal` CSV
+  ingester + `seed` TOML loader + bundled fixtures. Original v0
+  shape (4-tier postal + YAML orgs) was reshaped by slice #4.5;
+  the current shape is documented in [`api/seed/README.md`](../api/seed/README.md).
+- **Home + Results pages (slices #11 + #12):** Two-column broadsheet
+  home with `SearchBox` + drop-cap lede; `/r/:postalCode` results
+  with `Dateline` header + `EntryList` Local/Regional classified
+  layout against `/api/v1/lookup`. Right-column placeholders for
+  "Browse by metro" / "Recently added" until slice #6 lands the
+  backing endpoints.
 - **Region-graph refactor (slice #4.5):** regions become a multi-parent
   DAG; postal_codes point at the leaf; `scope_tier` is editorial;
   `RegionKind`/`Country` open to free-form strings; loaders move to
-  TOML (`regions_<cc>.toml`, `orgs.toml`). See
+  TOML (`regions_<cc>.toml`, `orgs.toml`); SPA renders ancestry
+  breadcrumb + "via X" subtitles. See
   [`docs/region-graph.md`](./region-graph.md) for the user-facing
   reference and `docs/superpowers/specs/2026-05-16-region-graph-design.md`
   for the design rationale.
+- `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
+  oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
+  `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
+  `loaddata`, `ci`.
 
 ## Backend (Go)
 
 | # | Slice | What lands |
 |---|-------|------------|
-| 3 | **`loadpostal` for real** | Pick free sources (US Census ZCTA→CBSA crosswalk; StatsCan FSA), write the CSV ingester, populate `regions` + `postal_codes`. |
-| 4 | **`seed` for real** | Generate `api/seed/orgs.toml` (~30–50 LLM-drafted-then-human-reviewed orgs), write the TOML loader (`github.com/pelletier/go-toml/v2`), wire the subcommand to upsert into Postgres. |
-| 4.6 | **First EU country trial** | Write `regions_<cc>.toml`, `postal_codes_<cc>.csv`, and curated orgs for one European country (Germany or France). Validates the graph model against city-states, federations, and overlapping metros before Phase 2 cutover. |
+| 4.6 | **First EU country trial** | Write `regions_<cc>.toml`, `postal_codes_<cc>.csv`, and curated orgs for one European country (Germany or France). Validates the graph model against city-states, federations, and overlapping metros before Phase 2 cutover. Per [`docs/region-graph.md`](./region-graph.md). |
 | 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. |
 | 6 | **Browse / recent endpoints** | `GET /api/v1/metros`, `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — feeds the homepage strip and `/browse`. |
 | 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. |
+| 7.5 | **Full-country postal data ingest** | Replace the bundled fixture CSVs (~30 ZIPs) with real Census ZCTA / StatsCan PCCF reshapes. Out-of-band ETL → 3-column CSVs in the format `loadpostal` already consumes. Documented in [`api/seed/README.md`](../api/seed/README.md). |
+| 7.6 | **Seed data growth** | Expand `orgs.toml` from the curated 19 to the planned ~30–50 across both countries. Editorial work, not engineering. |
 
 ## Frontend (React + Vite)
 
 | # | Slice | What lands |
 |---|-------|------------|
-| 11 | **Home page** | Two-column broadsheet — `SearchBox` + drop-cap lede on the left; "Browse by metro" + "Recently added" on the right (TanStack Query against #6). |
-| 12 | **Results page** | `/r/:postalCode` route; `Dateline` header treatment; `EntryList` rendering the "Local" / "Regional" classified-section layout against `/api/v1/lookup`. |
 | 13 | **Submit form** | `/submit` with `react-hook-form`, broadsheet-style fieldsets, optional Turnstile, POSTs to `/api/v1/submissions`. |
 | 14 | **Browse + metro pages** | `/browse` list of metros; `/m/:metroSlug` reusing the results layout. |
 | 15 | **About + 404** | Single-column `.page` treatment; mission/methodology/criteria copy. |
