@@ -4,6 +4,7 @@ import { Dateline } from '../components/Dateline.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { ApiError, lookup } from '../lib/api.ts';
 import type { Country, LookupOrg, LookupResult, Region } from '../lib/api.ts';
+import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 /**
@@ -15,11 +16,6 @@ import { queryKeys } from '../lib/queryKeys.ts';
 
 function parseCountry(raw: string | null): Country {
   return raw === 'CA' ? 'CA' : 'US';
-}
-
-function normalizePostal(raw: string | undefined): string {
-  if (!raw) return '';
-  return raw.replace(/\s+/g, '').toUpperCase();
 }
 
 /**
@@ -49,7 +45,7 @@ function buildRegionNameMap(
 export function Results() {
   const params = useParams<{ postalCode: string }>();
   const [search] = useSearchParams();
-  const postalCode = normalizePostal(params.postalCode);
+  const postalCode = normalizePostal(params.postalCode ?? '');
   const country = parseCountry(search.get('country'));
 
   const query = useQuery<LookupResult, ApiError>({
