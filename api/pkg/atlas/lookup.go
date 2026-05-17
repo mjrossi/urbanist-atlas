@@ -46,8 +46,8 @@ func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, 
 	for _, org := range orgs {
 		matched := make([]Region, 0)
 		for _, r := range org.Regions {
-			if _, ok := ancestorByID[r.ID]; ok {
-				matched = append(matched, ancestorByID[r.ID])
+			if ar, ok := ancestorByID[r.ID]; ok {
+				matched = append(matched, ar)
 			}
 		}
 		if len(matched) == 0 {
