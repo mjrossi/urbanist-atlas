@@ -1,0 +1,49 @@
+# fly.toml — urbanist-atlas API
+#
+# Single Fly app, single MPG cluster, single region. QA hostname
+# (qa-api.urbanistatlas.com) is attached via `flyctl certs create` in
+# slice #21; production hostname (api.urbanistatlas.com) is added to
+# this same app at prod launch (see
+# docs/superpowers/specs/2026-05-18-qa-deploy-design.md §
+# "Future migration: QA → prod").
+
+app = "urbanist-atlas"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Migrations run on every deploy via the same binary that serves
+# traffic — embedded migrations (api/migrations/embed.go) mean no
+# version skew is possible between code and schema.
+[deploy]
+  release_command = "urbanist-atlas-server migrate up"
+
+# Non-secret env vars. Secrets (URBANIST_DB_URL,
+# URBANIST_ADMIN_TOKEN, URBANIST_CLIENT_SECRET) are set via
+# `flyctl secrets set` in slice #20.
+[env]
+  URBANIST_PORT = "8080"
+  URBANIST_LOG_FORMAT = "json"
+  URBANIST_STORE = "postgres"
+  # CORS allowlist for Phase 1. `*.pages.dev` covers automatic Pages
+  # PR previews. At prod launch this grows to include
+  # https://urbanistatlas.com; once QA retires, drop the qa.* entry.
+  URBANIST_CORS_ORIGINS = "https://qa.urbanistatlas.com,*.pages.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Cold-start on idle is fine for a low-traffic dogfood window. Bump
+  # min_machines_running once traffic warrants it.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"

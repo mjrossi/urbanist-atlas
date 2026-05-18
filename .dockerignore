@@ -1,0 +1,43 @@
+# What NOT to send into the Docker build context. Keeps builds fast
+# and prevents accidental leakage of local files into image layers.
+
+# ── VCS + dev tooling ─────────────────────────────────
+.git
+.gitignore
+.github
+.dockerignore
+Dockerfile
+fly.toml
+
+# ── project planning + AI context ─────────────────────
+# Specs and roadmap live in docs/; nothing in the runtime image needs
+# them, so keep the build context tight.
+.planning
+.claude
+docs
+
+# ── editor + OS noise ────────────────────────────────
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# ── web bundle ───────────────────────────────────────
+# Cloudflare Pages deploys web/; the API image never touches it.
+web
+
+# ── go test artifacts + local outputs ─────────────────
+**/*_test.go
+**/testdata/
+api/bin/
+
+# ── node deps (in case anyone ran npm install at the wrong place) ──
+**/node_modules/
+
+# ── mise machine-local overrides ──────────────────────
+mise.local.toml
+
+# ── env files: never embed secrets in image layers ────
+**/.env
+**/.env.*
+!**/.env.example

@@ -250,6 +250,38 @@ web-gen-check:
 [doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
 
+# ── fly: deploy + ops ─────────────────────────────────
+# Thin wrappers around `flyctl` so the deploy / status / logs verbs
+# are discoverable via `just --list`. flyctl reads `fly.toml` at the
+# repo root and picks up the app name from there. Initial provisioning
+# (app creation, MPG attach, secrets) lives in docs/deploy.md — these
+# recipes are for ongoing ops once the app exists.
+
+# build + push + release on Fly
+[group('fly')]
+fly-deploy:
+    flyctl deploy
+
+# show machine + service status
+[group('fly')]
+fly-status:
+    flyctl status
+
+# tail live logs from Fly
+[group('fly')]
+fly-logs:
+    flyctl logs
+
+# list non-value Fly secrets (names + digests only)
+[group('fly')]
+fly-secrets:
+    flyctl secrets list
+
+# open an interactive shell inside a running Fly machine
+[group('fly')]
+fly-ssh:
+    flyctl ssh console
+
 # ── smoke: live curl helpers (server must be running) ─
 
 # curl /healthz against localhost

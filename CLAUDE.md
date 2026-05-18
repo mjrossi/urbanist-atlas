@@ -198,6 +198,12 @@ endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 - **Web:** Cloudflare Pages connected to `web/`. PR preview deploys per
   branch.
 
+The chunk that takes the project from localhost to live (slices
+#19/#20/#21/#23) is specced at
+[`docs/superpowers/specs/2026-05-18-qa-deploy-design.md`](./docs/superpowers/specs/2026-05-18-qa-deploy-design.md);
+operational runbook lives at
+[`docs/deploy.md`](./docs/deploy.md) (created in slice #20).
+
 ## Launch strategy
 
 The API ships in two phases — see roadmap slices #22–#28 for the
