@@ -194,8 +194,19 @@ flyctl secrets set URBANIST_ADMIN_TOKEN="$(openssl rand -hex 32)"
 
 Hand the new value to whichever tool/script consumes the admin endpoints.
 
-**`URBANIST_DB_URL`** is managed by Fly when MPG rotates credentials; no
-manual procedure required unless you intentionally rotate MPG.
+**`URBANIST_DB_URL`** is the project's renamed copy of MPG's
+`DATABASE_URL`. When MPG rotates credentials it updates `DATABASE_URL`
+on the Fly app; the renamed copy is not auto-updated, so the same
+manual re-mirror used in the initial bootstrap (§3 above) is required:
+
+```sh
+flyctl mpg attach urbanist-atlas-db --app urbanist-atlas   # re-prints DATABASE_URL
+flyctl secrets set URBANIST_DB_URL="postgres://...paste from the mpg attach output..."
+```
+
+Until that re-mirror runs, `serve`, `migrate`, and `loaddata` keep
+connecting with the old credentials and start failing as MPG retires
+them.
 
 ### What's *not* a secret
 
