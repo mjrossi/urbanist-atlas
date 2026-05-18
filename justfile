@@ -29,6 +29,17 @@ api-run:
 api-build:
     cd api && mkdir -p bin && go build -o bin/urbanist-atlas-server ./cmd/server
 
+# build the api binary the same way the Docker runtime stage does:
+# static (CGO_ENABLED=0), Linux-targeted, stripped. Output still goes
+# to api/bin/ for ergonomics. The Dockerfile inlines the SAME flags;
+# keep them in sync (a code-review concern — there's no automated
+# drift check because installing `just` inside the build stage to
+# delegate here would add a dependency for one command).
+[group('api')]
+[doc('build the api binary with the same flags the Docker image uses')]
+api-build-prod:
+    cd api && mkdir -p bin && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/urbanist-atlas-server ./cmd/server
+
 # format Go code
 [group('api')]
 api-fmt:

@@ -26,7 +26,12 @@ RUN cd api && go mod download
 COPY api/ ./api/
 
 # CGO off keeps the binary fully static so the runtime stage can be
-# minimal; -s -w strips symbols + DWARF for a smaller image.
+# minimal; -s -w strips symbols + DWARF for a smaller image. These
+# flags MUST stay in sync with `just api-build-prod` in the root
+# justfile — same build flags, different output path. Drift check is
+# a code-review concern; we don't install `just` inside the build
+# stage to delegate, since the dependency cost outweighs the parity
+# gain for a single command.
 WORKDIR /src/api
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w" \
