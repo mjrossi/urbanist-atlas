@@ -52,6 +52,7 @@ api/.fly/
 # ── Brainstorming / Claude scratch ──────────────────
 .superpowers/
 .claude/
+.worktrees/
 
 # ── Misc build / edit artifacts ─────────────────────
 *.log
