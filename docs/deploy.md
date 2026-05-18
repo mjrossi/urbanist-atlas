@@ -55,13 +55,20 @@ flyctl launch --no-deploy --name urbanist-atlas --region iad --copy-config
 ### 2. Provision Managed Postgres and attach it
 
 ```sh
-flyctl postgres create --name urbanist-atlas-db --region iad
-flyctl postgres attach urbanist-atlas-db --app urbanist-atlas
+flyctl mpg create --name urbanist-atlas-db --region iad
+flyctl mpg attach urbanist-atlas-db --app urbanist-atlas
 ```
 
-`postgres attach` prints a connection string and sets `DATABASE_URL`
-automatically. The binary reads `URBANIST_DB_URL`, not `DATABASE_URL`,
-so the next step re-sets that under the project's env name.
+`mpg attach` prints the connection string to stdout *once* and sets
+`DATABASE_URL` on the Fly app. Copy the printed `DATABASE_URL=postgres://...`
+line — the next step pastes it back under the project's env name
+(`URBANIST_DB_URL`), since the binary reads that, not `DATABASE_URL`.
+
+Why paste it manually instead of reading it via `flyctl ssh console -C
+'printenv DATABASE_URL'`? At this point no machine is running yet
+(launch was `--no-deploy`), so there's nothing to SSH into. The
+connection string is only revealed on `attach`; capturing it from
+stdout is the only one-pass option.
 
 ### 3. Set secrets
 
@@ -70,7 +77,7 @@ restart instead of three):
 
 ```sh
 flyctl secrets set \
-    URBANIST_DB_URL="$(flyctl ssh console -C 'printenv DATABASE_URL')" \
+    URBANIST_DB_URL="postgres://...paste from the mpg attach output..." \
     URBANIST_ADMIN_TOKEN="$(openssl rand -hex 32)" \
     URBANIST_CLIENT_SECRET="$(openssl rand -hex 32)"
 ```
@@ -251,5 +258,5 @@ ship in the runtime stage via `COPY api/seed/ ./seed/` in the
 
 **Need to inspect production data.**
 `flyctl ssh console` opens a shell on the running machine.
-`flyctl postgres connect -a urbanist-atlas-db` opens a `psql` session
+`flyctl mpg connect -a urbanist-atlas-db` opens a `psql` session
 against the MPG cluster. Both require Fly auth.
