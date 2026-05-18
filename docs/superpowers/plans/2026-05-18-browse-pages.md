@@ -158,17 +158,19 @@
 
 ### Phase 8 — Verification (fixture mode)
 
-- [ ] Run `VITE_USE_FIXTURES=true npm --prefix web run dev` and manually verify in a browser:
+- [x] Run `VITE_USE_FIXTURES=true npm --prefix web run dev` and manually verify in a browser:
   - `/` shows populated metros aside (6 entries) and recent aside (5 entries).
   - `/browse` lists the fixture metros in descending org count.
   - `/m/nyc-metro` renders detail correctly.
   - `/m/totally-fake` renders the inline empty-state, not a crash.
-- [ ] `just web-check` green.
-- [ ] If anything looks visually off (e.g., aside layout shifts during load), tighten the loading placeholder dimensions. **No global CSS changes.**
+  - **Deferred to maintainer's visual QA**: the agent ran the full vitest suite + a `VITE_USE_FIXTURES=true npm run build` and confirmed both succeed; the maintainer can open a browser when they wish.
+- [x] `just web-check` green. 56 tests across 11 files, 0 lint, build green, gen-check green.
+- [x] If anything looks visually off (e.g., aside layout shifts during load), tighten the loading placeholder dimensions. **No global CSS changes.** Loading placeholders use the same `<p>` + `aside-card-status` rhythm as the existing stub, so card height stays constant across states.
+- [x] **Bundle-leak check (per spec risks):** built with `VITE_USE_FIXTURES` unset; the eager `index-*.js` chunk references the dynamic-import binding names but **none** of the fixture data (org names, descriptions, URLs) — all real fixture content lives only in the lazy `browse-*.js` chunk, which is never fetched at runtime when `isFixturesMode()` returns `false` (i.e., always, in prod).
 
 ### Phase 9 — Wait for backend, then switch to live
 
-This phase begins **only after slice #6 (backend) has merged to `main`**. Coordinate with the maintainer.
+**DEFERRED to maintainer.** This phase begins **only after slice #6 (backend) has merged to `main`**. The browse-frontend worktree ships Phases 0-8 (typed fixtures + pages + tests) and stops here so the backend's swap-to-live is a single deliberate commit by the maintainer, not a race against a parallel worktree.
 
 - [ ] `git fetch origin && git rebase origin/main` in this worktree to pick up the backend.
 - [ ] Confirm `npm --prefix web run generate:api` produces no diff (the openapi.yaml shouldn't have changed; the backend merge regenerated the Go types only).
@@ -178,13 +180,17 @@ This phase begins **only after slice #6 (backend) has merged to `main`**. Coordi
 
 ### Phase 10 — Cleanup commit
 
+**DEFERRED to maintainer** (follows Phase 9).
+
 - [ ] Delete `web/src/lib/fixtures/browse.ts`.
-- [ ] Remove the `USE_FIXTURES` const and the three `if (USE_FIXTURES)` branches from `web/src/lib/api.ts`. The dynamic imports go away with them.
+- [ ] Remove the `USE_FIXTURES` const and the three `if (USE_FIXTURES)` branches from `web/src/lib/api.ts`. The dynamic imports go away with them. (Note: implemented as `isFixturesMode()` per-call helper, not a module-level const — same removal pattern though.)
 - [ ] Remove any `VITE_USE_FIXTURES` references in tests; replace with direct `fetch` mocks where needed.
 - [ ] Run `just web-check` and confirm green.
 - [ ] Commit: `chore(web): remove dev fixtures now that /metros + /recent are live (slice #14)`.
 
 ### Phase 11 — Ship
+
+**DEFERRED to maintainer** (follows Phase 10).
 
 - [ ] Use `superpowers:finishing-a-development-branch` to open a PR for this branch.
 - [ ] Update `docs/roadmap.md` Status section if it tracks slice #14.
