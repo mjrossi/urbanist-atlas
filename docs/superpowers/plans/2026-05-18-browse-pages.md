@@ -92,28 +92,28 @@
 
 ### Phase 3 — Query keys
 
-- [ ] Extend `web/src/lib/queryKeys.ts`:
+- [x] Extend `web/src/lib/queryKeys.ts`:
   ```ts
   metros: () => ['metros'] as const,
   metro: (slug: string) => ['metro', slug] as const,
   recent: () => ['recent'] as const,
   ```
-- [ ] No standalone tests; coverage comes via component tests.
-- [ ] Commit: included in the next code commit (no atomic commit for this trivial change).
+- [x] No standalone tests; coverage comes via component tests.
+- [x] Commit: included in the next code commit (no atomic commit for this trivial change).
 
 ### Phase 4 — Browse page
 
-- [ ] Write `web/src/routes/Browse.test.tsx` first, mirroring the structure of `Results.test.tsx` (vi.hoisted mock for `listMetros`, MemoryRouter wrapping, QueryClient with `retry: false`):
+- [x] Write `web/src/routes/Browse.test.tsx` first, mirroring the structure of `Results.test.tsx` (vi.hoisted mock for `listMetros`, MemoryRouter wrapping, QueryClient with `retry: false`):
   - Happy path: fixture-shaped metros render with names and org counts; rendered order matches input (descending).
   - Loading state: while query is pending, a "Loading metros…" or similar element is visible.
   - Error state: when `listMetros` rejects with `ApiError`, an inline error message renders (not a crash).
   - Each metro row contains a link with `href="/m/{slug}"`.
-- [ ] Implement `web/src/routes/Browse.tsx`. Use the `.page` single-column layout (per the design system; see `Home.tsx` for `.broadsheet-body`, but Browse is more list-y so `.page` is correct). Include:
+- [x] Implement `web/src/routes/Browse.tsx`. Use the `.page` single-column layout (per the design system; see `Home.tsx` for `.broadsheet-body`, but Browse is more list-y so `.page` is correct). Include:
   - `<h1>` or `.section-label` masthead-style heading "Browse by metro".
   - Brief two-sentence lede.
   - A list of metros. Each row: name (Link to `/m/:slug`), small `.dateline`-style country line, org count chip on the right.
-- [ ] Run Browse tests, confirm pass.
-- [ ] Commit: `feat(web): /browse page (slice #14)`.
+- [x] Run Browse tests, confirm pass.
+- [x] Commit: `feat(web): /browse page (slice #14)`.
 
 ### Phase 5 — Metro page
 
