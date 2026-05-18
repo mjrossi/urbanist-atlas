@@ -50,6 +50,7 @@ func New(cfg Config) http.Handler {
 	r.Get("/healthz", healthHandler())
 
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
+		r.Use(odblHeadersMiddleware)
 		r.Get("/openapi.yaml", openapiHandler())
 		r.Get("/lookup", lookupHandler(cfg.Store, logger))
 		r.Get("/metros", listMetrosHandler(cfg.Store, logger))
