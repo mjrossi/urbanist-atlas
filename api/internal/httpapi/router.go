@@ -21,6 +21,12 @@ type Config struct {
 	Logger      *slog.Logger
 	CORSOrigins []string
 	APIVersion  string // typically "v1"
+	// ClientSecret enables the X-Atlas-Client shared-secret gate
+	// (Phase 1 launch lockdown — slice #23 / CLAUDE.md § Launch
+	// strategy). Empty disables the gate; non-empty requires the
+	// matching header on every /api/v1/* data endpoint. /healthz and
+	// /api/v1/openapi.yaml stay exempt either way.
+	ClientSecret string
 }
 
 // New builds the full middleware stack and route table.
@@ -51,11 +57,17 @@ func New(cfg Config) http.Handler {
 
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
 		r.Use(odblHeadersMiddleware)
+		// /openapi.yaml stays public so consumers can discover the
+		// wire contract before any auth. Registered BEFORE the
+		// gated group so the client-secret middleware doesn't reach it.
 		r.Get("/openapi.yaml", openapiHandler())
-		r.Get("/lookup", lookupHandler(cfg.Store, logger))
-		r.Get("/metros", listMetrosHandler(cfg.Store, logger))
-		r.Get("/metros/{slug}", getMetroHandler(cfg.Store, logger))
-		r.Get("/recent", recentHandler(cfg.Store, logger))
+		r.Group(func(r chi.Router) {
+			r.Use(clientSecretMiddleware(cfg.ClientSecret))
+			r.Get("/lookup", lookupHandler(cfg.Store, logger))
+			r.Get("/metros", listMetrosHandler(cfg.Store, logger))
+			r.Get("/metros/{slug}", getMetroHandler(cfg.Store, logger))
+			r.Get("/recent", recentHandler(cfg.Store, logger))
+		})
 	})
 
 	return r

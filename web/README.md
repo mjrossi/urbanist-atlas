@@ -48,8 +48,18 @@ npm run build
 ```
 
 Point the SPA at a non-default API base by setting `VITE_API_BASE` in
-`.env.local` (e.g. `VITE_API_BASE=https://api.urbanistatlas.com`). The
-default is `http://localhost:8080`, which matches `cd ../api && just api-run`.
+`.env.local` (e.g. `VITE_API_BASE=https://qa-api.urbanistatlas.com`).
+The default is `http://localhost:8080`, which matches
+`cd ../api && just api-run`.
+
+During Phase 1 dogfooding (CLAUDE.md § Launch strategy), the API
+checks an `X-Atlas-Client` header against a shared secret. The SPA
+sources its copy of the secret from `VITE_API_CLIENT_SECRET`; if
+unset the header isn't sent and the backend's empty-secret no-op
+keeps local dev working. See [`.env.example`](./.env.example) for
+the full list of env vars. **For Cloudflare Pages deploys these
+two values live in the Pages dashboard, not in any committed
+`.env` file.**
 
 ## API client and types
 

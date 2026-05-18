@@ -581,7 +581,10 @@ export interface components {
             };
         };
         /**
-         * @description Missing or invalid bearer token.
+         * @description Authentication failed. Either the request omitted required
+         *     auth (missing `X-Atlas-Client` header during the Phase 1
+         *     dogfooding lockdown, or missing `Authorization` bearer on an
+         *     admin endpoint), or the presented value was invalid.
          *     Response body is an RFC 9457 problem document with
          *     `type` `https://urbanistatlas.com/problems/unauthorized`.
          */
@@ -736,6 +739,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
@@ -764,6 +768,7 @@ export interface operations {
                     "application/json": components["schemas"]["MetroSummariesEnvelope"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -790,6 +795,7 @@ export interface operations {
                     "application/json": components["schemas"]["MetroDetail"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
@@ -817,6 +823,7 @@ export interface operations {
                     "application/json": components["schemas"]["RecentEnvelope"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
