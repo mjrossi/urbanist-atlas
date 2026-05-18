@@ -38,6 +38,18 @@ var countries = []struct {
 	{"PT", "pt"},
 }
 
+// Countries returns the country codes whose seed files LoadAll loads,
+// in dependency order. Exposed so test code (and any future tooling
+// that needs to enumerate the bundle) can stay in sync with the source
+// of truth above without re-stating the list.
+func Countries() []string {
+	out := make([]string, 0, len(countries))
+	for _, c := range countries {
+		out = append(out, c.code)
+	}
+	return out
+}
+
 // LoadAll loads every bundled seed file in seedDir into the database
 // pointed to by pool. The chain is:
 //

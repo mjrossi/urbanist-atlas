@@ -46,8 +46,9 @@ func TestPipeline_LoaddataLoadAll(t *testing.T) {
 
 	// Each country in the bundle must have ≥1 region loaded. Catches a
 	// missing-country bug where the orchestrator silently drops a code
-	// from its list.
-	for _, cc := range []string{"US", "CA", "PT"} {
+	// from its list. Sourced from loaddata.Countries() so adding a
+	// country (e.g. slice #4.7 ES) is picked up here automatically.
+	for _, cc := range loaddata.Countries() {
 		var n int64
 		if err := store.Pool().QueryRow(ctx,
 			`SELECT COUNT(*) FROM regions WHERE country = $1`, cc,
