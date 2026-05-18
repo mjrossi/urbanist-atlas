@@ -32,12 +32,51 @@ describe('listMetros / getMetro / listRecent', () => {
     });
   }
 
-  it('listMetros calls GET /api/v1/metros and returns the parsed body', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+  it('listMetros calls GET /api/v1/metros and unwraps the envelope', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        meta: {
+          license: 'ODbL-1.0',
+          attribution_url: 'https://urbanistatlas.com',
+          generated_at: '2026-05-18T12:00:00Z',
+        },
+        data: [],
+      }),
+    );
     const result = await listMetros();
     expect(result).toEqual([]);
     const [url] = fetchMock.mock.calls[0]!;
     expect(String(url)).toContain('/api/v1/metros');
+  });
+
+  it('listMetros returns the unwrapped data array on a non-empty body', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        meta: {
+          license: 'ODbL-1.0',
+          attribution_url: 'https://urbanistatlas.com',
+          generated_at: '2026-05-18T12:00:00Z',
+        },
+        data: [
+          {
+            region: {
+              id: 1,
+              kind: 'us:metro',
+              name: 'New York Metro',
+              slug: 'nyc-metro',
+              country: 'US',
+              scope_tier: 'regional',
+              parent_slugs: [],
+            },
+            org_count: 7,
+          },
+        ],
+      }),
+    );
+    const result = await listMetros();
+    expect(result).toHaveLength(1);
+    expect(result[0]!.region.slug).toBe('nyc-metro');
+    expect(result[0]!.org_count).toBe(7);
   });
 
   it('getMetro calls GET /api/v1/metros/{slug}', async () => {
@@ -72,12 +111,57 @@ describe('listMetros / getMetro / listRecent', () => {
     await expect(getMetro('totally-fake')).rejects.toBeInstanceOf(ApiError);
   });
 
-  it('listRecent calls GET /api/v1/recent', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+  it('listRecent calls GET /api/v1/recent and unwraps the envelope', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        meta: {
+          license: 'ODbL-1.0',
+          attribution_url: 'https://urbanistatlas.com',
+          generated_at: '2026-05-18T12:00:00Z',
+        },
+        data: [],
+      }),
+    );
     const result = await listRecent();
     expect(result).toEqual([]);
     const [url] = fetchMock.mock.calls[0]!;
     expect(String(url)).toContain('/api/v1/recent');
+  });
+
+  it('listRecent returns the unwrapped data array on a non-empty body', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        meta: {
+          license: 'ODbL-1.0',
+          attribution_url: 'https://urbanistatlas.com',
+          generated_at: '2026-05-18T12:00:00Z',
+        },
+        data: [
+          {
+            id: 1,
+            slug: 'transalt',
+            name: 'Transportation Alternatives',
+            short_desc: 'NYC advocacy',
+            website_url: 'https://transalt.org',
+            tags: ['transit'],
+            regions: [
+              {
+                id: 1,
+                kind: 'us:metro',
+                name: 'New York Metro',
+                slug: 'nyc-metro',
+                country: 'US',
+                scope_tier: 'regional',
+                parent_slugs: [],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const result = await listRecent();
+    expect(result).toHaveLength(1);
+    expect(result[0]!.slug).toBe('transalt');
   });
 
   it('getMetro percent-encodes the slug', async () => {
