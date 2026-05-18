@@ -1,50 +1,63 @@
 # urbanist-atlas — common dev commands.
-# Run `just` (no args) to list recipes.
+# Run `just` (no args) to list recipes, organized by group.
 #
 # `just` itself is pinned in mise.toml (`aqua:casey/just`); a single
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
+#
+# Groups: api, data, postgres, web, smoke, ci. Each group corresponds
+# to a section comment below.
 
 set shell := ["bash", "-cu"]
 
 # ── default ───────────────────────────────────────────
 
-# show available recipes
+# show available recipes, organized by group
+[private]
 default:
     @just --list --unsorted
 
 # ── api: build & verify ───────────────────────────────
 
 # run the API server with text logs
+[group('api')]
 api-run:
     cd api && go run ./cmd/server serve --log-format=text
 
 # build the api binary to api/bin/urbanist-atlas-server
+[group('api')]
 api-build:
     cd api && mkdir -p bin && go build -o bin/urbanist-atlas-server ./cmd/server
 
 # format Go code
+[group('api')]
 api-fmt:
     cd api && gofmt -w .
 
 # go vet ./...
+[group('api')]
 api-vet:
     cd api && go vet ./...
 
 # go test ./... with race detector, no cache (matches CI)
+[group('api')]
 api-test:
     cd api && go test ./... -race -count=1
 
 # vet + test + gen-no-diff — the CI gate for api/, run locally
+[group('api')]
 api-check: api-vet api-test api-gen-check
 
 # go mod tidy
+[group('api')]
 api-tidy:
     cd api && go mod tidy
 
 # regenerate sqlc Go bindings from internal/store/postgres/queries/*.sql.
 # Wrapped in `mise exec --` so the pinned sqlc version is used even
 # when the shell doesn't have mise activated.
+[group('api')]
+[doc('regenerate sqlc Go bindings (mise-pinned sqlc)')]
 api-sqlc-gen:
     cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
 
@@ -52,6 +65,8 @@ api-sqlc-gen:
 # openapi.yaml next to the handler that serves it. Both flow through
 # `go generate ./...` so adding a new generated artifact is just a
 # matter of dropping a //go:generate directive on the right file.
+[group('api')]
+[doc('regenerate oapi-codegen types + sync embedded openapi.yaml')]
 api-oapi-gen:
     cd api && mise exec -- go generate ./...
 
@@ -59,6 +74,8 @@ api-oapi-gen:
 # build tag (requires Docker). Cheap default test suite stays
 # tag-free so `just api-test` keeps running on machines without
 # Docker.
+[group('api')]
+[doc('run postgres integration tests (Docker; build tag: integration)')]
 api-test-integration:
     cd api && go test -tags=integration -race -count=1 ./internal/store/postgres/...
 
@@ -66,6 +83,8 @@ api-test-integration:
 # and the embedded spec copy via `go generate`, then regenerates sqlc,
 # then asks git if anything moved. Used inside api-check so `just ci`
 # rejects commits that forgot to regenerate.
+[group('api')]
+[doc('fail if any generated file would drift after a regen')]
 api-gen-check:
     @cd api && mise exec -- go generate ./...
     @cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
@@ -75,39 +94,48 @@ api-gen-check:
         internal/store/postgres/gen/ \
         || (echo "generated files drifted; run \`just api-oapi-gen && just api-sqlc-gen\` and commit." && exit 1)
 
-# ── api: operational subcommands ──────────────────────
-# These wrap the server binary's urfave/cli subcommands.
-# `migrate-*`, `seed`, and `loadpostal` currently return
-# "not yet implemented" — they'll work once the Postgres store lands.
+# ── data: operational subcommands ─────────────────────
+# These wrap the server binary's urfave/cli subcommands for the
+# data-loading flow (migrations + seed fixtures).
 
 # apply pending DB migrations
+[group('data')]
 migrate-up:
     cd api && go run ./cmd/server migrate up
 
 # roll back the most recent migration
+[group('data')]
 migrate-down:
     cd api && go run ./cmd/server migrate down
 
 # show migration status
+[group('data')]
 migrate-status:
     cd api && go run ./cmd/server migrate status
 
 # load curated org seed data (api/seed/orgs.toml) into the DB
+[group('data')]
 seed:
     cd api && go run ./cmd/server seed
 
 # load region taxonomy (toml -> regions + region_parents)
 # usage: just loadregions seed/regions_us.toml US
+[group('data')]
+[doc('load region taxonomy; e.g. `just loadregions seed/regions_us.toml US`')]
 loadregions src country='US':
     cd api && go run ./cmd/server loadregions --src {{src}} --country {{country}}
 
 # map postal codes to leaf regions (csv -> postal_codes)
 # usage: just loadpostal seed/postal_codes_us.csv US
+[group('data')]
+[doc('map postal codes to leaf regions; e.g. `just loadpostal seed/postal_codes_us.csv US`')]
 loadpostal src country='US':
     cd api && go run ./cmd/server loadpostal --src {{src}} --country {{country}}
 
 # load all bundled fixtures in the right order:
 # regions first (so leaf slugs resolve), then postal codes, then orgs.
+[group('data')]
+[doc('load every bundled fixture in dependency order (regions → postal → orgs)')]
 loaddata:
     just loadregions seed/regions_us.toml US
     just loadpostal  seed/postal_codes_us.csv US
@@ -117,7 +145,7 @@ loaddata:
     just loadpostal  seed/postal_codes_pt.csv PT
     just seed
 
-# ── pg: dev postgres lifecycle (docker-based) ─────────
+# ── postgres: dev container lifecycle ─────────────────
 # Local dev Postgres runs in a named docker container with a
 # persistent volume on port 55432 (non-default to avoid clashing
 # with any system Postgres on :5432). Same image
@@ -129,6 +157,8 @@ loaddata:
 #   user: urbanist  pass: urbanist  db: urbanist_atlas_dev
 
 # start the dev postgres container (creates on first run, starts on subsequent), then wait for it to accept connections
+[group('postgres')]
+[doc('start the dev postgres container and wait for readiness')]
 pg-up:
     @if ! docker container inspect urbanist-atlas-pg >/dev/null 2>&1; then \
         docker run -d --name urbanist-atlas-pg \
@@ -152,11 +182,14 @@ pg-up:
     @echo "dev postgres ready on :55432 (db: urbanist_atlas_dev)"
 
 # stop the dev postgres container (keeps the data volume so a later pg-up is instant)
+[group('postgres')]
+[doc('stop the dev postgres container (data volume kept)')]
 pg-down:
     @docker stop urbanist-atlas-pg >/dev/null 2>&1 || true
     @echo "dev postgres stopped (data volume kept; pg-reset to nuke)"
 
 # nuke the container AND the data volume — start completely fresh
+[group('postgres')]
 pg-reset:
     @docker rm -f urbanist-atlas-pg >/dev/null 2>&1 || true
     @docker volume rm urbanist-atlas-pg-data >/dev/null 2>&1 || true
@@ -164,38 +197,48 @@ pg-reset:
 
 # open a psql shell into the dev database (via TCP — the alpine
 # image puts its socket at /var/run/postgresql, not psql's default /tmp)
+[group('postgres')]
+[doc('open a psql shell into the dev database (via TCP)')]
 pg-shell:
     docker exec -it urbanist-atlas-pg psql -h localhost -U urbanist urbanist_atlas_dev
 
 # tail the dev postgres container logs (Ctrl-C to detach)
+[group('postgres')]
 pg-logs:
     docker logs -f urbanist-atlas-pg
 
 # ── web: build & verify ───────────────────────────────
 
 # install JS deps with the lockfile (matches CI)
+[group('web')]
 web-deps:
     cd web && npm ci
 
 # run eslint
+[group('web')]
 web-lint:
     cd web && npm run lint
 
 # vitest --run (no watch, matches CI)
+[group('web')]
 web-test:
     cd web && npm test -- --run
 
 # production-mode bundle build
+[group('web')]
 web-build:
     cd web && npm run build
 
 # regenerate the TS wire types from api/openapi.yaml
+[group('web')]
 web-oapi-gen:
     cd web && npm run generate:api
 
 # fail if api.gen.ts would change after a regen against the
 # current openapi.yaml. Mirrors api-gen-check; the wire contract
 # can't drift silently between the two halves.
+[group('web')]
+[doc('fail if api.gen.ts would drift after a regen')]
 web-gen-check:
     @cd web && npm run generate:api
     @git diff --exit-code -- web/src/lib/api.gen.ts \
@@ -203,20 +246,26 @@ web-gen-check:
 
 # deps + lint + test + build + gen-no-diff — the CI gate for web/,
 # run locally
+[group('web')]
+[doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
 
-# ── api: live curl helpers (server must be running) ───
+# ── smoke: live curl helpers (server must be running) ─
 
 # curl /healthz against localhost
+[group('smoke')]
 healthz port='8080':
     @curl -sS -i "http://localhost:{{port}}/healthz" | sed -n '1,8p'
 
 # curl /api/v1/lookup, pretty-printed via jq
 # usage: just lookup 11217  (or `just lookup M5V CA`)
+[group('smoke')]
+[doc('curl /api/v1/lookup and jq the body; e.g. `just lookup 11217` or `just lookup M5V CA`')]
 lookup code country='US' port='8080':
     @curl -sS "http://localhost:{{port}}/api/v1/lookup?postal_code={{code}}&country={{country}}" | jq
 
 # ── ci-equivalent ─────────────────────────────────────
 
 # run every check CI would run today against the current tree
+[group('ci')]
 ci: api-check web-check

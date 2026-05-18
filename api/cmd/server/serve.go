@@ -57,6 +57,11 @@ func serveCommand() *cli.Command {
 				Usage:   "Postgres connection string (required when --store=postgres)",
 				Sources: cli.EnvVars("URBANIST_DB_URL"),
 			},
+			&cli.StringFlag{
+				Name:    "client-secret",
+				Usage:   "shared secret expected in the X-Atlas-Client header; empty disables the gate",
+				Sources: cli.EnvVars("URBANIST_CLIENT_SECRET"),
+			},
 		},
 		Action: runServe,
 	}
@@ -73,10 +78,11 @@ func runServe(ctx context.Context, c *cli.Command) error {
 
 	origins := splitCSV(c.String("cors-origins"))
 	handler := httpapi.New(httpapi.Config{
-		Store:       store,
-		Logger:      logger,
-		CORSOrigins: origins,
-		APIVersion:  "v1",
+		Store:        store,
+		Logger:       logger,
+		CORSOrigins:  origins,
+		APIVersion:   "v1",
+		ClientSecret: c.String("client-secret"),
 	})
 
 	addr := net.JoinHostPort("", c.String("port"))

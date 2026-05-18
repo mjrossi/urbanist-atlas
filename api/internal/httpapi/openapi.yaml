@@ -137,6 +137,8 @@ paths:
                 $ref: '#/components/schemas/LookupResult'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -168,6 +170,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetroSummariesEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -190,6 +194,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetroDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -218,6 +224,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecentEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -435,7 +443,10 @@ components:
             $ref: '#/components/schemas/ProblemDetails'
     Unauthorized:
       description: |
-        Missing or invalid bearer token.
+        Authentication failed. Either the request omitted required
+        auth (missing `X-Atlas-Client` header during the Phase 1
+        dogfooding lockdown, or missing `Authorization` bearer on an
+        admin endpoint), or the presented value was invalid.
         Response body is an RFC 9457 problem document with
         `type` `https://urbanistatlas.com/problems/unauthorized`.
       content:
