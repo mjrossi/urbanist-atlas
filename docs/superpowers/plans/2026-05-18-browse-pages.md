@@ -143,18 +143,18 @@
 
 ### Phase 7 — Homepage asides
 
-- [ ] If `web/src/routes/Home.test.tsx` does not exist, create it. Mock `listMetros` and `listRecent` via the same `vi.hoisted` pattern. Cover:
+- [x] If `web/src/routes/Home.test.tsx` does not exist, create it. Mock `listMetros` and `listRecent` via the same `vi.hoisted` pattern. Cover:
   - Top 6 metros render in the first aside; "Browse all metros →" link points to `/browse`.
   - Top 5 recent orgs render in the second aside.
-  - Error states fall back to the existing "Coming soon" copy + a tiny `(retry)` affordance (or just a graceful inline error — pick one).
+  - Error states fall back to the existing "Coming soon" copy + a tiny `(retry)` affordance (or just a graceful inline error — pick one). Chose the graceful "Coming soon" fallback (no retry affordance — keeps the surface visually identical to the pre-wired state).
   - Loading states show subdued placeholders that don't change layout dimensions much.
-- [ ] Modify `web/src/routes/Home.tsx`:
+- [x] Modify `web/src/routes/Home.tsx`:
   - Add `useQuery` hooks for `listMetros` (slice to 6) and `listRecent` (slice to 5).
   - Replace the inner content of the first `.aside-card` (currently the "Browse by metro" stub) with the metros list + a footer link to `/browse`.
   - Replace the inner content of the second `.aside-card` with the recent-orgs list.
   - Preserve the `.section-label` headers and the `.aside-card-status` class for loading/error states.
-- [ ] Run Home tests + all sibling tests; confirm pass.
-- [ ] Commit: `feat(web): wire homepage asides to /metros and /recent (slice #14)`.
+- [x] Run Home tests + all sibling tests; confirm pass.
+- [x] Commit: `feat(web): wire homepage asides to /metros and /recent (slice #14)`.
 
 ### Phase 8 — Verification (fixture mode)
 
