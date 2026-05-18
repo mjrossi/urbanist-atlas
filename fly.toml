@@ -26,6 +26,11 @@ primary_region = "iad"
   URBANIST_PORT = "8080"
   URBANIST_LOG_FORMAT = "json"
   URBANIST_STORE = "postgres"
+  # Absolute seed path inside the runtime image (matches the Dockerfile's
+  # `COPY api/seed/ ./seed/` against WORKDIR /app). Required because
+  # `flyctl ssh console -C "urbanist-atlas-server loaddata"` lands in /root,
+  # not /app, so the binary's `./seed` default doesn't resolve.
+  URBANIST_SEED_DIR = "/app/seed"
   # CORS allowlist for Phase 1. `*.pages.dev` covers automatic Pages
   # PR previews. At prod launch this grows to include
   # https://urbanistatlas.com; once QA retires, drop the qa.* entry.

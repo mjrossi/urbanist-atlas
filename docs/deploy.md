@@ -254,7 +254,9 @@ Either the seed files aren't in the image (verify by `flyctl ssh
 console -C "ls /app/seed"`) or `URBANIST_DB_URL` isn't set (verify by
 `flyctl secrets list`). Re-deploy if seed files are missing — they
 ship in the runtime stage via `COPY api/seed/ ./seed/` in the
-`Dockerfile`.
+`Dockerfile`. The binary finds them via `URBANIST_SEED_DIR=/app/seed`
+baked into `fly.toml`'s `[env]` block — no `--seed-dir` flag needed
+on Fly.
 
 **Need to inspect production data.**
 `flyctl ssh console` opens a shell on the running machine.

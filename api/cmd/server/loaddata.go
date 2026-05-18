@@ -26,9 +26,10 @@ func loaddataCommand() *cli.Command {
 		Usage: "Load every bundled seed file (regions → postal codes → orgs) in dependency order",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "seed-dir",
-				Usage: "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml",
-				Value: "./seed",
+				Name:    "seed-dir",
+				Usage:   "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml",
+				Value:   "./seed",
+				Sources: cli.EnvVars("URBANIST_SEED_DIR"),
 			},
 			&cli.StringFlag{
 				Name:    "db-url",
