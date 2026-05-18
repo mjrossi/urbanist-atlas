@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { App } from './App.tsx';
+import { About } from './routes/About.tsx';
 import { Browse } from './routes/Browse.tsx';
 import { Home } from './routes/Home.tsx';
 import { Metro } from './routes/Metro.tsx';
@@ -7,11 +8,12 @@ import { Results } from './routes/Results.tsx';
 
 /**
  * The site's route tree. Home and Results landed in slices #11 + #12;
- * Browse and Metro land in slice #14. Submit + about + a shared 404
- * follow in slices #15+.
+ * Browse and Metro in slice #14; About and the newspaper-style 404
+ * land in slice #15.
  *
- * `errorElement` is intentionally omitted for now; slice #15 adds a
- * shared not-found / error page.
+ * `errorElement` wraps the rest of the route tree with a graceful
+ * fallback — wired alongside `NotFound` in the second commit of
+ * slice #15.
  */
 export const router = createBrowserRouter([
   {
@@ -22,6 +24,7 @@ export const router = createBrowserRouter([
       { path: 'r/:postalCode', Component: Results },
       { path: 'browse', Component: Browse },
       { path: 'm/:metroSlug', Component: Metro },
+      { path: 'about', Component: About },
     ],
   },
 ]);
