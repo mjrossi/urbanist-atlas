@@ -167,13 +167,15 @@ Note: folded into the Phase 6 commit; see the Phase 6 note for why.
 
 ### Phase 8 — Final verification
 
-- [ ] `just api-check` green.
-- [ ] `just pg-reset && just migrate-up && just seed` succeeds.
-- [ ] `just api-run` in background; in another shell run each curl from the spec §"Acceptance criteria" block and confirm output matches.
-- [ ] Stop the server.
-- [ ] Update `docs/roadmap.md` if it tracks per-slice status (the existing format does, see the "## Status" section header at line 12).
-- [ ] Commit any docs-only updates separately: `docs(roadmap): mark slice #6 shipped`.
+- [x] `just api-check` green.
+- [x] `just pg-reset && just migrate-up && just seed` succeeds.
+- [x] `just api-run` in background; in another shell run each curl from the spec §"Acceptance criteria" block and confirm output matches.
+- [x] Stop the server.
+- [x] Update `docs/roadmap.md` if it tracks per-slice status (the existing format does, see the "## Status" section header at line 12).
+- [x] Commit any docs-only updates separately: `docs(roadmap): mark slice #6 shipped`.
 - [ ] Use `superpowers:finishing-a-development-branch` to open a PR.
+
+Maintainer opens the PR per worktree instructions (no `--push`).
 
 ---
 

@@ -77,6 +77,19 @@ the plan is the *design* view.
   autonomous-region parallel hierarchy, and uniões de freguesias.
   See `docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md`
   for the validation findings and forward-looking analysis for MX/NL/UK.
+- **Browse + recent endpoints (slice #6):** `GET /api/v1/metros`,
+  `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — the backend
+  half of the homepage Browse + Recently-added panels. The metro
+  set is named by a single `atlas.IsMetroKind` predicate (us:metro,
+  ca:cma, ca:regional-district, pt:area-metropolitana) so adding a
+  country's metro-equivalent is a one-line append. SQL walks the
+  region DAG downward via a recursive CTE — an org tagged only to
+  Brooklyn counts toward NYC metro — and `/recent` excludes orgs
+  whose only region attachments are `scope_tier='national'` (the
+  slice-#4.6 filter, so MUBi-nacional stays out of the homepage
+  strip). Handler-test coverage (httptest + MemStore) +
+  testcontainers-backed integration tests against the production
+  seed. See `docs/superpowers/specs/2026-05-18-browse-endpoints-design.md`.
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
@@ -88,7 +101,6 @@ the plan is the *design* view.
 |---|-------|------------|
 | 4.7 | **Second EU country validation (Spain)** | Repeat the validation exercise for Spain. Adds `regions_es.toml`, `postal_codes_es.csv`, ~5 ES orgs. Specifically validates: autonomous communities (Catalonia, Basque Country with their own transit authorities), the comarca layer in some communities, and Ceuta/Melilla as the analogue of Açores/Madeira. Should be mostly mechanical given #4.6's conventions and loader changes. |
 | 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. Region attachment uses the same `region_slugs` machinery as `orgs.toml`, so submitted orgs can target any region kind in any supported country. |
-| 6 | **Browse / recent endpoints** | `GET /api/v1/metros`, `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — feeds the homepage strip and `/browse`. "Metro" matches the country-prefixed metro-equivalent kinds (`us:metro`, `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`, future siblings); the handler should derive the set from a stable kind suffix rather than a hardcoded enum. |
 | 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. Lookup coverage should include: the national-tier filter (orgs attached to `scope_tier='national'` regions must NOT appear in default results) and the unknown-country fall-through (`country=ZZ` with an unknown postal code returns 404, not 400) — both shipped in slice #4.6 with light coverage in `pipeline_test.go`. |
 | 7.5 | **Full-country postal data ingest** | Replace the bundled fixture CSVs (~30 ZIPs) with real Census ZCTA / StatsCan PCCF reshapes (and OpenPLZ for PT when the directory expands). Out-of-band ETL → 3-column CSVs in the format `loadpostal` already consumes. Documented in [`api/seed/README.md`](../api/seed/README.md). |
 | 7.6 | **Seed data growth** | Expand `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to the planned ~30–50 across the supported countries. Editorial work, not engineering. |
