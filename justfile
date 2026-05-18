@@ -145,16 +145,15 @@ loadpostal src country='US':
 
 # load all bundled fixtures in the right order:
 # regions first (so leaf slugs resolve), then postal codes, then orgs.
+# Wraps the `loaddata` binary subcommand so dev runs go through the
+# exact same orchestration the Fly deploy uses
+# (flyctl ssh console -C "urbanist-atlas-server loaddata"). The country
+# list lives in api/internal/loaddata/loaddata.go — add new countries
+# there, not here.
 [group('data')]
 [doc('load every bundled fixture in dependency order (regions → postal → orgs)')]
 loaddata:
-    just loadregions seed/regions_us.toml US
-    just loadpostal  seed/postal_codes_us.csv US
-    just loadregions seed/regions_ca.toml CA
-    just loadpostal  seed/postal_codes_ca.csv CA
-    just loadregions seed/regions_pt.toml PT
-    just loadpostal  seed/postal_codes_pt.csv PT
-    just seed
+    cd api && go run ./cmd/server loaddata
 
 # ── postgres: dev container lifecycle ─────────────────
 # Local dev Postgres runs in a named docker container with a
