@@ -15,7 +15,7 @@ export function About() {
         <p>
           A directory of transit and safe-streets advocacy organizations,
           searchable by US ZIP or Canadian postal code. A companion volume to{' '}
-          <a href="https://mjrossi.com">Urbanist Lexicon</a>.
+          <a href="https://mjrossi.com/blog">Urbanist Lexicon</a>.
         </p>
       </header>
 
@@ -49,9 +49,9 @@ export function About() {
           <a href="https://opendatacommons.org/licenses/odbl/">
             Open Database License (ODbL) 1.0
           </a>{' '}
-          and will be available for download once the API exits its initial
-          dogfooding phase. Public submissions are coming with the API-key
-          program; until then, suggestions are welcome by email.
+          and will be available for download once the API opens to the public.
+          Public submissions are coming with the API-key program; until then,
+          suggestions are welcome by email.
         </p>
       </section>
 

@@ -40,10 +40,10 @@ describe('About', () => {
     expect(screen.getByText(/odbl/i)).toBeDefined();
   });
 
-  it('links to the companion publication at mjrossi.com', () => {
+  it('links to the companion publication at mjrossi.com/blog', () => {
     renderAbout();
     const link = screen.getByRole('link', { name: /urbanist lexicon/i });
-    expect(link.getAttribute('href')).toBe('https://mjrossi.com');
+    expect(link.getAttribute('href')).toBe('https://mjrossi.com/blog');
   });
 
   it('uses the .page single-column layout class', () => {
