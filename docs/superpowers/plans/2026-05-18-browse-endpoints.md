@@ -53,16 +53,16 @@
 
 ### Phase 0 — baseline
 
-- [ ] Confirm worktree state: `git rev-parse --abbrev-ref HEAD` is `slice-06-browse-endpoints`, working tree clean.
-- [ ] Run `just api-check` and confirm green.
-- [ ] Run `just api-oapi-gen` and confirm zero diff (contract unchanged).
+- [x] Confirm worktree state: `git rev-parse --abbrev-ref HEAD` is `slice-06-browse-endpoints`, working tree clean.
+- [x] Run `just api-check` and confirm green.
+- [x] Run `just api-oapi-gen` and confirm zero diff (contract unchanged).
 
 ### Phase 1 — `IsMetroKind` predicate
 
-- [ ] Write `api/pkg/atlas/metro_kinds_test.go` first. Assert `IsMetroKind` returns true for `us:metro`, `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`; returns false for `us:state`, `ca:province`, `pt:distrito`, `pt:nacional`, and `""`. Assert `MetroKinds()` returns those four kinds in deterministic order. Run the test, watch it fail to compile.
-- [ ] Write `api/pkg/atlas/metro_kinds.go` per spec §2. The `metroKinds` map is the source of truth; `IsMetroKind` and `MetroKinds()` derive from it. Doc comment names what's in/out per spec.
-- [ ] Run `go test ./pkg/atlas/...` and confirm tests pass.
-- [ ] Commit: `feat(api): add IsMetroKind predicate (slice #6)`.
+- [x] Write `api/pkg/atlas/metro_kinds_test.go` first. Assert `IsMetroKind` returns true for `us:metro`, `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`; returns false for `us:state`, `ca:province`, `pt:distrito`, `pt:nacional`, and `""`. Assert `MetroKinds()` returns those four kinds in deterministic order. Run the test, watch it fail to compile.
+- [x] Write `api/pkg/atlas/metro_kinds.go` per spec §2. The `metroKinds` map is the source of truth; `IsMetroKind` and `MetroKinds()` derive from it. Doc comment names what's in/out per spec.
+- [x] Run `go test ./pkg/atlas/...` and confirm tests pass.
+- [x] Commit: `feat(api): add IsMetroKind predicate (slice #6)`.
 
 ### Phase 2 — Domain types and Store interface
 
