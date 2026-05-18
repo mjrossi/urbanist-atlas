@@ -43,17 +43,20 @@ func odblHeadersMiddleware(next http.Handler) http.Handler {
 }
 
 // newMeta returns the meta block for a single response: license,
-// attribution URL, and a fresh UTC timestamp.
+// attribution URL, and a fresh UTC timestamp truncated to seconds.
 //
-// `GeneratedAt` is per-request `time.Now().UTC()`. The oapi-codegen
-// type is `time.Time`; JSON encoding produces an RFC 3339 string in
-// the response body. There is no caching layer in v1; the timestamp
-// records when this response was produced.
+// `GeneratedAt` is truncated before marshaling. Go's default
+// `time.Time` JSON encoder uses RFC3339Nano, which emits sub-second
+// digits when present; truncating to whole seconds drops the
+// fractional component on the wire — a zero-nanosecond UTC time
+// round-trips through RFC3339Nano as "...Z" with no '.'. The slice
+// #24 spec mandates second precision. There is no caching layer in
+// v1; the timestamp records when this response was produced.
 func newMeta() oapi.Meta {
 	return oapi.Meta{
 		License:        dataLicense,
 		AttributionUrl: dataAttributionURL,
-		GeneratedAt:    time.Now().UTC(),
+		GeneratedAt:    time.Now().UTC().Truncate(time.Second),
 	}
 }
 

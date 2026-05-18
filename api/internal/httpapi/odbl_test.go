@@ -140,22 +140,35 @@ func TestRespondCollection_NilSlice_EncodesEmptyArray(t *testing.T) {
 }
 
 // TestRespondCollection_EmitsRFC3339UTCInBody asserts the JSON wire
-// format of the meta.generated_at field is RFC3339 with a UTC zone
-// ('Z' or '+00:00'). The decoded time.Time has lost the original
-// string, so we re-encode and grep the bytes.
+// format of meta.generated_at is RFC3339 with a UTC zone ('Z'
+// suffix) AND second precision (no fractional seconds). The decoded
+// time.Time has lost the original string, so we extract the raw
+// value from the body bytes.
 func TestRespondCollection_EmitsRFC3339UTCInBody(t *testing.T) {
 	w := httptest.NewRecorder()
 	respondCollection[oapi.Org](w, nil)
 
 	body := w.Body.String()
-	// RFC3339 in UTC ends in "Z" (encoding/json marshals time.Time
-	// via .MarshalJSON, which uses time.RFC3339Nano; a UTC time
-	// renders with a "Z" suffix).
-	if !strings.Contains(body, `"generated_at":"`) {
+	const marker = `"generated_at":"`
+	start := strings.Index(body, marker)
+	if start == -1 {
 		t.Fatalf("generated_at field missing: %s", body)
 	}
-	if !strings.Contains(body, `Z"`) {
-		t.Errorf("generated_at: want UTC ('Z' suffix), got body %s", body)
+	start += len(marker)
+	end := strings.Index(body[start:], `"`)
+	if end == -1 {
+		t.Fatalf("generated_at not terminated: %s", body)
+	}
+	val := body[start : start+end]
+
+	if !strings.HasSuffix(val, "Z") {
+		t.Errorf("generated_at: want UTC ('Z' suffix), got %q", val)
+	}
+	// Second precision: RFC3339Nano renders nanos-zero times as
+	// "...HH:MM:SSZ" with no '.'. If newMeta stops truncating, a
+	// fractional component reappears and this fails.
+	if strings.Contains(val, ".") {
+		t.Errorf("generated_at: want second precision (no fractional digits), got %q", val)
 	}
 }
 
