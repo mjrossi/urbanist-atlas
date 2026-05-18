@@ -53,14 +53,14 @@
 
 ### Phase 0 — baseline
 
-- [ ] Confirm worktree state: `git rev-parse --abbrev-ref HEAD` is `slice-14-browse-pages`, working tree clean.
-- [ ] Run `just web-check` and confirm green.
-- [ ] Run `npm --prefix web run generate:api` and confirm zero diff (contract unchanged).
-- [ ] Verify `MetroSummary` and `MetroDetail` are re-exported in `web/src/lib/api.ts` (lines 24-25 per the spec). If not present, stop — the openapi codegen step is broken.
+- [x] Confirm worktree state: `git rev-parse --abbrev-ref HEAD` is `slice-14-browse-pages`, working tree clean.
+- [x] Run `just web-check` and confirm green.
+- [x] Run `npm --prefix web run generate:api` and confirm zero diff (contract unchanged).
+- [x] Verify `MetroSummary` and `MetroDetail` are re-exported in `web/src/lib/api.ts` (lines 24-25 per the spec). If not present, stop — the openapi codegen step is broken.
 
 ### Phase 1 — Fixtures
 
-- [ ] Create `web/src/lib/fixtures/browse.ts`. Export three constants typed against `components['schemas']`:
+- [x] Create `web/src/lib/fixtures/browse.ts`. Export three constants typed against `components['schemas']`:
   ```ts
   import type { components } from '../api.gen.ts';
   type MetroSummary = components['schemas']['MetroSummary'];
@@ -72,8 +72,8 @@
   export const recentFixture: Org[] = [ /* 5 entries, recent created_at */ ];
   ```
   Use realistic data shaped on the existing seed (see `api/seed/orgs.toml` for org examples).
-- [ ] No tests for the fixture file itself; the type checker is the guarantee.
-- [ ] Commit: `feat(web): typed dev fixtures for slice #14 browse pages`.
+- [x] No tests for the fixture file itself; the type checker is the guarantee.
+- [x] Commit: `feat(web): typed dev fixtures for slice #14 browse pages`.
 
 ### Phase 2 — API helpers
 
