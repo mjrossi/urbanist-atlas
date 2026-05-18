@@ -52,6 +52,18 @@ const DEFAULT_API_BASE = 'http://localhost:8080';
 export const apiBase: string = import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE;
 
 /**
+ * Shared secret bundled into the build during Phase 1 lockdown
+ * (slice #23 / CLAUDE.md § Launch strategy). The backend's
+ * `URBANIST_CLIENT_SECRET` checks for the matching `X-Atlas-Client`
+ * header on every `/api/v1/*` data endpoint; missing/wrong → 401.
+ *
+ * Empty (the default for local dev when `VITE_API_CLIENT_SECRET`
+ * isn't set) means the header isn't sent — the backend's empty-
+ * secret no-op preserves the dev workflow.
+ */
+const apiClientSecret: string = import.meta.env.VITE_API_CLIENT_SECRET ?? '';
+
+/**
  * Error thrown for any non-2xx response from the API. Carries the HTTP
  * status, the parsed RFC 9457 problem document (when the server sent
  * one), and the request ID for log correlation.
@@ -89,6 +101,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const headers = new Headers(init?.headers);
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json');
+  }
+  if (apiClientSecret && !headers.has('X-Atlas-Client')) {
+    headers.set('X-Atlas-Client', apiClientSecret);
   }
 
   const response = await fetch(url, { ...init, headers });

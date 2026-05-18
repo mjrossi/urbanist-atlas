@@ -12,13 +12,14 @@ import (
 // changes here when the spec changes.
 //
 // Only the URIs that the handlers in this slice emit are listed.
-// `unauthorized`, `conflict`, and `rate-limited` will be added by the
-// slices that need them (submissions / admin endpoints, slices #5 and
-// #6) to keep this file lint-clean in the interim.
+// `conflict` and `rate-limited` will be added by the slices that need
+// them (submissions / admin endpoints, slice #5; rate limiting, slice
+// #27) to keep this file lint-clean in the interim.
 const (
-	problemValidation = "https://urbanistatlas.com/problems/validation"
-	problemNotFound   = "https://urbanistatlas.com/problems/not-found"
-	problemInternal   = "https://urbanistatlas.com/problems/internal"
+	problemValidation   = "https://urbanistatlas.com/problems/validation"
+	problemNotFound     = "https://urbanistatlas.com/problems/not-found"
+	problemInternal     = "https://urbanistatlas.com/problems/internal"
+	problemUnauthorized = "https://urbanistatlas.com/problems/unauthorized"
 )
 
 // writeJSON emits an arbitrary value as application/json. Used for
