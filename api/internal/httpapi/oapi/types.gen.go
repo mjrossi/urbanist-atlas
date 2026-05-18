@@ -106,6 +106,24 @@ type LookupResult struct {
 	ResolvedPlaceLabel string      `json:"resolved_place_label"`
 }
 
+// Meta Attribution block included on every collection response.
+// Carries the ODbL license obligation in-band so consumers
+// that strip headers still see the share-alike requirement.
+type Meta struct {
+	// AttributionUrl URL downstream consumers should link to when crediting
+	// the source.
+	AttributionUrl string `json:"attribution_url"`
+
+	// GeneratedAt RFC 3339 timestamp recording when the response was
+	// produced server-side. Per-request — there is no caching
+	// layer in v1.
+	GeneratedAt time.Time `json:"generated_at"`
+
+	// License SPDX identifier of the data license. Stable for the
+	// lifetime of v1 (`ODbL-1.0`).
+	License string `json:"license"`
+}
+
 // MetroDetail A metro region with the approved organizations that serve it.
 type MetroDetail struct {
 	Orgs []Org `json:"orgs"`
@@ -115,6 +133,19 @@ type MetroDetail struct {
 	// (not transitive). Empty for top-of-hierarchy regions (states,
 	// multi-state regions, transit federations).
 	Region Region `json:"region"`
+}
+
+// MetroSummariesEnvelope Collection envelope for `GET /api/v1/metros`. Wraps the
+// metro list in a `meta` + `data` shape so every list
+// response carries the ODbL attribution alongside its
+// payload, even when transport-level headers are stripped.
+type MetroSummariesEnvelope struct {
+	Data []MetroSummary `json:"data"`
+
+	// Meta Attribution block included on every collection response.
+	// Carries the ODbL license obligation in-band so consumers
+	// that strip headers still see the share-alike requirement.
+	Meta Meta `json:"meta"`
 }
 
 // MetroSummary A metro region plus its approved-org count, for the browse-by-metro panel.
@@ -222,6 +253,17 @@ type ProblemDetails struct {
 	// absent or `about:blank`, the `title` alone identifies the
 	// problem.
 	Type string `json:"type"`
+}
+
+// RecentEnvelope Collection envelope for `GET /api/v1/recent`. Same shape
+// contract as `MetroSummariesEnvelope`.
+type RecentEnvelope struct {
+	Data []Org `json:"data"`
+
+	// Meta Attribution block included on every collection response.
+	// Carries the ODbL license obligation in-band so consumers
+	// that strip headers still see the share-alike requirement.
+	Meta Meta `json:"meta"`
 }
 
 // Region A geographic unit an organization can serve. Regions form a
