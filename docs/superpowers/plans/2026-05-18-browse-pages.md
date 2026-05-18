@@ -77,18 +77,18 @@
 
 ### Phase 2 — API helpers
 
-- [ ] Extend `web/src/lib/api.ts`:
-  - Add `const USE_FIXTURES: boolean = import.meta.env.VITE_USE_FIXTURES === 'true';` near the `apiBase` const.
+- [x] Extend `web/src/lib/api.ts`:
+  - Add `const USE_FIXTURES: boolean = import.meta.env.VITE_USE_FIXTURES === 'true';` near the `apiBase` const. (Implemented as a per-call `useFixtures()` helper so `vi.stubEnv` works during tests without juggling module-cache resets; Vite still inlines the literal in prod builds, so the dynamic fixture import is tree-shaken.)
   - Add `listMetros(init?)`, `getMetro(slug, init?)`, `listRecent(init?)` mirroring the existing `lookup`. Each function checks `USE_FIXTURES` and short-circuits to the fixture module (use dynamic `import('./fixtures/browse.ts')` inside the branch to keep the import out of the prod bundle's static graph).
   - `getMetro`: when `USE_FIXTURES` and the slug isn't in `metroDetailFixture`, throw an `ApiError(404, 'Not Found', undefined, undefined)` to match the real 404 path.
-- [ ] Write or extend `web/src/lib/api.test.ts` (create it if it doesn't exist — slice #17 in the roadmap calls for it; this slice gets a head start). Cover:
+- [x] Write or extend `web/src/lib/api.test.ts` (create it if it doesn't exist — slice #17 in the roadmap calls for it; this slice gets a head start). Cover:
   - `listMetros` returns the fixture when `VITE_USE_FIXTURES=true`.
   - `getMetro('nyc-metro')` returns the fixture detail.
   - `getMetro('nope')` throws `ApiError` with status 404.
   - `listRecent` returns ≤ 10 entries.
   - When `VITE_USE_FIXTURES` is unset, the functions call `fetch` (mock global `fetch` to a 200 + JSON body and assert the URL hit).
-- [ ] Run `npm --prefix web test`. All pass.
-- [ ] Commit: `feat(web): API helpers for browse + recent (slice #14)`.
+- [x] Run `npm --prefix web test`. All pass.
+- [x] Commit: `feat(web): API helpers for browse + recent (slice #14)`.
 
 ### Phase 3 — Query keys
 
