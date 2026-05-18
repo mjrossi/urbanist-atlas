@@ -106,13 +106,13 @@ internal/store/postgres without `ListMetros`/`GetMetro`/`ListRecent`).
 
 ### Phase 4 — Postgres SQL + sqlc
 
-- [ ] Write `api/internal/store/postgres/queries/browse.sql` with four named queries:
+- [x] Write `api/internal/store/postgres/queries/browse.sql` with four named queries:
   - `ListMetros :many` — recursive CTE walking `region_parents` downward from each metro region, counts distinct approved org IDs in `organization_regions`, filters `scope_tier <> 'national'`, returns `(region_id, country, kind, name, slug, scope_tier, sort_priority, org_count)`. Ordered `org_count DESC, name ASC`. The metro-kind set comes in as `$1::text[]`.
   - `GetMetroBySlug :one` — single region by slug AND `kind = ANY($2::text[])`. Returns NULL if not found or not a metro.
   - `OrgsForMetro :many` — recursive CTE descending from a region ID, return distinct orgs tagged to that region or any descendant. Order by `created_at DESC`.
   - `ListRecent :many` — top 10 orgs by `created_at DESC`, excluding orgs whose only region attachments are `scope_tier='national'`. Filter via NOT EXISTS on the org's non-national regions.
-- [ ] Run `just api-sqlc-gen`. Check `api/internal/store/postgres/gen/browse.sql.go` is generated; check that it compiles when included with the rest of the package.
-- [ ] Commit: `feat(api): sqlc browse queries (slice #6)`.
+- [x] Run `just api-sqlc-gen`. Check `api/internal/store/postgres/gen/browse.sql.go` is generated; check that it compiles when included with the rest of the package.
+- [x] Commit: `feat(api): sqlc browse queries (slice #6)`.
 
 ### Phase 5 — Postgres store implementations + integration test
 
