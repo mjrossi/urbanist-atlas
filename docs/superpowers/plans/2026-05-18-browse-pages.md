@@ -117,21 +117,18 @@
 
 ### Phase 5 — Metro page
 
-- [ ] Write `web/src/routes/Metro.test.tsx`:
+- [x] Write `web/src/routes/Metro.test.tsx`:
   - Happy path: GET `/m/nyc-metro` (with mocked `getMetro` returning fixture) renders the metro name + the orgs list.
   - 404 path: mocked `getMetro` throws `ApiError(404, ...)` → inline empty-state message ("This metro isn't in the atlas yet"), not a crash.
   - Empty orgs (200 with empty array): renders a friendly empty state.
-- [ ] Implement `web/src/routes/Metro.tsx`:
+- [x] Implement `web/src/routes/Metro.tsx`:
   - `useParams<{ metroSlug: string }>()` for the slug.
   - `useQuery({ queryKey: queryKeys.metro(slug), queryFn: () => getMetro(slug) })`.
   - On 404 (`ApiError` with status 404), render an inline empty-state.
-  - On 200, render a classified-section structure (one section, "Organizations serving {name}") listing each org. Reuse `<Entry>` if possible — note `Entry` currently expects `LookupOrg` (with `matched_region_slugs`). Two acceptable paths:
-    1. Build a `LookupOrg`-shaped view-model in `Metro.tsx` with `matched_region_slugs: []`; if `Entry` handles empty arrays cleanly (it should — see `Entry.tsx`), this is the simplest.
-    2. Add a minor variant component if the empty matched_region_slugs renders awkwardly. **Do NOT refactor Entry's signature** — that's out of scope per the spec.
-  - Always include a `<Dateline>` for the metro's country/state.
-- [ ] Run Metro tests, confirm pass.
-- [ ] Run `Results.test.tsx` and `Entry.test.tsx` and confirm they STILL pass (regression check for any Entry-touching refactors).
-- [ ] Commit: `feat(web): /m/:metroSlug page (slice #14)`.
+  - On 200, render a classified-section structure (one section, "Organizations serving {name}") listing each org. Reuse `<Entry>` via a `LookupOrg`-shaped view-model with `matched_region_slugs: []` (path 1; Entry's empty-array branch was already covered in `Entry.test.tsx`). `Dateline` is omitted in favor of a simpler `.page-header` block here — `Dateline` is postal-code-shaped and a metro page has no postal code; the broadsheet section heading carries the same role.
+- [x] Run Metro tests, confirm pass.
+- [x] Run `Results.test.tsx` and `Entry.test.tsx` and confirm they STILL pass (regression check for any Entry-touching refactors).
+- [x] Commit: `feat(web): /m/:metroSlug page (slice #14)`.
 
 ### Phase 6 — Router wiring
 
