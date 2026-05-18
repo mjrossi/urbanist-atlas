@@ -135,6 +135,33 @@ func TestPostgresStore_GetMetro_HappyPath(t *testing.T) {
 	}
 }
 
+func TestPostgresStore_GetMetro_OrgsOrderedNewestFirst(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.GetMetro(ctx, "nyc-metro")
+	if err != nil {
+		t.Fatalf("GetMetro: %v", err)
+	}
+	if got == nil || len(got.Orgs) < 2 {
+		t.Skipf("nyc-metro needs >=2 orgs to assert ordering; got %d", len(got.Orgs))
+	}
+	// Postgres ORDER BY o.created_at DESC, o.id DESC. Assert it holds.
+	for i := 1; i < len(got.Orgs); i++ {
+		prev, cur := got.Orgs[i-1], got.Orgs[i]
+		if cur.CreatedAt.After(prev.CreatedAt) {
+			t.Errorf("not descending by created_at: [%d]=%v (%s), [%d]=%v (%s)",
+				i-1, prev.CreatedAt, prev.Slug, i, cur.CreatedAt, cur.Slug)
+		}
+		if cur.CreatedAt.Equal(prev.CreatedAt) && cur.ID > prev.ID {
+			t.Errorf("tied created_at not descending by id: [%d]=%d, [%d]=%d",
+				i-1, prev.ID, i, cur.ID)
+		}
+	}
+}
+
 func TestPostgresStore_GetMetro_UnknownSlug_ReturnsNil(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)

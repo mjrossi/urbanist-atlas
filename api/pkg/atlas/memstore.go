@@ -163,8 +163,13 @@ func (s *MemStore) GetMetro(_ context.Context, slug string) (*MetroDetail, error
 	}
 	descendants := s.descendantRegionIDs(id)
 	orgs := s.orgsForRegionIDs(descendants)
-	sort.SliceStable(orgs, func(i, j int) bool {
-		return orgs[i].CreatedAt.After(orgs[j].CreatedAt)
+	// Match Postgres OrgsForMetro: created_at DESC, id DESC.
+	sort.Slice(orgs, func(i, j int) bool {
+		a, b := orgs[i], orgs[j]
+		if !a.CreatedAt.Equal(b.CreatedAt) {
+			return a.CreatedAt.After(b.CreatedAt)
+		}
+		return a.ID > b.ID
 	})
 	return &MetroDetail{Region: region, Orgs: orgs}, nil
 }
@@ -198,8 +203,15 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 		out.MatchedRegionSlugs = nil
 		candidates = append(candidates, out)
 	}
-	sort.SliceStable(candidates, func(i, j int) bool {
-		return candidates[i].CreatedAt.After(candidates[j].CreatedAt)
+	// Sort newest-first with ID DESC as tiebreak so a tied CreatedAt
+	// doesn't drift between MemStore and Postgres (Postgres uses
+	// "ORDER BY created_at DESC, id DESC" — see browse.sql).
+	sort.Slice(candidates, func(i, j int) bool {
+		a, b := candidates[i], candidates[j]
+		if !a.CreatedAt.Equal(b.CreatedAt) {
+			return a.CreatedAt.After(b.CreatedAt)
+		}
+		return a.ID > b.ID
 	})
 	if len(candidates) > 10 {
 		candidates = candidates[:10]

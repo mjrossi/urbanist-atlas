@@ -196,12 +196,7 @@ func (s *Store) regionsByID(ctx context.Context, ids []int64) (map[int64]atlas.R
 // adapter only fills the metro-kind parameter, maps rows to the domain
 // type, and hydrates Region.ParentSlugs for each row.
 func (s *Store) ListMetros(ctx context.Context) ([]atlas.MetroSummary, error) {
-	kinds := atlas.MetroKinds()
-	kindStrs := make([]string, len(kinds))
-	for i, k := range kinds {
-		kindStrs[i] = string(k)
-	}
-	rows, err := s.q.ListMetros(ctx, kindStrs)
+	rows, err := s.q.ListMetros(ctx, atlas.MetroKindStrings())
 	if err != nil {
 		return nil, fmt.Errorf("postgres: list metros: %w", err)
 	}
@@ -239,12 +234,7 @@ func (s *Store) ListMetros(ctx context.Context) ([]atlas.MetroSummary, error) {
 // slugs and for known slugs that don't name a metro-equivalent region
 // (the SQL gates on both conditions). Orgs are newest-first.
 func (s *Store) GetMetro(ctx context.Context, slug string) (*atlas.MetroDetail, error) {
-	kinds := atlas.MetroKinds()
-	kindStrs := make([]string, len(kinds))
-	for i, k := range kinds {
-		kindStrs[i] = string(k)
-	}
-	row, err := s.q.GetMetroBySlug(ctx, gen.GetMetroBySlugParams{Slug: slug, Kinds: kindStrs})
+	row, err := s.q.GetMetroBySlug(ctx, gen.GetMetroBySlugParams{Slug: slug, Kinds: atlas.MetroKindStrings()})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

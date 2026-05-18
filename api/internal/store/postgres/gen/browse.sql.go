@@ -226,6 +226,8 @@ WITH RECURSIVE descendants(region_id) AS (
     SELECT rp.region_id
     FROM descendants d
     JOIN region_parents rp ON rp.parent_region_id = d.region_id
+    JOIN regions r2        ON r2.id = rp.region_id
+    WHERE r2.scope_tier <> 'national'
 )
 SELECT
     o.id, o.slug, o.name, o.short_desc, o.website_url, o.contact_url, o.tags,
@@ -263,6 +265,13 @@ type OrgsForMetroRow struct {
 // itself + every descendant region). For each org we also array_agg
 // ALL its region attachments so the adapter can hydrate Org.Regions
 // in one round-trip.
+//
+// The recursion prunes scope_tier='national' nodes defensively. Today
+// the metro is always non-national (GetMetroBySlug enforces it) and
+// editorial policy keeps national tiers as graph roots, so the prune
+// is a no-op on the current seed. It guards against a future edge
+// that accidentally puts a national region under a metro, which would
+// otherwise leak national-only orgs into a metro detail page.
 //
 // Ordered by o.created_at DESC, then o.id DESC for stability.
 func (q *Queries) OrgsForMetro(ctx context.Context, metroID int64) ([]OrgsForMetroRow, error) {

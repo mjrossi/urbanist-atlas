@@ -45,3 +45,15 @@ func MetroKinds() []RegionKind {
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
+
+// MetroKindStrings returns MetroKinds as []string for the sqlc-generated
+// queries that take text[] parameters. Same ordering and freshness
+// guarantees as MetroKinds.
+func MetroKindStrings() []string {
+	kinds := MetroKinds()
+	out := make([]string, len(kinds))
+	for i, k := range kinds {
+		out[i] = string(k)
+	}
+	return out
+}
