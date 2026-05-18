@@ -128,36 +128,42 @@ internal/store/postgres without `ListMetros`/`GetMetro`/`ListRecent`).
 
 ### Phase 6 — HTTP handlers + httptest
 
-- [ ] Write `api/internal/httpapi/metros_test.go` first, mirroring `lookup_test.go`:
+- [x] Write `api/internal/httpapi/metros_test.go` first, mirroring `lookup_test.go`:
   - `TestListMetros_HappyPath_ReturnsOAPIShape`: status 200, `Content-Type: application/json`, body is `[]oapi.MetroSummary`, length ≥ 1, descending org_count.
   - `TestGetMetro_HappyPath`: GET `/api/v1/metros/{seed-metro-slug}` → 200, body has `region.slug = slug` and `orgs.length ≥ 1`.
   - `TestGetMetro_404`: GET `/api/v1/metros/totally-bogus` → 404, `Content-Type: application/problem+json`, body has `type`, `title`, `request_id` (echoing `X-Request-ID`).
   - `TestGetMetro_NonMetroSlug_404`: a state/province slug → 404 (the slug exists in regions but isn't a metro-equivalent).
-- [ ] Write `api/internal/httpapi/recent_test.go`:
+- [x] Write `api/internal/httpapi/recent_test.go`:
   - `TestListRecent_HappyPath_ReturnsOAPIShape`: 200, JSON array, length ≤ 10, newest-first.
   - `TestListRecent_ExcludesNationalTier`: seed a national-tier org (or rely on MUBi from devfixtures); assert it's absent from the response.
-- [ ] Run tests; they fail because handlers don't exist yet.
-- [ ] Implement `api/internal/httpapi/metros.go`:
+- [x] Run tests; they fail because handlers don't exist yet.
+- [x] Implement `api/internal/httpapi/metros.go`:
   - `listMetrosHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc` — ~10 lines.
   - `getMetroHandler(...)` — pulls slug from `chi.URLParam(r, "slug")`, calls `store.GetMetro`, returns 404 on nil pointer.
   - `toOAPIMetroSummary([]atlas.MetroSummary) []oapi.MetroSummary` adapter — mirror `toOAPILookupResult` style.
   - `toOAPIMetroDetail(*atlas.MetroDetail) oapi.MetroDetail` adapter.
-- [ ] Implement `api/internal/httpapi/recent.go`:
+- [x] Implement `api/internal/httpapi/recent.go`:
   - `recentHandler(store, logger)` — 10 lines.
   - Reuse the existing `toOAPIOrg` adapter (or add one if Org doesn't already have one — check by grepping for it; if absent, add it in `metros.go` since Metro also needs it).
-- [ ] Run handler tests, confirm all pass.
-- [ ] Commit: `feat(api): browse + recent handlers (slice #6)`.
+- [x] Run handler tests, confirm all pass.
+- [x] Commit: `feat(api): browse + recent handlers (slice #6)`.
+
+Note: routes had to be wired in the same commit as the handlers (the
+RED test from Phase 6 returns 404 from the router, not from the
+handler logic). Phase 7's checkbox folds into this commit.
 
 ### Phase 7 — Router wiring
 
-- [ ] Modify `api/internal/httpapi/router.go` inside the `r.Route("/api/"+apiVersion, ...)` block, after the existing `r.Get("/lookup", ...)` line:
+- [x] Modify `api/internal/httpapi/router.go` inside the `r.Route("/api/"+apiVersion, ...)` block, after the existing `r.Get("/lookup", ...)` line:
   ```go
   r.Get("/metros", listMetrosHandler(cfg.Store, logger))
   r.Get("/metros/{slug}", getMetroHandler(cfg.Store, logger))
   r.Get("/recent", recentHandler(cfg.Store, logger))
   ```
-- [ ] Run `just api-check`. All tests pass; no lint issues.
-- [ ] Commit: `feat(api): wire browse + recent routes (slice #6)`.
+- [x] Run `just api-check`. All tests pass; no lint issues.
+- [x] Commit: `feat(api): wire browse + recent routes (slice #6)`.
+
+Note: folded into the Phase 6 commit; see the Phase 6 note for why.
 
 ### Phase 8 — Final verification
 

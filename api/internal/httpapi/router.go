@@ -52,6 +52,9 @@ func New(cfg Config) http.Handler {
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
 		r.Get("/openapi.yaml", openapiHandler())
 		r.Get("/lookup", lookupHandler(cfg.Store, logger))
+		r.Get("/metros", listMetrosHandler(cfg.Store, logger))
+		r.Get("/metros/{slug}", getMetroHandler(cfg.Store, logger))
+		r.Get("/recent", recentHandler(cfg.Store, logger))
 	})
 
 	return r
