@@ -65,6 +65,21 @@ just api-run                  # API on :8080 (text logs)
 cd web && npm install && npm run dev    # SPA on :5173
 ```
 
+### Deploy
+
+The API ships as a multi-stage Docker image to Fly.io
+(`fly.toml` + `Dockerfile` at the repo root); the web SPA deploys
+to Cloudflare Pages from `web/`. Initial provisioning steps
+(creating the Fly app, attaching Fly Managed Postgres, wiring DNS,
+setting secrets) are documented in
+[`docs/deploy.md`](./docs/deploy.md) — see slice #20 / #21 in the
+[roadmap](./docs/roadmap.md) for status. Ongoing ops use the
+`fly-*` recipes (`just fly-deploy`, `just fly-status`,
+`just fly-logs`, `just fly-secrets`, `just fly-ssh`).
+
+The full chunk design (slices #19/#20/#21/#23) lives at
+[`docs/superpowers/specs/2026-05-18-qa-deploy-design.md`](./docs/superpowers/specs/2026-05-18-qa-deploy-design.md).
+
 ## Contributing organizations
 
 Once the site is live: visit `/submit` to propose an organization. All

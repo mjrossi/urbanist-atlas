@@ -29,6 +29,17 @@ api-run:
 api-build:
     cd api && mkdir -p bin && go build -o bin/urbanist-atlas-server ./cmd/server
 
+# build the api binary the same way the Docker runtime stage does:
+# static (CGO_ENABLED=0), Linux-targeted, stripped. Output still goes
+# to api/bin/ for ergonomics. The Dockerfile inlines the SAME flags;
+# keep them in sync (a code-review concern — there's no automated
+# drift check because installing `just` inside the build stage to
+# delegate here would add a dependency for one command).
+[group('api')]
+[doc('build the api binary with the same flags the Docker image uses')]
+api-build-prod:
+    cd api && mkdir -p bin && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/urbanist-atlas-server ./cmd/server
+
 # format Go code
 [group('api')]
 api-fmt:
@@ -249,6 +260,38 @@ web-gen-check:
 [group('web')]
 [doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
+
+# ── fly: deploy + ops ─────────────────────────────────
+# Thin wrappers around `flyctl` so the deploy / status / logs verbs
+# are discoverable via `just --list`. flyctl reads `fly.toml` at the
+# repo root and picks up the app name from there. Initial provisioning
+# (app creation, MPG attach, secrets) lives in docs/deploy.md — these
+# recipes are for ongoing ops once the app exists.
+
+# build + push + release on Fly
+[group('fly')]
+fly-deploy:
+    flyctl deploy
+
+# show machine + service status
+[group('fly')]
+fly-status:
+    flyctl status
+
+# tail live logs from Fly
+[group('fly')]
+fly-logs:
+    flyctl logs
+
+# list non-value Fly secrets (names + digests only)
+[group('fly')]
+fly-secrets:
+    flyctl secrets list
+
+# open an interactive shell inside a running Fly machine
+[group('fly')]
+fly-ssh:
+    flyctl ssh console
 
 # ── smoke: live curl helpers (server must be running) ─
 
