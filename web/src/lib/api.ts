@@ -123,3 +123,29 @@ export function lookup(
   const params = new URLSearchParams({ postal_code, country });
   return apiFetch<LookupResult>(`/api/v1/lookup?${params.toString()}`, init);
 }
+
+/**
+ * `GET /api/v1/metros` — list every metro region with its
+ * approved-org count. Feeds the `/browse` page and the homepage
+ * "Browse by metro" aside.
+ */
+export function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
+  return apiFetch<MetroSummary[]>('/api/v1/metros', init);
+}
+
+/**
+ * `GET /api/v1/metros/{slug}` — one metro region plus the approved
+ * organizations that serve it. Throws {@link ApiError} with status
+ * 404 when the slug isn't in the atlas.
+ */
+export function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail> {
+  return apiFetch<MetroDetail>(`/api/v1/metros/${encodeURIComponent(slug)}`, init);
+}
+
+/**
+ * `GET /api/v1/recent` — recently approved organizations, newest
+ * first. Feeds the homepage "Recently added" aside.
+ */
+export function listRecent(init?: RequestInit): Promise<Org[]> {
+  return apiFetch<Org[]>('/api/v1/recent', init);
+}
