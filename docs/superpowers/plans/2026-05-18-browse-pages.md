@@ -132,14 +132,14 @@
 
 ### Phase 6 — Router wiring
 
-- [ ] Modify `web/src/router.tsx` to add two new children of the `App` route after `r/:postalCode`:
+- [x] Modify `web/src/router.tsx` to add two new children of the `App` route after `r/:postalCode`:
   ```ts
   { path: 'browse', Component: Browse },
   { path: 'm/:metroSlug', Component: Metro },
   ```
   Import them at the top of the file.
-- [ ] Run `just web-check` (full CI gate). All pass.
-- [ ] Commit: `feat(web): wire /browse + /m/:metroSlug routes (slice #14)`.
+- [x] Run `just web-check` (full CI gate). All pass. Also: renamed the env-read helper from `useFixtures` to `isFixturesMode` so `eslint-plugin-react-hooks` doesn't mistake it for a custom hook; tightened two `noUncheckedIndexedAccess` test-only spots in api.test.ts.
+- [x] Commit: `feat(web): wire /browse + /m/:metroSlug routes (slice #14)`.
 
 ### Phase 7 — Homepage asides
 

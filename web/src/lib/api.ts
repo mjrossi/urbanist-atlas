@@ -59,7 +59,7 @@ export const apiBase: string = import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE
  * Removed (along with the fixture short-circuits below) in the
  * post-backend-merge cleanup commit.
  */
-function useFixtures(): boolean {
+function isFixturesMode(): boolean {
   return import.meta.env.VITE_USE_FIXTURES === 'true';
 }
 
@@ -144,11 +144,11 @@ export function lookup(
  * approved-org count. Feeds the `/browse` page and the homepage
  * "Browse by metro" aside.
  *
- * In fixture mode (see {@link useFixtures}) returns the static
+ * In fixture mode (see {@link isFixturesMode}) returns the static
  * fixture list instead of hitting the network.
  */
 export async function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
-  if (useFixtures()) {
+  if (isFixturesMode()) {
     const { metrosFixture } = await import('./fixtures/browse.ts');
     return metrosFixture;
   }
@@ -164,7 +164,7 @@ export async function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
  * pages can exercise their not-found branch without a backend.
  */
 export async function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail> {
-  if (useFixtures()) {
+  if (isFixturesMode()) {
     const { metroDetailFixture } = await import('./fixtures/browse.ts');
     const detail = metroDetailFixture[slug];
     if (!detail) {
@@ -182,7 +182,7 @@ export async function getMetro(slug: string, init?: RequestInit): Promise<MetroD
  * In fixture mode returns the static fixture list.
  */
 export async function listRecent(init?: RequestInit): Promise<Org[]> {
-  if (useFixtures()) {
+  if (isFixturesMode()) {
     const { recentFixture } = await import('./fixtures/browse.ts');
     return recentFixture;
   }

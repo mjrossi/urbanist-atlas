@@ -31,7 +31,9 @@ describe('listMetros / getMetro / listRecent', () => {
       // preserved end-to-end (regression guard for accidental reordering
       // in the fixture-mode branch).
       for (let i = 1; i < metros.length; i++) {
-        expect(metros[i - 1].org_count).toBeGreaterThanOrEqual(metros[i].org_count);
+        const prev = metros[i - 1]!;
+        const cur = metros[i]!;
+        expect(prev.org_count).toBeGreaterThanOrEqual(cur.org_count);
       }
     });
 
@@ -83,7 +85,7 @@ describe('listMetros / getMetro / listRecent', () => {
       fetchMock.mockResolvedValueOnce(jsonResponse([]));
       const result = await listMetros();
       expect(result).toEqual([]);
-      const [url] = fetchMock.mock.calls[0];
+      const [url] = fetchMock.mock.calls[0]!;
       expect(String(url)).toContain('/api/v1/metros');
     });
 
@@ -104,7 +106,7 @@ describe('listMetros / getMetro / listRecent', () => {
       );
       const result = await getMetro('nyc-metro');
       expect(result.region.slug).toBe('nyc-metro');
-      const [url] = fetchMock.mock.calls[0];
+      const [url] = fetchMock.mock.calls[0]!;
       expect(String(url)).toContain('/api/v1/metros/nyc-metro');
     });
 
@@ -112,7 +114,7 @@ describe('listMetros / getMetro / listRecent', () => {
       fetchMock.mockResolvedValueOnce(jsonResponse([]));
       const result = await listRecent();
       expect(result).toEqual([]);
-      const [url] = fetchMock.mock.calls[0];
+      const [url] = fetchMock.mock.calls[0]!;
       expect(String(url)).toContain('/api/v1/recent');
     });
 
@@ -132,7 +134,7 @@ describe('listMetros / getMetro / listRecent', () => {
         }),
       );
       await getMetro('weird slug');
-      const [url] = fetchMock.mock.calls[0];
+      const [url] = fetchMock.mock.calls[0]!;
       // Either '+' or '%20' is acceptable; the point is the space isn't
       // literally embedded in the URL path.
       expect(String(url)).not.toContain('weird slug');
