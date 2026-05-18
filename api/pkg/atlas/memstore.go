@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"context"
+	"sort"
 	"sync"
 )
 
@@ -54,7 +55,9 @@ func (s *MemStore) AddRegion(r Region) {
 }
 
 // AddOrg registers an organization with the IDs of the regions it
-// serves. The org's Regions field is overwritten on read.
+// serves. The org's Regions field is overwritten on read; CreatedAt is
+// preserved (it powers newest-first ordering in ListRecent and
+// GetMetro). Callers that don't care about ordering may leave it zero.
 func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -110,6 +113,195 @@ func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Reg
 		queue = append(queue, s.parents[id]...)
 	}
 	return out, nil
+}
+
+// ListMetros implements Store. Walks every registered region, filters
+// by IsMetroKind, and counts the orgs whose region attachments are in
+// the metro's downward DAG closure (so an org tagged only to Brooklyn
+// counts toward NYC metro). Excludes national-tier metros and metros
+// with zero approved orgs. Orders by org count DESC, then name ASC.
+func (s *MemStore) ListMetros(_ context.Context) ([]MetroSummary, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := []MetroSummary{}
+	for id, r := range s.regionsByID {
+		if !IsMetroKind(r.Kind) || r.ScopeTier == ScopeNational {
+			continue
+		}
+		descendants := s.descendantRegionIDs(id)
+		count := s.countOrgsForRegions(descendants)
+		if count == 0 {
+			continue
+		}
+		out = append(out, MetroSummary{Region: r, OrgCount: int64(count)})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].OrgCount != out[j].OrgCount {
+			return out[i].OrgCount > out[j].OrgCount
+		}
+		return out[i].Region.Name < out[j].Region.Name
+	})
+	return out, nil
+}
+
+// GetMetro implements Store. Returns nil for unknown slugs and for
+// known slugs that don't name a metro-equivalent kind. Returned orgs
+// are newest-first by CreatedAt.
+func (s *MemStore) GetMetro(_ context.Context, slug string) (*MetroDetail, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.regionsBySlug[slug]
+	if !ok {
+		return nil, nil
+	}
+	region, ok := s.regionsByID[id]
+	if !ok {
+		return nil, nil
+	}
+	if !IsMetroKind(region.Kind) || region.ScopeTier == ScopeNational {
+		return nil, nil
+	}
+	descendants := s.descendantRegionIDs(id)
+	orgs := s.orgsForRegionIDs(descendants)
+	sort.SliceStable(orgs, func(i, j int) bool {
+		return orgs[i].CreatedAt.After(orgs[j].CreatedAt)
+	})
+	return &MetroDetail{Region: region, Orgs: orgs}, nil
+}
+
+// ListRecent implements Store. Excludes orgs whose ONLY region
+// attachments are scope_tier='national', orders newest-first, caps at
+// 10.
+func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	candidates := make([]Org, 0, len(s.orgs))
+	for _, org := range s.orgs {
+		// Filter: at least one non-national region attachment.
+		hasNonNational := false
+		for _, rid := range s.orgRegions[org.ID] {
+			r, ok := s.regionsByID[rid]
+			if !ok {
+				continue
+			}
+			if r.ScopeTier != ScopeNational {
+				hasNonNational = true
+				break
+			}
+		}
+		if !hasNonNational {
+			continue
+		}
+		// Hydrate Regions like the wire contract expects.
+		out := org
+		out.Regions = s.regionsForOrg(org.ID)
+		out.MatchedRegionSlugs = nil
+		candidates = append(candidates, out)
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return candidates[i].CreatedAt.After(candidates[j].CreatedAt)
+	})
+	if len(candidates) > 10 {
+		candidates = candidates[:10]
+	}
+	return candidates, nil
+}
+
+// descendantRegionIDs returns rootID followed by every region reachable
+// by walking the parents map in reverse (child-of relation). Used to
+// answer "which orgs serve a metro or anything under it".
+//
+// Must be called with s.mu held (read or write).
+func (s *MemStore) descendantRegionIDs(rootID int64) []int64 {
+	// Build a child->parent index on the fly. With ~30 regions in v1
+	// this is cheap; if it ever shows up in a profile, the index can
+	// be cached on MemStore directly.
+	childrenOf := map[int64][]int64{}
+	for childID, parents := range s.parents {
+		for _, p := range parents {
+			childrenOf[p] = append(childrenOf[p], childID)
+		}
+	}
+	visited := map[int64]bool{}
+	out := []int64{}
+	queue := []int64{rootID}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if visited[id] {
+			continue
+		}
+		visited[id] = true
+		out = append(out, id)
+		queue = append(queue, childrenOf[id]...)
+	}
+	return out
+}
+
+// countOrgsForRegions returns the number of distinct orgs with at least
+// one attachment in regionIDs. Must be called with s.mu held.
+func (s *MemStore) countOrgsForRegions(regionIDs []int64) int {
+	if len(regionIDs) == 0 {
+		return 0
+	}
+	wanted := make(map[int64]bool, len(regionIDs))
+	for _, id := range regionIDs {
+		wanted[id] = true
+	}
+	count := 0
+	for _, org := range s.orgs {
+		for _, rid := range s.orgRegions[org.ID] {
+			if wanted[rid] {
+				count++
+				break
+			}
+		}
+	}
+	return count
+}
+
+// orgsForRegionIDs returns the distinct orgs with at least one
+// attachment in regionIDs, with Regions hydrated. Must be called with
+// s.mu held.
+func (s *MemStore) orgsForRegionIDs(regionIDs []int64) []Org {
+	if len(regionIDs) == 0 {
+		return nil
+	}
+	wanted := make(map[int64]bool, len(regionIDs))
+	for _, id := range regionIDs {
+		wanted[id] = true
+	}
+	var out []Org
+	for _, org := range s.orgs {
+		match := false
+		for _, rid := range s.orgRegions[org.ID] {
+			if wanted[rid] {
+				match = true
+				break
+			}
+		}
+		if !match {
+			continue
+		}
+		hydrated := org
+		hydrated.Regions = s.regionsForOrg(org.ID)
+		hydrated.MatchedRegionSlugs = nil
+		out = append(out, hydrated)
+	}
+	return out
+}
+
+// regionsForOrg gathers the Region rows for an org's attachments. Must
+// be called with s.mu held.
+func (s *MemStore) regionsForOrg(orgID int64) []Region {
+	ids := s.orgRegions[orgID]
+	regions := make([]Region, 0, len(ids))
+	for _, rid := range ids {
+		if r, ok := s.regionsByID[rid]; ok {
+			regions = append(regions, r)
+		}
+	}
+	return regions
 }
 
 // OrgsForRegions implements Store.

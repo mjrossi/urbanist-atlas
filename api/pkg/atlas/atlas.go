@@ -8,6 +8,8 @@
 // a Postgres-backed Store lives in internal/store/postgres.
 package atlas
 
+import "time"
+
 // Country is the ISO-style country code used throughout the atlas. It's
 // an opaque string; values come from seed data, not from a closed set.
 // US and CA are the v1 anchors; DE/FR/UK/AU/etc. are added by loading
@@ -68,16 +70,22 @@ type Region struct {
 // it with every region the org serves (not just the ones that matched).
 // MatchedRegionSlugs is populated only by Lookup and identifies the
 // subset of Regions that caused the org to surface for that lookup.
+//
+// CreatedAt is server-side only (`json:"-"`) and powers newest-first
+// ordering in Store.ListRecent and Store.GetMetro. The wire contract
+// in api/openapi.yaml does not include it; a future spec addition can
+// expose it without changing the data model.
 type Org struct {
-	ID                 int64    `json:"id"`
-	Slug               string   `json:"slug"`
-	Name               string   `json:"name"`
-	ShortDesc          string   `json:"short_desc"`
-	WebsiteURL         string   `json:"website_url"`
-	ContactURL         string   `json:"contact_url,omitempty"`
-	Tags               []Tag    `json:"tags"`
-	Regions            []Region `json:"regions"`
-	MatchedRegionSlugs []string `json:"matched_region_slugs,omitempty"`
+	ID                 int64     `json:"id"`
+	Slug               string    `json:"slug"`
+	Name               string    `json:"name"`
+	ShortDesc          string    `json:"short_desc"`
+	WebsiteURL         string    `json:"website_url"`
+	ContactURL         string    `json:"contact_url,omitempty"`
+	Tags               []Tag     `json:"tags"`
+	Regions            []Region  `json:"regions"`
+	MatchedRegionSlugs []string  `json:"matched_region_slugs,omitempty"`
+	CreatedAt          time.Time `json:"-"`
 }
 
 // LookupQuery is the input to Lookup.

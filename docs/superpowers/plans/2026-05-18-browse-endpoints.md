@@ -66,20 +66,24 @@
 
 ### Phase 2 — Domain types and Store interface
 
-- [ ] Add `MetroSummary` and `MetroDetail` to `api/pkg/atlas/browse.go`. Mirror the wire shape from `api/openapi.yaml:606-628`:
+- [x] Add `MetroSummary` and `MetroDetail` to `api/pkg/atlas/browse.go`. Mirror the wire shape from `api/openapi.yaml:606-628`:
   - `MetroSummary{ Region Region; OrgCount int64 }`
   - `MetroDetail{ Region Region; Orgs []Org }`
   - Doc comments noting these are domain types; wire types live in `oapi/`.
-- [ ] Extend `api/pkg/atlas/store.go` `Store` interface with three methods (signatures from spec §4):
+- [x] Extend `api/pkg/atlas/store.go` `Store` interface with three methods (signatures from spec §4):
   - `ListMetros(ctx context.Context) ([]MetroSummary, error)`
   - `GetMetro(ctx context.Context, slug string) (*MetroDetail, error)` — nil means not-found.
   - `ListRecent(ctx context.Context) ([]Org, error)`
-- [ ] Compile check: `go build ./...` will fail on both store implementations until they get the new methods. That's expected.
-- [ ] Commit: `feat(api): add browse Store methods (slice #6)`.
+- [x] Compile check: `go build ./...` will fail on both store implementations until they get the new methods. That's expected.
+- [x] Commit: `feat(api): add browse Store methods (slice #6)`.
+
+Note: also added `CreatedAt time.Time` with `json:"-"` to `atlas.Org`
+so newest-first ordering in `ListRecent` and `GetMetro` has a stable
+source. The wire contract is unchanged.
 
 ### Phase 3 — MemStore implementations + tests
 
-- [ ] Write `api/pkg/atlas/browse_test.go` first. Build a MemStore with `LoadDevFixtures` and assert:
+- [x] Write `api/pkg/atlas/browse_test.go` first. Build a MemStore with `LoadDevFixtures` and assert:
   - `ListMetros` returns ≥ 1 entry, ordered `OrgCount DESC, Name ASC`.
   - `ListMetros` excludes non-metro kinds (e.g., states, provinces, distritos).
   - `ListMetros` excludes metros with zero approved orgs.
@@ -88,13 +92,17 @@
   - `GetMetro` on a non-metro slug (e.g., a state slug from the fixtures) also returns `(nil, nil)`.
   - `ListRecent` returns ≤ 10 entries, ordered newest-first by `CreatedAt`.
   - `ListRecent` does NOT include any org whose ONLY region attachments are `scope_tier='national'`. Use MUBi if it's seeded; otherwise seed a national-tier region + org for the test specifically.
-- [ ] Implement on `MemStore` (in `api/pkg/atlas/memstore.go`):
+- [x] Implement on `MemStore` (in `api/pkg/atlas/memstore.go`):
   - `ListMetros`: walk `s.regions`, filter by `IsMetroKind`, count orgs whose `Regions` slice contains the region (or any descendant — see note), sort.
   - `GetMetro`: find region by slug, check `IsMetroKind`, gather descendant region IDs via downward graph walk, gather orgs tagged to any of them.
   - `ListRecent`: filter `s.orgs` by "has at least one non-national region attachment," sort by `CreatedAt DESC`, cap at 10.
   - **Note on descendants for MemStore:** the existing `AncestorRegions` walks upward (child → parents). For descendants, walk the same graph in the opposite direction. Add an unexported helper `descendantRegionIDs(rootID int64) []int64` if it doesn't already exist.
-- [ ] Run `go test ./pkg/atlas/...`. All tests pass.
-- [ ] Commit: `feat(api): MemStore browse implementations (slice #6)`.
+- [x] Run `go test ./pkg/atlas/...`. All tests pass.
+- [x] Commit: `feat(api): MemStore browse implementations (slice #6)`.
+
+Note: Phase 2 and Phase 3 share one commit to keep every checkpoint
+buildable (the Store interface widening in Phase 2 alone leaves
+internal/store/postgres without `ListMetros`/`GetMetro`/`ListRecent`).
 
 ### Phase 4 — Postgres SQL + sqlc
 

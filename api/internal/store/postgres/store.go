@@ -191,6 +191,29 @@ func (s *Store) regionsByID(ctx context.Context, ids []int64) (map[int64]atlas.R
 	return out, nil
 }
 
+// ListMetros, GetMetro, and ListRecent are placeholders until the
+// sqlc-generated browse queries land in Phase 4 + the adapter in
+// Phase 5. They satisfy the widened atlas.Store interface so the
+// build stays green at every commit.
+
+// ListMetros implements atlas.Store. (Postgres-backed implementation
+// lands in a follow-up phase.)
+func (s *Store) ListMetros(ctx context.Context) ([]atlas.MetroSummary, error) {
+	return nil, errors.New("postgres: ListMetros not yet implemented")
+}
+
+// GetMetro implements atlas.Store. (Postgres-backed implementation
+// lands in a follow-up phase.)
+func (s *Store) GetMetro(ctx context.Context, slug string) (*atlas.MetroDetail, error) {
+	return nil, errors.New("postgres: GetMetro not yet implemented")
+}
+
+// ListRecent implements atlas.Store. (Postgres-backed implementation
+// lands in a follow-up phase.)
+func (s *Store) ListRecent(ctx context.Context) ([]atlas.Org, error) {
+	return nil, errors.New("postgres: ListRecent not yet implemented")
+}
+
 func (s *Store) parentSlugsByRegion(ctx context.Context, ids []int64) (map[int64][]string, error) {
 	out := make(map[int64][]string, len(ids))
 	if len(ids) == 0 {
