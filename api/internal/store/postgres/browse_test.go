@@ -1,0 +1,222 @@
+//go:build integration
+
+// Integration tests for the Postgres-backed browse + recent Store
+// methods. Uses the same testcontainers harness as store_test.go and
+// the same seed loaders pipeline_test.go uses, so the regions /
+// postal_codes / orgs row set is the production seed (with the PT
+// addition from slice #4.6 — MUBi-nacional sits in pt-nacional and
+// must NOT surface from ListRecent).
+
+package postgres
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"sort"
+	"testing"
+
+	"github.com/mjrossi/urbanist-atlas/api/internal/loadpostal"
+	"github.com/mjrossi/urbanist-atlas/api/internal/loadregions"
+	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
+)
+
+// loadAllSeeds runs the same three-country region + postal + org
+// loaders pipeline_test.go uses. Caller must hold a Postgres pool
+// fresh from startPostgres + applyMigrations.
+func loadAllSeeds(ctx context.Context, t *testing.T, store *Store) {
+	t.Helper()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	files := []struct {
+		regions string
+		postal  string
+		country atlas.Country
+	}{
+		{repoFile(t, "seed", "regions_us.toml"), repoFile(t, "seed", "postal_codes_us.csv"), atlas.CountryUS},
+		{repoFile(t, "seed", "regions_ca.toml"), repoFile(t, "seed", "postal_codes_ca.csv"), atlas.CountryCA},
+		{repoFile(t, "seed", "regions_pt.toml"), repoFile(t, "seed", "postal_codes_pt.csv"), atlas.Country("PT")},
+	}
+	for _, f := range files {
+		if _, err := loadregions.LoadFile(ctx, store.Pool(), logger, f.regions, string(f.country)); err != nil {
+			t.Fatalf("loadregions %s: %v", f.country, err)
+		}
+		if _, err := loadpostal.LoadFile(ctx, store.Pool(), logger, f.postal, f.country); err != nil {
+			t.Fatalf("loadpostal %s: %v", f.country, err)
+		}
+	}
+	if _, err := seed.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "orgs.toml")); err != nil {
+		t.Fatalf("seed orgs: %v", err)
+	}
+}
+
+func TestPostgresStore_ListMetros_ShapeAndOrdering(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.ListMetros(ctx)
+	if err != nil {
+		t.Fatalf("ListMetros: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatal("want >=1 metro, got 0")
+	}
+	// Every entry should be a metro-equivalent kind, non-national, and
+	// have at least one org.
+	for _, m := range got {
+		if !atlas.IsMetroKind(m.Region.Kind) {
+			t.Errorf("non-metro kind in result: %q (%s)", m.Region.Kind, m.Region.Slug)
+		}
+		if m.Region.ScopeTier == atlas.ScopeNational {
+			t.Errorf("national-tier region in result: %s", m.Region.Slug)
+		}
+		if m.OrgCount == 0 {
+			t.Errorf("zero-org metro in result: %s", m.Region.Slug)
+		}
+	}
+	// Ordering: org_count DESC, then name ASC for ties.
+	for i := 1; i < len(got); i++ {
+		prev, cur := got[i-1], got[i]
+		if cur.OrgCount > prev.OrgCount {
+			t.Errorf("not descending by org_count: [%d]=%d, [%d]=%d",
+				i-1, prev.OrgCount, i, cur.OrgCount)
+		}
+		if cur.OrgCount == prev.OrgCount && cur.Region.Name < prev.Region.Name {
+			t.Errorf("not ascending by name within count tie: [%d]=%q, [%d]=%q",
+				i-1, prev.Region.Name, i, cur.Region.Name)
+		}
+	}
+}
+
+func TestPostgresStore_GetMetro_HappyPath(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.GetMetro(ctx, "nyc-metro")
+	if err != nil {
+		t.Fatalf("GetMetro: %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for known metro slug")
+	}
+	if got.Region.Slug != "nyc-metro" {
+		t.Errorf("region slug: want nyc-metro, got %s", got.Region.Slug)
+	}
+	if len(got.Orgs) == 0 {
+		t.Errorf("nyc-metro has no orgs; expected at least one (TransitCenter / TransAlt via nyc descendant)")
+	}
+	// At least one of the seeded orgs that attach to nyc-metro or its
+	// descendants should be present.
+	gotSlugs := make(map[string]bool, len(got.Orgs))
+	for _, o := range got.Orgs {
+		gotSlugs[o.Slug] = true
+	}
+	wantOneOf := []string{"transitcenter", "transportation-alternatives", "riders-alliance"}
+	found := false
+	for _, w := range wantOneOf {
+		if gotSlugs[w] {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("none of %v in nyc-metro orgs; got %v", wantOneOf, sortedKeys(gotSlugs))
+	}
+	// Each org's Regions must be hydrated.
+	for _, o := range got.Orgs {
+		if len(o.Regions) == 0 {
+			t.Errorf("org %s has empty Regions; hydration failed", o.Slug)
+		}
+	}
+}
+
+func TestPostgresStore_GetMetro_UnknownSlug_ReturnsNil(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.GetMetro(ctx, "does-not-exist")
+	if err != nil {
+		t.Fatalf("err: want nil, got %v", err)
+	}
+	if got != nil {
+		t.Errorf("result: want nil, got %+v", got)
+	}
+}
+
+func TestPostgresStore_GetMetro_NonMetroSlug_ReturnsNil(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	// "ny" is a us:state slug — exists but is not a metro kind.
+	got, err := store.GetMetro(ctx, "ny")
+	if err != nil {
+		t.Fatalf("err: want nil, got %v", err)
+	}
+	if got != nil {
+		t.Errorf("result: want nil for non-metro slug, got %+v", got)
+	}
+}
+
+func TestPostgresStore_ListRecent_ShapeAndCap(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.ListRecent(ctx)
+	if err != nil {
+		t.Fatalf("ListRecent: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatal("ListRecent returned 0 orgs")
+	}
+	if len(got) > 10 {
+		t.Errorf("len: want <= 10, got %d", len(got))
+	}
+	// Newest first by CreatedAt.
+	for i := 1; i < len(got); i++ {
+		if got[i].CreatedAt.After(got[i-1].CreatedAt) {
+			t.Errorf("not descending by created_at: [%d]=%v, [%d]=%v",
+				i-1, got[i-1].CreatedAt, i, got[i].CreatedAt)
+		}
+	}
+}
+
+// MUBi (mubi-nacional) is the slice-#4.6 seed org attached ONLY to
+// pt-nacional (scope_tier='national'). It must NOT surface in
+// ListRecent's default response. A regression here is the kind of
+// silent failure the test is specifically guarding against.
+func TestPostgresStore_ListRecent_ExcludesNationalTier(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.ListRecent(ctx)
+	if err != nil {
+		t.Fatalf("ListRecent: %v", err)
+	}
+	for _, o := range got {
+		if o.Slug == "mubi-nacional" {
+			t.Errorf("national-tier org mubi-nacional leaked into ListRecent: %+v", o)
+		}
+	}
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}

@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/store/postgres/gen"
@@ -191,27 +192,200 @@ func (s *Store) regionsByID(ctx context.Context, ids []int64) (map[int64]atlas.R
 	return out, nil
 }
 
-// ListMetros, GetMetro, and ListRecent are placeholders until the
-// sqlc-generated browse queries land in Phase 4 + the adapter in
-// Phase 5. They satisfy the widened atlas.Store interface so the
-// build stays green at every commit.
-
-// ListMetros implements atlas.Store. (Postgres-backed implementation
-// lands in a follow-up phase.)
+// ListMetros implements atlas.Store. The SQL is in browse.sql; this
+// adapter only fills the metro-kind parameter, maps rows to the domain
+// type, and hydrates Region.ParentSlugs for each row.
 func (s *Store) ListMetros(ctx context.Context) ([]atlas.MetroSummary, error) {
-	return nil, errors.New("postgres: ListMetros not yet implemented")
+	kinds := atlas.MetroKinds()
+	kindStrs := make([]string, len(kinds))
+	for i, k := range kinds {
+		kindStrs[i] = string(k)
+	}
+	rows, err := s.q.ListMetros(ctx, kindStrs)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list metros: %w", err)
+	}
+	if len(rows) == 0 {
+		return []atlas.MetroSummary{}, nil
+	}
+	ids := make([]int64, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	parents, err := s.parentSlugsByRegion(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]atlas.MetroSummary, len(rows))
+	for i, r := range rows {
+		out[i] = atlas.MetroSummary{
+			Region: atlas.Region{
+				ID:           r.ID,
+				Country:      atlas.Country(r.Country),
+				Kind:         atlas.RegionKind(r.Kind),
+				Name:         r.Name,
+				Slug:         r.Slug,
+				ScopeTier:    atlas.ScopeTier(r.ScopeTier),
+				SortPriority: int(r.SortPriority),
+				ParentSlugs:  parents[r.ID],
+			},
+			OrgCount: r.OrgCount,
+		}
+	}
+	return out, nil
 }
 
-// GetMetro implements atlas.Store. (Postgres-backed implementation
-// lands in a follow-up phase.)
+// GetMetro implements atlas.Store. Returns (nil, nil) for unknown
+// slugs and for known slugs that don't name a metro-equivalent region
+// (the SQL gates on both conditions). Orgs are newest-first.
 func (s *Store) GetMetro(ctx context.Context, slug string) (*atlas.MetroDetail, error) {
-	return nil, errors.New("postgres: GetMetro not yet implemented")
+	kinds := atlas.MetroKinds()
+	kindStrs := make([]string, len(kinds))
+	for i, k := range kinds {
+		kindStrs[i] = string(k)
+	}
+	row, err := s.q.GetMetroBySlug(ctx, gen.GetMetroBySlugParams{Slug: slug, Kinds: kindStrs})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("postgres: get metro: %w", err)
+	}
+	region := atlas.Region{
+		ID:           row.ID,
+		Country:      atlas.Country(row.Country),
+		Kind:         atlas.RegionKind(row.Kind),
+		Name:         row.Name,
+		Slug:         row.Slug,
+		ScopeTier:    atlas.ScopeTier(row.ScopeTier),
+		SortPriority: int(row.SortPriority),
+	}
+	parents, err := s.parentSlugsByRegion(ctx, []int64{region.ID})
+	if err != nil {
+		return nil, err
+	}
+	region.ParentSlugs = parents[region.ID]
+
+	orgRows, err := s.q.OrgsForMetro(ctx, region.ID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: orgs for metro: %w", err)
+	}
+	orgs, err := s.hydrateOrgRows(ctx, orgsForMetroRows(orgRows))
+	if err != nil {
+		return nil, err
+	}
+	return &atlas.MetroDetail{Region: region, Orgs: orgs}, nil
 }
 
-// ListRecent implements atlas.Store. (Postgres-backed implementation
-// lands in a follow-up phase.)
+// ListRecent implements atlas.Store. The SQL handles the national-tier
+// filter, ordering, and 10-row cap; this adapter only maps rows and
+// hydrates Org.Regions.
 func (s *Store) ListRecent(ctx context.Context) ([]atlas.Org, error) {
-	return nil, errors.New("postgres: ListRecent not yet implemented")
+	rows, err := s.q.ListRecent(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list recent: %w", err)
+	}
+	return s.hydrateOrgRows(ctx, listRecentRows(rows))
+}
+
+// orgRow normalizes the two sqlc-generated row types that carry the
+// same columns (ListRecentRow, OrgsForMetroRow). The adapter walks the
+// slice once to gather distinct region IDs, hydrates them in one
+// round-trip, then maps each row to an atlas.Org. Keeping the row
+// types in a tiny internal interface avoids two near-identical copies
+// of the hydration code.
+type orgRow struct {
+	ID         int64
+	Slug       string
+	Name       string
+	ShortDesc  string
+	WebsiteUrl string
+	ContactUrl pgtype.Text
+	Tags       []string
+	CreatedAt  pgtype.Timestamptz
+	RegionIds  []int64
+}
+
+func orgsForMetroRows(rows []gen.OrgsForMetroRow) []orgRow {
+	out := make([]orgRow, len(rows))
+	for i, r := range rows {
+		out[i] = orgRow{
+			ID: r.ID, Slug: r.Slug, Name: r.Name, ShortDesc: r.ShortDesc,
+			WebsiteUrl: r.WebsiteUrl, ContactUrl: r.ContactUrl, Tags: r.Tags,
+			CreatedAt: r.CreatedAt, RegionIds: r.RegionIds,
+		}
+	}
+	return out
+}
+
+func listRecentRows(rows []gen.ListRecentRow) []orgRow {
+	out := make([]orgRow, len(rows))
+	for i, r := range rows {
+		out[i] = orgRow{
+			ID: r.ID, Slug: r.Slug, Name: r.Name, ShortDesc: r.ShortDesc,
+			WebsiteUrl: r.WebsiteUrl, ContactUrl: r.ContactUrl, Tags: r.Tags,
+			CreatedAt: r.CreatedAt, RegionIds: r.RegionIds,
+		}
+	}
+	return out
+}
+
+func (s *Store) hydrateOrgRows(ctx context.Context, rows []orgRow) ([]atlas.Org, error) {
+	if len(rows) == 0 {
+		return []atlas.Org{}, nil
+	}
+	seen := map[int64]struct{}{}
+	for _, row := range rows {
+		for _, rid := range row.RegionIds {
+			seen[rid] = struct{}{}
+		}
+	}
+	ids := make([]int64, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	regionsByID, err := s.regionsByID(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	parents, err := s.parentSlugsByRegion(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for id, r := range regionsByID {
+		r.ParentSlugs = parents[id]
+		regionsByID[id] = r
+	}
+	out := make([]atlas.Org, 0, len(rows))
+	for _, row := range rows {
+		regions := make([]atlas.Region, 0, len(row.RegionIds))
+		for _, rid := range row.RegionIds {
+			if r, ok := regionsByID[rid]; ok {
+				regions = append(regions, r)
+			}
+		}
+		tags := make([]atlas.Tag, len(row.Tags))
+		for i, t := range row.Tags {
+			tags[i] = atlas.Tag(t)
+		}
+		org := atlas.Org{
+			ID:         row.ID,
+			Slug:       row.Slug,
+			Name:       row.Name,
+			ShortDesc:  row.ShortDesc,
+			WebsiteURL: row.WebsiteUrl,
+			Tags:       tags,
+			Regions:    regions,
+		}
+		if row.ContactUrl.Valid {
+			org.ContactURL = row.ContactUrl.String
+		}
+		if row.CreatedAt.Valid {
+			org.CreatedAt = row.CreatedAt.Time
+		}
+		out = append(out, org)
+	}
+	return out, nil
 }
 
 func (s *Store) parentSlugsByRegion(ctx context.Context, ids []int64) (map[int64][]string, error) {

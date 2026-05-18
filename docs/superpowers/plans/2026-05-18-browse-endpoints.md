@@ -116,15 +116,15 @@ internal/store/postgres without `ListMetros`/`GetMetro`/`ListRecent`).
 
 ### Phase 5 — Postgres store implementations + integration test
 
-- [ ] Implement the three methods on the Postgres store in `api/internal/store/postgres/store.go`:
+- [x] Implement the three methods on the Postgres store in `api/internal/store/postgres/store.go`:
   - `ListMetros` calls `ListMetros(ctx, atlas.MetroKinds())` and maps rows → `[]atlas.MetroSummary`.
   - `GetMetro`: first call `GetMetroBySlug(ctx, slug, atlas.MetroKinds())`. If no row, return `(nil, nil)`. Otherwise call `OrgsForMetro` and assemble.
   - `ListRecent` calls `ListRecent(ctx)` and maps to `[]atlas.Org`.
-- [ ] Extend `api/internal/store/postgres/pipeline_test.go` (or add a new `*_test.go` next to it) with a testcontainers-backed test that:
+- [x] Extend `api/internal/store/postgres/pipeline_test.go` (or add a new `*_test.go` next to it) with a testcontainers-backed test that:
   - Loads seed data via the existing helpers.
   - Calls each new Store method and asserts: shape correctness, ordering, national-tier exclusion.
-- [ ] Run `go test -tags=integration ./internal/store/postgres/...` and confirm pass. (Requires Docker.)
-- [ ] Commit: `feat(api): Postgres browse implementations (slice #6)`.
+- [x] Run `go test -tags=integration ./internal/store/postgres/...` and confirm pass. (Requires Docker.)
+- [x] Commit: `feat(api): Postgres browse implementations (slice #6)`.
 
 ### Phase 6 — HTTP handlers + httptest
 
