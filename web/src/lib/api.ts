@@ -23,6 +23,9 @@ export type LookupQuery = components['schemas']['LookupQuery'];
 export type LookupResult = components['schemas']['LookupResult'];
 export type MetroSummary = components['schemas']['MetroSummary'];
 export type MetroDetail = components['schemas']['MetroDetail'];
+export type Meta = components['schemas']['Meta'];
+export type MetroSummariesEnvelope = components['schemas']['MetroSummariesEnvelope'];
+export type RecentEnvelope = components['schemas']['RecentEnvelope'];
 export type Submission = components['schemas']['Submission'];
 export type SubmissionPayload = components['schemas']['SubmissionPayload'];
 export type NewSubmissionRequest = components['schemas']['NewSubmissionRequest'];
@@ -128,9 +131,16 @@ export function lookup(
  * `GET /api/v1/metros` — list every metro region with its
  * approved-org count. Feeds the `/browse` page and the homepage
  * "Browse by metro" aside.
+ *
+ * The wire shape is `{ meta, data: MetroSummary[] }`; this helper
+ * unwraps `data` so callers continue to receive the bare array.
+ * Read `meta` (license, attribution_url, generated_at) by calling
+ * `apiFetch<MetroSummariesEnvelope>` directly if you need it.
  */
 export function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
-  return apiFetch<MetroSummary[]>('/api/v1/metros', init);
+  return apiFetch<MetroSummariesEnvelope>('/api/v1/metros', init).then(
+    (env) => env.data,
+  );
 }
 
 /**
@@ -145,7 +155,12 @@ export function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail>
 /**
  * `GET /api/v1/recent` — recently approved organizations, newest
  * first. Feeds the homepage "Recently added" aside.
+ *
+ * The wire shape is `{ meta, data: Org[] }`; this helper unwraps
+ * `data` so callers continue to receive the bare array.
  */
 export function listRecent(init?: RequestInit): Promise<Org[]> {
-  return apiFetch<Org[]>('/api/v1/recent', init);
+  return apiFetch<RecentEnvelope>('/api/v1/recent', init).then(
+    (env) => env.data,
+  );
 }

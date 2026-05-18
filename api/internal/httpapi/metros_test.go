@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 )
@@ -24,11 +25,34 @@ func TestListMetros_HappyPath_ReturnsOAPIShape(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
 		t.Errorf("Content-Type: want application/json prefix, got %q", ct)
 	}
+	// ODbL attribution headers ride every /api/v1/** response.
+	if got, want := resp.Header.Get("X-Data-License"), "ODbL-1.0"; got != want {
+		t.Errorf("X-Data-License: want %q, got %q", want, got)
+	}
+	if got, want := resp.Header.Get("X-Data-Attribution"), "https://urbanistatlas.com"; got != want {
+		t.Errorf("X-Data-Attribution: want %q, got %q", want, got)
+	}
 
-	var got []oapi.MetroSummary
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+	var env oapi.MetroSummariesEnvelope
+	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
+	// meta block populated.
+	if env.Meta.License != "ODbL-1.0" {
+		t.Errorf("meta.license: want %q, got %q", "ODbL-1.0", env.Meta.License)
+	}
+	if env.Meta.AttributionUrl != "https://urbanistatlas.com" {
+		t.Errorf("meta.attribution_url: want %q, got %q",
+			"https://urbanistatlas.com", env.Meta.AttributionUrl)
+	}
+	if env.Meta.GeneratedAt.IsZero() {
+		t.Errorf("meta.generated_at: want a real time, got zero value")
+	}
+	if d := time.Since(env.Meta.GeneratedAt); d < 0 || d > 5*time.Second {
+		t.Errorf("meta.generated_at: want within 5s of now, got delta %s", d)
+	}
+
+	got := env.Data
 	if len(got) == 0 {
 		t.Fatal("want at least one metro, got 0")
 	}

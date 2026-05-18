@@ -28,11 +28,25 @@ func TestListRecent_HappyPath_ReturnsOAPIShape(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
 		t.Errorf("Content-Type: want application/json prefix, got %q", ct)
 	}
+	if got, want := resp.Header.Get("X-Data-License"), "ODbL-1.0"; got != want {
+		t.Errorf("X-Data-License: want %q, got %q", want, got)
+	}
+	if got, want := resp.Header.Get("X-Data-Attribution"), "https://urbanistatlas.com"; got != want {
+		t.Errorf("X-Data-Attribution: want %q, got %q", want, got)
+	}
 
-	var got []oapi.Org
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+	var env oapi.RecentEnvelope
+	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
+	if env.Meta.License != "ODbL-1.0" {
+		t.Errorf("meta.license: want %q, got %q", "ODbL-1.0", env.Meta.License)
+	}
+	if env.Meta.GeneratedAt.IsZero() {
+		t.Errorf("meta.generated_at: want a real time, got zero value")
+	}
+
+	got := env.Data
 	// LoadDevFixtures seeds plain orgs only (no national-tier). Empty
 	// is technically legal; non-empty is what we ship with.
 	if len(got) > 10 {
@@ -92,10 +106,11 @@ func TestListRecent_ExcludesNationalTier(t *testing.T) {
 		t.Fatalf("status: want 200, got %d", resp.StatusCode)
 	}
 
-	var got []oapi.Org
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+	var env oapi.RecentEnvelope
+	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
+	got := env.Data
 	if len(got) != 1 {
 		t.Fatalf("want exactly 1 org (plain-org); got %d (%v)", len(got), oapiOrgSlugs(got))
 	}

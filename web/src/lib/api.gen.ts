@@ -237,6 +237,34 @@ export interface components {
          */
         Country: string;
         /**
+         * @description Attribution block included on every collection response.
+         *     Carries the ODbL license obligation in-band so consumers
+         *     that strip headers still see the share-alike requirement.
+         */
+        Meta: {
+            /**
+             * @description SPDX identifier of the data license. Stable for the
+             *     lifetime of v1 (`ODbL-1.0`).
+             * @example ODbL-1.0
+             */
+            license: string;
+            /**
+             * Format: uri
+             * @description URL downstream consumers should link to when crediting
+             *     the source.
+             * @example https://urbanistatlas.com
+             */
+            attribution_url: string;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp recording when the response was
+             *     produced server-side. Per-request — there is no caching
+             *     layer in v1.
+             * @example 2026-05-18T12:34:56Z
+             */
+            generated_at: string;
+        };
+        /**
          * @description Drives result grouping in `/lookup`. `local` for city/county
          *     regions; `regional` for metro/state/province/multi-state;
          *     `national` for country-wide umbrellas (federations, advocacy
@@ -378,6 +406,24 @@ export interface components {
         MetroDetail: {
             region: components["schemas"]["Region"];
             orgs: components["schemas"]["Org"][];
+        };
+        /**
+         * @description Collection envelope for `GET /api/v1/metros`. Wraps the
+         *     metro list in a `meta` + `data` shape so every list
+         *     response carries the ODbL attribution alongside its
+         *     payload, even when transport-level headers are stripped.
+         */
+        MetroSummariesEnvelope: {
+            meta: components["schemas"]["Meta"];
+            data: components["schemas"]["MetroSummary"][];
+        };
+        /**
+         * @description Collection envelope for `GET /api/v1/recent`. Same shape
+         *     contract as `MetroSummariesEnvelope`.
+         */
+        RecentEnvelope: {
+            meta: components["schemas"]["Meta"];
+            data: components["schemas"]["Org"][];
         };
         /** @description The proposed organization, as submitted by a member of the public. */
         SubmissionPayload: {
@@ -604,7 +650,18 @@ export interface components {
         SubmissionID: number;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /**
+         * @description SPDX identifier of the dataset license. Stable for the
+         *     lifetime of v1.
+         */
+        XDataLicense: string;
+        /**
+         * @description URL downstream consumers should link to when crediting
+         *     the source.
+         */
+        XDataAttribution: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -670,6 +727,8 @@ export interface operations {
             /** @description Lookup succeeded. */
             200: {
                 headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -690,13 +749,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Metros with counts, ordered by org count descending. */
+            /**
+             * @description Metros with counts, ordered by org count descending.
+             *     Wrapped in a `{ meta, data }` envelope; the
+             *     `MetroSummary[]` lives at `data`.
+             */
             200: {
                 headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MetroSummary"][];
+                    "application/json": components["schemas"]["MetroSummariesEnvelope"];
                 };
             };
             500: components["responses"]["InternalError"];
@@ -717,6 +782,8 @@ export interface operations {
             /** @description The metro region and its organizations. */
             200: {
                 headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -736,13 +803,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Recently approved organizations. */
+            /**
+             * @description Recently approved organizations. Wrapped in a
+             *     `{ meta, data }` envelope; the `Org[]` lives at `data`.
+             */
             200: {
                 headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Org"][];
+                    "application/json": components["schemas"]["RecentEnvelope"];
                 };
             };
             500: components["responses"]["InternalError"];

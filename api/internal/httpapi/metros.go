@@ -26,7 +26,7 @@ func listMetrosHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc 
 			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)
 			return
 		}
-		writeJSON(w, http.StatusOK, toOAPIMetroSummaries(metros))
+		respondCollection(w, toOAPIMetroSummaries(metros))
 	}
 }
 
