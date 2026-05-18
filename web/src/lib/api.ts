@@ -23,10 +23,28 @@ export type LookupQuery = components['schemas']['LookupQuery'];
 export type LookupResult = components['schemas']['LookupResult'];
 export type MetroSummary = components['schemas']['MetroSummary'];
 export type MetroDetail = components['schemas']['MetroDetail'];
+export type Meta = components['schemas']['Meta'];
+export type MetroSummariesEnvelope = components['schemas']['MetroSummariesEnvelope'];
+export type RecentEnvelope = components['schemas']['RecentEnvelope'];
 export type Submission = components['schemas']['Submission'];
 export type SubmissionPayload = components['schemas']['SubmissionPayload'];
 export type NewSubmissionRequest = components['schemas']['NewSubmissionRequest'];
 export type ProblemDetails = components['schemas']['ProblemDetails'];
+
+/**
+ * Countries the SPA actively exposes to users. The wire `Country`
+ * type is open (just `string` — the API accepts any code seed data
+ * defines), but the UI is gated on this narrower set so a stray
+ * `?country=…` value renders an error instead of silently coercing.
+ * Bump this and SearchBox.tsx's `<select>` options together when a
+ * new country goes user-facing.
+ */
+export const SUPPORTED_COUNTRIES = ['US', 'CA'] as const satisfies readonly Country[];
+
+/** True if `raw` is one of {@link SUPPORTED_COUNTRIES}. */
+export function isSupportedCountry(raw: string): raw is Country {
+  return (SUPPORTED_COUNTRIES as readonly string[]).includes(raw);
+}
 
 const DEFAULT_API_BASE = 'http://localhost:8080';
 
@@ -107,4 +125,42 @@ export function lookup(
 ): Promise<LookupResult> {
   const params = new URLSearchParams({ postal_code, country });
   return apiFetch<LookupResult>(`/api/v1/lookup?${params.toString()}`, init);
+}
+
+/**
+ * `GET /api/v1/metros` — list every metro region with its
+ * approved-org count. Feeds the `/browse` page and the homepage
+ * "Browse by metro" aside.
+ *
+ * The wire shape is `{ meta, data: MetroSummary[] }`; this helper
+ * unwraps `data` so callers continue to receive the bare array.
+ * Read `meta` (license, attribution_url, generated_at) by calling
+ * `apiFetch<MetroSummariesEnvelope>` directly if you need it.
+ */
+export function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
+  return apiFetch<MetroSummariesEnvelope>('/api/v1/metros', init).then(
+    (env) => env.data,
+  );
+}
+
+/**
+ * `GET /api/v1/metros/{slug}` — one metro region plus the approved
+ * organizations that serve it. Throws {@link ApiError} with status
+ * 404 when the slug isn't in the atlas.
+ */
+export function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail> {
+  return apiFetch<MetroDetail>(`/api/v1/metros/${encodeURIComponent(slug)}`, init);
+}
+
+/**
+ * `GET /api/v1/recent` — recently approved organizations, newest
+ * first. Feeds the homepage "Recently added" aside.
+ *
+ * The wire shape is `{ meta, data: Org[] }`; this helper unwraps
+ * `data` so callers continue to receive the bare array.
+ */
+export function listRecent(init?: RequestInit): Promise<Org[]> {
+  return apiFetch<RecentEnvelope>('/api/v1/recent', init).then(
+    (env) => env.data,
+  );
 }

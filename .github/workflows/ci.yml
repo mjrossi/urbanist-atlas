@@ -51,36 +51,44 @@ jobs:
     needs: detect
     if: needs.detect.outputs.api == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v4
+      - name: Show mise version
+        # Surfaces the installed mise version in the job log so a
+        # future breaking change to `mise env --dotenv` (used below)
+        # is obvious at a glance rather than buried in a sed-like
+        # diff. jdx/mise-action doesn't pin a specific mise binary,
+        # so this is the cheapest visibility we get.
+        run: mise --version
       - name: Export mise [env] to GITHUB_ENV
         # jdx/mise-action installs mise but does NOT auto-propagate
         # [env] to subsequent steps. Re-export so URBANIST_* values
-        # from mise.toml + mise.ci.toml are visible to go test.
-        working-directory: ${{ github.workspace }}
-        run: mise env --shell=bash | sed -E 's/^export ([^=]+)="?([^"]*)"?$/\1=\2/' >> "$GITHUB_ENV"
-      - run: go vet ./...
-      - run: go test ./... -race -count=1
+        # from mise.toml + mise.ci.toml are visible to the steps below.
+        # `mise env --dotenv` emits raw KEY=VALUE pairs (no quoting,
+        # no `export`), which is exactly the format $GITHUB_ENV
+        # expects — avoids a fragile sed regex over `mise env`'s
+        # bash output.
+        run: mise env --dotenv >> "$GITHUB_ENV"
+      # `just api-check` = vet + test + go-generate/sqlc drift check.
+      # Single source of truth for "what CI runs"; same recipe a
+      # contributor runs locally before pushing.
+      - run: just api-check
 
   web:
     name: web (vite)
     needs: detect
     if: needs.detect.outputs.web == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v4
+      - name: Show mise version
+        run: mise --version
       - name: Export mise [env] to GITHUB_ENV
-        working-directory: ${{ github.workspace }}
-        run: mise env --shell=bash | sed -E 's/^export ([^=]+)="?([^"]*)"?$/\1=\2/' >> "$GITHUB_ENV"
-      - run: npm ci
-      - run: npm run lint --if-present
-      - run: npm test --if-present -- --run
-      - run: npm run build --if-present
+        run: mise env --dotenv >> "$GITHUB_ENV"
+      # `just web-check` = deps + lint + test + build + openapi-typescript
+      # drift check. The drift check catches the case where
+      # api/openapi.yaml changes but src/lib/api.gen.ts wasn't
+      # regenerated — silently shipping stale wire types.
+      - run: just web-check

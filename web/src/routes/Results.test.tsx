@@ -141,4 +141,12 @@ describe('Results', () => {
       expect(lookupMock).toHaveBeenCalledWith('M5V', 'CA', expect.any(Object));
     });
   });
+
+  it('renders an unsupported-country error without calling the API', () => {
+    renderAt('/r/11217?country=DE');
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toMatch(/country.*DE.*isn.t supported/i);
+    expect(lookupMock).not.toHaveBeenCalled();
+  });
 });

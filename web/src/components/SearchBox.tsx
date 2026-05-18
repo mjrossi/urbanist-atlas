@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import type { Country } from '../lib/api.ts';
+import { normalizePostal } from '../lib/postal.ts';
 
 /**
  * Postal-code search input. Accepts a US 5-digit ZIP or a Canadian
@@ -16,6 +17,12 @@ import type { Country } from '../lib/api.ts';
 
 type DetectedCountry = Country | null;
 
+// TODO(third-country): the digit→US, letter→CA heuristic only works
+// while the UI exposes exactly two countries. Before adding a third
+// (e.g. PT/ES going user-facing), either retire the auto-detect and
+// require an explicit country pick, or replace this with a per-country
+// regex map. The `<select>` options below and lib/api.ts'
+// SUPPORTED_COUNTRIES need updating in lockstep.
 function detectCountry(raw: string): DetectedCountry {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;
@@ -24,10 +31,6 @@ function detectCountry(raw: string): DetectedCountry {
   if (/[0-9]/.test(first)) return 'US';
   if (/[A-Za-z]/.test(first)) return 'CA';
   return null;
-}
-
-function normalize(raw: string): string {
-  return raw.replace(/\s+/g, '').toUpperCase();
 }
 
 /**
@@ -60,7 +63,7 @@ export function SearchBox() {
   const effectiveCountry: Country =
     countryOverride !== '' ? countryOverride : (detectCountry(raw) ?? 'US');
 
-  const normalized = useMemo(() => normalize(raw), [raw]);
+  const normalized = useMemo(() => normalizePostal(raw), [raw]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

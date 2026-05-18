@@ -22,10 +22,10 @@ import (
 func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
-		postal := strings.TrimSpace(r.URL.Query().Get("postal_code"))
+		rawPostal := strings.TrimSpace(r.URL.Query().Get("postal_code"))
 		country := atlas.Country(strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("country"))))
 
-		if postal == "" {
+		if rawPostal == "" {
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "postal_code is required", rid)
 			return
 		}
@@ -37,6 +37,12 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 		// doesn't gate on a known-country list. Unknown countries fall
 		// through to atlas.Lookup which returns ErrPostalCodeNotFound
 		// (→ 404) when no matching postal code exists.
+
+		// Canonicalize once at the boundary so logs, error details, and
+		// downstream Store calls all see the same form. Both Store
+		// implementations re-normalize internally; that second call is
+		// idempotent.
+		postal := atlas.NormalizePostalCode(country, rawPostal)
 
 		result, err := atlas.Lookup(r.Context(), store, atlas.LookupQuery{
 			PostalCode: postal,
@@ -123,14 +129,6 @@ func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
 	return out
 }
 
-func toOAPIOrgs(orgs []atlas.Org) []oapi.Org {
-	out := make([]oapi.Org, 0, len(orgs))
-	for _, o := range orgs {
-		out = append(out, toOAPIOrg(o))
-	}
-	return out
-}
-
 func toOAPIRegion(r atlas.Region) oapi.Region {
 	parentSlugs := r.ParentSlugs
 	if parentSlugs == nil {
@@ -147,27 +145,3 @@ func toOAPIRegion(r atlas.Region) oapi.Region {
 	}
 }
 
-func toOAPIOrg(o atlas.Org) oapi.Org {
-	tags := make([]string, len(o.Tags))
-	for i, t := range o.Tags {
-		tags[i] = string(t)
-	}
-	regions := make([]oapi.Region, 0, len(o.Regions))
-	for _, r := range o.Regions {
-		regions = append(regions, toOAPIRegion(r))
-	}
-	out := oapi.Org{
-		Id:         o.ID,
-		Slug:       o.Slug,
-		Name:       o.Name,
-		ShortDesc:  o.ShortDesc,
-		WebsiteUrl: o.WebsiteURL,
-		Tags:       tags,
-		Regions:    regions,
-	}
-	if o.ContactURL != "" {
-		cu := o.ContactURL
-		out.ContactUrl = &cu
-	}
-	return out
-}

@@ -43,7 +43,7 @@ func serveCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:    "cors-origins",
 				Usage:   "comma-separated allowed CORS origins (exact match)",
-				Value:   "http://localhost:5173,http://localhost:3000",
+				Value:   "http://localhost:5173",
 				Sources: cli.EnvVars("URBANIST_CORS_ORIGINS"),
 			},
 			&cli.StringFlag{

@@ -27,19 +27,26 @@ reasoning behind tech choices.
 
 ## Status
 
-Foundation in. Both halves are scaffolded, the v1 wire contract is
-committed at [`api/openapi.yaml`](./api/openapi.yaml) (served at
-runtime from `GET /api/v1/openapi.yaml`), Go and TS types are
-generated from it, the backend has a real Postgres-backed store with
-embedded migrations, and the frontend renders the broadsheet
-masthead shell. Errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
+Most of v1.0 is wired. The API serves `/lookup`, `/metros`,
+`/metros/{slug}`, and `/recent` against a Postgres store with
+embedded migrations; the v1 wire contract is committed at
+[`api/openapi.yaml`](./api/openapi.yaml) and embedded into the
+binary at `GET /api/v1/openapi.yaml`. Every `/api/v1/**` success
+response carries ODbL attribution headers; collection responses
+wrap their payload in a `{ meta, data }` envelope. The SPA renders
+home (search) + results + browse + per-metro + about + 404
+against the live API. Errors on both halves use
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 `application/problem+json`.
 
-Remaining slices to v1 — postal-code data, seed orgs, submissions +
-admin queue, the actual pages, deployment — are tracked in
-[`docs/roadmap.md`](./docs/roadmap.md). The full architectural plan
-lives at `~/.claude/plans/we-are-planning-a-smooth-candy.md` (local
-to the maintainer); the load-bearing pieces are mirrored into
+Remaining slices to v1.0 — postal-code data expansion, seed-data
+growth, Dockerfile + Fly deploy, Cloudflare Pages, and the Phase 1
+lockdown sequence — are tracked in
+[`docs/roadmap.md`](./docs/roadmap.md). Public submissions are
+deferred to Phase 2 alongside the API-key + email-verified account
+system. The full architectural plan lives at
+`~/.claude/plans/we-are-planning-a-smooth-candy.md` (local to the
+maintainer); the load-bearing pieces are mirrored into
 [`CLAUDE.md`](./CLAUDE.md).
 
 ### Quick start

@@ -2,9 +2,10 @@ package atlas
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func nycFixture(t *testing.T) *MemStore {
@@ -51,11 +52,11 @@ func TestLookup_NYC_Brooklyn(t *testing.T) {
 	}
 	wantLocal := []string{"brooklyn-spoke", "transalt"}
 	wantRegional := []string{"transitcenter", "ny-lcv", "tri-state"}
-	if !reflect.DeepEqual(slugs(got.Local), wantLocal) {
-		t.Errorf("Local:\n  got  %v\n  want %v", slugs(got.Local), wantLocal)
+	if diff := cmp.Diff(wantLocal, slugs(got.Local)); diff != "" {
+		t.Errorf("Local (-want +got):\n%s", diff)
 	}
-	if !reflect.DeepEqual(slugs(got.Regional), wantRegional) {
-		t.Errorf("Regional:\n  got  %v\n  want %v", slugs(got.Regional), wantRegional)
+	if diff := cmp.Diff(wantRegional, slugs(got.Regional)); diff != "" {
+		t.Errorf("Regional (-want +got):\n%s", diff)
 	}
 }
 
@@ -104,8 +105,8 @@ func TestLookup_ResolvedAncestry(t *testing.T) {
 	for i, r := range got.ResolvedAncestry {
 		gotOrder[i] = r.Slug
 	}
-	if !reflect.DeepEqual(gotOrder, wantOrder) {
-		t.Errorf("ResolvedAncestry:\n  got  %v\n  want %v", gotOrder, wantOrder)
+	if diff := cmp.Diff(wantOrder, gotOrder); diff != "" {
+		t.Errorf("ResolvedAncestry (-want +got):\n%s", diff)
 	}
 }
 

@@ -25,6 +25,14 @@ info:
     - Every response includes an `X-Request-ID` header; error response
       bodies also echo it as the `request_id` extension field so
       clients can quote it when reporting bugs.
+    - Every `/api/v1/**` response carries `X-Data-License: ODbL-1.0`
+      and `X-Data-Attribution: https://urbanistatlas.com` headers
+      announcing the dataset license (ODbL 1.0; see `LICENSE-DATA`
+      in the repo). Collection responses additionally carry a `meta`
+      envelope with `license`, `attribution_url`, and `generated_at`
+      (RFC3339 UTC) — the array lives at `data`. The envelope keeps
+      the license obligation in-band when transport headers are
+      stripped.
     - Admin endpoints require an `Authorization: Bearer <token>`
       header; the token is configured via the `URBANIST_ADMIN_TOKEN`
       environment variable on the server.
@@ -118,6 +126,11 @@ paths:
       responses:
         '200':
           description: Lookup succeeded.
+          headers:
+            X-Data-License:
+              $ref: '#/components/headers/XDataLicense'
+            X-Data-Attribution:
+              $ref: '#/components/headers/XDataAttribution'
           content:
             application/json:
               schema:
@@ -142,13 +155,19 @@ paths:
       operationId: listMetros
       responses:
         '200':
-          description: Metros with counts, ordered by org count descending.
+          description: |
+            Metros with counts, ordered by org count descending.
+            Wrapped in a `{ meta, data }` envelope; the
+            `MetroSummary[]` lives at `data`.
+          headers:
+            X-Data-License:
+              $ref: '#/components/headers/XDataLicense'
+            X-Data-Attribution:
+              $ref: '#/components/headers/XDataAttribution'
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MetroSummary'
+                $ref: '#/components/schemas/MetroSummariesEnvelope'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -162,6 +181,11 @@ paths:
       responses:
         '200':
           description: The metro region and its organizations.
+          headers:
+            X-Data-License:
+              $ref: '#/components/headers/XDataLicense'
+            X-Data-Attribution:
+              $ref: '#/components/headers/XDataAttribution'
           content:
             application/json:
               schema:
@@ -182,13 +206,18 @@ paths:
       operationId: listRecent
       responses:
         '200':
-          description: Recently approved organizations.
+          description: |
+            Recently approved organizations. Wrapped in a
+            `{ meta, data }` envelope; the `Org[]` lives at `data`.
+          headers:
+            X-Data-License:
+              $ref: '#/components/headers/XDataLicense'
+            X-Data-Attribution:
+              $ref: '#/components/headers/XDataAttribution'
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Org'
+                $ref: '#/components/schemas/RecentEnvelope'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -377,6 +406,23 @@ components:
         format: int64
       description: The submission's numeric ID.
 
+  headers:
+    XDataLicense:
+      description: |
+        SPDX identifier of the dataset license. Stable for the
+        lifetime of v1.
+      schema:
+        type: string
+        example: ODbL-1.0
+    XDataAttribution:
+      description: |
+        URL downstream consumers should link to when crediting
+        the source.
+      schema:
+        type: string
+        format: uri
+        example: https://urbanistatlas.com
+
   responses:
     BadRequest:
       description: |
@@ -438,6 +484,36 @@ components:
         countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
         changes as data is loaded.
       example: US
+
+    Meta:
+      type: object
+      description: |
+        Attribution block included on every collection response.
+        Carries the ODbL license obligation in-band so consumers
+        that strip headers still see the share-alike requirement.
+      required: [license, attribution_url, generated_at]
+      properties:
+        license:
+          type: string
+          example: ODbL-1.0
+          description: |
+            SPDX identifier of the data license. Stable for the
+            lifetime of v1 (`ODbL-1.0`).
+        attribution_url:
+          type: string
+          format: uri
+          example: https://urbanistatlas.com
+          description: |
+            URL downstream consumers should link to when crediting
+            the source.
+        generated_at:
+          type: string
+          format: date-time
+          example: "2026-05-18T12:34:56Z"
+          description: |
+            RFC 3339 timestamp recording when the response was
+            produced server-side. Per-request — there is no caching
+            layer in v1.
 
     ScopeTier:
       type: string
@@ -623,6 +699,36 @@ components:
         region:
           $ref: '#/components/schemas/Region'
         orgs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Org'
+
+    MetroSummariesEnvelope:
+      type: object
+      description: |
+        Collection envelope for `GET /api/v1/metros`. Wraps the
+        metro list in a `meta` + `data` shape so every list
+        response carries the ODbL attribution alongside its
+        payload, even when transport-level headers are stripped.
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: '#/components/schemas/Meta'
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetroSummary'
+
+    RecentEnvelope:
+      type: object
+      description: |
+        Collection envelope for `GET /api/v1/recent`. Same shape
+        contract as `MetroSummariesEnvelope`.
+      required: [meta, data]
+      properties:
+        meta:
+          $ref: '#/components/schemas/Meta'
+        data:
           type: array
           items:
             $ref: '#/components/schemas/Org'

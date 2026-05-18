@@ -1,9 +1,11 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router';
 import { Dateline } from '../components/Dateline.tsx';
 import { EntryList } from '../components/EntryList.tsx';
-import { ApiError, lookup } from '../lib/api.ts';
+import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
 import type { Country, LookupOrg, LookupResult, Region } from '../lib/api.ts';
+import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 /**
@@ -13,13 +15,16 @@ import { queryKeys } from '../lib/queryKeys.ts';
  * (defaults to `US`); the SearchBox always supplies one explicitly.
  */
 
-function parseCountry(raw: string | null): Country {
-  return raw === 'CA' ? 'CA' : 'US';
-}
-
-function normalizePostal(raw: string | undefined): string {
-  if (!raw) return '';
-  return raw.replace(/\s+/g, '').toUpperCase();
+/**
+ * Map the raw `?country=` search param onto a supported `Country`.
+ * Missing param falls back to US (the SearchBox always sets one
+ * explicitly; this default just keeps a hand-typed `/r/11217` URL
+ * working). An unsupported value returns `null` so the caller can
+ * render an error instead of silently coercing.
+ */
+function parseCountry(raw: string | null): Country | null {
+  if (raw === null) return 'US';
+  return isSupportedCountry(raw) ? raw : null;
 }
 
 /**
@@ -49,13 +54,21 @@ function buildRegionNameMap(
 export function Results() {
   const params = useParams<{ postalCode: string }>();
   const [search] = useSearchParams();
-  const postalCode = normalizePostal(params.postalCode);
-  const country = parseCountry(search.get('country'));
+  const postalCode = normalizePostal(params.postalCode ?? '');
+  const rawCountry = search.get('country');
+  const country = parseCountry(rawCountry);
+  // `country` is `null` when the param is an unsupported value; the
+  // `enabled` gate keeps the queryFn from running in that case, so the
+  // fallback to 'US' here is just to give useQuery a concrete key/arg.
+  // Keeping the gate as the single source of truth (rather than a cast)
+  // means a future change to `enabled` can't silently leak an
+  // unsupported-country fetch.
+  const effectiveCountry: Country = country ?? 'US';
 
   const query = useQuery<LookupResult, ApiError>({
-    queryKey: queryKeys.lookup(postalCode, country),
-    queryFn: ({ signal }) => lookup(postalCode, country, { signal }),
-    enabled: postalCode.length > 0,
+    queryKey: queryKeys.lookup(postalCode, effectiveCountry),
+    queryFn: ({ signal }) => lookup(postalCode, effectiveCountry, { signal }),
+    enabled: postalCode.length > 0 && country !== null,
   });
 
   const placeLabel = query.data?.resolved_place_label;
@@ -65,11 +78,16 @@ export function Results() {
     <div className="page">
       <Dateline
         postalCode={postalCode || '—'}
-        country={country}
+        country={country ?? 'US'}
         placeLabel={placeLabel}
         ancestry={ancestry}
       />
-      <ResultsBody query={query} postalCode={postalCode} />
+      <ResultsBody
+        query={query}
+        postalCode={postalCode}
+        country={country}
+        rawCountry={rawCountry}
+      />
     </div>
   );
 }
@@ -77,12 +95,36 @@ export function Results() {
 function ResultsBody({
   query,
   postalCode,
+  country,
+  rawCountry,
 }: {
   query: ReturnType<typeof useQuery<LookupResult, ApiError>>;
   postalCode: string;
+  country: Country | null;
+  rawCountry: string | null;
 }) {
+  // Hooks must run unconditionally before any early return, hence the
+  // optional-chain into query.data and the empty-array fallbacks. When
+  // query.data is undefined the memo result is a fresh empty Map; cheap
+  // and discarded because we early-return before rendering EntryList.
+  const ancestry = query.data?.resolved_ancestry;
+  const local = query.data?.local;
+  const regional = query.data?.regional;
+  const regionNameBySlug = useMemo(
+    () => buildRegionNameMap(ancestry ?? [], [...(local ?? []), ...(regional ?? [])]),
+    [ancestry, local, regional],
+  );
+
   if (postalCode.length === 0) {
     return <p className="results-state">No postal code in the URL.</p>;
+  }
+  if (country === null) {
+    return (
+      <p className="results-state error" role="alert">
+        Country <code>{rawCountry}</code> isn’t supported yet. Try{' '}
+        <code>?country=US</code> or <code>?country=CA</code>.
+      </p>
+    );
   }
   if (query.isPending) {
     return (
@@ -102,8 +144,7 @@ function ResultsBody({
       </p>
     );
   }
-  const { local, regional, resolved_ancestry } = query.data;
-  if (local.length === 0 && regional.length === 0) {
+  if (query.data.local.length === 0 && query.data.regional.length === 0) {
     return (
       <p className="results-state">
         No groups indexed yet for {postalCode}. Know one?{' '}
@@ -111,6 +152,11 @@ function ResultsBody({
       </p>
     );
   }
-  const regionNameBySlug = buildRegionNameMap(resolved_ancestry, [...local, ...regional]);
-  return <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />;
+  return (
+    <EntryList
+      local={query.data.local}
+      regional={query.data.regional}
+      regionNameBySlug={regionNameBySlug}
+    />
+  );
 }

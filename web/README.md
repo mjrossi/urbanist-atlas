@@ -11,7 +11,8 @@ web/
 │   ├── main.tsx        # createRoot + QueryClientProvider + RouterProvider
 │   ├── router.tsx      # react-router v7 route table
 │   ├── App.tsx         # layout shell: Masthead + Outlet + Footer
-│   ├── routes/         # one file per route (Home, …)
+│   ├── routes/         # one file per route (Home, Results,
+│   │                   #   Browse, Metro, About, NotFound)
 │   ├── components/     # Masthead, BroadsheetNav, Footer, …
 │   ├── styles/         # global.css ported from mjrossi.com
 │   └── lib/
@@ -28,7 +29,7 @@ See the root `CLAUDE.md` and the approved plan. In short:
 - TypeScript, strict mode (`strict` + `noUncheckedIndexedAccess`).
 - Routing: `react-router` v7 (SPA / data mode).
 - Server state: `@tanstack/react-query` v5. No global client state lib.
-- Forms: `react-hook-form` for the submission form (lands with slice #13).
+- Forms: `react-hook-form` is the pre-approved choice; not yet installed (the submission form, slice #13, is deferred to Phase 2 alongside the account model).
 - Styling: plain CSS via `src/styles/global.css`. No Tailwind, no CSS-in-JS.
 - Fonts: Fraunces + Source Serif 4 + Inter via `@fontsource-variable/*`.
 - Tests: Vitest + React Testing Library.
@@ -61,14 +62,19 @@ npm run generate:api
 ```
 
 `src/lib/api.ts` imports the wire shapes (`LookupResult`, `Org`,
-`Region`, `ProblemDetails`, etc.) from `api.gen.ts`, so they stay in
-lockstep with the contract. It exposes:
+`Region`, `ProblemDetails`, `MetroSummary`, `MetroDetail`, `Meta`,
+etc.) from `api.gen.ts`, so they stay in lockstep with the
+contract. It exposes:
 
 - `apiFetch<T>(path, init?)` — low-level fetch wrapper that throws
   `ApiError` on non-2xx responses, parsing `application/problem+json`
   bodies into a typed `ProblemDetails`.
 - `lookup(postal_code, country)` — typed wrapper for
   `GET /api/v1/lookup`.
+- `listMetros()`, `getMetro(slug)`, `listRecent()` — typed wrappers
+  for the browse + recent endpoints. Collection responses arrive as
+  `{ meta, data }` envelopes (slice #24); these helpers unwrap
+  `data` so call sites see plain arrays.
 
 `src/lib/queryKeys.ts` centralizes the `@tanstack/react-query` keys so
 cache invalidation has a single source of truth.
