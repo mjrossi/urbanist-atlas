@@ -49,21 +49,6 @@ const DEFAULT_API_BASE = 'http://localhost:8080';
 export const apiBase: string = import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE;
 
 /**
- * Read `VITE_USE_FIXTURES` per-call rather than freezing it at module
- * load. Lets `vi.stubEnv(...)` in tests flip the branch on the fly
- * without juggling module-cache resets. In production the Vite build
- * inlines `import.meta.env.VITE_USE_FIXTURES` to its literal value
- * (`undefined` if unset), so the function folds to a constant `false`
- * and the dynamic fixture import is tree-shaken from the bundle.
- *
- * Removed (along with the fixture short-circuits below) in the
- * post-backend-merge cleanup commit.
- */
-function isFixturesMode(): boolean {
-  return import.meta.env.VITE_USE_FIXTURES === 'true';
-}
-
-/**
  * Error thrown for any non-2xx response from the API. Carries the HTTP
  * status, the parsed RFC 9457 problem document (when the server sent
  * one), and the request ID for log correlation.
@@ -143,15 +128,8 @@ export function lookup(
  * `GET /api/v1/metros` — list every metro region with its
  * approved-org count. Feeds the `/browse` page and the homepage
  * "Browse by metro" aside.
- *
- * In fixture mode (see {@link isFixturesMode}) returns the static
- * fixture list instead of hitting the network.
  */
-export async function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
-  if (isFixturesMode()) {
-    const { metrosFixture } = await import('./fixtures/browse.ts');
-    return metrosFixture;
-  }
+export function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
   return apiFetch<MetroSummary[]>('/api/v1/metros', init);
 }
 
@@ -159,32 +137,15 @@ export async function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
  * `GET /api/v1/metros/{slug}` — one metro region plus the approved
  * organizations that serve it. Throws {@link ApiError} with status
  * 404 when the slug isn't in the atlas.
- *
- * In fixture mode the same 404 contract is honored synthetically so
- * pages can exercise their not-found branch without a backend.
  */
-export async function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail> {
-  if (isFixturesMode()) {
-    const { metroDetailFixture } = await import('./fixtures/browse.ts');
-    const detail = metroDetailFixture[slug];
-    if (!detail) {
-      throw new ApiError(404, 'Not Found', undefined, undefined);
-    }
-    return detail;
-  }
+export function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail> {
   return apiFetch<MetroDetail>(`/api/v1/metros/${encodeURIComponent(slug)}`, init);
 }
 
 /**
  * `GET /api/v1/recent` — recently approved organizations, newest
  * first. Feeds the homepage "Recently added" aside.
- *
- * In fixture mode returns the static fixture list.
  */
-export async function listRecent(init?: RequestInit): Promise<Org[]> {
-  if (isFixturesMode()) {
-    const { recentFixture } = await import('./fixtures/browse.ts');
-    return recentFixture;
-  }
+export function listRecent(init?: RequestInit): Promise<Org[]> {
   return apiFetch<Org[]>('/api/v1/recent', init);
 }
