@@ -3,10 +3,10 @@
 #
 # `just` itself is pinned in mise.toml (`aqua:casey/just`); a single
 # `mise install` at the repo root provisions it alongside go, node,
-# sqlc, goose, oapi-codegen, and staticcheck.
+# sqlc, goose, oapi-codegen, staticcheck, and flyctl.
 #
-# Groups: api, data, postgres, web, smoke, ci. Each group corresponds
-# to a section comment below.
+# Groups: api, data, postgres, web, smoke, fly, ci. Each group
+# corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 

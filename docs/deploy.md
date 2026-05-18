@@ -123,6 +123,11 @@ seed files do. Add a country by dropping `seed/regions_<cc>.toml` and
 (`TestPipeline_LoaddataLoadAll`) will pick the new country up
 automatically.
 
+If `loaddata` fails partway through (e.g. `loaddata: postal CA: ...`),
+the preceding countries' rows stay committed — the loaders are
+upsert-based and idempotent, so fix the offending file and re-run.
+No reset needed.
+
 ### 6. Smoke test the API
 
 The `.fly.dev` hostname is live as soon as `flyctl deploy` reports
