@@ -56,9 +56,7 @@ the plan is the *design* view.
 - **Home + Results pages (slices #11 + #12):** Two-column broadsheet
   home with `SearchBox` + drop-cap lede; `/r/:postalCode` results
   with `Dateline` header + `EntryList` Local/Regional classified
-  layout against `/api/v1/lookup`. Right-column placeholders for
-  "Browse by metro" / "Recently added" until slice #6 lands the
-  backing endpoints.
+  layout against `/api/v1/lookup`.
 - **Region-graph refactor (slice #4.5):** regions become a multi-parent
   DAG; postal_codes point at the leaf; `scope_tier` is editorial;
   `RegionKind`/`Country` open to free-form strings; loaders move to
@@ -90,10 +88,55 @@ the plan is the *design* view.
   strip). Handler-test coverage (httptest + MemStore) +
   testcontainers-backed integration tests against the production
   seed. See `docs/superpowers/specs/2026-05-18-browse-endpoints-design.md`.
+- **Browse + metro pages (slice #14):** `/browse` lists every metro
+  with org counts, ordered by org count desc + name asc tiebreak;
+  `/m/:metroSlug` reuses the classified-section layout from
+  `/r/:postalCode`. The homepage right-column asides ("Browse by
+  metro" / "Recently added") now render real data via `useQuery`
+  against `/api/v1/metros` and `/api/v1/recent` — no more "Coming
+  soon" placeholders. See
+  `docs/superpowers/specs/2026-05-18-browse-pages-design.md`.
+- **About + 404 page (slice #15):** `/about` uses a single-column
+  `.page` treatment with mission / methodology / criteria /
+  acknowledgments copy linking to *Urbanist Lexicon* at
+  `mjrossi.com/blog`. Newspaper-style 404 ("Page not in this
+  edition.") wired via `errorElement` on the root route. See
+  `docs/superpowers/specs/2026-05-18-about-404-design.md`.
+- **ODbL attribution in responses (slice #24):** every
+  `/api/v1/**` success response now carries `X-Data-License:
+  ODbL-1.0` and `X-Data-Attribution: https://urbanistatlas.com`;
+  collection responses (`/metros`, `/recent`) wrap their payload in
+  a `{ meta, data }` envelope where `meta` adds `license`,
+  `attribution_url`, and `generated_at` (RFC3339 UTC, second
+  precision). The `respondCollection[T]` helper in
+  `api/internal/httpapi/odbl.go` is the in-tree wrapping point; an
+  `/api/v1`-scoped middleware sets the headers (with `/healthz`
+  intentionally exempt). Frontend helpers unwrap `data`
+  transparently. See
+  `docs/superpowers/specs/2026-05-18-odbl-response-shape-design.md`.
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
   `loaddata`, `ci`.
+
+## Deferred from this milestone
+
+A few numbered slices were deferred during the v1.0 build:
+
+- **#4.7 Second EU country validation (Spain)** — deferred
+  2026-05-18. After Portugal (#4.6) the data model was deemed
+  sufficient for v1.0; Spain becomes a v1.1+ candidate.
+- **#5 Submissions + admin queue** and **#13 Submit form** —
+  deferred to Phase 2 alongside slice #26 (API keys + email-verified
+  registration). The reasoning: a public submission flow needs both
+  an operational triage workflow and an account model; the natural
+  home is the same account / email-verification machinery Phase 2
+  already requires for API keys. Building accounts now just for
+  submissions would mean building them twice. Slice #16 (Admin
+  queue page) and the form-validation half of slice #17 ride this
+  deferral.
+
+The rows remain in the tables below for traceability.
 
 ## Backend (Go)
 
@@ -110,8 +153,6 @@ the plan is the *design* view.
 | # | Slice | What lands |
 |---|-------|------------|
 | 13 | **Submit form** | `/submit` with `react-hook-form`, broadsheet-style fieldsets, optional Turnstile, POSTs to `/api/v1/submissions`. |
-| 14 | **Browse + metro pages** | `/browse` list of metros; `/m/:metroSlug` reusing the results layout. |
-| 15 | **About + 404** | Single-column `.page` treatment; mission/methodology/criteria copy. |
 | 16 | **Admin queue page** | `/admin/queue` — bearer token in `localStorage` for v1, approve/reject controls. Utilitarian, not for public eyes. |
 | 17 | **Web CI tests (partial)** | `lint` / `test` / `build` already run in CI; pending pieces are dedicated `lib/api.ts` tests and the form-validation tests that land with slice #13. |
 | 18 | **Web recipes in justfile** | `web-dev`, `web-build`, `web-test`, `web-lint`. |
@@ -131,7 +172,6 @@ attribution travels in every response in both phases.
 | 21 | **Cloudflare Pages** | Connect Pages to `web/`; production domain `urbanistatlas.com` + DNS; `api.urbanistatlas.com` → Fly. |
 | 22 | **Production CORS (Phase 1 lockdown)** | Set `URBANIST_CORS_ORIGINS` to **only** `https://urbanistatlas.com` + `*.pages.dev`. No wildcard. |
 | 23 | **Shared-secret gate (Phase 1)** | New middleware checking an `X-Atlas-Client` header against a server-side secret (`URBANIST_CLIENT_SECRET`); reject with RFC 9457 `unauthorized` problem if missing/wrong. Frontend build embeds the secret via `VITE_API_CLIENT_SECRET`. Cheap, defeats casual scrapers/bots. Bypassed for `/healthz` and `/api/v1/openapi.yaml`. |
-| 24 | **ODbL attribution in responses** | Every `/api/v1/**` success response carries `X-Data-License: ODbL-1.0` + `X-Data-Attribution: https://urbanistatlas.com` headers, and a `meta` envelope on collection responses with `license`, `attribution_url`, `generated_at`. Document the requirement in the OpenAPI spec. Wraps the existing handlers via a single response middleware. |
 | 25 | **End-to-end smoke (Phase 1)** | Hit prod `/healthz` + `/api/v1/lookup` (with shared secret) + `/submit` flow + admin approve. Confirm attribution headers + meta envelope are present. Confirm anonymous (no-secret) calls are rejected. |
 | 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. |
 | 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. |
