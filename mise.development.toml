@@ -18,8 +18,8 @@ URBANIST_LOG_FORMAT = "text"
 # Credentials/db match what `just pg-up` provisions on first run.
 # Override in mise.local.toml if you'd rather use a system Postgres
 # or different credentials.
-URBANIST_DB_URL = "postgres://urbanist:urbanist@localhost:55432/urbanist_atlas_dev?sslmode=disable"
+DATABASE_URL = "postgres://urbanist:urbanist@localhost:55432/urbanist_atlas_dev?sslmode=disable"
 
 # Dev-only admin token. Do not deploy this value anywhere. The real
-# production token lives in Fly secrets, not in this repo.
+# production token lives in Heroku app config, not in this repo.
 URBANIST_ADMIN_TOKEN = "dev-admin-token-not-secret"

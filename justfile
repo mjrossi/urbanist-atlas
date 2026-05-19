@@ -5,8 +5,8 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, smoke, ci. Each group corresponds
-# to a section comment below.
+# Groups: api, data, postgres, web, heroku, smoke, ci. Each group
+# corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -28,17 +28,6 @@ api-run:
 [group('api')]
 api-build:
     cd api && mkdir -p bin && go build -o bin/urbanist-atlas-server ./cmd/server
-
-# build the api binary the same way the Docker runtime stage does:
-# static (CGO_ENABLED=0), Linux-targeted, stripped. Output still goes
-# to api/bin/ for ergonomics. The Dockerfile inlines the SAME flags;
-# keep them in sync (a code-review concern — there's no automated
-# drift check because installing `just` inside the build stage to
-# delegate here would add a dependency for one command).
-[group('api')]
-[doc('build the api binary with the same flags the Docker image uses')]
-api-build-prod:
-    cd api && mkdir -p bin && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/urbanist-atlas-server ./cmd/server
 
 # format Go code
 [group('api')]
@@ -145,16 +134,15 @@ loadpostal src country='US':
 
 # load all bundled fixtures in the right order:
 # regions first (so leaf slugs resolve), then postal codes, then orgs.
+# Wraps the `loaddata` binary subcommand so dev runs go through the
+# exact same orchestration the Heroku deploy uses
+# (heroku run urbanist-atlas-server loaddata). The country list
+# lives in api/internal/loaddata/loaddata.go — add new countries
+# there, not here.
 [group('data')]
 [doc('load every bundled fixture in dependency order (regions → postal → orgs)')]
 loaddata:
-    just loadregions seed/regions_us.toml US
-    just loadpostal  seed/postal_codes_us.csv US
-    just loadregions seed/regions_ca.toml CA
-    just loadpostal  seed/postal_codes_ca.csv CA
-    just loadregions seed/regions_pt.toml PT
-    just loadpostal  seed/postal_codes_pt.csv PT
-    just seed
+    cd api && go run ./cmd/server loaddata
 
 # ── postgres: dev container lifecycle ─────────────────
 # Local dev Postgres runs in a named docker container with a
@@ -164,7 +152,7 @@ loaddata:
 # is identical.
 #
 # Credentials and DB name are dev-only and match what
-# mise.development.toml hands to URBANIST_DB_URL:
+# mise.development.toml hands to DATABASE_URL:
 #   user: urbanist  pass: urbanist  db: urbanist_atlas_dev
 
 # start the dev postgres container (creates on first run, starts on subsequent), then wait for it to accept connections
@@ -261,37 +249,49 @@ web-gen-check:
 [doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
 
-# ── fly: deploy + ops ─────────────────────────────────
-# Thin wrappers around `flyctl` so the deploy / status / logs verbs
-# are discoverable via `just --list`. flyctl reads `fly.toml` at the
-# repo root and picks up the app name from there. Initial provisioning
-# (app creation, MPG attach, secrets) lives in docs/deploy.md — these
-# recipes are for ongoing ops once the app exists.
+# ── heroku: deploy + ops ──────────────────────────────
+# Thin wrappers around `heroku` so the deploy / logs / config verbs
+# are discoverable via `just --list`. App name (urbanist-atlas) is
+# pinned via -a so these work from any branch without git remote
+# config. Initial provisioning (app creation, Essential-0 attach,
+# secrets) lives in docs/deploy.md — these recipes are for ongoing
+# ops once the app exists.
 
-# build + push + release on Fly
-[group('fly')]
-fly-deploy:
-    flyctl deploy
+# Uses HEAD:main so this works from a feature branch without first
+# switching back to a main-tracking checkout — Heroku only deploys
+# refs pushed to its `main` branch.
+[group('heroku')]
+[doc('push current HEAD to Heroku as main (release phase runs migrations)')]
+heroku-deploy:
+    git push heroku HEAD:main
 
-# show machine + service status
-[group('fly')]
-fly-status:
-    flyctl status
+# tail live Heroku logs
+[group('heroku')]
+heroku-logs:
+    heroku logs --tail -a urbanist-atlas
 
-# tail live logs from Fly
-[group('fly')]
-fly-logs:
-    flyctl logs
+# list app config (names + masked values)
+[group('heroku')]
+heroku-config:
+    heroku config -a urbanist-atlas
 
-# list non-value Fly secrets (names + digests only)
-[group('fly')]
-fly-secrets:
-    flyctl secrets list
+# open an interactive shell inside a one-off dyno
+[group('heroku')]
+heroku-ssh:
+    heroku run bash -a urbanist-atlas
 
-# open an interactive shell inside a running Fly machine
-[group('fly')]
-fly-ssh:
-    flyctl ssh console
+# Runs against PROD data in a billed one-off dyno. Idempotent —
+# every loader upserts by stable key, so re-runs converge rather than
+# duplicate. Use after a seed-data edit lands on main.
+[group('heroku')]
+[doc('re-seed the LIVE database (one-off dyno; idempotent upserts)')]
+heroku-loaddata:
+    heroku run urbanist-atlas-server loaddata -a urbanist-atlas
+
+# capture an on-demand Postgres backup; `heroku pg:backups` shows retention
+[group('heroku')]
+db-backup:
+    heroku pg:backups:capture -a urbanist-atlas
 
 # ── smoke: live curl helpers (server must be running) ─
 
