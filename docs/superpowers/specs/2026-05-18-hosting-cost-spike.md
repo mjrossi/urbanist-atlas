@@ -1,7 +1,9 @@
 # Hosting cost spike — verify Fly Managed Postgres pricing & pick a Phase 1 target
 
-**Status:** Spike — research deliverable for new roadmap slice **#19.5**.
-A decision recorded here unblocks slice #20.
+**Status:** Resolved (2026-05-19). Decision: Heroku Basic dyno +
+Heroku Postgres Essential-0 (us, Virginia), $12/mo total. Slice #20
+deliverables built against that decision shipped in PR #14; runbook
+execution still pending.
 **Supersedes:** none.
 **Related:**
 - [`docs/roadmap.md`](../../roadmap.md) (slice rows #19, **#19.5**, #20)

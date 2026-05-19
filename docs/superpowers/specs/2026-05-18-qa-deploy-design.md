@@ -1,7 +1,8 @@
 # QA-first deploy chunk (slices #19 + #20 + #21 + #23)
 
-**Status:** Active — implementation of the Phase 1 launch chunk that
-takes Urbanist Atlas from "works on localhost" to "live at QA URLs."
+**Status:** Deliverables shipped (slices #19/#23/#19.5/#20/#21 code,
+config, docs all landed on `main` by 2026-05-19); runbook execution
+against live Heroku + Cloudflare Pages still pending.
 **Supersedes:** none.
 **Superseded-in-part-by:** [`2026-05-18-hosting-cost-spike.md`](./2026-05-18-hosting-cost-spike.md)
 + [`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)

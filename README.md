@@ -8,7 +8,7 @@ back the local and regional groups working in your area.
 
 A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
-**Site:** Dogfood deployment at [qa.urbanistatlas.com](https://qa.urbanistatlas.com); the production `urbanistatlas.com` hostname attaches to the same Pages project once Phase 2 (API keys, rate limiting) ships. See the [deploy runbook](./docs/deploy.md) for the QA topology.
+**Site:** Not yet deployed. Phase 1 dogfooding will attach to `qa.urbanistatlas.com` (SPA) and `qa-api.urbanistatlas.com` (API) when the [deploy runbook](./docs/deploy.md) is executed against a fresh Heroku + Cloudflare Pages account; the production `urbanistatlas.com` hostname attaches to the same Pages project once Phase 2 (API keys, rate limiting) ships.
 
 ---
 
@@ -39,9 +39,11 @@ against the live API. Errors on both halves use
 [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 `application/problem+json`.
 
-Remaining slices to v1.0 — postal-code data expansion, seed-data
-growth, Heroku deploy, Cloudflare Pages, and the Phase 1
-lockdown sequence — are tracked in
+Remaining work to v1.0 — executing the Heroku + Cloudflare Pages
+deploy runbook (the slice #20/#21 deliverables landed as code,
+config, and docs, but the runbook has not yet been run against
+live infrastructure), postal-code data expansion, seed-data
+growth, and the Phase 1 lockdown sequence — is tracked in
 [`docs/roadmap.md`](./docs/roadmap.md). Public submissions are
 deferred to Phase 2 alongside the API-key + email-verified account
 system. The full architectural plan lives at
@@ -67,14 +69,18 @@ cd web && npm install && npm run dev    # SPA on :5173
 
 ### Deploy
 
-The API ships via the `heroku/go` buildpack to Heroku (region `us`,
-Virginia, Common Runtime) backed by Heroku Postgres Essential-0;
-`Procfile` at the repo root declares release-phase migrations + the
-web process. The web SPA deploys to Cloudflare Pages from `web/`.
-Initial provisioning steps (creating the Heroku app, attaching the
-Postgres add-on, wiring DNS, setting secrets) are documented in
-[`docs/deploy.md`](./docs/deploy.md) — see slice #20 / #21 in the
-[roadmap](./docs/roadmap.md) for status. Ongoing ops use the
+The API is configured to ship via the `heroku/go` buildpack to
+Heroku (region `us`, Virginia, Common Runtime) backed by Heroku
+Postgres Essential-0; `Procfile` at the repo root declares
+release-phase migrations + the web process. The web SPA is
+configured to deploy to Cloudflare Pages from `web/`, with
+`web/public/_redirects` providing the SPA fallback for direct
+navigation. **No deploy has been executed yet** — the initial
+provisioning runbook (creating the Heroku app, attaching the
+Postgres add-on, wiring DNS, setting secrets) lives at
+[`docs/deploy.md`](./docs/deploy.md); see slice #20 / #21 in the
+[roadmap](./docs/roadmap.md) for the split between "deliverables
+landed" and "runbook executed." Ongoing ops will use the
 `heroku-*` recipes (`just heroku-deploy`, `just heroku-logs`,
 `just heroku-config`, `just heroku-ssh`, `just heroku-loaddata`,
 `just db-backup`).

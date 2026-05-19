@@ -6,6 +6,13 @@ motivates this runbook is at
 [`docs/superpowers/specs/2026-05-18-heroku-deploy-design.md`](./superpowers/specs/2026-05-18-heroku-deploy-design.md);
 this file is the executable playbook.
 
+> **Status: not yet executed.** The slice #20 / #21 deliverables
+> (`Procfile`, `loaddata` subcommand, `heroku-*` justfile recipes,
+> `_redirects`, this runbook) are merged to `main`, but no Heroku
+> app, Postgres add-on, Pages project, or DNS record has been
+> provisioned yet. The steps below run end-to-end against a clean
+> account.
+
 The launch chunk is four slices:
 
 | Slice | What it ships | Where it's documented |

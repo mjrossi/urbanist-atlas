@@ -1,8 +1,13 @@
 # Heroku deploy design — Phase 1 dogfood host
 
-**Status:** Design — implementation deliverable for the hosting pivot
-chosen in slice **#19.5**. Drives the rebuild of slice **#20** and a
-small rebase of slice **#21**.
+**Status:** Shipped (deliverables) / pending execution. Slice **#20**
+code, config, and runbook landed on `main` in PR
+[#14](https://github.com/mjrossi/urbanist-atlas/pull/14) (2026-05-19);
+slice **#21**'s `_redirects` + Pages runbook landed in PR
+[#12](https://github.com/mjrossi/urbanist-atlas/pull/12) (2026-05-19).
+The runbook at [`docs/deploy.md`](../../deploy.md) has **not yet been
+executed** against a live Heroku account; no Heroku app, Postgres
+add-on, Pages project, or DNS record exists yet.
 **Supersedes:** the Fly Managed Postgres path documented in
 [`2026-05-18-qa-deploy-design.md`](./2026-05-18-qa-deploy-design.md)
 §Slice #20 (which targets `flyctl mpg`).

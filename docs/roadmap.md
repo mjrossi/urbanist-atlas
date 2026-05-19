@@ -114,6 +114,47 @@ the plan is the *design* view.
   intentionally exempt). Frontend helpers unwrap `data`
   transparently. See
   `docs/superpowers/specs/2026-05-18-odbl-response-shape-design.md`.
+- **X-Atlas-Client shared-secret gate (slice #23):**
+  `api/internal/httpapi/clientsecret.go` middleware checks
+  `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via
+  `subtle.ConstantTimeCompare`; mismatch → 401 with the new
+  `unauthorized` RFC 9457 problem type. `/healthz` and
+  `/api/v1/openapi.yaml` are bypass-listed so liveness probes and
+  contract discovery work without the secret; an empty secret turns
+  the middleware into a no-op (preserves local-dev ergonomics).
+  Frontend (`web/src/lib/api.ts`) injects the header from
+  `VITE_API_CLIENT_SECRET` on every `apiFetch`.
+- **Hosting cost spike (slice #19.5):** survey of May-2026 pricing
+  across Fly Machines, Hetzner, Render, Cloudflare Workers
+  Containers, and Heroku pivoted Phase 1 off Fly Managed Postgres
+  (~$38/mo) to **Heroku Basic dyno + Heroku Postgres Essential-0
+  (us, Virginia) at $12/mo total**. Decision recorded in
+  `docs/superpowers/specs/2026-05-18-hosting-cost-spike.md` and
+  expanded in `docs/superpowers/specs/2026-05-18-heroku-deploy-design.md`.
+- **Heroku deploy deliverables (slice #20) — code/config/docs only;
+  runbook not yet executed:** `Procfile` at repo root declares the
+  `release` (migrations) + `web` (serve) processes;
+  `URBANIST_DB_URL` → `DATABASE_URL` rename across every
+  Postgres-touching urfave/cli flag (`serve`, `migrate`, `seed`,
+  `loadregions`, `loadpostal`, `loaddata`); new `loaddata`
+  subcommand (`api/cmd/server/loaddata.go` +
+  `api/internal/loaddata/loaddata.go`) chains regions → postal
+  codes → orgs across every bundled country in dependency order,
+  with testcontainers-backed integration coverage; `[group('heroku')]`
+  recipes in the justfile (`heroku-deploy`, `heroku-logs`,
+  `heroku-config`, `heroku-ssh`, `heroku-loaddata`, `db-backup`);
+  end-to-end Heroku runbook at `docs/deploy.md`. The slice-#19
+  `Dockerfile` + `fly.toml` deleted by the pivot. **Not yet
+  executed against live Heroku** — no Heroku app exists, no
+  Postgres add-on is provisioned, no deploy has been pushed.
+- **Cloudflare Pages deliverables (slice #21) — code/docs only;
+  runbook not yet executed:** `web/public/_redirects` ships the
+  `/* /index.html 200` Pages SPA fallback so direct navigation to
+  `/about`, `/browse`, `/m/:slug`, `/r/:postalCode` works in
+  production; `docs/deploy.md` § Cloudflare Pages + DNS documents
+  Pages project setup, DNS records, custom-domain attachment, and
+  smoke tests for both halves. **Not yet executed** — no Pages
+  project exists and no DNS records have been created.
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
@@ -165,18 +206,21 @@ dogfooding — only the project's own frontend can call it — and **Phase 2**
 opens the API to the public behind a free-key + rate-limit model. ODbL
 attribution travels in every response in both phases.
 
-| # | Slice | What lands |
-|---|-------|------------|
-| 19 | **Dockerfile + fly.toml** *(retired by #19.5)* | Multi-stage Go build (binary embeds migrations); `fly launch`; `release_command = "urbanist-atlas-server migrate up"`. Shipped, then deleted by the slice #19.5 Heroku pivot — Heroku uses the `heroku/go` buildpack + `Procfile` instead. |
-| **19.5** | **Hosting cost spike (blocker for #20)** | Verify Fly Managed Postgres pricing (~$38/mo Basic before storage), survey alternatives, pick a Phase 1 DB host that lands ≤ $5/mo all-in. Deliverable: `docs/superpowers/specs/2026-05-18-hosting-cost-spike.md`, with the decision recorded in its **Decision** section. The chosen finalist drives the rewrite of slice #20 below. PR #11 (the in-flight slice #20) is held pending this decision; PR #12 (slice #21) is unaffected and can merge independently. |
-| 20 | **Heroku deploy + Postgres Essential-0** | Create the Heroku app (region `us`, Common Runtime, `heroku/go` buildpack), provision Heroku Postgres Essential-0 add-on (auto-sets `DATABASE_URL`), set `URBANIST_ADMIN_TOKEN` + `URBANIST_CLIENT_SECRET` + non-secret config via `heroku config:set`, push to deploy (release-phase Procfile entry runs migrations), seed via `heroku run urbanist-atlas-server loaddata`. Runbook in `docs/deploy.md` (rewritten end-to-end for Heroku per slice #19.5's decision). PR #11 (the slice-20-fly-deploy-loaddata branch) is closed; this slice lands on `slice-20-heroku-deploy`. |
-| 21 | **Cloudflare Pages** | Connect Pages to `web/`; production domain `urbanistatlas.com` + DNS; `api.urbanistatlas.com` → Heroku. |
-| 22 | **Production CORS (Phase 1 lockdown)** | Set `URBANIST_CORS_ORIGINS` to **only** `https://urbanistatlas.com` + `*.pages.dev`. No wildcard. |
-| 23 | **Shared-secret gate (Phase 1)** | New middleware checking an `X-Atlas-Client` header against a server-side secret (`URBANIST_CLIENT_SECRET`); reject with RFC 9457 `unauthorized` problem if missing/wrong. Frontend build embeds the secret via `VITE_API_CLIENT_SECRET`. Cheap, defeats casual scrapers/bots. Bypassed for `/healthz` and `/api/v1/openapi.yaml`. |
-| 25 | **End-to-end smoke (Phase 1)** | Hit prod `/healthz` + `/api/v1/lookup` (with shared secret) + `/submit` flow + admin approve. Confirm attribution headers + meta envelope are present. Confirm anonymous (no-secret) calls are rejected. |
-| 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. |
-| 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. |
-| 28 | **Phase 2 cutover** | Loosen CORS to allow any origin; remove the shared-secret middleware; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. |
+Status legend below: ✅ = deliverables landed in the repo; ▶ = runbook
+execution against live infra; ⏳ = not yet started.
+
+| # | Slice | What lands | Status |
+|---|-------|------------|--------|
+| 19 | **Dockerfile + fly.toml** *(retired by #19.5)* | Multi-stage Go build (binary embeds migrations); `fly launch`; `release_command = "urbanist-atlas-server migrate up"`. Shipped, then deleted by the slice #19.5 Heroku pivot — Heroku uses the `heroku/go` buildpack + `Procfile` instead. | ✅ (then retired) |
+| **19.5** | **Hosting cost spike** | Verify Fly Managed Postgres pricing (~$38/mo Basic before storage), survey alternatives, pick a Phase 1 DB host that lands ≤ $5/mo all-in. Deliverable: `docs/superpowers/specs/2026-05-18-hosting-cost-spike.md`, with the decision recorded in its **Decision** section (Heroku Basic + Postgres Essential-0, $12/mo total). | ✅ |
+| 20 | **Heroku deploy + Postgres Essential-0** | **Deliverables (shipped):** `Procfile`, `URBANIST_DB_URL` → `DATABASE_URL` env rename across every cli flag, `loaddata` subcommand, `heroku-*` justfile recipes, `docs/deploy.md` end-to-end runbook. **Runbook execution (pending):** create the Heroku app (region `us`, Common Runtime, `heroku/go` buildpack), provision Heroku Postgres Essential-0 add-on (auto-sets `DATABASE_URL`), set `URBANIST_ADMIN_TOKEN` + `URBANIST_CLIENT_SECRET` + non-secret config via `heroku config:set`, push to deploy (release-phase Procfile entry runs migrations), seed via `heroku run urbanist-atlas-server loaddata`. | ✅ deliverables / ▶ execute runbook |
+| 21 | **Cloudflare Pages + DNS** | **Deliverables (shipped):** `web/public/_redirects` SPA fallback; `docs/deploy.md` § Cloudflare Pages + DNS documenting Pages project setup, DNS records, custom-domain attachment, smoke tests. **Runbook execution (pending):** create the Pages project (build cmd `cd web && npm ci && npm run build`, output `web/dist`, env vars `VITE_API_BASE` / `VITE_API_CLIENT_SECRET` / `NODE_VERSION=22` on Production + Preview), wire Cloudflare DNS (`qa` CNAME proxy ON, `qa-api` CNAME proxy OFF), attach `qa.urbanistatlas.com` as Pages custom domain, `heroku domains:add qa-api.urbanistatlas.com` + `heroku domains:wait` for ACM. | ✅ deliverables / ▶ execute runbook |
+| 22 | **Production CORS (Phase 1 lockdown)** | Tighten `URBANIST_CORS_ORIGINS` from local-dev defaults to **only** `https://qa.urbanistatlas.com` + `*.pages.dev` once Phase 1 dogfooding is live (and later, on prod cutover, swap in `https://urbanistatlas.com`). No wildcard. Set via `heroku config:set` during slice #20 execution; this slice is the audit that confirms it. | ⏳ |
+| 23 | **Shared-secret gate (Phase 1)** | Middleware checking `X-Atlas-Client` against `URBANIST_CLIENT_SECRET`; mismatch → 401 RFC 9457 `unauthorized`. Frontend bundles the secret via `VITE_API_CLIENT_SECRET`. Bypass list: `/healthz`, `/api/v1/openapi.yaml`. | ✅ |
+| 25 | **End-to-end smoke (Phase 1)** | Hit dogfood `/healthz` + `/api/v1/lookup` (with shared secret). Confirm attribution headers + meta envelope are present. Confirm anonymous (no-secret) calls are rejected. Submissions + admin smoke deferred to Phase 2 with their slices. | ⏳ |
+| 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. | ⏳ |
+| 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. | ⏳ |
+| 28 | **Phase 2 cutover** | Add `urbanistatlas.com` as a second Pages custom domain + `api.urbanistatlas.com` to Heroku; loosen CORS to include the prod origin; remove the shared-secret middleware; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. | ⏳ |
 
 ## Deferred (v1.1+)
 
