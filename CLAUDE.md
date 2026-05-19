@@ -11,7 +11,7 @@ self-explanatory.
 A directory of transit + safe-streets advocacy organizations, searchable
 by US ZIP or Canadian postal code. Two halves:
 
-- `api/` — Go service on Fly.io, Postgres-backed, exposes `/api/v1`.
+- `api/` — Go service on Heroku, Postgres-backed, exposes `/api/v1`.
 - `web/` — React + Vite SPA on Cloudflare Pages.
 
 Companion to the maintainer's publication, *Urbanist Lexicon*
@@ -77,7 +77,12 @@ dependency that isn't installed by mise.
 - **Errors:** stdlib `errors` + `fmt.Errorf("...: %w", err)`. No third-party
   errors libraries.
 - **Config:** all via urfave/cli flags with env-var fallbacks
-  (`URBANIST_DB_URL`, `URBANIST_ADMIN_TOKEN`, `URBANIST_PORT`, etc.). No `viper`.
+  (`URBANIST_ADMIN_TOKEN`, `URBANIST_PORT`, `URBANIST_LOG_FORMAT`,
+  `URBANIST_CORS_ORIGINS`, `URBANIST_STORE`, `URBANIST_SEED_DIR`,
+  etc.). The Postgres connection string is the one exception:
+  follows the universal `DATABASE_URL` convention (every managed-
+  Postgres host — Heroku, Fly MPG, Render, Neon, Railway — sets
+  this name automatically). No `viper`.
 - **Layout:** standard. `cmd/` for binaries, `pkg/` for the public library,
   `internal/` for non-exported.
 - **Style:** `gofmt`, `go vet`, `staticcheck`. No custom linter config.
@@ -91,7 +96,7 @@ parse request → call a `pkg/atlas` function → encode response. No
 business logic in handlers.
 
 `serve` accepts `--store=memory|postgres` (postgres default) and
-`--db-url` (with `URBANIST_DB_URL` env fallback). The memory store
+`--db-url` (with `DATABASE_URL` env fallback). The memory store
 stays available for tests and offline CLI use.
 
 ### React (`web/`)
@@ -194,7 +199,13 @@ endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 
 ## Hosting
 
-- **API:** Fly.io. Single Dockerfile, single binary, Fly Managed Postgres.
+- **API:** Heroku Common Runtime (region `us`, Virginia). Heroku/go
+  buildpack compiles the binary from `api/cmd/server`; Heroku Postgres
+  Essential-0 add-on provides the database. `Procfile` declares the
+  `release` (migrations) and `web` (serve) processes. See
+  [`docs/superpowers/specs/2026-05-18-heroku-deploy-design.md`](./docs/superpowers/specs/2026-05-18-heroku-deploy-design.md)
+  for the design and
+  [`docs/deploy.md`](./docs/deploy.md) for the runbook.
 - **Web:** Cloudflare Pages connected to `web/`. PR preview deploys per
   branch.
 
