@@ -197,6 +197,7 @@ The rows remain in the tables below for traceability.
 | 16 | **Admin queue page** | `/admin/queue` — bearer token in `localStorage` for v1, approve/reject controls. Utilitarian, not for public eyes. |
 | 17 | **Web CI tests (partial)** | `lint` / `test` / `build` already run in CI; pending pieces are dedicated `lib/api.ts` tests and the form-validation tests that land with slice #13. |
 | 18 | **Web recipes in justfile** | `web-dev`, `web-build`, `web-test`, `web-lint`. |
+| 18.5 | **Dev-loop env wiring** | Default `VITE_API_BASE` and `VITE_API_CLIENT_SECRET` for the local dev loop so `just web-dev` talks to `just api-run` out of the box. Preferred home is `mise.development.toml` (mirroring how `DATABASE_URL` is set for the server); alternative is a committed `web/.env.development`. Small ergonomic follow-up to slice #18 — `web-build`/`web-test` are affected too. |
 
 ## Gatekeeping, licensing & ops
 
