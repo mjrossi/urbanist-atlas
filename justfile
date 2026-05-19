@@ -208,6 +208,11 @@ pg-logs:
 
 # ── web: build & verify ───────────────────────────────
 
+# run the Vite dev server (defaults to http://localhost:5173)
+[group('web')]
+web-dev:
+    cd web && npm run dev
+
 # install JS deps with the lockfile (matches CI)
 [group('web')]
 web-deps:
