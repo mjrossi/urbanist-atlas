@@ -16,8 +16,8 @@ A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
 This is a monorepo with two halves:
 
-- **[`api/`](./api)** — Go service (chi + sqlc + goose + Fly Managed Postgres),
-  deployed to Fly.io. Hosts the public JSON API at `/api/v1`.
+- **[`api/`](./api)** — Go service (chi + sqlc + goose + Heroku Postgres Essential-0),
+  deployed to Heroku. Hosts the public JSON API at `/api/v1`.
 - **[`web/`](./web)** — React + Vite SPA, deployed to Cloudflare Pages.
   Consumes the JSON API.
 
@@ -40,7 +40,7 @@ against the live API. Errors on both halves use
 `application/problem+json`.
 
 Remaining slices to v1.0 — postal-code data expansion, seed-data
-growth, Dockerfile + Fly deploy, Cloudflare Pages, and the Phase 1
+growth, Heroku deploy, Cloudflare Pages, and the Phase 1
 lockdown sequence — are tracked in
 [`docs/roadmap.md`](./docs/roadmap.md). Public submissions are
 deferred to Phase 2 alongside the API-key + email-verified account
@@ -67,16 +67,22 @@ cd web && npm install && npm run dev    # SPA on :5173
 
 ### Deploy
 
-The API ships as a multi-stage Docker image to Fly.io
-(`fly.toml` + `Dockerfile` at the repo root); the web SPA deploys
-to Cloudflare Pages from `web/`. Initial provisioning steps
-(creating the Fly app, attaching Fly Managed Postgres, wiring DNS,
-setting secrets) are documented in
+The API ships via the `heroku/go` buildpack to Heroku (region `us`,
+Virginia, Common Runtime) backed by Heroku Postgres Essential-0;
+`Procfile` at the repo root declares release-phase migrations + the
+web process. The web SPA deploys to Cloudflare Pages from `web/`.
+Initial provisioning steps (creating the Heroku app, attaching the
+Postgres add-on, wiring DNS, setting secrets) are documented in
 [`docs/deploy.md`](./docs/deploy.md) — see slice #20 / #21 in the
 [roadmap](./docs/roadmap.md) for status. Ongoing ops use the
-`fly-*` recipes (`just fly-deploy`, `just fly-status`,
-`just fly-logs`, `just fly-secrets`, `just fly-ssh`).
+`heroku-*` recipes (`just heroku-deploy`, `just heroku-logs`,
+`just heroku-config`, `just heroku-ssh`, `just heroku-loaddata`,
+`just db-backup`).
 
+The hosting decision behind the Heroku choice is documented at
+[`docs/superpowers/specs/2026-05-18-hosting-cost-spike.md`](./docs/superpowers/specs/2026-05-18-hosting-cost-spike.md)
+and
+[`docs/superpowers/specs/2026-05-18-heroku-deploy-design.md`](./docs/superpowers/specs/2026-05-18-heroku-deploy-design.md).
 The full chunk design (slices #19/#20/#21/#23) lives at
 [`docs/superpowers/specs/2026-05-18-qa-deploy-design.md`](./docs/superpowers/specs/2026-05-18-qa-deploy-design.md).
 
