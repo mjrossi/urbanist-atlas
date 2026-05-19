@@ -4,7 +4,15 @@
  * (or throws {@link ApiError} on a non-2xx response).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, apiFetch, getMetro, listMetros, listRecent, lookup } from './api.ts';
+import {
+  ApiError,
+  apiFetch,
+  getMetro,
+  isSupportedCountry,
+  listMetros,
+  listRecent,
+  lookup,
+} from './api.ts';
 
 function jsonResponse(
   body: unknown,
@@ -256,13 +264,31 @@ describe('lookup()', () => {
         detail: 'No region found for postal code 99999.',
       }),
     );
-    const promise = lookup('99999', 'US');
-    await expect(promise).rejects.toBeInstanceOf(ApiError);
-    await promise.catch((err: unknown) => {
-      expect(err).toBeInstanceOf(ApiError);
-      const apiErr = err as ApiError;
-      expect(apiErr.status).toBe(404);
-    });
+    // try/catch + caught: a chained `.catch` would swallow any inner
+    // `expect` throw and let the test pass silently. The pattern below
+    // mirrors the rest of the suite (see ApiError tests at L353+).
+    let caught: unknown;
+    try {
+      await lookup('99999', 'US');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    const apiErr = caught as ApiError;
+    expect(apiErr.status).toBe(404);
+  });
+
+  it('URL-encodes a CA postal code that contains a space', async () => {
+    // URLSearchParams encodes a space as '+'. A future refactor that
+    // switched to encodeURIComponent (which uses '%20') would break
+    // the wire contract that the API parses.
+    fetchMock.mockResolvedValueOnce(jsonResponse(lookupBody()));
+    await lookup('M5V 3A8', 'CA');
+    const [url] = fetchMock.mock.calls[0]!;
+    const s = String(url);
+    expect(s).toContain('postal_code=M5V+3A8');
+    // Belt-and-suspenders: the literal space must not appear.
+    expect(s).not.toContain('M5V 3A8');
   });
 });
 
@@ -291,9 +317,10 @@ describe('apiFetch — happy path', () => {
     await apiFetch('/api/v1/anything');
     const [url] = fetchMock.mock.calls[0]!;
     // Default apiBase is http://localhost:8080 in tests (no
-    // VITE_API_BASE set), so the relative path should be prepended
-    // with a scheme + host.
-    expect(String(url)).toMatch(/^https?:\/\/[^/]+\/api\/v1\/anything$/);
+    // VITE_API_BASE set). Strict equality pins both the scheme/host
+    // (so a regression that quietly changes DEFAULT_API_BASE is caught)
+    // and the prepended path.
+    expect(String(url)).toBe('http://localhost:8080/api/v1/anything');
   });
 
   it('leaves absolute URLs un-prepended', async () => {
@@ -437,7 +464,11 @@ describe('ApiError — rich shape from problem+json', () => {
         type: 'https://urbanistatlas.com/problems/unauthorized',
         title: 'Unauthorized',
         status: 401,
-        detail: 'Missing or invalid X-Atlas-Client header.',
+        // Exact server-emitted string — matches the `writeProblem`
+        // call in api/internal/httpapi/clientsecret.go:31-33
+        // (lowercase, no trailing period). A future reader copying
+        // this fixture should see what the wire actually carries.
+        detail: 'missing or invalid X-Atlas-Client header',
       }),
     );
     let caught: unknown;
@@ -453,6 +484,11 @@ describe('ApiError — rich shape from problem+json', () => {
       'https://urbanistatlas.com/problems/unauthorized',
     );
     expect(apiErr.problem?.title).toBe('Unauthorized');
+    // Pin the detail too so the fixture is actually load-bearing —
+    // a future drift in the server-emitted string will fail here.
+    expect(apiErr.problem?.detail).toBe(
+      'missing or invalid X-Atlas-Client header',
+    );
   });
 
   it('non-2xx with non-problem body: problem is undefined, message is `HTTP <status>`', async () => {
@@ -547,6 +583,23 @@ describe('X-Atlas-Client header injection (env-gated)', () => {
     expect(headers.has('X-Atlas-Client')).toBe(false);
   });
 
+  it('does NOT inject X-Atlas-Client when env var is unset', async () => {
+    // Production has two distinct shapes for "no secret":
+    //   1. VITE_API_CLIENT_SECRET= in .env (empty string — covered above)
+    //   2. The var omitted entirely from .env (undefined — covered here)
+    // The `?? ''` fallback at api.ts:64 collapses both to empty, so the
+    // module-level apiClientSecret is '' in either case. This test pins
+    // the second branch — if the fallback ever disappears, only the
+    // unset case would break.
+    vi.stubEnv('VITE_API_CLIENT_SECRET', undefined);
+    const { lookup } = await import('./api.ts');
+    fetchMock.mockResolvedValueOnce(jsonResponse(lookupBody()));
+    await lookup('11217', 'US');
+    const [, init] = fetchMock.mock.calls[0]!;
+    const headers = new Headers((init as RequestInit).headers);
+    expect(headers.has('X-Atlas-Client')).toBe(false);
+  });
+
   it('does NOT overwrite caller-provided X-Atlas-Client header', async () => {
     vi.stubEnv('VITE_API_CLIENT_SECRET', 'env-secret');
     const { apiFetch } = await import('./api.ts');
@@ -557,5 +610,30 @@ describe('X-Atlas-Client header injection (env-gated)', () => {
     const [, init] = fetchMock.mock.calls[0]!;
     const headers = new Headers((init as RequestInit).headers);
     expect(headers.get('X-Atlas-Client')).toBe('caller-override');
+  });
+});
+
+describe('isSupportedCountry', () => {
+  // The wire `Country` type is open (the API accepts any code the seed
+  // data defines), but the UI gates on a narrower set so a stray
+  // `?country=…` query renders an error instead of silently coercing.
+  // Keep this in lockstep with SUPPORTED_COUNTRIES in api.ts.
+  it('returns true for currently-shipping countries', () => {
+    expect(isSupportedCountry('US')).toBe(true);
+    expect(isSupportedCountry('CA')).toBe(true);
+  });
+
+  it('returns false for unsupported codes', () => {
+    expect(isSupportedCountry('GB')).toBe(false);
+    expect(isSupportedCountry('PT')).toBe(false);
+    expect(isSupportedCountry('')).toBe(false);
+  });
+
+  it('is case-sensitive — lowercase does not match', () => {
+    // SUPPORTED_COUNTRIES is uppercase. Lowercase must NOT coerce,
+    // because the API expects uppercase ISO codes and a silent
+    // coercion here would mask a UI bug.
+    expect(isSupportedCountry('us')).toBe(false);
+    expect(isSupportedCountry('ca')).toBe(false);
   });
 });
