@@ -34,7 +34,7 @@ func loaddataCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:    "db-url",
 				Usage:   "Postgres connection string",
-				Sources: cli.EnvVars("URBANIST_DB_URL"),
+				Sources: cli.EnvVars("DATABASE_URL"),
 			},
 			&cli.StringFlag{
 				Name:    "log-format",
@@ -50,7 +50,7 @@ func loaddataCommand() *cli.Command {
 func runLoaddata(ctx context.Context, c *cli.Command) error {
 	dbURL := c.String("db-url")
 	if dbURL == "" {
-		return errors.New("loaddata: --db-url or URBANIST_DB_URL is required")
+		return errors.New("loaddata: --db-url or DATABASE_URL is required")
 	}
 	seedDir := c.String("seed-dir")
 	logger := buildLogger(c.String("log-format"))
