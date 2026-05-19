@@ -495,3 +495,67 @@ describe('ApiError — rich shape from problem+json', () => {
     expect(apiErr.message).toBe('HTTP 422');
   });
 });
+
+describe('X-Atlas-Client header injection (env-gated)', () => {
+  // `apiClientSecret` is captured at module-load time from
+  // `import.meta.env.VITE_API_CLIENT_SECRET`, so each test resets the
+  // module registry, stubs the env, then dynamically re-imports `./api.ts`
+  // so the captured value reflects the stub. Without resetModules the
+  // const in `api.ts` would still hold whatever value was visible the
+  // first time the file was imported (when the test suite loaded).
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.resetModules();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  function lookupBody() {
+    return {
+      query: { postal_code: '11217', country: 'US' },
+      resolved_place_label: 'Brooklyn',
+      resolved_ancestry: [],
+      local: [],
+      regional: [],
+    };
+  }
+
+  it('injects X-Atlas-Client when VITE_API_CLIENT_SECRET is set', async () => {
+    vi.stubEnv('VITE_API_CLIENT_SECRET', 'the-secret');
+    const { lookup } = await import('./api.ts');
+    fetchMock.mockResolvedValueOnce(jsonResponse(lookupBody()));
+    await lookup('11217', 'US');
+    const [, init] = fetchMock.mock.calls[0]!;
+    const headers = new Headers((init as RequestInit).headers);
+    expect(headers.get('X-Atlas-Client')).toBe('the-secret');
+    expect(headers.get('Accept')).toBe('application/json');
+  });
+
+  it('does NOT inject X-Atlas-Client when env var is empty', async () => {
+    vi.stubEnv('VITE_API_CLIENT_SECRET', '');
+    const { lookup } = await import('./api.ts');
+    fetchMock.mockResolvedValueOnce(jsonResponse(lookupBody()));
+    await lookup('11217', 'US');
+    const [, init] = fetchMock.mock.calls[0]!;
+    const headers = new Headers((init as RequestInit).headers);
+    expect(headers.has('X-Atlas-Client')).toBe(false);
+  });
+
+  it('does NOT overwrite caller-provided X-Atlas-Client header', async () => {
+    vi.stubEnv('VITE_API_CLIENT_SECRET', 'env-secret');
+    const { apiFetch } = await import('./api.ts');
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await apiFetch('/api/v1/something', {
+      headers: { 'X-Atlas-Client': 'caller-override' },
+    });
+    const [, init] = fetchMock.mock.calls[0]!;
+    const headers = new Headers((init as RequestInit).headers);
+    expect(headers.get('X-Atlas-Client')).toBe('caller-override');
+  });
+});
