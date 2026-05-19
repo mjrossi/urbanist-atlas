@@ -7,6 +7,7 @@
 //	urbanist-atlas-server migrate up
 //	urbanist-atlas-server loadpostal --src ./data/postal_us.csv
 //	urbanist-atlas-server seed
+//	urbanist-atlas-server loaddata
 package main
 
 import (
@@ -50,6 +51,7 @@ func newRootCommand() *cli.Command {
 			loadregionsCommand(),
 			loadpostalCommand(),
 			seedCommand(),
+			loaddataCommand(),
 		},
 	}
 }
