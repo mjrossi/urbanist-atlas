@@ -213,15 +213,34 @@ self-hosted finalist ever feels like drudgery.
 
 ## Decision
 
-> _Filled in by the maintainer after reviewing this doc. One of:
-> "Stay on MPG" / "Finalist 1: Fly sibling Postgres" / "Finalist 2:
-> Hetzner whole stack" / "Finalist 3: Neon"._
+**Adopt Heroku Basic dyno + Heroku Postgres Essential-0 in the `us`
+(Virginia, Common Runtime) region.** This was not one of the four
+finalists in the original spike; brainstorming with the maintainer
+surfaced operator familiarity (the maintainer's prior employer is
+Heroku) as a decision axis the spike under-weighted, and re-verified
+May-2026 pricing across Heroku, Render, Cloudflare Workers
+Containers, Hetzner, and Fly that confirmed Heroku at ~$12/mo total
+is a defensible Phase 1 spend in exchange for: included near-PITR
+backups (Aurora-backed Essential-0 with continuous WAL off-premise),
+zero learning tax, and a clean Phase 2 transition.
 
-Once recorded here, slice #20 in `docs/roadmap.md` and the Slice #20
-section of
-[`2026-05-18-qa-deploy-design.md`](./2026-05-18-qa-deploy-design.md)
-get rewritten to match, and PR #11 either merges as-is (status quo) or
-is rebased with the new runbook (any pivot).
+The ~$7/mo delta over the spike's recommended Finalist 1 (Fly
+sibling Postgres at ~$5/mo) is a deliberate trade — see the cost
+table and trade-off discussion in
+[`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)
+§Why this exists.
+
+The full implementation design + cascading file rewrites are
+specified in
+[`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md);
+the implementation plan is at
+[`../plans/2026-05-18-heroku-deploy-implementation.md`](../plans/2026-05-18-heroku-deploy-implementation.md).
+
+PR #11 (slice-20-fly-deploy-loaddata) is closed; the work continues
+on `slice-20-heroku-deploy`. PR #12 (slice #21, Pages/DNS) rebases
+on the new `docs/deploy.md` after the Heroku PR lands. The
+reversibility plan (migrate back to Fly if dogfood reveals a fit
+problem) is in the Heroku design doc's §Reversibility section.
 
 ## Impact map (read once a decision lands)
 
