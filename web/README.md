@@ -1,7 +1,14 @@
 # Urbanist Atlas — Web
 
-React + Vite SPA for [urbanistatlas.com](https://urbanistatlas.com). Deployed
-to Cloudflare Pages.
+React + Vite SPA for Urbanist Atlas. Not yet deployed — Phase 1
+dogfooding will serve the SPA from
+[qa.urbanistatlas.com](https://qa.urbanistatlas.com) once the
+[deploy runbook](../docs/deploy.md) is executed against a Cloudflare
+Pages project; the production `urbanistatlas.com` hostname attaches
+to the same project at Phase 2 cutover. `web/public/_redirects`
+ships the `/* /index.html 200` rule Pages needs for direct
+navigation to client routes (`/about`, `/browse`, `/m/:slug`,
+`/r/:postalCode`).
 
 ## Layout
 

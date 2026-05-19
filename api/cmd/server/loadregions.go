@@ -32,7 +32,7 @@ func loadregionsCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:    "db-url",
 				Usage:   "Postgres connection string",
-				Sources: cli.EnvVars("URBANIST_DB_URL"),
+				Sources: cli.EnvVars("DATABASE_URL"),
 			},
 			&cli.StringFlag{
 				Name:    "log-format",
@@ -48,7 +48,7 @@ func loadregionsCommand() *cli.Command {
 func runLoadregions(ctx context.Context, c *cli.Command) error {
 	dbURL := c.String("db-url")
 	if dbURL == "" {
-		return errors.New("loadregions: --db-url or URBANIST_DB_URL is required")
+		return errors.New("loadregions: --db-url or DATABASE_URL is required")
 	}
 	src := c.String("src")
 	country := c.String("country")

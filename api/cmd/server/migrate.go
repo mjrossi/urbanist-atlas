@@ -31,7 +31,7 @@ func migrateCommand() *cli.Command {
 		&cli.StringFlag{
 			Name:     "db-url",
 			Usage:    "Postgres connection string",
-			Sources:  cli.EnvVars("URBANIST_DB_URL"),
+			Sources:  cli.EnvVars("DATABASE_URL"),
 			Required: false, // checked at action time so --help works without env
 		},
 	}
@@ -66,7 +66,7 @@ func runMigrate(action string) cli.ActionFunc {
 	return func(ctx context.Context, c *cli.Command) error {
 		dbURL := c.String("db-url")
 		if dbURL == "" {
-			return errors.New("migrate: --db-url or URBANIST_DB_URL is required")
+			return errors.New("migrate: --db-url or DATABASE_URL is required")
 		}
 
 		// Goose drives migrations through database/sql, so we wrap our

@@ -1,6 +1,6 @@
 # Urbanist Atlas — API
 
-Go service powering [urbanistatlas.com](https://urbanistatlas.com). Public JSON API at `/api/v1`, served by Fly.io.
+Go service powering [urbanistatlas.com](https://urbanistatlas.com). Public JSON API at `/api/v1`, served from Fly.io.
 
 ## Layout
 
@@ -8,7 +8,7 @@ Go service powering [urbanistatlas.com](https://urbanistatlas.com). Public JSON 
 api/
 ├── cmd/server/         # urfave/cli entry point. Subcommands:
 │                       #   serve, migrate {up|down|status},
-│                       #   loadregions, loadpostal, seed
+│                       #   loadregions, loadpostal, seed, loaddata
 ├── pkg/atlas/          # Public, importable library. Pure Go.
 │                       # Org/Region/LookupResult types, the lookup
 │                       # algorithm, the Store interface, and an
@@ -71,10 +71,10 @@ Migrations and the Postgres store are owned by the server binary —
 no external goose CLI required.
 
 ```
-# 1. provision Postgres locally; URBANIST_DB_URL is read by every
+# 1. provision Postgres locally; DATABASE_URL is read by every
 #    Postgres-touching subcommand.
 createdb urbanist_atlas_dev
-export URBANIST_DB_URL=postgres://localhost:5432/urbanist_atlas_dev?sslmode=disable
+export DATABASE_URL=postgres://localhost:5432/urbanist_atlas_dev?sslmode=disable
 
 # 2. apply schema migrations (embedded into the binary).
 just migrate-up

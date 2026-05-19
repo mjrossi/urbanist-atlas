@@ -5,8 +5,8 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, smoke, ci. Each group corresponds
-# to a section comment below.
+# Groups: api, data, postgres, web, fly, smoke, ci. Each group
+# corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -134,16 +134,32 @@ loadpostal src country='US':
 
 # load all bundled fixtures in the right order:
 # regions first (so leaf slugs resolve), then postal codes, then orgs.
+# Wraps the `loaddata` binary subcommand so dev runs go through the
+# exact same orchestration the Fly deploy uses
+# (flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata").
+# The country list lives in api/internal/loaddata/loaddata.go — add
+# new countries there, not here.
 [group('data')]
 [doc('load every bundled fixture in dependency order (regions → postal → orgs)')]
 loaddata:
-    just loadregions seed/regions_us.toml US
-    just loadpostal  seed/postal_codes_us.csv US
-    just loadregions seed/regions_ca.toml CA
-    just loadpostal  seed/postal_codes_ca.csv CA
-    just loadregions seed/regions_pt.toml PT
-    just loadpostal  seed/postal_codes_pt.csv PT
-    just seed
+    cd api && go run ./cmd/server loaddata
+
+# fetch upstream Census/StatsCan source files into etl/sources/<country>/
+# and validate checksums against etl/SOURCES.md. Foundation slice
+# (#7.5.1) ships this as a no-op stub; concrete US/CA plans land in
+# slices #7.5.3 / #7.5.4.
+[group('data')]
+[doc('etl: fetch upstream source files for a country (e.g. `just etl-download US`)')]
+etl-download country:
+    cd api && go run ./cmd/server etl download --country {{country}} --src ../etl/sources
+
+# regenerate seed TOML/CSV under api/seed/ from staged etl/sources/
+# data. Reproducible — same upstream vintage produces byte-identical
+# output. No-op stub until #7.5.3/#7.5.4.
+[group('data')]
+[doc('etl: regenerate seed files from staged sources (e.g. `just etl-regenerate US`)')]
+etl-regenerate country:
+    cd api && go run ./cmd/server etl regenerate --country {{country}} --src ../etl/sources --out seed
 
 # ── postgres: dev container lifecycle ─────────────────
 # Local dev Postgres runs in a named docker container with a
@@ -153,7 +169,7 @@ loaddata:
 # is identical.
 #
 # Credentials and DB name are dev-only and match what
-# mise.development.toml hands to URBANIST_DB_URL:
+# mise.development.toml hands to DATABASE_URL:
 #   user: urbanist  pass: urbanist  db: urbanist_atlas_dev
 
 # start the dev postgres container (creates on first run, starts on subsequent), then wait for it to accept connections
@@ -209,6 +225,11 @@ pg-logs:
 
 # ── web: build & verify ───────────────────────────────
 
+# run the Vite dev server (defaults to http://localhost:5173)
+[group('web')]
+web-dev:
+    cd web && npm run dev
+
 # install JS deps with the lockfile (matches CI)
 [group('web')]
 web-deps:
@@ -250,6 +271,82 @@ web-gen-check:
 [doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
 
+# ── fly: deploy + ops ─────────────────────────────────
+# Thin wrappers around `flyctl` so the deploy / logs / secrets /
+# ssh verbs are discoverable via `just --list`. App names
+# (urbanist-atlas for the API, urbanist-atlas-db for the sibling
+# Postgres) are pinned via -a so these work from any branch
+# without flyctl config. Initial provisioning (app creation, volume,
+# secrets, DNS, certs) lives in docs/deploy.md — these recipes
+# are for ongoing ops once both apps exist.
+
+# deploy the API app from the current checkout. Release-command in
+# fly.toml runs `migrate up` before the new machine takes traffic.
+[group('fly')]
+[doc('deploy the API to Fly (release_command runs migrations)')]
+fly-deploy:
+    flyctl deploy -a urbanist-atlas
+
+# deploy the sibling Postgres app. Rarely needed after first launch;
+# the image rolls forward when we bump postgres:17-alpine to a newer
+# patch, which is an explicit maintenance decision.
+[group('fly')]
+[doc('deploy the sibling Postgres app (rare; only on image bumps)')]
+fly-deploy-db:
+    flyctl deploy -a urbanist-atlas-db -c infra/postgres/fly.toml
+
+# tail live Fly logs (API)
+[group('fly')]
+fly-logs:
+    flyctl logs -a urbanist-atlas
+
+# tail live Fly logs (DB)
+[group('fly')]
+fly-logs-db:
+    flyctl logs -a urbanist-atlas-db
+
+# list app secrets (names + digests; values are write-only)
+[group('fly')]
+fly-secrets:
+    flyctl secrets list -a urbanist-atlas
+
+# open an interactive shell inside a running API machine
+[group('fly')]
+fly-ssh:
+    flyctl ssh console -a urbanist-atlas
+
+# Runs against PROD data in a one-off ssh session. Idempotent —
+# every loader upserts by stable key, so re-runs converge rather than
+# duplicate. Use after a seed-data edit lands on main.
+[group('fly')]
+[doc('re-seed the LIVE database (flyctl ssh; idempotent upserts)')]
+fly-loaddata:
+    flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata"
+
+# capture an on-demand Postgres backup to a local file. Same pipeline
+# as the nightly GHA cron workflow at .github/workflows/backup.yml,
+# but writes locally rather than uploading to R2 — for ad-hoc
+# snapshots the maintainer wants in hand before a risky change.
+[group('fly')]
+[doc('on-demand local pg_dump via flyctl ssh (writes ./urbanist-atlas-YYYY-MM-DD.sql.gz)')]
+db-backup:
+    @out="urbanist-atlas-$(date -u +%Y-%m-%d).sql.gz"; \
+    flyctl ssh console -a urbanist-atlas-db \
+        -C "sh -c 'pg_dump -U urbanist urbanist_atlas | gzip -c'" \
+        > "$out" && \
+    test -s "$out" && \
+    ls -lh "$out"
+
+# Restore a previously captured backup into the LIVE Postgres. Destructive;
+# the operator confirms by passing the dump path explicitly.
+# usage: just db-restore ./urbanist-atlas-2026-05-21.sql.gz
+[group('fly')]
+[doc('restore a .sql.gz dump into the LIVE Postgres (destructive)')]
+db-restore dump:
+    @echo "→ Restoring {{dump}} into urbanist-atlas-db (DESTRUCTIVE)"
+    @gunzip -c {{dump}} | flyctl ssh console -a urbanist-atlas-db \
+        -C "psql -U urbanist -d urbanist_atlas"
+
 # ── smoke: live curl helpers (server must be running) ─
 
 # curl /healthz against localhost
@@ -263,6 +360,53 @@ healthz port='8080':
 [doc('curl /api/v1/lookup and jq the body; e.g. `just lookup 11217` or `just lookup M5V CA`')]
 lookup code country='US' port='8080':
     @curl -sS "http://localhost:{{port}}/api/v1/lookup?postal_code={{code}}&country={{country}}" | jq
+
+# End-to-end smoke against the LIVE QA endpoint. Verifies:
+# /healthz reachable, /api/v1/lookup behind the X-Atlas-Client gate
+# (401 without, 200 with), ODbL attribution headers + meta envelope
+# present, OpenAPI YAML served. Requires URBANIST_CLIENT_SECRET in
+# the environment (or pass as a positional arg).
+# usage: URBANIST_CLIENT_SECRET=... just smoke
+#        or: just smoke <secret> [host]
+[group('smoke')]
+[doc('e2e smoke against qa-api.urbanistatlas.com (set URBANIST_CLIENT_SECRET first)')]
+smoke secret='' host='qa-api.urbanistatlas.com':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    SECRET="{{secret}}"
+    if [ -z "$SECRET" ]; then SECRET="${URBANIST_CLIENT_SECRET:-}"; fi
+    if [ -z "$SECRET" ]; then
+        echo "smoke: URBANIST_CLIENT_SECRET is required (env var or first positional arg)" >&2
+        exit 2
+    fi
+    BASE="https://{{host}}"
+    fail=0
+    echo "→ GET $BASE/healthz"
+    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/healthz")
+    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
+
+    echo "→ GET $BASE/api/v1/lookup?postal_code=10001&country=US (no X-Atlas-Client)"
+    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/lookup?postal_code=10001&country=US")
+    if [ "$code" != "401" ]; then echo "  FAIL: expected 401, got $code"; fail=1; else echo "  OK 401"; fi
+
+    echo "→ GET $BASE/api/v1/lookup?postal_code=10001&country=US (with secret)"
+    headers=$(mktemp)
+    body=$(mktemp)
+    code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
+        -H "X-Atlas-Client: $SECRET" \
+        "$BASE/api/v1/lookup?postal_code=10001&country=US")
+    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
+    if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
+    if ! grep -qi '^X-Data-Attribution: ' "$headers"; then echo "  FAIL: missing X-Data-Attribution header"; fail=1; else echo "  OK X-Data-Attribution"; fi
+    if ! jq -e '.meta.license and .meta.attribution_url and .meta.generated_at' "$body" >/dev/null; then echo "  FAIL: meta envelope missing license/attribution_url/generated_at"; fail=1; else echo "  OK meta envelope"; fi
+    rm -f "$headers" "$body"
+
+    echo "→ GET $BASE/api/v1/openapi.yaml"
+    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/openapi.yaml")
+    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
+
+    if [ "$fail" -ne 0 ]; then echo "smoke: FAILED"; exit 1; fi
+    echo "smoke: PASS"
 
 # ── ci-equivalent ─────────────────────────────────────
 

@@ -11,6 +11,14 @@ the plan is the *design* view.
 
 ## Status
 
+**Phase 1 QA dogfooding is LIVE (2026-05-21):**
+`qa.urbanistatlas.com` (SPA on Cloudflare Workers + Pages) +
+`qa-api.urbanistatlas.com` (API on Fly.io, region `iad`, behind the
+`X-Atlas-Client` shared-secret gate). DB is a sibling Fly app
+running `postgres:17-alpine` on a 1 GB volume. 134 orgs and 35,424
+postal codes seeded. R2 backup workflow is the only bring-up task
+still pending operator action.
+
 **Done:**
 
 - Monorepo bones (`api/`, `web/`, `.github/`, READMEs, `.gitignore`)
@@ -114,6 +122,80 @@ the plan is the *design* view.
   intentionally exempt). Frontend helpers unwrap `data`
   transparently. See
   `docs/superpowers/specs/2026-05-18-odbl-response-shape-design.md`.
+- **Postal-code coverage at scale (slice #7.5, sub-slices #7.5.1–4):**
+  Replaces the 47-row fixture with 33,774 US ZCTAs + 1,643 CA FSAs
+  via the smallest-anchor model. New `internal/etl/{us,ca}` packages
+  parse Census CBSA + ZCTA crosswalks (US) and StatsCan FSA + CMA
+  boundary DBFs (CA), emitting deterministic `regions_us_msas.toml`
+  (393 MSAs), `regions_ca_cmas.toml` (41 CMAs), and per-country
+  `postal_codes_*.csv`. Region taxonomy gains state/province tier
+  (52 US + 13 CA), multistate tier (3 US), and CMA/MSA tier (393 + 41).
+  NYC `nyc` flips to a regional intermediate region above 5 borough
+  leaves; the state edge moves from `nyc → ny` to the borough rows
+  per region-graph rule §1. `loadpostal` switched to batched
+  `unnest` upserts via raw `pgx.Exec` so 33k US rows load in ~3s
+  instead of multi-minute per-row round-trips. `internal/loadregions`
+  gains cross-file parent resolution so multi-tier TOML splits
+  resolve. Design spec: `docs/superpowers/specs/2026-05-19-postal-coverage-design.md`.
+- **Non-ZCTA ZIP backfill (slice #7.5.5) — code shipped, data diff
+  deferred to operator:** adds HUD's USPS ZIP-to-County crosswalk as
+  a second US ETL source for ZIPs Census ZCTA omits (P.O. Box-only,
+  single-building, APO/FPO). New `api/internal/etl/us/hud.go` stdlib
+  CSV parser + `CrosswalkHUDBackfill` sibling to the existing 6-tier
+  `Crosswalk`. Per ZIP, picks `max(TOT_RATIO)` row (correct for
+  P.O. Box-only ZIPs where `RES_RATIO=0`) and walks county FIPS
+  through `nyc-borough → countyToLeaf → countyToMSA → stateFIPSToSlug`;
+  writer merges + dedups with ZCTA winning any tie. 20811 (Bethesda
+  P.O. Box) now resolves to `washington-dc-metro`. HUD source is
+  HUDUser-account-gated, so the orchestrator degrades to ZCTA-only
+  when the CSV is absent; the operator pins the sha256 in
+  `etl/SOURCES.md` + `api/internal/etl/us/us.go` and re-runs
+  `etl regenerate --country=US` to materialize the ~5–10k net-new
+  rows in `api/seed/postal_codes_us.csv`.
+- **Org-seed growth (slice #7.6):** Expanded `api/seed/orgs.toml` from
+  23 curated entries (19 US/CA + 4 PT) to 111 via two independent
+  coverage gates — a universal state/province floor (every US state +
+  every CA province has ≥1 org or a documented `# gap`) and a top-30
+  metro gate (≥1 metro-anchored org per metro in the 25 US + 5 CA
+  canvas). Closing tally: 88 net-new orgs, 13 documented gaps (9 US:
+  WV, AR, OK, KS, ND, SD, NV, WY, PR; 4 CA: PE, SK, NB, plus YT/NT/NU
+  consolidated), and 1 multi-anchored org (The Street Trust). Design
+  spec: `docs/superpowers/specs/2026-05-20-org-seed-growth-design.md`.
+- **Top-20 metro depth pass (slice #7.7):** Raised the metro gate to
+  ≥3 orgs per top-20 metro (top-21–30 stays at ≥1). Boston gets the
+  showcase treatment at 5 metro orgs (TransitMatters, LivableStreets,
+  Boston Cyclists Union, A Better City, MBTA Advisory Board) plus
+  WalkMassachusetts at the state floor. LA, Chicago, Dallas, Houston,
+  Philadelphia, Atlanta, SF Bay, Seattle, Minneapolis, Phoenix,
+  Detroit, and St. Louis lift to ≥3 metro orgs each. Four top-20
+  metros end the pass with documented third-org gaps (Miami at 2,
+  Inland Empire at 2, Tampa at 1, Denver at 2) rather than padding
+  with dormant or out-of-scope candidates. Final tally: 23 net-new
+  orgs (orgs.toml grows from 111 → 134). Design spec gate language
+  updated in the same spec.
+- **X-Atlas-Client shared-secret gate (slice #23):**
+  `api/internal/httpapi/clientsecret.go` middleware checks
+  `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via
+  `subtle.ConstantTimeCompare`; mismatch → 401 with the new
+  `unauthorized` RFC 9457 problem type. `/healthz` and
+  `/api/v1/openapi.yaml` are bypass-listed so liveness probes and
+  contract discovery work without the secret; an empty secret turns
+  the middleware into a no-op (preserves local-dev ergonomics).
+  Frontend (`web/src/lib/api.ts`) injects the header from
+  `VITE_API_CLIENT_SECRET` on every `apiFetch`.
+- **Phase 1 deploy (Fly + sibling Postgres + Cloudflare Workers +
+  Pages):** API on a Fly app in region `iad` via a multi-stage
+  Alpine Dockerfile (`release_command = "migrate up"`); database on
+  a sibling Fly app running plain `postgres:17-alpine` with a 1 GB
+  volume (same image as the testcontainers integration suite, so
+  the wire is identical); SPA on Cloudflare Workers + Pages (Static
+  Assets), SPA fallback via `wrangler.jsonc`'s
+  `assets.not_found_handling = "single-page-application"`; nightly
+  `pg_dump | gzip` → Cloudflare R2 via a GitHub Actions cron with a
+  30-day bucket lifecycle. `qa.urbanistatlas.com` +
+  `qa-api.urbanistatlas.com` live behind the `X-Atlas-Client` gate.
+  Design: [`docs/superpowers/specs/2026-05-21-fly-deploy-design.md`](./superpowers/specs/2026-05-21-fly-deploy-design.md);
+  runbook: [`docs/deploy.md`](./deploy.md).
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
@@ -145,8 +227,14 @@ The rows remain in the tables below for traceability.
 | 4.7 | **Second EU country validation (Spain)** | Repeat the validation exercise for Spain. Adds `regions_es.toml`, `postal_codes_es.csv`, ~5 ES orgs. Specifically validates: autonomous communities (Catalonia, Basque Country with their own transit authorities), the comarca layer in some communities, and Ceuta/Melilla as the analogue of Açores/Madeira. Should be mostly mechanical given #4.6's conventions and loader changes. |
 | 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. Region attachment uses the same `region_slugs` machinery as `orgs.toml`, so submitted orgs can target any region kind in any supported country. |
 | 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. Lookup coverage should include: the national-tier filter (orgs attached to `scope_tier='national'` regions must NOT appear in default results) and the unknown-country fall-through (`country=ZZ` with an unknown postal code returns 404, not 400) — both shipped in slice #4.6 with light coverage in `pipeline_test.go`. |
-| 7.5 | **Full-country postal data ingest** | Replace the bundled fixture CSVs (~30 ZIPs) with real Census ZCTA / StatsCan PCCF reshapes (and OpenPLZ for PT when the directory expands). Out-of-band ETL → 3-column CSVs in the format `loadpostal` already consumes. Documented in [`api/seed/README.md`](../api/seed/README.md). |
-| 7.6 | **Seed data growth** | Expand `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to the planned ~30–50 across the supported countries. Editorial work, not engineering. |
+| 7.5 | **Full-country postal data ingest** *(broken into sub-slices below)* | The smallest-anchor design has every US ZIP and CA FSA resolve to the smallest curated region (city leaf → NYC borough → MSA → state/province) — schema unchanged, no app-level fallback logic. Sub-slices below. Design spec: [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md). |
+| 7.5.1 | **Foundation: ETL scaffolding + states/provinces** | Design spec; `etl download`/`etl regenerate` subcommand stubs on the `urbanist` binary; `api/internal/etl/` package skeleton; hand-defined `regions_us_states.toml` (52: 50 states + DC + PR) and `regions_ca_provinces.toml` (13: 10 provinces + 3 territories), with existing state/province entries moved out of `regions_us.toml` and `regions_ca.toml` for cleaner separation. No data-scale change. |
+| 7.5.2 | **NYC borough split** *(shipped)* | Migration `0004_split_nyc.sql` flips `nyc.scope_tier=regional`, drops the `nyc → ny` edge (boroughs carry the state edge per region-graph rule §1), keeps `nyc → nyc-metro`. Borough leaves keep their parents `[nyc, ny]`. Editorial decision: citywide NYC orgs (TransAlt, Riders Alliance, StreetsPAC) stay on `nyc` and bucket as Regional for borough lookups. Place-label heuristic in `pkg/atlas/lookup.go` updated to prefer `IsMetroKind` for the broad slot so labels like "Brooklyn, New York City — New York Metro" survive the regional-tier `nyc`. |
+| 7.5.3 | **US MSAs + ~34k ZCTA postal codes** *(shipped)* | New `internal/etl/us` package parses Census CBSA delineation (xlsx → CSV via `etl/scripts/xlsx_to_csv.py`) + ZCTA-to-place + ZCTA-to-county. Generates `regions_us_msas.toml` (393 entries) using `regions_us_msa_overrides.toml` for the 7 known metros (nyc-metro, chicago-metro, sf-bay-area, greater-boston, greater-miami, seattle-metro, greater-la). Generates `postal_codes_us.csv` (~33.7k rows) via smallest-anchor crosswalk. `loadpostal` switched to batched `unnest` upserts via raw `pgx.Exec` to avoid 33k per-row round-trips against the production Postgres. New `regions_us_multistate.toml` carved out of `regions_us.toml` to break the circular load order between MSAs and curated leaves. Integration tests passing in ~36s. |
+| 7.5.4 | **CA CMAs + 1,643 FSA postal codes** *(shipped)* | New `internal/etl/ca` package parses the StatsCan FSA + CMA boundary file DBF tables (extracted from the boundary zips inside the ETL; shapefile geometry ignored). Generates `regions_ca_cmas.toml` (41 CMAs filtered to type='B', with overrides for toronto-cma/montreal-cma/metro-vancouver/ottawa-gatineau-cma) and `postal_codes_ca.csv` (1,643 rows). FSA→CMA mapping uses a coarse FSA-prefix table (M, L1/3/4/5/6 → Toronto; H → Montréal; V5-7 → Vancouver; K1-2 + J8-9 → Ottawa-Gatineau; T2-3 → Calgary; T5-6 → Edmonton; L8-9 → Hamilton) in lieu of the restricted-licence PCCF. Minimal stdlib-only DBF reader; Latin-1 → UTF-8 decoding for accented CMA names. Anchor distribution: 10 city-leaf, 522 CMA, 1111 province. Closes #7.5. |
+| 7.5.5 | **Non-ZCTA ZIP fallback** *(shipped — code; data diff deferred to operator)* | Census ZCTA excludes P.O. Box-only ZIPs, single-building ZIPs, and APO/FPO ZIPs — so `/lookup?postal_code=20811` (Bethesda P.O. Box) returned `postal-code-not-found` pre-#7.5.5. Adds HUD's quarterly USPS ZIP-to-County crosswalk as a second US ETL source via `api/internal/etl/us/hud.go` + `CrosswalkHUDBackfill` (sibling to the existing untouched `Crosswalk`); emits fallback rows only for ZIPs absent from ZCTA, picking max-`TOT_RATIO` row (correct for P.O. Box-only ZIPs where `RES_RATIO=0`) and walking county FIPS through the existing `nyc-borough → county-leaf → msa → state` chain. Writer merges + dedups with ZCTA winning. CA needs no equivalent — FSA-prefix → province fallback in #7.5.4 already covers P.O. Box FSAs. HUD pin in `etl/SOURCES.md` (sha256 TBD by operator on first HUDUser download); integration-test regression on 20811 via synthetic anchor fixture. §Out-of-coverage UX of [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md) updated. Operator follow-up: run `etl regenerate --country=US` after pinning the HUD sha256 to materialize the ~5–10k net-new rows in `api/seed/postal_codes_us.csv`. |
+| 7.6 | **Seed data growth** *(shipped)* | Expanded `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to **111** across the supported countries via two independent coverage gates: a **universal state/province floor** (every US state + every CA province has ≥1 org or a documented `# gap`) plus a **top-30 metro gate** (25 US CBSAs + 5 CA CMAs each get ≥1 org). Closing tally: 88 net-new orgs, 13 documented gaps (9 US: WV, AR, OK, KS, ND, SD, NV, WY, PR; 4 CA: PE, SK, NB, plus YT/NT/NU consolidated), 1 multi-anchored org (The Street Trust). Editorial work, not engineering. Design spec: [`docs/superpowers/specs/2026-05-20-org-seed-growth-design.md`](./superpowers/specs/2026-05-20-org-seed-growth-design.md). |
+| 7.7 | **Top-20 metro depth pass** *(shipped)* | Raised the metro gate to ≥3 orgs per top-20 metro (top-21–30 stays at ≥1). Boston gets the showcase treatment at 5 metro orgs plus WalkMassachusetts at the state floor; LA, Chicago, Dallas, Houston, Philadelphia, Atlanta, SF Bay, Seattle, Minneapolis, Phoenix, Detroit, and St. Louis lift to ≥3. Four top-20 metros end the pass with documented third-org gaps (Miami at 2, Inland Empire at 2, Tampa at 1, Denver at 2). Final tally: 23 net-new orgs (orgs.toml grows from 111 → 134). Updates the 7.6 design-spec gate language. Editorial work, not engineering. |
 
 ## Frontend (React + Vite)
 
@@ -156,6 +244,7 @@ The rows remain in the tables below for traceability.
 | 16 | **Admin queue page** | `/admin/queue` — bearer token in `localStorage` for v1, approve/reject controls. Utilitarian, not for public eyes. |
 | 17 | **Web CI tests (partial)** | `lint` / `test` / `build` already run in CI; pending pieces are dedicated `lib/api.ts` tests and the form-validation tests that land with slice #13. |
 | 18 | **Web recipes in justfile** | `web-dev`, `web-build`, `web-test`, `web-lint`. |
+| 18.5 | **Dev-loop env wiring** | Default `VITE_API_BASE` and `VITE_API_CLIENT_SECRET` for the local dev loop so `just web-dev` talks to `just api-run` out of the box. Preferred home is `mise.development.toml` (mirroring how `DATABASE_URL` is set for the server); alternative is a committed `web/.env.development`. Small ergonomic follow-up to slice #18 — `web-build`/`web-test` are affected too. |
 
 ## Gatekeeping, licensing & ops
 
@@ -165,17 +254,18 @@ dogfooding — only the project's own frontend can call it — and **Phase 2**
 opens the API to the public behind a free-key + rate-limit model. ODbL
 attribution travels in every response in both phases.
 
-| # | Slice | What lands |
-|---|-------|------------|
-| 19 | **Dockerfile + fly.toml** | Multi-stage Go build (binary embeds migrations); `fly launch`; `release_command = "urbanist-atlas-server migrate up"`. |
-| 20 | **Fly Managed Postgres** | Provision MPG, attach to the app, set `URBANIST_DB_URL` + `URBANIST_ADMIN_TOKEN` in Fly secrets. |
-| 21 | **Cloudflare Pages** | Connect Pages to `web/`; production domain `urbanistatlas.com` + DNS; `api.urbanistatlas.com` → Fly. |
-| 22 | **Production CORS (Phase 1 lockdown)** | Set `URBANIST_CORS_ORIGINS` to **only** `https://urbanistatlas.com` + `*.pages.dev`. No wildcard. |
-| 23 | **Shared-secret gate (Phase 1)** | New middleware checking an `X-Atlas-Client` header against a server-side secret (`URBANIST_CLIENT_SECRET`); reject with RFC 9457 `unauthorized` problem if missing/wrong. Frontend build embeds the secret via `VITE_API_CLIENT_SECRET`. Cheap, defeats casual scrapers/bots. Bypassed for `/healthz` and `/api/v1/openapi.yaml`. |
-| 25 | **End-to-end smoke (Phase 1)** | Hit prod `/healthz` + `/api/v1/lookup` (with shared secret) + `/submit` flow + admin approve. Confirm attribution headers + meta envelope are present. Confirm anonymous (no-secret) calls are rejected. |
-| 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. |
-| 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. |
-| 28 | **Phase 2 cutover** | Loosen CORS to allow any origin; remove the shared-secret middleware; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. |
+Status legend below: ✅ = deliverables landed in the repo; ▶ = runbook
+execution against live infra; ⏳ = not yet started.
+
+| # | Slice | What lands | Status |
+|---|-------|------------|--------|
+| Bring-up | **Phase 1 deploy: Fly + sibling Postgres + Cloudflare Workers + Pages + DNS + CORS + smoke** *(merged + live 2026-05-21)* | **Shipped:** `Dockerfile` + `fly.toml` at the repo root (multi-stage Alpine Go build, `release_command = "migrate up"`); `infra/postgres/{Dockerfile, entrypoint-fly.sh, fly.toml}` for the sibling `urbanist-atlas-db` app — postgres:17-alpine wrapped with a root-stage `chown` so the postgres user can write the PGDATA subdir on Fly's root-owned mount, with `[[restart]] policy = "always"` for resilience; `[group('fly')]` justfile recipes (`fly-deploy`, `fly-deploy-db`, `fly-logs`, `fly-logs-db`, `fly-secrets`, `fly-ssh`, `fly-loaddata`, `db-backup`, `db-restore`); `just smoke` recipe in `[group('smoke')]` (curl checks against `/healthz`, `/api/v1/lookup` with + without `X-Atlas-Client`, ODbL headers, meta envelope, OpenAPI YAML); `wrangler.jsonc` at repo root for Cloudflare Workers + Pages (Static Assets) with SPA fallback via `not_found_handling = "single-page-application"`; `.github/workflows/backup.yml` nightly cron + workflow_dispatch (pg_dump → R2, 30-day retention); `docs/deploy.md` operator runbook; `docs/superpowers/specs/2026-05-21-fly-deploy-design.md` design doc. **Live:** `qa.urbanistatlas.com` (Workers + Pages) + `qa-api.urbanistatlas.com` (Fly app, region `iad`) behind the `X-Atlas-Client` gate; 134 orgs, 35,424 postal codes seeded; release_command, PGDATA, restart, Workers/Pages unified bring-up bugs all caught and fixed with docs/runbook patches. R2 backup workflow setup remains pending operator action. | ✅ |
+| CORS | **Production CORS (Phase 1 lockdown)** | `URBANIST_CORS_ORIGINS` locked to `https://qa.urbanistatlas.com` + `*.<account>.workers.dev` in `fly.toml`'s `[env]` block; verified by `just smoke`. (On prod cutover, swap in `https://urbanistatlas.com`.) | ✅ |
+| Gate | **Shared-secret gate (Phase 1)** | Middleware checking `X-Atlas-Client` against `URBANIST_CLIENT_SECRET`; mismatch → 401 RFC 9457 `unauthorized`. Frontend bundles the secret via `VITE_API_CLIENT_SECRET`. Bypass list: `/healthz`, `/api/v1/openapi.yaml`. | ✅ |
+| Smoke | **End-to-end smoke (Phase 1)** | `just smoke` recipe hits the live QA endpoint: `/healthz` (200), `/api/v1/lookup?postal_code=10001&country=US` without secret (401), with secret (200 + `X-Data-License: ODbL-1.0` + `X-Data-Attribution` + `meta` envelope), `/api/v1/openapi.yaml` (200). Submissions + admin smoke deferred to Phase 2 with their slices. | ✅ |
+| 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. | ⏳ |
+| 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. | ⏳ |
+| 28 | **Phase 2 cutover** | Add `urbanistatlas.com` as a second Workers + Pages custom domain + `flyctl certs add api.urbanistatlas.com -a urbanist-atlas` + A/AAAA records for `api`; loosen CORS to include the prod origin; remove the shared-secret middleware; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. | ⏳ |
 
 ## Deferred (v1.1+)
 

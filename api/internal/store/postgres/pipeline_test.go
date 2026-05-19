@@ -470,3 +470,110 @@ func TestPipeline_PT_ValidationFixture(t *testing.T) {
 		}
 	})
 }
+
+// TestPipeline_NationalTierAncestor_FilteredByCTE is the safety-net
+// companion to TestLookup_NationalTierOrg_ExcludedFromDefaultLookup in
+// api/internal/httpapi/lookup_test.go. That test uses a sibling-
+// attachment fixture (national region NOT in the ancestor chain) and
+// works against MemStore + Postgres equivalently — but it does not
+// exercise the recursive-CTE filter at queries/lookup.sql:23,29
+// (`WHERE r.scope_tier <> 'national'`).
+//
+// This test puts a national region directly in the ancestor chain:
+//
+//	leaf-city → parent-region → NATIONAL-region
+//
+// Without the CTE filter, the recursive walk would surface the national
+// region (and orgs attached only to it). With the filter, the walk
+// stops at parent-region. This is the defense-in-depth that protects
+// against an editorial mistake (a parent edge from the leaf chain into
+// a national region) — the data shape intentionally avoids such edges,
+// but the filter ensures national-tier orgs stay hidden if one slips
+// in. See queries/lookup.sql:14-19 and the slice #4.6 spec for the
+// rationale.
+//
+// MemStore does NOT filter at this seam (see the comment on
+// TestLookup_NationalTierOrg_ExcludedFromDefaultLookup), so this test
+// is meaningful only against Postgres — hence its placement here under
+// the integration build tag.
+func TestPipeline_NationalTierAncestor_FilteredByCTE(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+
+	// Build the topology directly via SQL: a leaf city, a local parent,
+	// and a national region as the parent of the local parent.
+	stmts := []string{
+		`INSERT INTO regions (id, kind, name, slug, country, scope_tier, sort_priority) VALUES
+			(7001, 'city',   'Leaf City',     'leaf-city',     'XX', 'local',    10),
+			(7002, 'region', 'Parent Region', 'parent-region', 'XX', 'local',    20),
+			(7003, 'nation', 'Nation X',      'nation-x',      'XX', 'national', 90)`,
+		`SELECT setval(pg_get_serial_sequence('regions','id'), 7003)`,
+		// Edges: leaf-city → parent-region → nation-x.
+		// nation-x is intentionally IN the ancestor chain so the CTE's
+		// scope_tier filter is the only thing that stops it from
+		// surfacing.
+		`INSERT INTO region_parents (region_id, parent_region_id) VALUES
+			(7001, 7002),
+			(7002, 7003)`,
+		`INSERT INTO postal_codes (postal_code, country, leaf_region_id) VALUES
+			('99999', 'XX', 7001)`,
+		`INSERT INTO organizations (id, slug, name, short_desc, website_url, contact_url, tags, status, approved_at) VALUES
+			(7001, 'leaf-spoke', 'Leaf Spoke', 'Local advocacy.',
+				'https://example.org/leaf', NULL,
+				ARRAY['transit']::text[], 'approved', NOW()),
+			(7002, 'national-only', 'National Only', 'National umbrella.',
+				'https://example.org/national', NULL,
+				ARRAY['transit']::text[], 'approved', NOW())`,
+		`SELECT setval(pg_get_serial_sequence('organizations','id'), 7002)`,
+		// leaf-spoke attaches to leaf-city (local).
+		// national-only attaches ONLY to nation-x. Without the CTE
+		// filter, the ancestor walk would yield {leaf-city, parent-
+		// region, nation-x} and national-only would land in Regional.
+		// With the filter, the walk stops at parent-region and
+		// national-only is invisible to atlas.Lookup.
+		`INSERT INTO organization_regions (organization_id, region_id) VALUES
+			(7001, 7001),
+			(7002, 7003)`,
+	}
+	for _, s := range stmts {
+		if _, err := store.Pool().Exec(ctx, s); err != nil {
+			t.Fatalf("seed: %v\nstmt: %s", err, s)
+		}
+	}
+
+	// First assert the AncestorRegions seam directly — this is where
+	// the CTE filter applies, and the most narrowly-targeted way to
+	// detect a filter regression.
+	ancestry, err := store.AncestorRegions(ctx, 7001)
+	if err != nil {
+		t.Fatalf("AncestorRegions: %v", err)
+	}
+	for _, r := range ancestry {
+		if r.ScopeTier == atlas.ScopeNational {
+			t.Errorf("AncestorRegions returned a national-tier region %q (CTE filter regression)", r.Slug)
+		}
+		if r.Slug == "nation-x" {
+			t.Errorf("AncestorRegions returned nation-x — the CTE filter at queries/lookup.sql:23,29 must drop it")
+		}
+	}
+
+	// Then assert the end-to-end Lookup surface: national-only must
+	// not appear in either bucket; leaf-spoke must appear in Local.
+	res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "99999", Country: atlas.Country("XX")})
+	if err != nil {
+		t.Fatalf("Lookup 99999: %v", err)
+	}
+	all := slugSet(res.Local)
+	for k := range slugSet(res.Regional) {
+		all[k] = true
+	}
+	if all["national-only"] {
+		t.Errorf("national-only org surfaced in default lookup (CTE filter regression); got Local=%v Regional=%v",
+			orgSlugList(res.Local), orgSlugList(res.Regional))
+	}
+	if !all["leaf-spoke"] {
+		t.Errorf("leaf-spoke missing from default lookup; got Local=%v Regional=%v",
+			orgSlugList(res.Local), orgSlugList(res.Regional))
+	}
+}

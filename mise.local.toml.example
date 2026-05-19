@@ -16,5 +16,5 @@
 #   - testing against a staging API
 
 # [env]
-# URBANIST_DB_URL      = "postgres://urbanist@localhost:5432/atlas?sslmode=disable"
+# DATABASE_URL         = "postgres://urbanist@localhost:5432/atlas?sslmode=disable"
 # URBANIST_ADMIN_TOKEN = "my-personal-dev-token"

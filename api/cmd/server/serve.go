@@ -55,7 +55,7 @@ func serveCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:    "db-url",
 				Usage:   "Postgres connection string (required when --store=postgres)",
-				Sources: cli.EnvVars("URBANIST_DB_URL"),
+				Sources: cli.EnvVars("DATABASE_URL"),
 			},
 			&cli.StringFlag{
 				Name:    "client-secret",
@@ -140,7 +140,7 @@ func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas
 	case storeKindPostgres, "":
 		dbURL := c.String("db-url")
 		if dbURL == "" {
-			return nil, nil, errors.New("serve: --db-url or URBANIST_DB_URL is required when --store=postgres")
+			return nil, nil, errors.New("serve: --db-url or DATABASE_URL is required when --store=postgres")
 		}
 		s, closeFn, err := postgres.Open(ctx, dbURL)
 		if err != nil {
