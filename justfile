@@ -5,8 +5,8 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, smoke, ci. Each group corresponds
-# to a section comment below.
+# Groups: api, data, postgres, web, heroku, smoke, ci. Each group
+# corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -261,37 +261,43 @@ web-gen-check:
 [doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
 
-# ── fly: deploy + ops ─────────────────────────────────
-# Thin wrappers around `flyctl` so the deploy / status / logs verbs
-# are discoverable via `just --list`. flyctl reads `fly.toml` at the
-# repo root and picks up the app name from there. Initial provisioning
-# (app creation, MPG attach, secrets) lives in docs/deploy.md — these
-# recipes are for ongoing ops once the app exists.
+# ── heroku: deploy + ops ──────────────────────────────
+# Thin wrappers around `heroku` so the deploy / logs / config verbs
+# are discoverable via `just --list`. App name (urbanist-atlas) is
+# pinned via -a so these work from any branch without git remote
+# config. Initial provisioning (app creation, Essential-0 attach,
+# secrets) lives in docs/deploy.md — these recipes are for ongoing
+# ops once the app exists.
 
-# build + push + release on Fly
-[group('fly')]
-fly-deploy:
-    flyctl deploy
+# build + push current branch to Heroku (release phase runs migrations)
+[group('heroku')]
+heroku-deploy:
+    git push heroku main
 
-# show machine + service status
-[group('fly')]
-fly-status:
-    flyctl status
+# tail live Heroku logs
+[group('heroku')]
+heroku-logs:
+    heroku logs --tail -a urbanist-atlas
 
-# tail live logs from Fly
-[group('fly')]
-fly-logs:
-    flyctl logs
+# list app config (names + masked values)
+[group('heroku')]
+heroku-config:
+    heroku config -a urbanist-atlas
 
-# list non-value Fly secrets (names + digests only)
-[group('fly')]
-fly-secrets:
-    flyctl secrets list
+# open an interactive shell inside a one-off dyno
+[group('heroku')]
+heroku-ssh:
+    heroku run bash -a urbanist-atlas
 
-# open an interactive shell inside a running Fly machine
-[group('fly')]
-fly-ssh:
-    flyctl ssh console
+# seed the live database (regions → postal → orgs)
+[group('heroku')]
+heroku-loaddata:
+    heroku run urbanist-atlas-server loaddata -a urbanist-atlas
+
+# capture an on-demand Postgres backup; `heroku pg:backups` shows retention
+[group('heroku')]
+db-backup:
+    heroku pg:backups:capture -a urbanist-atlas
 
 # ── smoke: live curl helpers (server must be running) ─
 
