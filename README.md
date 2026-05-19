@@ -8,7 +8,7 @@ back the local and regional groups working in your area.
 
 A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
-**Site:** [urbanistatlas.com](https://urbanistatlas.com) *(not yet live)*
+**Site:** Dogfood deployment at [qa.urbanistatlas.com](https://qa.urbanistatlas.com); the production `urbanistatlas.com` hostname attaches to the same Pages project once Phase 2 (API keys, rate limiting) ships. See the [deploy runbook](./docs/deploy.md) for the QA topology.
 
 ---
 

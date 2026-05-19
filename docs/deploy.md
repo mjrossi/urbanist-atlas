@@ -13,7 +13,7 @@ The launch chunk is four slices:
 | #19 | (Retired by slice #19.5 pivot — `Dockerfile` + `fly.toml` deleted) | — |
 | #19.5 | Hosting cost spike + Heroku pivot decision | `docs/superpowers/specs/2026-05-18-hosting-cost-spike.md` + `2026-05-18-heroku-deploy-design.md` |
 | #20 | Heroku app + Postgres Essential-0 + first deploy + seed | **§ Heroku: API + database** below |
-| #21 | Cloudflare Pages + DNS + TLS for `qa.*` hostnames | § Cloudflare Pages + DNS below (added by slice #21) |
+| #21 | Cloudflare Pages + DNS + TLS for `qa.*` hostnames | **§ Cloudflare Pages + DNS** below |
 | #23 | `X-Atlas-Client` shared-secret gate | In tree; this runbook references the secret in § Secrets |
 
 ## Hosting topology
@@ -187,6 +187,147 @@ heroku pg:backups -a urbanist-atlas    # list schedule + retained backups
 
 (The `us` region's overnight low-traffic window aligns with Eastern
 Time. Adjust if your user base shifts.)
+
+## Cloudflare Pages + DNS
+
+The SPA deploys to Cloudflare Pages from `web/`. Pages reads
+`web/public/_redirects` to rewrite every non-asset path to
+`/index.html`, which is the SPA fallback that makes direct navigation
+to `/about`, `/browse`, `/m/:slug`, `/r/:postalCode` work.
+
+The order in this section matters: Heroku ACM issues the cert for
+`qa-api.urbanistatlas.com` automatically, but only once it can resolve
+the CNAME — so the Heroku side runs first (§1 produces the CNAME
+target), then Cloudflare DNS (§3), then the Pages side (§4–§5) which
+depends only on Cloudflare.
+
+### 1. Attach the API hostname to Heroku
+
+```sh
+heroku domains:add qa-api.urbanistatlas.com -a urbanist-atlas
+heroku domains -a urbanist-atlas    # print the assigned CNAME target
+```
+
+`heroku domains:add` prints the DNS target the CNAME in §3 must point
+at — something like `lavender-eel-abc123.herokudns.com`. Capture it;
+that exact string goes into the `qa-api` CNAME value in §3.
+
+Heroku ACM issues the TLS cert in the background once the CNAME from
+§3 resolves to the Heroku edge. Nothing more to configure on the
+Heroku side — no `_acme-challenge` records, no `certs:create` step.
+
+### 2. Create the Pages project (dashboard)
+
+Cloudflare dashboard → **Pages → Create → Connect to Git**:
+
+- **Repo:** `mjrossi/urbanist-atlas`
+- **Production branch:** `main`
+- **Build command:** `cd web && npm ci && npm run build`
+- **Build output directory:** `web/dist`
+- **Root directory:** repo root (leave blank)
+- **Project name:** `urbanist-atlas` *(this becomes the `*.pages.dev`
+  subdomain — substitute consistently for `<pages-project>` in §3 if
+  you pick a different name)*
+
+Environment variables — **apply to both Production AND Preview**:
+
+| Name | Value |
+|---|---|
+| `VITE_API_BASE` | `https://qa-api.urbanistatlas.com` |
+| `VITE_API_CLIENT_SECRET` | *(same value as the Heroku `URBANIST_CLIENT_SECRET` set in § Heroku step 3 above)* |
+| `NODE_VERSION` | `22` *(Pages honors a major-version pin only; minor/patch may drift from `mise.toml`'s `22.22.3` pin, which is acceptable for a static SPA build)* |
+
+`VITE_API_CLIENT_SECRET` is bundled into the static build, so the SPA
+can include it in the `X-Atlas-Client` header on every API request.
+Phase 1 lockdown is a deterrent against casual scrapers, not a real
+secret — anyone who downloads the bundle can read it. The value still
+needs to match `URBANIST_CLIENT_SECRET` exactly or the SPA 401s.
+
+The first push to `main` after this configures Pages triggers an
+automatic deploy. Pages will say "this branch has not been deployed"
+until then.
+
+### 3. DNS records (Cloudflare DNS, `urbanistatlas.com` zone)
+
+| Name | Type | Value | Proxy |
+|---|---|---|---|
+| `qa` | CNAME | `<pages-project>.pages.dev` | **ON** *(Pages requires its CDN proxy)* |
+| `qa-api` | CNAME | *(the `*.herokudns.com` target printed by §1)* | **OFF** *(Heroku ACM terminates TLS directly)* |
+
+`qa` is the SPA hostname. `qa-api` is the API hostname; the proxy
+must be OFF because Heroku is the TLS terminator. A proxied `qa-api`
+would cause cert validation failures and break Heroku's ACM auto-
+issuance.
+
+### 4. Custom domain for the SPA
+
+In the Pages project: **Custom domains → Set up a custom domain →
+`qa.urbanistatlas.com`**. Pages auto-detects the CNAME added in §3 and
+issues its own cert through Cloudflare. No manual cert step.
+
+### 5. Wait for the Heroku ACM cert
+
+```sh
+heroku domains:wait qa-api.urbanistatlas.com -a urbanist-atlas
+# or, to poll the cert status interactively:
+heroku certs:auto -a urbanist-atlas
+```
+
+`heroku domains:wait` blocks until ACM reports the cert as `OK`.
+Propagation is usually under 5 minutes once the CNAME in §3 has gone
+live; if it stalls beyond 15 minutes, verify (a) the `qa-api` CNAME
+resolves to the exact `*.herokudns.com` target from §1
+(`dig qa-api.urbanistatlas.com CNAME +short`), (b) the Cloudflare
+proxy on that record is OFF, and (c) no DNSSEC or CAA record on the
+zone is blocking Let's Encrypt issuance.
+
+### 6. Smoke test the deploy
+
+```sh
+# Web SPA — direct navigation should work for every client route.
+curl -I https://qa.urbanistatlas.com
+curl -I https://qa.urbanistatlas.com/browse
+curl -I https://qa.urbanistatlas.com/about
+# All → 200, served by Pages (look for the cf-ray header).
+
+# Confirm _redirects actually rewrites to index.html (not a Pages
+# default-404 page, which would also 200): the response body for a
+# non-root path must include the SPA root mount.
+curl -s https://qa.urbanistatlas.com/browse | grep -q '<div id="root"' \
+    && echo "SPA shell served"
+
+# Confirm static assets are served as files, NOT rewritten to
+# index.html. Pages short-circuits the _redirects catch-all for any
+# path that matches a file in the build output; this is what keeps
+# /assets/*.js loading instead of returning the SPA shell.
+ASSET=$(curl -s https://qa.urbanistatlas.com \
+    | grep -oE '/assets/[A-Za-z0-9._-]+\.js' | head -1)
+curl -I "https://qa.urbanistatlas.com${ASSET}"
+# → 200 with content-type: application/javascript (NOT text/html).
+
+# Confirm the API CORS allowlist contains the SPA origin. curl
+# bypasses CORS, so browser-side breakage from a missing entry
+# wouldn't show up in the smoke below without this check.
+heroku config:get URBANIST_CORS_ORIGINS -a urbanist-atlas
+# → must contain https://qa.urbanistatlas.com and *.pages.dev.
+
+# API direct — no cf-ray header, Heroku is the terminator.
+curl -I https://qa-api.urbanistatlas.com/healthz
+# → 200, no cf-ray.
+
+# Browser end-to-end: load qa.urbanistatlas.com, run a known seed ZIP
+# (e.g. 10001 US → /r/10001). DevTools should show:
+#   Request:  X-Atlas-Client: <matches VITE_API_CLIENT_SECRET>
+#   Response: X-Data-License: ODbL-1.0
+#             X-Data-Attribution: …urbanistatlas.com/about/data…
+```
+
+A throwaway branch push exercises the Pages preview path: `git push
+origin throwaway-branch` produces
+`https://throwaway-branch.<pages-project>.pages.dev`, which Pages
+auto-deploys with the **Preview** env vars (so it still calls the QA
+API). The `*.pages.dev` entry in `URBANIST_CORS_ORIGINS` keeps these
+preview URLs working.
 
 ## Ongoing operations
 

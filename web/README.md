@@ -1,7 +1,10 @@
 # Urbanist Atlas — Web
 
-React + Vite SPA for [urbanistatlas.com](https://urbanistatlas.com). Deployed
-to Cloudflare Pages.
+React + Vite SPA for Urbanist Atlas. Phase 1 currently serves the SPA
+from [qa.urbanistatlas.com](https://qa.urbanistatlas.com); the
+production `urbanistatlas.com` hostname attaches to the same
+Cloudflare Pages project at Phase 2 cutover. See the
+[deploy runbook](../docs/deploy.md) for the QA topology.
 
 ## Layout
 

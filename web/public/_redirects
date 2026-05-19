@@ -1,0 +1,9 @@
+# Cloudflare Pages SPA fallback. Every request that doesn't match a
+# static asset gets rewritten to /index.html with a 200, so client-side
+# routes like /about, /browse, /m/:slug, /r/:postalCode work when typed
+# directly into the address bar or hit by an external link. Without
+# this, Pages serves its default 404 for any non-asset path.
+#
+# Pages-specific rule format docs: https://developers.cloudflare.com/pages/configuration/redirects/
+
+/*    /index.html   200
