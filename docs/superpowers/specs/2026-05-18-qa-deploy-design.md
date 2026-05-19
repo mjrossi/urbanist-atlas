@@ -3,6 +3,12 @@
 **Status:** Active — implementation of the Phase 1 launch chunk that
 takes Urbanist Atlas from "works on localhost" to "live at QA URLs."
 **Supersedes:** none.
+**Superseded-in-part-by:** [`2026-05-18-hosting-cost-spike.md`](./2026-05-18-hosting-cost-spike.md)
++ [`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)
+— the DB row in the architecture table and the Slice #20 section are
+rewritten against Heroku Postgres Essential-0 instead of Fly Managed
+Postgres. Slices #19 / #21 / #23 are unaffected (slice #19's
+`Dockerfile` + `fly.toml` are deleted by the Heroku pivot).
 **Related:**
 - [`docs/roadmap.md`](../../roadmap.md) (slice rows #19, #20, #21, #23)
 - [`CLAUDE.md`](../../../CLAUDE.md) §Hosting + §Launch strategy
@@ -51,7 +57,7 @@ rather than a re-architecture.
 | Component | Resource | Initial hostname |
 |---|---|---|
 | API | Fly app `urbanist-atlas`, region `iad` | `qa-api.urbanistatlas.com` (Fly cert) |
-| DB | Fly Managed Postgres `urbanist-atlas-db` | (private to the Fly app) |
+| DB | Heroku Postgres Essential-0 add-on | (private to the Heroku app via `DATABASE_URL`) |
 | Web | Cloudflare Pages project `urbanist-atlas`, prod branch `main` | `qa.urbanistatlas.com` (custom domain) |
 | Web previews | `<branch>.urbanist-atlas.pages.dev` | Automatic per non-`main` branch |
 
@@ -144,30 +150,48 @@ Deliverables:
 - `web/.env.example` documents both `VITE_API_BASE` and
   `VITE_API_CLIENT_SECRET`.
 
-#### Slice #20 — Fly MPG + first deploy (operational + optional code)
+#### Slice #20 — Heroku deploy + Postgres Essential-0 (operational + code rename)
 
-After #19 merges. Provisions Managed Postgres, sets secrets,
-deploys, seeds the dataset. Mostly `flyctl` CLI invocations; one
-small optional code change.
+After #19.5 (the cost-spike decision) lands. Provisions the Heroku
+app + Postgres Essential-0 add-on, sets secrets + non-secret
+config, deploys via `git push heroku main`, seeds the dataset.
+Mostly `heroku` CLI invocations; one cross-cutting code rename
+(`URBANIST_DB_URL` → `DATABASE_URL` on the urfave/cli flags) so
+the binary aligns with the de-facto managed-Postgres convention.
+
+The full Heroku design is at
+[`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md);
+implementation plan at
+[`../plans/2026-05-18-heroku-deploy-implementation.md`](../plans/2026-05-18-heroku-deploy-implementation.md).
 
 Deliverables:
 
 - New runbook at `docs/deploy.md` documenting the operational
-  steps (auth, launch, MPG create + attach, secrets set, deploy,
-  seed).
-- Three Fly secrets staged:
-  - `URBANIST_DB_URL` (required) — manual mapping from MPG's
-    `DATABASE_URL` because the binary reads our env name.
+  steps (auth, `heroku create` + buildpack + add-on, config + secrets,
+  deploy, seed, backup schedule, smoke).
+- Two app-level secrets staged via `heroku config:set`:
   - `URBANIST_ADMIN_TOKEN` (Phase 2 pre-stage; no-op until admin
     endpoints land).
   - `URBANIST_CLIENT_SECRET` (required by slice #23 in prod).
-- Optional `urbanist-atlas-server loaddata` subcommand
-  (`api/cmd/server/loaddata.go`) wrapping the existing
-  loadregions / loadpostal / seed chain in dependency order, so
-  every redeploy seed step is a single
-  `flyctl ssh console -C "urbanist-atlas-server loaddata"`. The
-  existing chain lives in `justfile:139-146`; the Go subcommand
-  mirrors it. Recommended in.
+- `DATABASE_URL` is **not** manually set — the Heroku Postgres
+  add-on owns it and rotates it automatically.
+- `urbanist-atlas-server loaddata` subcommand
+  (`api/cmd/server/loaddata.go`) — ported forward from the closed
+  slice-20-fly-deploy-loaddata branch (PR #11). Wraps the existing
+  loadregions / loadpostal / seed chain so every redeploy seed
+  step is a single `heroku run urbanist-atlas-server loaddata`.
+  The dev `just loaddata` recipe delegates to the same binary
+  subcommand for parity.
+- Procfile at the repo root: `release` runs migrations, `web` runs
+  serve. Replaces the slice-#19 `fly.toml` + `Dockerfile`, which
+  are deleted in this slice.
+- Connection-string env-var rename: every Postgres-touching
+  subcommand (`serve`, `migrate`, `seed`, `loadregions`,
+  `loadpostal`, `loaddata`) flips its urfave/cli flag's env source
+  from `URBANIST_DB_URL` to `DATABASE_URL`.
+  `mise.development.toml`, `mise.local.toml.example`, the `pg-up`
+  header comment in `justfile`, `api/README.md`, and CLAUDE.md's
+  convention list all rename in lockstep.
 
 #### Slice #21 — Cloudflare Pages + DNS (operational + tiny code)
 
