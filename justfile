@@ -164,7 +164,7 @@ loaddata:
 # is identical.
 #
 # Credentials and DB name are dev-only and match what
-# mise.development.toml hands to URBANIST_DB_URL:
+# mise.development.toml hands to DATABASE_URL:
 #   user: urbanist  pass: urbanist  db: urbanist_atlas_dev
 
 # start the dev postgres container (creates on first run, starts on subsequent), then wait for it to accept connections
