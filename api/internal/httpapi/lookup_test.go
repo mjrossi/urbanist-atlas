@@ -76,6 +76,16 @@ func TestLookup_HappyPath_ReturnsOAPIShape(t *testing.T) {
 			t.Error("regional org has no regions populated; full set is required by the wire contract")
 		}
 	}
+	// ODbL attribution headers must accompany every /api/v1/** success
+	// (CLAUDE.md "Launch strategy — Ongoing — ODbL attribution"). The
+	// canonical middleware coverage lives in odbl_test.go; this one-line
+	// assertion pins that /lookup specifically participates.
+	if got, want := resp.Header.Get("X-Data-License"), "ODbL-1.0"; got != want {
+		t.Errorf("X-Data-License: want %q, got %q", want, got)
+	}
+	if got := resp.Header.Get("X-Data-Attribution"); got == "" {
+		t.Errorf("X-Data-Attribution: want non-empty, got empty")
+	}
 }
 
 // TestLookup_BadRequests is the table-driven sweep over the handler's
@@ -274,12 +284,20 @@ func TestLookup_NormalizesPostalCodeAtBoundary(t *testing.T) {
 }
 
 // TestLookup_NationalTierOrg_ExcludedFromDefaultLookup pins the
-// scope_tier='national' filter against a custom store: a national region
-// (and its only org) is attached as a SIBLING of the leaf chain — not as
-// an ancestor — because MemStore.AncestorRegions does NOT prune national
-// (only the Postgres recursive CTE does). The sibling-attachment model
-// mirrors how PT's MUBi sits relative to lisboa-municipio in the seed
-// data and is the contract this test is pinning.
+// editorial sibling-attachment contract: when a national region is NOT
+// an ancestor of the leaf chain (as MUBi sits relative to
+// lisboa-municipio in the PT seed), it must not leak into either bucket.
+// This works equally against MemStore and Postgres because the ancestor
+// walk never reaches the national region in either backend.
+//
+// What this test does NOT exercise: the recursive-CTE safety-net filter
+// (lookup.sql `WHERE r.scope_tier <> 'national'`) — i.e. an ancestor-
+// attached national region that the SQL filter is responsible for
+// pruning. That case is covered by
+// TestPipeline_NationalTierAncestor_FilteredByCTE in
+// api/internal/store/postgres/pipeline_test.go (build tag: integration),
+// where only the Postgres backend's behavior is meaningful (MemStore
+// does not filter at the AncestorRegions seam).
 func TestLookup_NationalTierOrg_ExcludedFromDefaultLookup(t *testing.T) {
 	s := atlas.NewMemStore()
 
