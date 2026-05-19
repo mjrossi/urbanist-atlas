@@ -5,10 +5,23 @@ takes Urbanist Atlas from "works on localhost" to "live at QA URLs."
 **Supersedes:** none.
 **Superseded-in-part-by:** [`2026-05-18-hosting-cost-spike.md`](./2026-05-18-hosting-cost-spike.md)
 + [`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)
-— the DB row in the architecture table and the Slice #20 section are
-rewritten against Heroku Postgres Essential-0 instead of Fly Managed
-Postgres. Slices #19 / #21 / #23 are unaffected (slice #19's
-`Dockerfile` + `fly.toml` are deleted by the Heroku pivot).
+— the pivot from Fly.io to Heroku Common Runtime + Heroku Postgres
+Essential-0 rewrites:
+- the **API row** of the architecture table (now Heroku app, not Fly app);
+- the **DB row** of the architecture table (now Heroku Postgres
+  Essential-0, not Fly Managed Postgres);
+- the **API row** of the URL / DNS plan table (now CNAME → Heroku
+  DNS target, not `urbanist-atlas.fly.dev`);
+- **Slice #19** in full (the `Dockerfile` + `fly.toml` + `[group('fly')]`
+  recipes are deleted; Heroku ships from `Procfile` + buildpack);
+- **Slice #20** in full (Heroku CLI + Postgres add-on, no `flyctl`);
+- the **Future migration** section (read against the Heroku design
+  doc's "Reversibility" section instead).
+
+Slices #21 / #23 / #22 / #25 are unaffected in spirit, though any
+inline references to Fly within those sections (CORS origin location,
+TLS cert provisioning, etc.) should be read as their Heroku
+equivalents.
 **Related:**
 - [`docs/roadmap.md`](../../roadmap.md) (slice rows #19, #20, #21, #23)
 - [`CLAUDE.md`](../../../CLAUDE.md) §Hosting + §Launch strategy
@@ -25,10 +38,9 @@ All Phase 1a feature work is shipped: every v1 endpoint, every SPA
 page, ODbL attribution in every response, the region-DAG schema with
 PT validation. The codebase has no half-built features and no
 flagged tech debt. What's missing is operational — there is no
-container, no Fly app, no Pages project, no DNS, and no
-`X-Atlas-Client` shared-secret gate to keep the dogfood window
-locked down per CLAUDE.md's "Phase 1: locked-down dogfooding"
-framing.
+deployed API, no Pages project, no DNS, and no `X-Atlas-Client`
+shared-secret gate to keep the dogfood window locked down per
+CLAUDE.md's "Phase 1: locked-down dogfooding" framing.
 
 This chunk lands those four pieces in a way that maps cleanly to
 the launch strategy: deploy under **QA URLs only** first
@@ -36,7 +48,7 @@ the launch strategy: deploy under **QA URLs only** first
 full stack in production conditions, then attach the production
 hostnames to the same infrastructure when ready. The QA hostnames
 retire at prod-launch; ongoing test environments shift to
-ephemeral Pages `*.pages.dev` previews + Fly review apps.
+ephemeral Pages `*.pages.dev` previews + Heroku review apps.
 
 ## Strategic goal
 
@@ -56,18 +68,18 @@ rather than a re-architecture.
 
 | Component | Resource | Initial hostname |
 |---|---|---|
-| API | Fly app `urbanist-atlas`, region `iad` | `qa-api.urbanistatlas.com` (Fly cert) |
+| API | ~~Fly app `urbanist-atlas`, region `iad`~~ → Heroku app `urbanist-atlas`, Common Runtime region `us` | `qa-api.urbanistatlas.com` (Heroku ACM cert) |
 | DB | Heroku Postgres Essential-0 add-on | (private to the Heroku app via `DATABASE_URL`) |
 | Web | Cloudflare Pages project `urbanist-atlas`, prod branch `main` | `qa.urbanistatlas.com` (custom domain) |
 | Web previews | `<branch>.urbanist-atlas.pages.dev` | Automatic per non-`main` branch |
 
-The Fly app and Pages project are named *without* a `-qa` suffix.
+The Heroku app and Pages project are named *without* a `-qa` suffix.
 They are the same resources that will host production traffic
 later; only the hostnames mapped to them are environment-flavored.
 This keeps the QA → prod transition to "attach prod custom
 domains, drop QA ones."
 
-`URBANIST_CORS_ORIGINS` in `fly.toml` is set to
+`URBANIST_CORS_ORIGINS` is set via `heroku config:set` to
 `https://qa.urbanistatlas.com,*.pages.dev` for this chunk. Both
 forms are already supported by the in-tree CORS handler
 (`api/internal/httpapi/cors.go:23-29` for the `*.suffix` matcher).
@@ -77,42 +89,26 @@ forms are already supported by the in-tree CORS handler
 | Hostname | Target | Cloudflare proxy | When |
 |---|---|---|---|
 | `qa.urbanistatlas.com` | Pages project `urbanist-atlas` | **ON** (Pages requires) | This chunk |
-| `qa-api.urbanistatlas.com` | Fly app `urbanist-atlas` | **OFF** (direct, Fly TLS) | This chunk |
+| `qa-api.urbanistatlas.com` | Heroku app `urbanist-atlas` (CNAME to Heroku DNS target) | **OFF** (direct, Heroku ACM TLS) | This chunk |
 | `*.urbanist-atlas.pages.dev` | Cloudflare-managed | n/a | Automatic |
 | `urbanistatlas.com` | — | — | Prod launch (future) |
 | `api.urbanistatlas.com` | — | — | Prod launch (future) |
 
 The API subdomain is **not** Cloudflare-proxied: putting Cloudflare
 in front of a JSON API adds a hop without meaningful caching
-benefit (responses are personalized per postal code) and Fly
-already terminates TLS.
+benefit (responses are personalized per postal code) and Heroku's
+ACM already terminates TLS.
 
 ### Slice breakdown
 
-#### Slice #19 — Dockerfile + fly.toml (code only)
+#### ~~Slice #19 — Dockerfile + fly.toml (code only)~~ *(deleted by Heroku pivot)*
 
-Containerize the existing Go binary; declare the Fly deployment
-shape. **No** Fly account, DNS, secrets, or services are touched
-in this slice — it's just files in the repo.
-
-Deliverables:
-
-- Multi-stage `Dockerfile` (Go build stage + alpine runtime),
-  copying `api/seed/` into the runtime image so slice #20 can run
-  the one-time data load.
-- `.dockerignore` to keep the build context lean.
-- `fly.toml` at the repo root declaring app `urbanist-atlas`,
-  region `iad`, `release_command = "urbanist-atlas-server migrate up"`,
-  `URBANIST_CORS_ORIGINS = "https://qa.urbanistatlas.com,*.pages.dev"`,
-  `[http_service]` with auto-stop and a `/healthz` check.
-- `[group('fly')]` in the `justfile` with `fly-deploy`, `fly-status`,
-  `fly-logs`, `fly-secrets`, `fly-ssh` recipes.
-- Cross-reference link from `CLAUDE.md` §Hosting to this spec.
-
-The slice **reuses** the existing `migrate up` subcommand
-(`api/cmd/server/migrate.go`) and embedded migration FS
-(`api/migrations/embed.go`) — release_command is just the binary
-running its own migrate subcommand. No code path is new.
+> **Superseded.** Slice #19's deliverables (`Dockerfile`, `.dockerignore`,
+> `fly.toml`, `[group('fly')]` justfile recipes) never landed on main and
+> are deleted by the Heroku pivot. The Heroku-equivalent deliverables
+> live in slice #20 below (Procfile + `[group('heroku')]` recipes).
+> Slice #20's design is documented in
+> [`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md).
 
 #### Slice #23 — X-Atlas-Client shared-secret middleware (code only)
 
@@ -208,12 +204,12 @@ Deliverables:
 - DNS records (Cloudflare):
   - `qa` → CNAME → `<project>.pages.dev` (proxy ON; Pages
     requires it).
-  - `qa-api` → CNAME → `urbanist-atlas.fly.dev` (proxy OFF).
-- Fly TLS cert: `flyctl certs create qa-api.urbanistatlas.com`
-  plus DNS challenge records.
+  - `qa-api` → CNAME → Heroku-assigned DNS target (proxy OFF).
+- Heroku ACM cert: `heroku domains:add qa-api.urbanistatlas.com -a urbanist-atlas`
+  plus the Cloudflare CNAME pointing at the Heroku-assigned DNS target.
 - Pages env vars (set in dashboard, NOT in repo): `VITE_API_BASE
   = https://qa-api.urbanistatlas.com`, `VITE_API_CLIENT_SECRET =
-  <same as Fly URBANIST_CLIENT_SECRET>`, `NODE_VERSION = 22`.
+  <same as Heroku URBANIST_CLIENT_SECRET>`, `NODE_VERSION = 22`.
 - `README.md` and `web/README.md` updated to reflect QA URL is
   live; `docs/deploy.md` extended with the Pages/DNS section.
 
@@ -221,12 +217,14 @@ Deliverables:
 
 Slices land as four independent PRs:
 
-1. **Worktree A → slice #19** lands first (small PR, no
-   dependencies).
-2. **Worktree D → slice #23** can develop in parallel with
-   worktree A — touches different files.
-3. After #19 is on `main`:
-   - **Worktree B → slice #20** (Fly side).
+1. ~~**Worktree A → slice #19** lands first (small PR, no
+   dependencies).~~ *(superseded — slice #19's Dockerfile +
+   `fly.toml` artifacts never landed; the equivalent code lands
+   inside slice #20's Heroku PR.)*
+2. **Worktree D → slice #23** can develop in parallel with the
+   Heroku worktree — touches different files.
+3. After slice #23 is ready:
+   - **Worktree B → slice #20** (Heroku side).
    - **Worktree C → slice #21** (Pages side).
    - B and C are mutually independent; only the shared
      `docs/deploy.md` file is appended in both, and the conflict
@@ -255,25 +253,13 @@ only meaningful piece of testable logic in this chunk).
 
 ## Future migration: QA → prod
 
-When the maintainer is ready to launch prod, the transition is
-configuration-only:
-
-1. Cloudflare Pages: add `urbanistatlas.com` (apex) as a second
-   custom domain to the same Pages project; add DNS CNAMEs for
-   apex + `www`.
-2. Fly: `flyctl certs create api.urbanistatlas.com`; add DNS
-   CNAME for `api`.
-3. Update Fly secret `URBANIST_CORS_ORIGINS` to include
-   `https://urbanistatlas.com`; redeploy.
-4. Pages dashboard: point `VITE_API_BASE` at
-   `https://api.urbanistatlas.com`; redeploy.
-5. After prod verification, remove the QA hostnames (drop Pages
-   custom domain, drop Fly cert, drop CORS entry, drop DNS
-   records).
-6. Going forward, rely on Pages' `*.pages.dev` previews + Fly
-   review apps for ephemeral test environments.
-
-No application code change is required for this transition.
+> **Superseded by the Heroku design doc's "Reversibility / forward
+> migration" section.** The principle is unchanged (transition is
+> configuration-only, no application code change), but the concrete
+> steps now use `heroku domains:add` / `heroku config:set` instead of
+> `flyctl certs create` / `flyctl secrets set`. See
+> [`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)
+> for the canonical sequence.
 
 ## Verification per slice
 
@@ -281,12 +267,11 @@ Verification details live in the implementation plan
 (`~/.claude/plans/ok-let-s-pick-this-sorted-treasure.md`) and on
 each PR. Headline checks:
 
-- **#19:** `docker build .` succeeds; `docker run --rm urbanist-atlas serve --store=memory`
-  responds on `:8080`; `flyctl config validate` passes.
+- ~~**#19:**~~ *(superseded; see Heroku design doc + `docs/deploy.md`)*
 - **#23:** new middleware tests pass; local curl without the
   header → 401 problem+json; with the header → 200; `/healthz`
   and `/api/v1/openapi.yaml` succeed regardless.
-- **#20:** `curl https://urbanist-atlas.fly.dev/healthz` → 200;
+- **#20:** `curl https://urbanist-atlas-*.herokuapp.com/healthz` → 200;
   `curl -H "X-Atlas-Client: $SECRET" .../api/v1/lookup?...`
   returns a `LookupResult` with ODbL headers.
 - **#21:** `https://qa.urbanistatlas.com` loads the home page;

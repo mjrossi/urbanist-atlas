@@ -14,11 +14,11 @@ import (
 // loaddataCommand runs the full bundled-seed import in one shot:
 // regions → postal codes → orgs, for every country in the bundle.
 // Mirrors the `just loaddata` recipe in the root justfile, but as a
-// single Go subcommand so a Fly deploy can run it via
+// single Go subcommand so a Heroku deploy can run it via
 //
-//	flyctl ssh console -C "urbanist-atlas-server loaddata"
+//	heroku run urbanist-atlas-server loaddata -a urbanist-atlas
 //
-// without depending on `just` or shell scripting inside the image.
+// without depending on `just` or shell scripting inside the dyno.
 // The real logic lives in internal/loaddata; this is glue.
 func loaddataCommand() *cli.Command {
 	return &cli.Command{

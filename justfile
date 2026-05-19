@@ -29,17 +29,6 @@ api-run:
 api-build:
     cd api && mkdir -p bin && go build -o bin/urbanist-atlas-server ./cmd/server
 
-# build the api binary the same way the Docker runtime stage does:
-# static (CGO_ENABLED=0), Linux-targeted, stripped. Output still goes
-# to api/bin/ for ergonomics. The Dockerfile inlines the SAME flags;
-# keep them in sync (a code-review concern — there's no automated
-# drift check because installing `just` inside the build stage to
-# delegate here would add a dependency for one command).
-[group('api')]
-[doc('build the api binary with the same flags the Docker image uses')]
-api-build-prod:
-    cd api && mkdir -p bin && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/urbanist-atlas-server ./cmd/server
-
 # format Go code
 [group('api')]
 api-fmt:
@@ -268,10 +257,13 @@ web-check: web-deps web-lint web-test web-build web-gen-check
 # secrets) lives in docs/deploy.md — these recipes are for ongoing
 # ops once the app exists.
 
-# build + push current branch to Heroku (release phase runs migrations)
+# Uses HEAD:main so this works from a feature branch without first
+# switching back to a main-tracking checkout — Heroku only deploys
+# refs pushed to its `main` branch.
 [group('heroku')]
+[doc('push current HEAD to Heroku as main (release phase runs migrations)')]
 heroku-deploy:
-    git push heroku main
+    git push heroku HEAD:main
 
 # tail live Heroku logs
 [group('heroku')]
@@ -288,8 +280,11 @@ heroku-config:
 heroku-ssh:
     heroku run bash -a urbanist-atlas
 
-# seed the live database (regions → postal → orgs)
+# Runs against PROD data in a billed one-off dyno. Idempotent —
+# every loader upserts by stable key, so re-runs converge rather than
+# duplicate. Use after a seed-data edit lands on main.
 [group('heroku')]
+[doc('re-seed the LIVE database (one-off dyno; idempotent upserts)')]
 heroku-loaddata:
     heroku run urbanist-atlas-server loaddata -a urbanist-atlas
 

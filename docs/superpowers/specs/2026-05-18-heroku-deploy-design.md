@@ -33,7 +33,7 @@ verified that Fly Managed Postgres at ~$38/mo is indefensible for a
 locked-down Phase 1 dogfood. After re-verifying May-2026 pricing
 across Fly Machines, Hetzner, Render, Cloudflare Workers Containers,
 and Heroku, the maintainer chose **Heroku Basic dyno + Heroku Postgres
-Essential-0 (eu region)** at **$12/mo total**.
+Essential-0 (us region, Virginia)** at **$12/mo total**.
 
 The choice trades ~$7/mo over the spike's recommended Fly-sibling
 Postgres path for:
@@ -231,7 +231,7 @@ Heroku Postgres Essential-0 includes:
 Operationally:
 
 ```sh
-heroku pg:backups:schedule DATABASE_URL --at "02:00 Europe/Lisbon" -a urbanist-atlas
+heroku pg:backups:schedule DATABASE_URL --at "02:00 America/New_York" -a urbanist-atlas
 heroku pg:backups -a urbanist-atlas              # list
 heroku pg:backups:capture -a urbanist-atlas      # ad-hoc snapshot
 heroku pg:backups:download -a urbanist-atlas     # pull most recent dump

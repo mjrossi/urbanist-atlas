@@ -8,7 +8,7 @@ Go service powering [urbanistatlas.com](https://urbanistatlas.com). Public JSON 
 api/
 ├── cmd/server/         # urfave/cli entry point. Subcommands:
 │                       #   serve, migrate {up|down|status},
-│                       #   loadregions, loadpostal, seed
+│                       #   loadregions, loadpostal, seed, loaddata
 ├── pkg/atlas/          # Public, importable library. Pure Go.
 │                       # Org/Region/LookupResult types, the lookup
 │                       # algorithm, the Store interface, and an
