@@ -135,7 +135,9 @@ website_url = "https://betterstreetschi.org"
 tags = ["safe-streets", "advocacy", "grassroots"]
 region_slugs = ["chicago"]
 
-# --- CA / Toronto / Vancouver / Montréal ---
+# --- Canada ---
+
+# --- Toronto ---
 
 [[org]]
 slug = "ttcriders"
@@ -154,6 +156,8 @@ website_url = "https://walktoronto.ca"
 tags = ["walking", "safe-streets"]
 region_slugs = ["toronto"]
 
+# --- Vancouver ---
+
 [[org]]
 slug = "hub-cycling"
 name = "HUB Cycling"
@@ -169,6 +173,35 @@ short_desc = "Volunteer-run organization advocating for better, more affordable 
 website_url = "https://movementvancouver.ca"
 tags = ["transit", "grassroots"]
 region_slugs = ["metro-vancouver"]
+
+# --- Montréal ---
+
+[[org]]
+slug = "centre-ecologie-urbaine-montreal"
+name = "Centre d'écologie urbaine de Montréal"
+short_desc = "Montréal nonprofit advancing active mobility, citizen participation, and ecological urbanism; runs the Rues conviviales friendly-streets program for Québec municipalities."
+website_url = "https://www.ecologieurbaine.net"
+contact_url = "https://www.ecologieurbaine.net/fr/contactez-nous"
+tags = ["walking", "cycling", "urban-ecology", "advocacy", "participation"]
+region_slugs = ["montreal"]
+
+[[org]]
+slug = "coalition-mobilite-active-montreal"
+name = "Coalition Mobilité Active Montréal"
+short_desc = "Federation of Montréal borough-level active-mobility groups, advocating since 2012 for safer streets and better cycling/walking infrastructure across the city."
+website_url = "https://coalitionmam.org"
+tags = ["cycling", "walking", "safe-streets", "advocacy", "grassroots"]
+region_slugs = ["montreal"]
+
+[[org]]
+slug = "cre-montreal"
+name = "CRE-Montréal"
+short_desc = "Regional environmental council coordinating transit-funding, vehicle-reduction, and sustainable-mobility advocacy across the Greater Montréal region (CMM) since 1996."
+website_url = "https://www.cremtl.org"
+tags = ["transit", "policy", "regional", "environment", "advocacy"]
+region_slugs = ["montreal-cma"]
+
+# --- Québec (provincial) ---
 
 [[org]]
 slug = "trajectoire-quebec"
