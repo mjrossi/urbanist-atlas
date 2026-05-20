@@ -33,6 +33,11 @@
 // api/cmd/server/etl.go.
 package etl
 
+import (
+	"context"
+	"log/slog"
+)
+
 // SourceDescriptor names an upstream file the ETL pipeline expects to
 // find in etl/sources/<country>/. Concrete instances live in per-country
 // plans (added in slices #7.5.3 and #7.5.4).
@@ -72,9 +77,11 @@ type OutputTarget struct {
 	MaxRows int
 }
 
-// Country bundles a country's expected upstream sources and the
-// targets it generates. Concrete plans (US, CA) land in slices
-// #7.5.3 and #7.5.4.
+// Country bundles a country's expected upstream sources, the targets
+// it generates, and the Regenerate hook that performs the
+// transformation. Concrete plans (US, CA) register via init() blocks
+// in internal/etl/<cc>/ subpackages; the cmd/server etl subcommand
+// dispatches into Plans[code].
 type Country struct {
 	// Code is the canonical upper-case country code (e.g., "US",
 	// "CA").
@@ -86,6 +93,12 @@ type Country struct {
 	Sources []SourceDescriptor
 	// Targets lists every seed artifact the regenerate step writes.
 	Targets []OutputTarget
+	// Regenerate parses the staged source files in srcDir and writes
+	// the deterministic seed outputs (TOML + CSV) into outDir. May be
+	// nil for plans whose regenerate flow isn't implemented yet — in
+	// that case the cli stub returns an error indicating which slice
+	// is expected to land it.
+	Regenerate func(ctx context.Context, srcDir, outDir string, logger *slog.Logger) error
 }
 
 // Plans is the registered set of country plans the ETL subcommand

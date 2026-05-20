@@ -25,89 +25,18 @@
 #   60  state / province  (defined in regions_us_states.toml)
 #   80  multi-state / multi-province
 
-# --- Multi-state and federation regions ---
+# Multi-state and transit-federation regions live in
+# regions_us_multistate.toml (loaded between us_states and us_msas so
+# MSA overrides can parent under them). City/borough/county leaves
+# below cross-reference them via the loader's DB-lookup fallback.
 
-[[region]]
-slug = "nyc-tristate"
-kind = "us:multi-state"
-name = "Tri-State Region (NY/NJ/CT)"
-scope_tier = "regional"
-sort_priority = 80
-parents = []
-
-[[region]]
-slug = "chicagoland-multistate"
-kind = "us:multi-state"
-name = "Chicagoland (IL/IN/WI)"
-scope_tier = "regional"
-sort_priority = 80
-parents = []
-
-[[region]]
-slug = "rta-service-area"
-kind = "us:transit-federation"
-name = "RTA Service Area (Cook + 5 collar)"
-scope_tier = "regional"
-sort_priority = 50
-parents = ["il"]
-
-# --- Metros (parented under multi-state where applicable) ---
-
-[[region]]
-slug = "nyc-metro"
-kind = "us:metro"
-name = "New York Metro"
-scope_tier = "regional"
-sort_priority = 40
-parents = ["nyc-tristate"]
-
-[[region]]
-slug = "chicago-metro"
-kind = "us:metro"
-name = "Chicago Metro"
-scope_tier = "regional"
-sort_priority = 40
-parents = ["chicagoland-multistate"]
-
-[[region]]
-slug = "sf-bay-area"
-kind = "us:metro"
-name = "San Francisco Bay Area"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "greater-boston"
-kind = "us:metro"
-name = "Greater Boston"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "greater-miami"
-kind = "us:metro"
-name = "Greater Miami"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "seattle-metro"
-kind = "us:metro"
-name = "Seattle Metro"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "greater-la"
-kind = "us:metro"
-name = "Greater Los Angeles"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
+# --- Metros ---
+#
+# All US MSAs (Census CBSAs) live in regions_us_msas.toml, generated
+# by `urbanist-atlas-server etl regenerate --country=US`. Editorial
+# overrides for slug/name/parents are in regions_us_msa_overrides.toml.
+# Load order ensures the MSA file is upserted before this file so the
+# city leaves below can cross-reference MSA slugs as parents.
 
 # --- Counties (where they matter for advocacy reach) ---
 

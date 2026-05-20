@@ -16,16 +16,48 @@ Design at
 
 ## US
 
-Concrete plan lands in slice #7.5.3. The expected sources are:
+Sources pinned by slice #7.5.3. Files live under `etl/sources/us/`
+(gitignored).
 
-| File                              | Vintage     | URL                                                                                                                          | sha256          |
-| --------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `cbsa-est2023-delineation.csv`    | 2023 update | https://www.census.gov/programs-surveys/metro-micro/about/delineation-files.html                                             | _(TBD #7.5.3)_  |
-| `zcta-place-relationship.txt`     | 2020 census | https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.html                                   | _(TBD #7.5.3)_  |
-| `zcta-county-relationship.txt`    | 2020 census | https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.html                                   | _(TBD #7.5.3)_  |
+| File                                  | Vintage          | URL                                                                                                                            | sha256 |
+| ------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| `list1_2023.xlsx`                     | Census CBSA, July 2023      | https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx       | `952c4b1e78acbb54e6ec9412434b7602fedacbf021736351a63c181bdb753629` |
+| `list1_2023.csv`                      | (derived from xlsx)         | (run `etl/scripts/xlsx_to_csv.py list1_2023.xlsx list1_2023.csv`)                                                              | `6ad49da23ac95fe35f6e038e6ebc54b59b071d1503c1bde249d0a585f199b14a` |
+| `tab20_zcta520_place20_natl.txt`      | Census ZCTA-to-place, 2020  | https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_place20_natl.txt                                | `698a5dad71ed419411677d0ffd8ecd9331067f59c472cdd239b92c12f698285d` |
+| `tab20_zcta520_county20_natl.txt`     | Census ZCTA-to-county, 2020 | https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt                               | `3ed41278d637dc249e0323306f68be8a6c234e3090f4de88ef328dee71aeaaaf` |
 
-Census files are public domain — no attribution required by Census,
-but `LICENSE-DATA` will credit them anyway for transparency.
+### Manual refresh workflow
+
+The Census Bureau publishes the CBSA delineation file in xlsx format
+only — no CSV variant — so the workflow has a Python conversion step.
+
+```sh
+# 1a. mise install (one time) provisions Python 3.
+# 1b. pip install -r etl/scripts/requirements.txt (one time)
+#     pulls openpyxl. It's library-only so it doesn't fit mise's
+#     pipx backend; the requirements file pins the version instead.
+
+# 2. Fetch upstream files into etl/sources/us/.
+mkdir -p etl/sources/us && cd etl/sources/us
+curl -O https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx
+curl -O https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_place20_natl.txt
+curl -O https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt
+
+# 3. Convert the xlsx to CSV.
+python3 ../../scripts/xlsx_to_csv.py list1_2023.xlsx list1_2023.csv
+
+# 4. Verify checksums against this file. Mismatch = upstream vintage
+#    changed; bump the entries above and re-review the generated
+#    seed diff.
+shasum -a 256 list1_2023.xlsx list1_2023.csv tab20_*.txt
+
+# 5. Run the ETL.
+cd ../../../api
+go run ./cmd/server etl regenerate --country=US --src=../etl/sources --out=seed
+```
+
+Census reference files are in the public domain (17 U.S.C. § 105).
+See `LICENSE-DATA` for attribution recommendation.
 
 ## CA
 

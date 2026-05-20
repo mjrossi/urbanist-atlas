@@ -37,6 +37,8 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	defer cancel()
 
 	usStates := repoFile(t, "seed", "regions_us_states.toml")
+	usMultistate := repoFile(t, "seed", "regions_us_multistate.toml")
+	usMSAs := repoFile(t, "seed", "regions_us_msas.toml")
 	usRegions := repoFile(t, "seed", "regions_us.toml")
 	caProvinces := repoFile(t, "seed", "regions_ca_provinces.toml")
 	caRegions := repoFile(t, "seed", "regions_ca.toml")
@@ -57,6 +59,12 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	// RegionIDBySlug fallback).
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
 		t.Fatalf("loadregions US states: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMultistate, "US"); err != nil {
+		t.Fatalf("loadregions US multistate: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMSAs, "US"); err != nil {
+		t.Fatalf("loadregions US msas: %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US: %v", err)
@@ -138,6 +146,12 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
 		t.Fatalf("loadregions US states (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMultistate, "US"); err != nil {
+		t.Fatalf("loadregions US multistate (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMSAs, "US"); err != nil {
+		t.Fatalf("loadregions US msas (2nd): %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US (2nd): %v", err)
@@ -263,9 +277,13 @@ func TestPipeline_WorkedCities(t *testing.T) {
 	}
 
 	// orgs.toml has US/CA/PT entries; PT regions must exist before seed.
-	// State/province-tier files load before each country's main file
-	// (their slugs are referenced as parents via cross-file resolution).
+	// US load order: states → multistate → msas → us (cross-file parent
+	// references resolve via the loader's DB lookup fallback).
 	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_states.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_multistate.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_msas.toml"), "US")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
 	must(err)
@@ -392,9 +410,13 @@ func TestPipeline_PT_ValidationFixture(t *testing.T) {
 	// references US/CA region slugs that must exist or the org seed
 	// loader fails. The PT-specific assertions below only inspect PT
 	// state, so the additional US/CA load is just a no-op precondition.
-	// State/province-tier files load before each country's main file
-	// so cross-file parent references resolve.
+	// US load order: states → multistate → msas → us; cross-file parent
+	// references resolve via the loader's DB lookup fallback.
 	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_states.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_multistate.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_msas.toml"), "US")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
 	must(err)

@@ -4,10 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
+
+	// Blank-import per-country plans so their init() blocks register
+	// with etl.Plans. Adding a new country = add a blank import here.
+	_ "github.com/mjrossi/urbanist-atlas/api/internal/etl/us"
 )
 
 // etlCommand wraps the operator-side data pipeline that reshapes
@@ -109,21 +115,37 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 
 	plan, ok := etl.Plans[country]
 	if !ok {
-		// Foundation slice ships no plans; this is the expected path
-		// until #7.5.3 / #7.5.4 register US and CA.
-		logger.Info("etl regenerate: no plan registered for country (no-op stub)",
+		return fmt.Errorf("etl regenerate: no plan registered for country %q (known: %s)", country, strings.Join(planCodes(), ", "))
+	}
+	if plan.Regenerate == nil {
+		logger.Info("etl regenerate: plan registered but Regenerate hook is nil (no-op)",
 			"country", country,
 			"hint", "concrete plans land in slices #7.5.3 (US) and #7.5.4 (CA)",
 		)
 		return nil
 	}
 
-	logger.Info("etl regenerate: plan found",
+	srcDir := filepath.Join(c.String("src"), plan.SourcesDir)
+	outDir := c.String("out")
+
+	logger.Info("etl regenerate: start",
 		"country", country,
 		"sources", len(plan.Sources),
 		"targets", len(plan.Targets),
-		"src_dir", c.String("src"),
-		"out_dir", c.String("out"),
+		"src_dir", srcDir,
+		"out_dir", outDir,
 	)
-	return fmt.Errorf("etl regenerate: country %q plan registered but regenerate flow not yet implemented (lands in #7.5.3/#7.5.4)", country)
+	if err := plan.Regenerate(ctx, srcDir, outDir, logger); err != nil {
+		return fmt.Errorf("etl regenerate %s: %w", country, err)
+	}
+	logger.Info("etl regenerate: complete", "country", country)
+	return nil
+}
+
+func planCodes() []string {
+	out := make([]string, 0, len(etl.Plans))
+	for k := range etl.Plans {
+		out = append(out, k)
+	}
+	return out
 }

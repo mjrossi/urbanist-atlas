@@ -36,6 +36,8 @@ func loadAllSeeds(ctx context.Context, t *testing.T, store *Store) {
 		country string
 	}{
 		{repoFile(t, "seed", "regions_us_states.toml"), "US"},
+		{repoFile(t, "seed", "regions_us_multistate.toml"), "US"},
+		{repoFile(t, "seed", "regions_us_msas.toml"), "US"},
 		{repoFile(t, "seed", "regions_us.toml"), "US"},
 		{repoFile(t, "seed", "regions_ca_provinces.toml"), "CA"},
 		{repoFile(t, "seed", "regions_ca.toml"), "CA"},

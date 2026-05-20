@@ -1,0 +1,65 @@
+# US MSA editorial overrides applied by etl regenerate --country=US.
+#
+# Each [[override]] block pins the slug, display name, and parent
+# edges for a specific Census CBSA code. The ETL replaces the
+# auto-generated "<first-city>-<state>-metro" defaults with these
+# values when writing regions_us_msas.toml.
+#
+# Use overrides for:
+#   - well-known metros whose curated slug should be short (e.g.,
+#     "nyc-metro" rather than "new-york-ny-metro")
+#   - multi-state metros that should parent under an intermediate
+#     multi-state region (nyc-tristate, chicagoland-multistate) rather
+#     than under each constituent state directly
+#   - any future editorial cleanup of auto-generated names
+#
+# CBSA codes are stable identifiers across Census revisions; using
+# them as the override key is more robust than keying by current slug.
+
+[[override]]
+cbsa_code = "35620"
+slug = "nyc-metro"
+name = "New York Metro"
+parents = ["nyc-tristate"]
+
+[[override]]
+cbsa_code = "16980"
+slug = "chicago-metro"
+name = "Chicago Metro"
+parents = ["chicagoland-multistate"]
+
+# Single-state metros with curated leaves below carry no state parent
+# per region-graph.md §1 ("state edges live on the leaf, not on the
+# metro") — otherwise an SF/Boston/Miami/Seattle/LA ZIP would surface
+# the state region twice in resolved_ancestry (once via the leaf's
+# state edge, once via the metro→state edge).
+
+[[override]]
+cbsa_code = "41860"
+slug = "sf-bay-area"
+name = "San Francisco Bay Area"
+parents = []
+
+[[override]]
+cbsa_code = "14460"
+slug = "greater-boston"
+name = "Greater Boston"
+parents = []
+
+[[override]]
+cbsa_code = "33100"
+slug = "greater-miami"
+name = "Greater Miami"
+parents = []
+
+[[override]]
+cbsa_code = "42660"
+slug = "seattle-metro"
+name = "Seattle Metro"
+parents = []
+
+[[override]]
+cbsa_code = "31080"
+slug = "greater-la"
+name = "Greater Los Angeles"
+parents = []

@@ -1,0 +1,9 @@
+# Python dependencies for etl/scripts/. Install with:
+#
+#     pip install -r etl/scripts/requirements.txt
+#
+# Pinned for reproducibility. Only needed by contributors refreshing
+# the Census xlsx source (xlsx_to_csv.py); the runtime API server has
+# no Python dependency.
+
+openpyxl==3.1.5
