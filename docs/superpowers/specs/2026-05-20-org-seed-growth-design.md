@@ -312,6 +312,21 @@ during the editorial pass.)
   unreachable; San Antonio Mobility Coalition skews highway-funding
   (out of scope); Earn-A-Bike and San Antonio Wheelmen are
   shop/club rather than advocacy. Metro gate satisfied via the
-  Texas state-floor org (BikeTexas, to be added in Round 3) through
-  ancestor walk for SA ZIPs. Worth revisiting if a maintainer with
-  local knowledge surfaces an active SA advocacy group.
+  Texas state-floor org (BikeTexas) through ancestor walk for SA ZIPs.
+  Worth revisiting if a maintainer with local knowledge surfaces an
+  active SA advocacy group.
+
+### State floor gaps (documented; ZIPs in these states will return empty)
+
+- **West Virginia (WV)** — no demonstrably-active statewide ped/bike
+  advocacy nonprofit. Existing WV bike orgs (Country Roads Cyclists,
+  WVMBA, WVTrails) are recreational, mountain-bike, or trail-focused
+  rather than safe-streets advocacy.
+- **Arkansas (AR)** — Bike/Walk Arkansas was organized 2015 but
+  stalled; no active statewide advocacy successor. ARDOT's
+  Bicycle-Pedestrian Coordinator is reportedly trying to seed a new
+  effort.
+- **Oklahoma (OK)** — BikeOklahoma (Oklahoma Bicycling Coalition) is
+  dissolving and transferring assets to the Oklahoma Bicycle Summit,
+  Inc. No replacement statewide advocacy 501(c)(3) active as of
+  2026-05-20.

@@ -544,6 +544,156 @@ website_url = "https://www.localmotion.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets"]
 region_slugs = ["vt"]
 
+# --- Delaware ---
+
+[[org]]
+slug = "bike-delaware"
+name = "Bike Delaware"
+short_desc = "Delaware 501(c)(3) nonprofit advocating for safe, convenient cycling and walking statewide; organizes the #RideforPie Amish Country Bike Tour and policy advocacy."
+website_url = "https://www.bikede.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["de"]
+
+# --- Maryland ---
+
+[[org]]
+slug = "bike-maryland"
+name = "Bike Maryland"
+short_desc = "Maryland statewide bicycle advocacy nonprofit organizing the annual Bike Maryland Symposium and the state's bike/walk legislative priorities."
+website_url = "https://www.bikemaryland.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["md"]
+
+# --- Virginia ---
+
+[[org]]
+slug = "virginia-bicycling-federation"
+name = "Virginia Bicycling Federation"
+short_desc = "Virginia statewide cycling advocacy organization working to change public policy for safe cycling; 2026 priority bill HB661 (two-abreast riding, pedestrian-signal use, Safety Yield)."
+website_url = "https://www.vabike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["va"]
+
+# --- West Virginia ---
+# gap: no demonstrably-active statewide ped/bike advocacy nonprofit as
+# of 2026-05-20. Existing WV bike orgs (Country Roads Cyclists, WVMBA,
+# WVTrails) are recreational / mountain-bike / trail-focused rather
+# than safe-streets advocacy. Revisit if maintainer has local sources.
+
+# --- North Carolina ---
+
+[[org]]
+slug = "bikewalk-nc"
+name = "BikeWalk NC"
+short_desc = "North Carolina's statewide advocate for safe cycling and walking; works through education, advocacy, and promotion to make transportation, recreation, and health safer statewide."
+website_url = "https://www.bikewalknc.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "education"]
+region_slugs = ["nc"]
+
+# --- South Carolina ---
+
+[[org]]
+slug = "palmetto-walk-bike"
+name = "Palmetto Walk Bike"
+short_desc = "South Carolina statewide nonprofit (rebranded from Palmetto Cycling Coalition in 2025) working to make walking and biking safer and more accessible across the state since 1995."
+website_url = "https://palmettowalkbike.com"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
+region_slugs = ["sc"]
+
+# --- Georgia ---
+
+[[org]]
+slug = "georgia-bikes"
+name = "Georgia Bikes"
+short_desc = "Georgia statewide bicycle advocacy nonprofit, providing resources and support for local advocacy organizations and coordinating Georgia-wide bicycle policy work."
+website_url = "https://georgiabikes.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ga"]
+
+# --- Florida ---
+
+[[org]]
+slug = "florida-bicycle-association"
+name = "Florida Bicycle Association"
+short_desc = "Florida statewide 501(c)(3) bicycle advocacy and education coalition; represents the Sunshine State at the League of American Bicyclists National Bike Summit."
+website_url = "https://floridabicycle.org"
+tags = ["cycling", "advocacy", "safe-streets", "education", "policy"]
+region_slugs = ["fl"]
+
+# --- Kentucky ---
+
+[[org]]
+slug = "bike-walk-kentucky"
+name = "Bike Walk Kentucky"
+short_desc = "Kentucky 501(c)(3) statewide active-transportation advocacy nonprofit working with leaders and partners to make walking and biking safer and more accessible."
+website_url = "https://bikewalk.ky"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["ky"]
+
+# --- Tennessee ---
+
+[[org]]
+slug = "bike-walk-tennessee"
+name = "Bike Walk Tennessee"
+short_desc = "Tennessee statewide cycling and pedestrian advocacy nonprofit providing educational resources for local, state, and national stakeholders; active on infrastructure policy."
+website_url = "https://www.bikewalktn.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "education"]
+region_slugs = ["tn"]
+
+# --- Alabama ---
+
+[[org]]
+slug = "alabike"
+name = "Alabama Bicycle Coalition"
+short_desc = "Alabama statewide grassroots 501(c)(3) cycling advocacy organization (AlaBike) promoting cycling safety, education, and access."
+website_url = "https://www.alabike.org"
+tags = ["cycling", "advocacy", "safe-streets", "education", "grassroots"]
+region_slugs = ["al"]
+
+# --- Mississippi ---
+
+[[org]]
+slug = "bike-walk-mississippi"
+name = "Bike Walk Mississippi"
+short_desc = "Mississippi's statewide bicycle and pedestrian advocacy nonprofit working to make walking and biking safer across the state."
+website_url = "https://www.bikewalkmississippi.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["ms"]
+
+# --- Arkansas ---
+# gap: no active statewide ped/bike advocacy nonprofit as of 2026-05-20.
+# Bike/Walk Arkansas was organized in 2015 but stalled and has not been
+# active since. ARDOT's Bicycle-Pedestrian Coordinator is reportedly
+# looking to help re-establish a statewide advocacy effort. Revisit when
+# that materializes.
+
+# --- Louisiana ---
+
+[[org]]
+slug = "bike-easy"
+name = "Bike Easy"
+short_desc = "Greater New Orleans bicycle education and advocacy nonprofit; serves as Louisiana's de facto statewide voice at the National Bike Summit and on state policy."
+website_url = "https://bikeeasy.org"
+tags = ["cycling", "advocacy", "safe-streets", "education"]
+region_slugs = ["la"]
+
+# --- Oklahoma ---
+# gap: BikeOklahoma (Oklahoma Bicycling Coalition) is in the process of
+# dissolving and transferring assets to the Oklahoma Bicycle Summit, Inc.
+# (as of mid-2025). No replacement statewide advocacy 501(c)(3) is
+# active as of 2026-05-20. Revisit once the Oklahoma Bicycle Summit
+# successor body stands up as a sustained advocacy entity.
+
+# --- Texas ---
+
+[[org]]
+slug = "biketexas"
+name = "BikeTexas"
+short_desc = "Texas's statewide bicycle advocacy and education organization (founded 1991 as the Texas Bicycle Coalition); advances bicycle access, safety, and Complete Streets policy."
+website_url = "https://www.biketexas.org"
+tags = ["cycling", "advocacy", "safe-streets", "education", "policy"]
+region_slugs = ["tx"]
+
 # --- Canada ---
 
 # --- Toronto ---
