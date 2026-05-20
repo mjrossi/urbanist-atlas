@@ -153,6 +153,17 @@ website_url = "https://cmtalliance.org"
 tags = ["transit", "policy", "research", "regional"]
 region_slugs = ["baltimore-md-metro"]
 
+# --- Charlotte ---
+
+[[org]]
+slug = "sustain-charlotte"
+name = "Sustain Charlotte"
+short_desc = "Charlotte regional sustainability nonprofit advocating for better transit, safer walking and biking, complete streets, and equitable transportation policy."
+website_url = "https://sustaincharlotte.org"
+contact_url = "https://sustaincharlotte.org/contact/"
+tags = ["transit", "walking", "cycling", "advocacy", "sustainability", "policy"]
+region_slugs = ["charlotte-nc-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
