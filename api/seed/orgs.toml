@@ -174,6 +174,15 @@ website_url = "https://www.bikewalkcentralflorida.org"
 tags = ["cycling", "walking", "pedestrian", "safe-streets", "advocacy"]
 region_slugs = ["orlando-fl-metro"]
 
+# --- San Antonio ---
+# Metro gap as of 2026-05-20: no metro-anchored org meets the activity
+# bar. Bike San Antonio (bikesatx.org) is unreachable; San Antonio
+# Mobility Coalition is highway-funding-focused, out of scope; Earn-A-Bike
+# and San Antonio Wheelmen are bike shop / cycling club, not safe-streets
+# advocacy per se. Metro gate is satisfied via the TX state-floor org
+# (BikeTexas) through the recursive-CTE ancestor walk. Revisit if a
+# maintainer with local knowledge surfaces an active SA advocacy org.
+
 # --- Canada ---
 
 # --- Toronto ---

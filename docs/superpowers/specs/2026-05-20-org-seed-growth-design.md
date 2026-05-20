@@ -303,5 +303,15 @@ cover the loader + lookup paths; they fail at `pg-reset` time if any
 ## Canvas adjustments
 
 (This section captures any metros swapped or states demoted to `# gap`
-during the editorial pass. Empty at design time; populated as work
-progresses.)
+during the editorial pass.)
+
+### Metro gate gaps (satisfied via state-floor fallback)
+
+- **San Antonio (US #24)** — no metro-anchored advocacy org meets the
+  activity bar as of 2026-05-20. Bike San Antonio's website is
+  unreachable; San Antonio Mobility Coalition skews highway-funding
+  (out of scope); Earn-A-Bike and San Antonio Wheelmen are
+  shop/club rather than advocacy. Metro gate satisfied via the
+  Texas state-floor org (BikeTexas, to be added in Round 3) through
+  ancestor walk for SA ZIPs. Worth revisiting if a maintainer with
+  local knowledge surfaces an active SA advocacy group.
