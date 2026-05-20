@@ -327,6 +327,16 @@ website_url = "https://www.friendsoftransit.org"
 tags = ["transit", "advocacy", "education", "rail"]
 region_slugs = ["phoenix-az-metro"]
 
+# --- Riverside-San Bernardino (Inland Empire) ---
+
+[[org]]
+slug = "inland-empire-biking-alliance"
+name = "Inland Empire Biking Alliance"
+short_desc = "Redlands-based cycling advocacy alliance unifying the Inland Empire cycling community across Riverside and San Bernardino counties for safer streets and better transportation."
+website_url = "https://ieba.clubexpress.com"
+tags = ["cycling", "advocacy", "regional"]
+region_slugs = ["riverside-ca-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
