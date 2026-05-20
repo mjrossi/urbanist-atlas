@@ -399,6 +399,17 @@ website_url = "https://www.bikesd.org"
 tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["san-diego-ca-metro"]
 
+# --- Tampa ---
+
+[[org]]
+slug = "walk-bike-tampa"
+name = "Walk Bike Tampa"
+short_desc = "Citizen-based Tampa advocacy nonprofit promoting safe, connected routes for people walking, biking, and rolling; organizes Bike Month and World Car Free Day."
+website_url = "https://www.walkbiketampa.org"
+contact_url = "https://walkbiketampa.org/contact-us/"
+tags = ["cycling", "walking", "safe-streets", "advocacy"]
+region_slugs = ["tampa-fl-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
