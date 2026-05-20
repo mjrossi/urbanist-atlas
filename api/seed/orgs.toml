@@ -373,6 +373,32 @@ website_url = "https://www.ourstreetsmn.org"
 tags = ["cycling", "walking", "safe-streets", "advocacy"]
 region_slugs = ["minneapolis-mn-metro"]
 
+# --- San Diego ---
+
+[[org]]
+slug = "circulate-san-diego"
+name = "Circulate San Diego"
+short_desc = "San Diego regional multimodal advocacy nonprofit working on transit, walking, biking, and Vision Zero; coordinates Bike Anywhere Day and the regional Vision Zero Coalition."
+website_url = "https://www.circulatesd.org"
+tags = ["transit", "cycling", "walking", "advocacy", "vision-zero", "regional"]
+region_slugs = ["san-diego-ca-metro"]
+
+[[org]]
+slug = "san-diego-county-bike-coalition"
+name = "San Diego County Bike Coalition"
+short_desc = "San Diego County cycling advocacy coalition fighting to fix the \"Fatal 15\" most dangerous intersections and bring safer school routes to the region."
+website_url = "https://sdbikecoalition.org"
+tags = ["cycling", "safe-streets", "advocacy", "vision-zero"]
+region_slugs = ["san-diego-ca-metro"]
+
+[[org]]
+slug = "bikesd"
+name = "BikeSD"
+short_desc = "San Diego cycling advocacy organization holding the mayor and City accountable on safe streets, bike-program funding, and Fatal-15 corridor improvements."
+website_url = "https://www.bikesd.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["san-diego-ca-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
