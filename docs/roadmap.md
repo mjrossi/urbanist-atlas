@@ -114,6 +114,21 @@ the plan is the *design* view.
   intentionally exempt). Frontend helpers unwrap `data`
   transparently. See
   `docs/superpowers/specs/2026-05-18-odbl-response-shape-design.md`.
+- **Postal-code coverage at scale (slice #7.5, sub-slices #7.5.1–4):**
+  Replaces the 47-row fixture with 33,774 US ZCTAs + 1,643 CA FSAs
+  via the smallest-anchor model. New `internal/etl/{us,ca}` packages
+  parse Census CBSA + ZCTA crosswalks (US) and StatsCan FSA + CMA
+  boundary DBFs (CA), emitting deterministic `regions_us_msas.toml`
+  (393 MSAs), `regions_ca_cmas.toml` (41 CMAs), and per-country
+  `postal_codes_*.csv`. Region taxonomy gains state/province tier
+  (52 US + 13 CA), multistate tier (3 US), and CMA/MSA tier (393 + 41).
+  NYC `nyc` flips to a regional intermediate region above 5 borough
+  leaves; the state edge moves from `nyc → ny` to the borough rows
+  per region-graph rule §1. `loadpostal` switched to batched
+  `unnest` upserts via raw `pgx.Exec` so 33k US rows load in ~3s
+  instead of multi-minute per-row round-trips. `internal/loadregions`
+  gains cross-file parent resolution so multi-tier TOML splits
+  resolve. Design spec: `docs/superpowers/specs/2026-05-19-postal-coverage-design.md`.
 - **X-Atlas-Client shared-secret gate (slice #23):**
   `api/internal/httpapi/clientsecret.go` middleware checks
   `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via

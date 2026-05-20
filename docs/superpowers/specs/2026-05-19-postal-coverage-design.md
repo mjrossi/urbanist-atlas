@@ -552,48 +552,81 @@ in a consistent state:
 
 ### #7.5.4 — CA CMAs + FSA postal codes
 
-**Deliverables:**
+**Deliverables (as shipped):**
 
-- ETL parsers for: StatsCan PCCF (filtered to FSA + CSD + CMA +
-  province columns), StatsCan CMA reference file.
-- `api/seed/regions_ca_cmas.toml` — 35 entries, all hand-cleaned.
-- `api/seed/postal_codes_ca.csv` — regenerated, ~1.6k rows.
-- `etl/SOURCES.md` populated with CA source vintage + checksums.
-- `LICENSE-DATA` updated with StatsCan Open License attribution
-  text per StatsCan's required format.
+- ETL parsers for the StatsCan FSA + CMA boundary file DBFs (NOT
+  the PCCF — see "Sourcing pivot" below). The boundary zips are
+  parsed in-place: only the ~150KB DBF attribute tables are read;
+  the ~300MB shapefile geometry is ignored.
+- Minimal stdlib-only DBF reader at `api/internal/etl/ca/dbf.go`
+  (no new Go dependency).
+- `api/seed/regions_ca_cmas.toml` — 41 entries (CMATYPE='B' filter;
+  Census Agglomerations of type 'D' filtered out). 4 hand-cleaned
+  overrides (toronto-cma, montreal-cma, metro-vancouver,
+  ottawa-gatineau-cma); the remaining 37 use auto-generated
+  `<slugified-name>-cma` slugs and the cleaned StatsCan name.
+- `api/seed/postal_codes_ca.csv` — 1,643 FSAs anchored at city leaf
+  (10), CMA via prefix table (522), or province (1,111).
+- `etl/SOURCES.md` populated with CA source vintage + sha256s.
+- `LICENSE-DATA` Statistics Canada Open Licence section with the
+  required acknowledgement text.
 
-**Verification:**
+**Sourcing pivot (recorded for the historical record):** the
+original plan was to filter the PCCF (92-154-X) for FSA → CSD/CMA/
+province columns. The PCCF Open Licence variant turned out to be
+gated by a registration agreement we didn't want to bake into the
+contributor workflow. We pivoted to the publicly-licensed boundary
+files (lfsa000b21a_e + lcma000b21a_e) which give us FSA → province
+directly but not FSA → CMA. A coarse hand-coded prefix table in
+`api/internal/etl/ca/mappings.go` (M, L1-L6, L8-L9, H, V5-V7,
+K1-K2, J8-J9, T2-T3, T5-T6) covers the major metros (Toronto,
+Hamilton, Montréal, Vancouver, Ottawa-Gatineau, Calgary, Edmonton).
+FSAs outside those prefixes fall through to province. A future
+slice can replace the prefix table with per-FSA spatial join data
+when access improves.
 
-- Lookup of varied CA FSAs returns the expected anchor (city leaf
-  for Toronto/Montréal/Vancouver FSAs; CMA for Ottawa-area FSAs;
-  province for non-CMA FSAs).
-- `urbanist etl regenerate --country=CA` is reproducible.
-- All 13 provinces + territories surface in `/api/v1/metros` or
-  via direct lookup (depending on the metro-kind predicate; see
-  open question below).
+**Verification (as observed):**
+
+- Lookup of varied CA FSAs returns the expected anchor (M5V →
+  toronto, L4T → toronto-cma, L8P → hamilton-cma, K1A →
+  ottawa-gatineau-cma, A0A → nl-province).
+- `urbanist-atlas-server etl regenerate --country=CA` is reproducible.
+- All 13 provinces + territories load via `regions_ca_provinces.toml`
+  and surface in `/api/v1/metros` only if their kind is metro-equivalent
+  (it isn't — `ca:province` is intentionally out of the metro list).
 
 ---
 
 ## Open questions
 
-1. **Should the metro predicate include MSAs/CMAs?** `atlas.IsMetroKind`
-   currently matches `us:metro`, `ca:cma`, `ca:regional-district`,
-   `pt:area-metropolitana`. The new MSAs use `us:metro` (already
-   covered) and the new CMAs use `ca:cma` (already covered) — so
-   they'll automatically surface on `/api/v1/metros` and the
-   homepage Browse panel. **Decision deferred to #7.5.3**: the
-   Browse list jumping from ~10 to ~419 entries is a UX problem.
-   Two paths: (a) filter Browse to top-50 by population; (b) keep
-   showing all but paginate. Or (c) defer Browse-list growth
-   policy to a separate slice (#7.5.5 or similar).
-2. **Source vintage**: pin Census 2020 ZCTAs (10-year vintage; next
-   refresh is 2030 census) and StatsCan 2025-Q1 PCCF. Locked in
-   #7.5.3/4 at commit time; documented in `etl/SOURCES.md`.
-3. **Override file naming**: settled on
-   `regions_us_msa_overrides.toml` (one file, applies to entries
-   in `regions_us_msas.toml`). The same pattern is available for
-   CA if CMA naming needs after-the-fact adjustment.
-4. **Phase 2 / API-keys impact**: none. The smallest-anchor model
+1. **Browse-list growth policy.** After #7.5.3 + #7.5.4, the
+   `IsMetroKind` predicate returns true for 393 US MSAs + 41 CA
+   CMAs + 1 metro-vancouver + 4 PT área-metropolitanas = ~440 metros
+   on `/api/v1/metros` and the homepage Browse panel. The current
+   UI was designed for ~10. **Decision deferred to a follow-up
+   slice** (#7.5.5 or a separate Browse-policy slice). Three paths:
+   (a) filter Browse to top-50-by-org-count (cheapest, hides
+   metros with no orgs); (b) paginate; (c) tier the list with a
+   "show all" toggle. The default API behavior (return all metros)
+   stays correct; the UI policy is what changes.
+2. **Source vintages (locked).** Census 2020 ZCTAs + Census 2023
+   CBSA delineation + StatsCan 2021 census boundary files. All
+   sha256-pinned in `etl/SOURCES.md`. Vintage upgrades are
+   deliberate future slices.
+3. **Override file naming (locked).** US overrides live in
+   `api/seed/regions_us_msa_overrides.toml` (one file, applies to
+   entries in `regions_us_msas.toml`). CA overrides live in
+   `api/internal/etl/ca/mappings.go` (the small fixed CMA set
+   didn't warrant a separate TOML file). The dichotomy is
+   intentional: US has 393 MSAs with editorial open-endedness;
+   CA has 41 CMAs and the override set is bounded.
+4. **PCCF for finer CA granularity.** The current FSA-prefix
+   mapping is approximate (e.g., L7 straddles Toronto and Hamilton
+   CMAs but maps to province). A future slice could replace it
+   with per-FSA spatial join data via either (a) shelling out to
+   a Python+GeoPandas script during ETL or (b) negotiating PCCF
+   Open Licence access. Tracked but not blocking Phase 1.
+5. **Phase 2 / API-keys impact**: none. The smallest-anchor model
    doesn't change the wire contract; lookup responses look the
    same to clients. Anchors that resolve to MSA or state regions
    produce shorter `resolved_ancestry` arrays than city-anchored

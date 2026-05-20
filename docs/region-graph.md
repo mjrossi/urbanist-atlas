@@ -450,52 +450,75 @@ explicitly query for national-tier orgs.
 
 ## Adding a new country
 
-Worked example: Germany.
+Worked example: Germany. The region taxonomy now splits across
+multiple files per country, mirroring how slices #7.5.1–#7.5.4
+structured US + CA. Files at minimum:
 
-1. **Write `api/seed/regions_de.toml`.** Start with the Länder, then
-   add Bezirke/Kreise as needed, then cities. Set `scope_tier` per
-   region using the conventions above. For city-states (Berlin,
-   Hamburg, Bremen), use `scope_tier='local'`. Add transit federations
-   (VBB, VRR, MVV, …) as top-level regions with the leaves they serve
-   as children.
+| File | Purpose |
+|---|---|
+| `regions_de_lander.toml` (or `_states`) | Top-tier hand-defined Länder. `scope_tier=regional`. No parents. |
+| `regions_de_multistate.toml` *(optional)* | Multi-Länder advocacy regions or transit federations (e.g., VBB, MVV). |
+| `regions_de_msas.toml` *(generated, optional)* | Metro-equivalent regions from a Census-style upstream source via the ETL pipeline. Skip if you start hand-curated. |
+| `regions_de.toml` | Hand-curated city/Gemeinde leaves. Parents reference state/multi-state/MSA slugs from the files above (cross-file resolution handled by `internal/loadregions/write.go`'s `RegionIDBySlug` fallback). |
 
-2. **Generate `api/seed/postal_codes_de.csv`.** Take an upstream source
-   (OpenGeoDB, Geonames, official Bundespost data), reshape into the
-   3-column format `postal_code,country,leaf_region_slug`. Each German
-   postcode maps to its leaf city/Gemeinde.
+Per-country file lists live in `api/internal/loaddata/loaddata.go`'s
+`countries` table — add a `{code, regionFiles, postal}` entry there
+when adding a country, in the right load order.
 
-3. **Add DE orgs to `api/seed/orgs.toml`.** Use `region_slugs` to
-   attach them. For an org that works across the VBB area, attach to
-   `["vbb-region"]`. For a Berlin-wide org, attach to `["berlin"]`.
+### Step-by-step
 
-4. **Run `just loaddata` (after updating the recipe to include the new
-   files).** It runs:
+1. **Write `api/seed/regions_de_lander.toml`.** All 16 Länder.
+   `scope_tier=regional`, `kind=de:land`, no parents. Mirror the
+   structure of `regions_us_states.toml`.
 
-   ```sh
-   just loadregions seed/regions_de.toml DE
-   just loadpostal  seed/postal_codes_de.csv DE
-   just seed
-   ```
+2. **(Optional) Write `api/seed/regions_de_multistate.toml`.** Transit
+   federations (VBB, VRR, MVV, …) and any multi-Länder advocacy
+   regions. Parent under the Länder slugs from step 1 where
+   appropriate per rule §3.
 
-5. **Add a per-country postal normalizer if needed.** Edit
-   `api/pkg/atlas/postal.go`. The default normalizer (`uppercase +
-   strip whitespace`) works for DE/FR/MX (5-digit numeric). UK and CA
-   need special handling (outward code / FSA truncation); those are
-   already in place. Australia is 4-digit numeric.
+3. **(Optional) Build the ETL plan.** If Germany has a Census-style
+   reference for metros (e.g., the EU's NUTS-3 codes mapped to
+   FUAs / Stadtregionen), add `api/internal/etl/de/` with parsers +
+   plan registration. Otherwise skip — hand-curating one
+   `regions_de.toml` is fine for low cardinality.
 
-6. **Smoke-test:**
+4. **Write `api/seed/regions_de.toml`.** Cities. For city-states
+   (Berlin, Hamburg, Bremen), use `kind=de:land` + `scope_tier=local`
+   (the editorial override per rule §4). Other cities get
+   `kind=de:kreisfreie-stadt` or `de:gemeinde` + `scope_tier=local`.
 
-   ```sh
-   just lookup 10115 DE     # Berlin-Mitte
-   just lookup 14467 DE     # Potsdam
-   ```
+5. **Generate `api/seed/postal_codes_de.csv`.** Reshape an upstream
+   source (OpenGeoDB, Geonames, official Bundespost data) into the
+   3-column format `postal_code,country,leaf_region_slug` using the
+   smallest-anchor pattern: prefer city leaves, fall through to
+   Länder for un-curated postcodes. The ETL pipeline can do this if
+   you build the DE plan in step 3.
 
-   The first should return Berlin and VBB orgs in Local + Regional.
-   The second should return Brandenburg + VBB orgs in Regional, NOT
-   the Berlin-attached orgs.
+6. **Add DE orgs to `api/seed/orgs.toml`.** Use `region_slugs` to
+   attach them.
 
-That's the entire flow. No schema changes; no code changes for
-typical countries.
+7. **Update `api/internal/loaddata/loaddata.go`.** Add a
+   `{"DE", []string{"de_lander", "de_multistate", "de"}, "de"}`
+   entry so `just loaddata` picks up the new country.
+
+8. **Run `just loaddata` against a fresh dev DB.**
+
+9. **Add a per-country postal normalizer if needed.** Edit
+   `api/pkg/atlas/postal.go`. The default normalizer
+   (`uppercase + strip whitespace`) works for DE (5-digit numeric).
+   UK and CA need special handling (outward code / FSA truncation);
+   those are already in place.
+
+10. **Smoke-test:**
+
+    ```sh
+    just lookup 10115 DE     # Berlin-Mitte
+    just lookup 14467 DE     # Potsdam
+    ```
+
+That's the flow. No schema changes; no code changes beyond the
+single-line addition in `loaddata.go` (and the ETL plan if you
+choose to build one).
 
 ---
 

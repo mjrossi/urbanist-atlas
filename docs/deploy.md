@@ -146,13 +146,27 @@ heroku run urbanist-atlas-server loaddata -a urbanist-atlas
 ```
 
 `loaddata` runs the regions → postal-codes → orgs chain for every
-bundled country in dependency order. The loaders are upsert-based,
-so re-running is safe — counts won't change unless the seed files
-do. Add a country by dropping `seed/regions_<cc>.toml` and
-`seed/postal_codes_<cc>.csv` into `api/seed/` and appending an
-entry to `api/internal/loaddata/loaddata.go`; the integration test
-(`TestPipeline_LoaddataLoadAll`) picks the new country up
-automatically via `loaddata.Countries()`.
+bundled country in dependency order. Each country has its own
+multi-tier region file list (state/province → multistate → MSAs/CMAs
+→ curated leaves) declared in `api/internal/loaddata/loaddata.go`'s
+`countries` table. The loaders are upsert-based, so re-running is
+safe — counts won't change unless the seed files do. Adding a new
+country is documented in `docs/region-graph.md` § "Adding a new
+country"; the integration test (`TestPipeline_LoaddataLoadAll`)
+picks the new country up automatically via `loaddata.Countries()`.
+
+**Expected load size for the current bundle** (slice #7.5 onward):
+
+| Country | Region rows | Postal-code rows |
+|---|---|---|
+| US | 52 states + 3 multistate + 393 MSAs + 19 leaves = **467** | **33,774** ZCTAs |
+| CA | 13 provinces + 41 CMAs + 5 leaves = **59** | **1,643** FSAs |
+| PT | 22 regions | 7 postal codes (validation fixture) |
+| Orgs | — | 23 organizations |
+
+The 33k US postal-code load is handled by the batched UNNEST upsert
+path in `internal/loadpostal` and completes in ~3s on Heroku
+Postgres Essential-0 (vs. ~27min if it were per-row upserts).
 
 If `loaddata` fails partway through (e.g. `loaddata: postal CA: …`),
 the preceding countries' rows stay committed — the loaders are

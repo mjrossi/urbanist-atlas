@@ -83,17 +83,23 @@ The primary shipping decision remains US + CA.
 
 ## Real-world data sources
 
-`postal_codes_*.csv` in this directory are **bundled fixtures** (curated
-ZIP coverage of the worked-example cities). Full-country imports use:
+US + CA postal-code datasets in this directory are now **generated
+by the ETL pipeline** from upstream Census + Statistics Canada
+geographic reference files. The ETL workflow + pinned upstream
+URLs + sha256 checksums live in
+[`etl/SOURCES.md`](../../etl/SOURCES.md). Source files themselves
+are gitignored under `etl/sources/` — commit only the regenerated
+outputs in this directory.
 
-| Country | Source | URL |
+| Country | Upstream | Implemented |
 |---|---|---|
-| US | Census ZCTA crosswalk | https://www.census.gov/geographies/reference-files.html |
-| CA | StatsCan Postal Code Conversion File (PCCF) | https://www150.statcan.gc.ca/n1/en/catalogue/92-154-X |
-| PT | CTT via OpenPLZ (ODbL-licensed; OSM-derived) | https://www.openplzapi.org/en/ |
-| DE | Various open sources (e.g. OpenGeoDB, Geonames) | https://download.geonames.org/export/zip/ |
-| UK | ONS Postcode Directory | https://geoportal.statistics.gov.uk/ |
+| US | Census CBSA delineation (xlsx) + ZCTA-to-place + ZCTA-to-county relationship files | `api/internal/etl/us` (slice #7.5.3) |
+| CA | StatsCan FSA + CMA boundary files (DBF extracted from shapefile zips) | `api/internal/etl/ca` (slice #7.5.4) |
+| PT | CTT via OpenPLZ (ODbL-licensed; OSM-derived) | Hand-curated validation fixture; ETL plan not yet built |
+| DE / UK / FR / MX / AU | Various open sources (OpenGeoDB, Geonames, ONS, etc.) | Not yet implemented; add `api/internal/etl/<cc>` when needed |
 
-Each requires an out-of-band ETL pass (script, notebook) to reshape
-into the 3-column format above before `loadpostal` is run. Sha256
-checksums of the upstream files are tracked in this README when added.
+Refresh workflow: `mise install && pip install -r etl/scripts/requirements.txt`
+once (Python + openpyxl are only needed by the xlsx→CSV conversion
+in the US workflow), then `urbanist-atlas-server etl regenerate
+--country=US|CA`. The ETL is deterministic — same upstream vintage
+produces byte-identical seed-file output.
