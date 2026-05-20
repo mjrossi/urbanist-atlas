@@ -48,11 +48,13 @@ func init() {
 			{
 				Filename: "lfsa000b21a_e.zip",
 				URL:      "https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip",
+				SHA256:   "9fd2b6adf66e5716d06f91ebdcdb5d8a4e8b9eeb520f8b4285030d34319959db",
 				Vintage:  "Statistics Canada FSA boundary file, 2021 census",
 			},
 			{
 				Filename: "lcma000b21a_e.zip",
 				URL:      "https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip",
+				SHA256:   "a12dd39b3262edb48f9490b435d2f43b0327cc4af7d829f32aebae4d4b9f8fa0",
 				Vintage:  "Statistics Canada CMA boundary file, 2021 census",
 			},
 		},

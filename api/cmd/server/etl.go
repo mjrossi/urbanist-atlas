@@ -2,10 +2,17 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -27,13 +34,18 @@ import (
 //	urbanist-atlas-server etl download   --country US
 //	urbanist-atlas-server etl regenerate --country US
 //
-// The foundation slice (#7.5.1) ships these as no-op stubs that just
-// log what they would do. Concrete country plans land in:
+// download fetches every SourceDescriptor in the country plan via HTTP,
+// streams each file into etl/sources/<country>/, and verifies the
+// SHA256 against the value pinned in the plan (mirrored in
+// etl/SOURCES.md). regenerate parses the staged sources and writes the
+// deterministic seed TOML/CSV files under api/seed/. Country plans
+// live in api/internal/etl/<cc>/ and self-register in etl.Plans via
+// init() blocks.
 //
-//   - #7.5.3 — US: Census CBSA + ZCTA-to-place + ZCTA-to-county →
-//     regions_us_msas.toml + postal_codes_us.csv.
-//   - #7.5.4 — CA: StatsCan PCCF + CMA reference →
-//     regions_ca_cmas.toml + postal_codes_ca.csv.
+// US note: the Census CBSA file ships as xlsx only. download writes
+// list1_2023.xlsx; an out-of-band Python step (etl/scripts/xlsx_to_csv.py)
+// converts it to list1_2023.csv, which regenerate consumes. See
+// etl/SOURCES.md for the recipe.
 //
 // Design rationale at docs/superpowers/specs/2026-05-19-postal-coverage-design.md.
 func etlCommand() *cli.Command {
@@ -90,21 +102,88 @@ func runEtlDownload(ctx context.Context, c *cli.Command) error {
 
 	plan, ok := etl.Plans[country]
 	if !ok {
-		// Foundation slice ships no plans; this is the expected path
-		// until #7.5.3 / #7.5.4 register US and CA.
-		logger.Info("etl download: no plan registered for country (no-op stub)",
-			"country", country,
-			"hint", "concrete plans land in slices #7.5.3 (US) and #7.5.4 (CA)",
-		)
-		return nil
+		return fmt.Errorf("etl download: no plan registered for country %q (known: %s)", country, strings.Join(planCodes(), ", "))
 	}
 
-	logger.Info("etl download: plan found",
+	srcDir := filepath.Join(c.String("src"), plan.SourcesDir)
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		return fmt.Errorf("etl download: create %s: %w", srcDir, err)
+	}
+
+	logger.Info("etl download: start",
 		"country", country,
 		"sources", len(plan.Sources),
-		"src_dir", c.String("src"),
+		"src_dir", srcDir,
 	)
-	return fmt.Errorf("etl download: country %q plan registered but download flow not yet implemented (lands in #7.5.3/#7.5.4)", country)
+
+	client := &http.Client{Timeout: 5 * time.Minute}
+	for _, src := range plan.Sources {
+		dst := filepath.Join(srcDir, src.Filename)
+		if err := downloadSource(ctx, client, src, dst, logger); err != nil {
+			return fmt.Errorf("etl download %s: %w", src.Filename, err)
+		}
+	}
+
+	if country == "US" {
+		logger.Info("etl download: complete — US has a follow-up xlsx conversion step before regenerate",
+			"country", country,
+			"hint", "python3 etl/scripts/xlsx_to_csv.py etl/sources/us/list1_2023.xlsx etl/sources/us/list1_2023.csv",
+		)
+	} else {
+		logger.Info("etl download: complete", "country", country)
+	}
+	return nil
+}
+
+// downloadSource fetches src.URL, streams the body into dst while
+// computing sha256, and verifies the result against src.SHA256 (if
+// non-empty). A mismatch leaves the file on disk and returns an
+// error — the operator can re-review the upstream vintage rather
+// than losing the download.
+func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDescriptor, dst string, logger *slog.Logger) error {
+	logger.Info("etl download: fetching",
+		"filename", src.Filename,
+		"url", src.URL,
+		"vintage", src.Vintage,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.URL, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("http get: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("http get: status %s", resp.Status)
+	}
+
+	f, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", dst, err)
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	n, err := io.Copy(io.MultiWriter(f, h), resp.Body)
+	if err != nil {
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	got := hex.EncodeToString(h.Sum(nil))
+
+	logger.Info("etl download: wrote",
+		"filename", src.Filename,
+		"bytes", n,
+		"sha256", got,
+	)
+
+	if src.SHA256 != "" && got != src.SHA256 {
+		return fmt.Errorf("sha256 mismatch for %s: got %s, want %s (upstream vintage may have changed — update SHA256 in the country plan + etl/SOURCES.md after reviewing the diff)",
+			src.Filename, got, src.SHA256)
+	}
+	return nil
 }
 
 func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
@@ -119,9 +198,11 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 		return fmt.Errorf("etl regenerate: no plan registered for country %q (known: %s)", country, strings.Join(planCodes(), ", "))
 	}
 	if plan.Regenerate == nil {
+		// Defensive: a country plan may register itself but defer
+		// implementing Regenerate to a follow-up slice. US and CA both
+		// ship complete plans today.
 		logger.Info("etl regenerate: plan registered but Regenerate hook is nil (no-op)",
 			"country", country,
-			"hint", "concrete plans land in slices #7.5.3 (US) and #7.5.4 (CA)",
 		)
 		return nil
 	}

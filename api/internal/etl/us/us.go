@@ -34,18 +34,26 @@ func init() {
 		SourcesDir: "us",
 		Sources: []etl.SourceDescriptor{
 			{
-				Filename: "list1_2023.csv",
+				// CBSA delineation ships as xlsx only; the Filename
+				// here is the downloaded xlsx. Regenerate reads the
+				// derived CSV (list1_2023.csv) produced by the
+				// manual `etl/scripts/xlsx_to_csv.py` step — see
+				// etl/SOURCES.md for the recipe.
+				Filename: "list1_2023.xlsx",
 				URL:      "https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx",
+				SHA256:   "952c4b1e78acbb54e6ec9412434b7602fedacbf021736351a63c181bdb753629",
 				Vintage:  "Census CBSA delineation, July 2023",
 			},
 			{
 				Filename: "tab20_zcta520_place20_natl.txt",
 				URL:      "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_place20_natl.txt",
+				SHA256:   "698a5dad71ed419411677d0ffd8ecd9331067f59c472cdd239b92c12f698285d",
 				Vintage:  "Census ZCTA-to-place relationship, 2020 vintage",
 			},
 			{
 				Filename: "tab20_zcta520_county20_natl.txt",
 				URL:      "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt",
+				SHA256:   "3ed41278d637dc249e0323306f68be8a6c234e3090f4de88ef328dee71aeaaaf",
 				Vintage:  "Census ZCTA-to-county relationship, 2020 vintage",
 			},
 		},
