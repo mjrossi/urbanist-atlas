@@ -337,6 +337,24 @@ website_url = "https://ieba.clubexpress.com"
 tags = ["cycling", "advocacy", "regional"]
 region_slugs = ["riverside-ca-metro"]
 
+# --- Detroit ---
+
+[[org]]
+slug = "transportation-riders-united"
+name = "Transportation Riders United"
+short_desc = "Detroit-region transit advocacy nonprofit since 1999, organizing for expanded service across Wayne, Oakland, and Macomb counties; wins include the D2A2 and DAX buses to Ann Arbor."
+website_url = "https://www.detroittransit.org"
+tags = ["transit", "advocacy", "regional"]
+region_slugs = ["detroit-mi-metro"]
+
+[[org]]
+slug = "detroit-greenways-coalition"
+name = "Detroit Greenways Coalition"
+short_desc = "Detroit advocacy nonprofit for better biking and walking since 2007; led the citywide greenway vision including the Joe Louis Greenway and Gordie Howe International Bridge bike access."
+website_url = "https://detroitgreenways.org"
+tags = ["cycling", "walking", "advocacy", "greenways", "safe-streets"]
+region_slugs = ["detroit-mi-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
