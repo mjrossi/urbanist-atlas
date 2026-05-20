@@ -410,6 +410,24 @@ contact_url = "https://walkbiketampa.org/contact-us/"
 tags = ["cycling", "walking", "safe-streets", "advocacy"]
 region_slugs = ["tampa-fl-metro"]
 
+# --- Denver ---
+
+[[org]]
+slug = "denver-streets-partnership"
+name = "Denver Streets Partnership"
+short_desc = "Denver multimodal advocacy organization (Bicycle Colorado + WalkDenver merger) coordinating biking, walking, and transit policy; ran the \"Waiting for Dignity\" bus-stop campaign and helped pass $115M in bike/ped funding."
+website_url = "https://denverstreetspartnership.org"
+tags = ["transit", "cycling", "walking", "safe-streets", "advocacy", "policy"]
+region_slugs = ["denver-co-metro"]
+
+[[org]]
+slug = "greater-denver-transit"
+name = "Greater Denver Transit"
+short_desc = "Volunteer-led Denver-region transit-rider advocacy collective pushing for fast, frequent, reliable RTD service; campaigns on downtown bus improvements and regional rail."
+website_url = "https://www.greaterdenvertransit.com"
+tags = ["transit", "grassroots", "advocacy", "regional"]
+region_slugs = ["denver-co-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
