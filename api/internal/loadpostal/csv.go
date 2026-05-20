@@ -40,13 +40,56 @@ type Row struct {
 // Summary is the per-run report returned by LoadFile.
 type Summary struct {
 	PostalCodes int
+	// DistinctSlugs is the number of unique leaf_region_slug values
+	// resolved during the load. Exposed so callers (and tests) can
+	// confirm the in-memory slug cache short-circuited as expected —
+	// 33k US ZCTAs typically resolve to a few hundred distinct
+	// region slugs (states + MSAs + curated leaves).
+	DistinctSlugs int
+	// Batches is the number of UNNEST upsert chunks issued. For N
+	// rows this is ceil(N / batchSize). Exposed so a regression that
+	// reverted to per-row Exec calls fails a count-based assertion.
+	Batches int
 }
 
 var header = []string{"postal_code", "country", "leaf_region_slug"}
 
+// batchSize is the row count per UNNEST-INSERT chunk. Tuned so the
+// Postgres parameter limit (~65,535 per statement) stays safe with the
+// three parallel arrays we pass — 500 × 3 = 1,500 array elements is
+// well below the cap — and so the per-batch transaction work is small
+// enough to keep memory and statement-parse time bounded.
+const batchSize = 500
+
+// upsertPostalCodesBatchStmt is issued via raw pgx.Exec rather than
+// sqlc-generated code because sqlc 1.x can't type-check multi-arg
+// UNNEST against the parameter signature. pgx handles []string →
+// text[] and []int64 → bigint[] natively, so the call site stays
+// almost as clean as a sqlc-generated wrapper.
+const upsertPostalCodesBatchStmt = `
+INSERT INTO postal_codes (country, postal_code, leaf_region_id)
+SELECT * FROM unnest($1::text[], $2::text[], $3::bigint[])
+ON CONFLICT (country, postal_code) DO UPDATE
+SET leaf_region_id = EXCLUDED.leaf_region_id`
+
 // LoadFile parses a CSV at path and upserts its contents inside a
 // single transaction. Unknown slugs are a hard error — silently
 // skipping would leave postal codes pointing at nothing.
+//
+// Implementation note: two-pass to keep network round-trips bounded:
+//
+//  1. Resolve every distinct leaf slug to its region ID via the sqlc
+//     RegionIDBySlug query, building a cache. Distinct slug count is
+//     small (~hundreds, capped by the number of curated leaves +
+//     MSAs + states), so this is cheap even for 30k+ row files.
+//  2. Chunk the resolved rows into batchSize-row groups and issue one
+//     multi-row INSERT … SELECT FROM unnest(...) per group via raw
+//     pgx.Exec. For 33k US ZCTAs that's ~66 batches instead of 33k
+//     per-row Exec round-trips — turns a multi-minute Heroku load into
+//     a few seconds.
+//
+// Idempotent: re-running with the same input produces the same row
+// set (ON CONFLICT … DO UPDATE keeps the leaf_region_id current).
 func LoadFile(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, path string, country atlas.Country) (Summary, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -67,8 +110,8 @@ func LoadFile(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, path
 
 	q := gen.New(tx)
 	slugCache := map[string]int64{}
-	summary := Summary{}
-	for _, row := range rows {
+	resolvedIDs := make([]int64, len(rows))
+	for i, row := range rows {
 		leafID, ok := slugCache[row.LeafRegionSlug]
 		if !ok {
 			id, err := q.RegionIDBySlug(ctx, row.LeafRegionSlug)
@@ -81,18 +124,31 @@ func LoadFile(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, path
 			slugCache[row.LeafRegionSlug] = id
 			leafID = id
 		}
-		if err := q.UpsertPostalCode(ctx, gen.UpsertPostalCodeParams{
-			Country:      string(row.Country),
-			PostalCode:   row.PostalCode,
-			LeafRegionID: leafID,
-		}); err != nil {
-			return Summary{}, fmt.Errorf("loadpostal: upsert %s/%s: %w", row.Country, row.PostalCode, err)
+		resolvedIDs[i] = leafID
+	}
+
+	summary := Summary{}
+	for start := 0; start < len(rows); start += batchSize {
+		end := min(start+batchSize, len(rows))
+		chunk := rows[start:end]
+		ids := resolvedIDs[start:end]
+
+		countries := make([]string, len(chunk))
+		codes := make([]string, len(chunk))
+		for j, row := range chunk {
+			countries[j] = string(row.Country)
+			codes[j] = row.PostalCode
 		}
-		summary.PostalCodes++
-		if logger != nil && summary.PostalCodes%500 == 0 {
+		if _, err := tx.Exec(ctx, upsertPostalCodesBatchStmt, countries, codes, ids); err != nil {
+			return Summary{}, fmt.Errorf("loadpostal: batch upsert rows [%d:%d): %w", start, end, err)
+		}
+		summary.PostalCodes += len(chunk)
+		summary.Batches++
+		if logger != nil && summary.PostalCodes%5000 == 0 {
 			logger.Info("loadpostal: progress", "rows", summary.PostalCodes, "total", len(rows))
 		}
 	}
+	summary.DistinctSlugs = len(slugCache)
 	if err := tx.Commit(ctx); err != nil {
 		return Summary{}, fmt.Errorf("loadpostal: commit: %w", err)
 	}

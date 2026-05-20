@@ -51,3 +51,46 @@ software in this repository (the Go API and React web application) is
 licensed separately under the Apache License 2.0; see LICENSE.
 Documentation and prose content is licensed under CC BY-SA 4.0; see
 LICENSE-CONTENT.
+
+Third-party reference data
+--------------------------
+
+The postal-code anchor mappings under api/seed/postal_codes_us.csv
+and the MSA region rows under api/seed/regions_us_msas.toml are
+derived from US Census Bureau geographic reference files:
+
+  - CBSA Delineation Files (List 1, July 2023):
+    https://www.census.gov/programs-surveys/metro-micro/about/delineation-files.html
+  - 2020 ZCTA Relationship Files (ZCTA-to-place, ZCTA-to-county):
+    https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.html
+
+US Census Bureau publications are works of the federal government and
+are in the public domain (17 U.S.C. § 105). No attribution is legally
+required, but downstream users are encouraged to credit the Census
+Bureau when republishing this derived data, e.g.:
+
+  Postal-to-region anchors and MSA membership derived from US Census
+  Bureau geographic reference files (public domain).
+
+The original Census files themselves are not redistributed by this
+repository — only the reshaped + curated derivative outputs under
+api/seed/ are committed. See etl/SOURCES.md for the upstream URLs and
+vintage manifest.
+
+Similarly, the CMA region rows under api/seed/regions_ca_cmas.toml
+and the FSA-anchor mappings under api/seed/postal_codes_ca.csv are
+derived from Statistics Canada geographic boundary files:
+
+  - Forward Sortation Area Boundary File (2021 census):
+    https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip
+  - Census Metropolitan Area Boundary File (2021 census):
+    https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip
+
+Statistics Canada releases these files under the Statistics Canada
+Open Licence (https://www.statcan.gc.ca/en/reference/licence), which
+permits use, redistribution, and adaptation with attribution. The
+required acknowledgement is:
+
+  Adapted from Statistics Canada, Census of Population, 2021. This
+  does not constitute an endorsement by Statistics Canada of this
+  product.

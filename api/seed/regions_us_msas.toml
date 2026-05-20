@@ -1,0 +1,3565 @@
+# US Metropolitan Statistical Areas (MSAs), generated from the
+# Census Bureau's CBSA delineation file by api/cmd/server etl
+# regenerate --country=US.
+#
+# Edit policy: do NOT hand-edit this file. Editorial overrides for
+# slug, name, and parents live in regions_us_msa_overrides.toml and
+# are applied by the ETL run. To change a metro's slug/name/parents,
+# add or update an override and re-run etl regenerate.
+#
+# Slug convention:
+#   - Override-supplied for the well-known metros (nyc-metro,
+#     chicago-metro, etc.). See regions_us_msa_overrides.toml.
+#   - Auto-generated otherwise as "<first-city>-<primary-state>-metro"
+#     (the state suffix keeps slugs stable across Census revisions
+#     that may shuffle MSAs sharing a first-city name).
+#
+# Parents:
+#   - Single-state MSAs parent under their state slug.
+#   - Multi-state MSAs without an override parent under all their
+#     constituent states (so MSA-anchored ZCTAs surface state-tier
+#     orgs through the ancestor walk). Curated multi-state regions
+#     in regions_us.toml (nyc-tristate, chicagoland-multistate) are
+#     plumbed in via the override file.
+#
+# Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
+# states) and regions_us.toml (children: curated city/borough leaves
+# that may reference these metros). Cross-file parent resolution lives
+# in internal/loadregions/write.go.
+
+[[region]]
+slug = "abilene-tx-metro"
+kind = "us:metro"
+name = "Abilene Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 10180 — Abilene, TX
+
+[[region]]
+slug = "aguadilla-pr-metro"
+kind = "us:metro"
+name = "Aguadilla Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pr"]
+# Census CBSA 10380 — Aguadilla, PR
+
+[[region]]
+slug = "akron-oh-metro"
+kind = "us:metro"
+name = "Akron Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 10420 — Akron, OH
+
+[[region]]
+slug = "albany-ga-metro"
+kind = "us:metro"
+name = "Albany Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 10500 — Albany, GA
+
+[[region]]
+slug = "albany-ny-metro"
+kind = "us:metro"
+name = "Albany Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 10580 — Albany-Schenectady-Troy, NY
+
+[[region]]
+slug = "albany-or-metro"
+kind = "us:metro"
+name = "Albany Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or"]
+# Census CBSA 10540 — Albany, OR
+
+[[region]]
+slug = "albuquerque-nm-metro"
+kind = "us:metro"
+name = "Albuquerque Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nm"]
+# Census CBSA 10740 — Albuquerque, NM
+
+[[region]]
+slug = "alexandria-la-metro"
+kind = "us:metro"
+name = "Alexandria Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 10780 — Alexandria, LA
+
+[[region]]
+slug = "allentown-pa-metro"
+kind = "us:metro"
+name = "Allentown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa", "nj"]
+# Census CBSA 10900 — Allentown-Bethlehem-Easton, PA-NJ
+
+[[region]]
+slug = "altoona-pa-metro"
+kind = "us:metro"
+name = "Altoona Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 11020 — Altoona, PA
+
+[[region]]
+slug = "amarillo-tx-metro"
+kind = "us:metro"
+name = "Amarillo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 11100 — Amarillo, TX
+
+[[region]]
+slug = "ames-ia-metro"
+kind = "us:metro"
+name = "Ames Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia"]
+# Census CBSA 11180 — Ames, IA
+
+[[region]]
+slug = "amherst-town-ma-metro"
+kind = "us:metro"
+name = "Amherst Town Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ma"]
+# Census CBSA 11200 — Amherst Town-Northampton, MA
+
+[[region]]
+slug = "anchorage-ak-metro"
+kind = "us:metro"
+name = "Anchorage Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ak"]
+# Census CBSA 11260 — Anchorage, AK
+
+[[region]]
+slug = "ann-arbor-mi-metro"
+kind = "us:metro"
+name = "Ann Arbor Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 11460 — Ann Arbor, MI
+
+[[region]]
+slug = "anniston-al-metro"
+kind = "us:metro"
+name = "Anniston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 11500 — Anniston-Oxford, AL
+
+[[region]]
+slug = "appleton-wi-metro"
+kind = "us:metro"
+name = "Appleton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 11540 — Appleton, WI
+
+[[region]]
+slug = "arecibo-pr-metro"
+kind = "us:metro"
+name = "Arecibo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pr"]
+# Census CBSA 11640 — Arecibo, PR
+
+[[region]]
+slug = "asheville-nc-metro"
+kind = "us:metro"
+name = "Asheville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 11700 — Asheville, NC
+
+[[region]]
+slug = "athens-ga-metro"
+kind = "us:metro"
+name = "Athens Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 12020 — Athens-Clarke County, GA
+
+[[region]]
+slug = "atlanta-ga-metro"
+kind = "us:metro"
+name = "Atlanta Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 12060 — Atlanta-Sandy Springs-Roswell, GA
+
+[[region]]
+slug = "atlantic-city-nj-metro"
+kind = "us:metro"
+name = "Atlantic City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nj"]
+# Census CBSA 12100 — Atlantic City-Hammonton, NJ
+
+[[region]]
+slug = "auburn-al-metro"
+kind = "us:metro"
+name = "Auburn Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 12220 — Auburn-Opelika, AL
+
+[[region]]
+slug = "augusta-ga-metro"
+kind = "us:metro"
+name = "Augusta Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga", "sc"]
+# Census CBSA 12260 — Augusta-Richmond County, GA-SC
+
+[[region]]
+slug = "austin-tx-metro"
+kind = "us:metro"
+name = "Austin Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 12420 — Austin-Round Rock-San Marcos, TX
+
+[[region]]
+slug = "bakersfield-ca-metro"
+kind = "us:metro"
+name = "Bakersfield Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 12540 — Bakersfield-Delano, CA
+
+[[region]]
+slug = "baltimore-md-metro"
+kind = "us:metro"
+name = "Baltimore Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["md"]
+# Census CBSA 12580 — Baltimore-Columbia-Towson, MD
+
+[[region]]
+slug = "bangor-me-metro"
+kind = "us:metro"
+name = "Bangor Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["me"]
+# Census CBSA 12620 — Bangor, ME
+
+[[region]]
+slug = "barnstable-town-ma-metro"
+kind = "us:metro"
+name = "Barnstable Town Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ma"]
+# Census CBSA 12700 — Barnstable Town, MA
+
+[[region]]
+slug = "baton-rouge-la-metro"
+kind = "us:metro"
+name = "Baton Rouge Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 12940 — Baton Rouge, LA
+
+[[region]]
+slug = "battle-creek-mi-metro"
+kind = "us:metro"
+name = "Battle Creek Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 12980 — Battle Creek, MI
+
+[[region]]
+slug = "bay-city-mi-metro"
+kind = "us:metro"
+name = "Bay City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 13020 — Bay City, MI
+
+[[region]]
+slug = "beaumont-tx-metro"
+kind = "us:metro"
+name = "Beaumont Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 13140 — Beaumont-Port Arthur, TX
+
+[[region]]
+slug = "beckley-wv-metro"
+kind = "us:metro"
+name = "Beckley Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv"]
+# Census CBSA 13220 — Beckley, WV
+
+[[region]]
+slug = "bellingham-wa-metro"
+kind = "us:metro"
+name = "Bellingham Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 13380 — Bellingham, WA
+
+[[region]]
+slug = "bend-or-metro"
+kind = "us:metro"
+name = "Bend Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or"]
+# Census CBSA 13460 — Bend, OR
+
+[[region]]
+slug = "billings-mt-metro"
+kind = "us:metro"
+name = "Billings Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mt"]
+# Census CBSA 13740 — Billings, MT
+
+[[region]]
+slug = "binghamton-ny-metro"
+kind = "us:metro"
+name = "Binghamton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 13780 — Binghamton, NY
+
+[[region]]
+slug = "birmingham-al-metro"
+kind = "us:metro"
+name = "Birmingham Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 13820 — Birmingham, AL
+
+[[region]]
+slug = "bismarck-nd-metro"
+kind = "us:metro"
+name = "Bismarck Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nd"]
+# Census CBSA 13900 — Bismarck, ND
+
+[[region]]
+slug = "blacksburg-va-metro"
+kind = "us:metro"
+name = "Blacksburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va"]
+# Census CBSA 13980 — Blacksburg-Christiansburg-Radford, VA
+
+[[region]]
+slug = "bloomington-il-metro"
+kind = "us:metro"
+name = "Bloomington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il"]
+# Census CBSA 14010 — Bloomington, IL
+
+[[region]]
+slug = "bloomington-in-metro"
+kind = "us:metro"
+name = "Bloomington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 14020 — Bloomington, IN
+
+[[region]]
+slug = "boise-city-id-metro"
+kind = "us:metro"
+name = "Boise City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id"]
+# Census CBSA 14260 — Boise City, ID
+
+[[region]]
+slug = "boulder-co-metro"
+kind = "us:metro"
+name = "Boulder Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["co"]
+# Census CBSA 14500 — Boulder, CO
+
+[[region]]
+slug = "bowling-green-ky-metro"
+kind = "us:metro"
+name = "Bowling Green Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky"]
+# Census CBSA 14540 — Bowling Green, KY
+
+[[region]]
+slug = "bozeman-mt-metro"
+kind = "us:metro"
+name = "Bozeman Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mt"]
+# Census CBSA 14580 — Bozeman, MT
+
+[[region]]
+slug = "bremerton-wa-metro"
+kind = "us:metro"
+name = "Bremerton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 14740 — Bremerton-Silverdale-Port Orchard, WA
+
+[[region]]
+slug = "bridgeport-ct-metro"
+kind = "us:metro"
+name = "Bridgeport Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ct"]
+# Census CBSA 14860 — Bridgeport-Stamford-Danbury, CT
+
+[[region]]
+slug = "brownsville-tx-metro"
+kind = "us:metro"
+name = "Brownsville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 15180 — Brownsville-Harlingen, TX
+
+[[region]]
+slug = "brunswick-ga-metro"
+kind = "us:metro"
+name = "Brunswick Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 15260 — Brunswick-St. Simons, GA
+
+[[region]]
+slug = "buffalo-ny-metro"
+kind = "us:metro"
+name = "Buffalo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 15380 — Buffalo-Cheektowaga, NY
+
+[[region]]
+slug = "burlington-nc-metro"
+kind = "us:metro"
+name = "Burlington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 15500 — Burlington, NC
+
+[[region]]
+slug = "burlington-vt-metro"
+kind = "us:metro"
+name = "Burlington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["vt"]
+# Census CBSA 15540 — Burlington-South Burlington, VT
+
+[[region]]
+slug = "canton-oh-metro"
+kind = "us:metro"
+name = "Canton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 15940 — Canton-Massillon, OH
+
+[[region]]
+slug = "cape-coral-fl-metro"
+kind = "us:metro"
+name = "Cape Coral Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 15980 — Cape Coral-Fort Myers, FL
+
+[[region]]
+slug = "cape-girardeau-mo-metro"
+kind = "us:metro"
+name = "Cape Girardeau Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "il"]
+# Census CBSA 16020 — Cape Girardeau, MO-IL
+
+[[region]]
+slug = "carson-city-nv-metro"
+kind = "us:metro"
+name = "Carson City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nv"]
+# Census CBSA 16180 — Carson City, NV
+
+[[region]]
+slug = "casper-wy-metro"
+kind = "us:metro"
+name = "Casper Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wy"]
+# Census CBSA 16220 — Casper, WY
+
+[[region]]
+slug = "cedar-rapids-ia-metro"
+kind = "us:metro"
+name = "Cedar Rapids Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia"]
+# Census CBSA 16300 — Cedar Rapids, IA
+
+[[region]]
+slug = "chambersburg-pa-metro"
+kind = "us:metro"
+name = "Chambersburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 16540 — Chambersburg, PA
+
+[[region]]
+slug = "champaign-il-metro"
+kind = "us:metro"
+name = "Champaign Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il"]
+# Census CBSA 16580 — Champaign-Urbana, IL
+
+[[region]]
+slug = "charleston-sc-metro"
+kind = "us:metro"
+name = "Charleston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 16700 — Charleston-North Charleston, SC
+
+[[region]]
+slug = "charleston-wv-metro"
+kind = "us:metro"
+name = "Charleston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv"]
+# Census CBSA 16620 — Charleston, WV
+
+[[region]]
+slug = "charlotte-nc-metro"
+kind = "us:metro"
+name = "Charlotte Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc", "sc"]
+# Census CBSA 16740 — Charlotte-Concord-Gastonia, NC-SC
+
+[[region]]
+slug = "charlottesville-va-metro"
+kind = "us:metro"
+name = "Charlottesville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va"]
+# Census CBSA 16820 — Charlottesville, VA
+
+[[region]]
+slug = "chattanooga-tn-metro"
+kind = "us:metro"
+name = "Chattanooga Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "ga"]
+# Census CBSA 16860 — Chattanooga, TN-GA
+
+[[region]]
+slug = "cheyenne-wy-metro"
+kind = "us:metro"
+name = "Cheyenne Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wy"]
+# Census CBSA 16940 — Cheyenne, WY
+
+[[region]]
+slug = "chicago-metro"
+kind = "us:metro"
+name = "Chicago Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["chicagoland-multistate"]
+# Census CBSA 16980 — Chicago-Naperville-Elgin, IL-IN
+
+[[region]]
+slug = "chico-ca-metro"
+kind = "us:metro"
+name = "Chico Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 17020 — Chico, CA
+
+[[region]]
+slug = "cincinnati-oh-metro"
+kind = "us:metro"
+name = "Cincinnati Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh", "ky", "in"]
+# Census CBSA 17140 — Cincinnati, OH-KY-IN
+
+[[region]]
+slug = "clarksville-tn-metro"
+kind = "us:metro"
+name = "Clarksville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "ky"]
+# Census CBSA 17300 — Clarksville, TN-KY
+
+[[region]]
+slug = "cleveland-oh-metro"
+kind = "us:metro"
+name = "Cleveland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 17410 — Cleveland, OH
+
+[[region]]
+slug = "cleveland-tn-metro"
+kind = "us:metro"
+name = "Cleveland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn"]
+# Census CBSA 17420 — Cleveland, TN
+
+[[region]]
+slug = "coeur-dalene-id-metro"
+kind = "us:metro"
+name = "Coeur d'Alene Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id"]
+# Census CBSA 17660 — Coeur d'Alene, ID
+
+[[region]]
+slug = "college-station-tx-metro"
+kind = "us:metro"
+name = "College Station Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 17780 — College Station-Bryan, TX
+
+[[region]]
+slug = "colorado-springs-co-metro"
+kind = "us:metro"
+name = "Colorado Springs Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["co"]
+# Census CBSA 17820 — Colorado Springs, CO
+
+[[region]]
+slug = "columbia-mo-metro"
+kind = "us:metro"
+name = "Columbia Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo"]
+# Census CBSA 17860 — Columbia, MO
+
+[[region]]
+slug = "columbia-sc-metro"
+kind = "us:metro"
+name = "Columbia Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 17900 — Columbia, SC
+
+[[region]]
+slug = "columbus-ga-metro"
+kind = "us:metro"
+name = "Columbus Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga", "al"]
+# Census CBSA 17980 — Columbus, GA-AL
+
+[[region]]
+slug = "columbus-in-metro"
+kind = "us:metro"
+name = "Columbus Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 18020 — Columbus, IN
+
+[[region]]
+slug = "columbus-oh-metro"
+kind = "us:metro"
+name = "Columbus Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 18140 — Columbus, OH
+
+[[region]]
+slug = "corpus-christi-tx-metro"
+kind = "us:metro"
+name = "Corpus Christi Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 18580 — Corpus Christi, TX
+
+[[region]]
+slug = "corvallis-or-metro"
+kind = "us:metro"
+name = "Corvallis Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or"]
+# Census CBSA 18700 — Corvallis, OR
+
+[[region]]
+slug = "crestview-fl-metro"
+kind = "us:metro"
+name = "Crestview Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 18880 — Crestview-Fort Walton Beach-Destin, FL
+
+[[region]]
+slug = "dallas-tx-metro"
+kind = "us:metro"
+name = "Dallas Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 19100 — Dallas-Fort Worth-Arlington, TX
+
+[[region]]
+slug = "dalton-ga-metro"
+kind = "us:metro"
+name = "Dalton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 19140 — Dalton, GA
+
+[[region]]
+slug = "daphne-al-metro"
+kind = "us:metro"
+name = "Daphne Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 19300 — Daphne-Fairhope-Foley, AL
+
+[[region]]
+slug = "davenport-ia-metro"
+kind = "us:metro"
+name = "Davenport Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia", "il"]
+# Census CBSA 19340 — Davenport-Moline-Rock Island, IA-IL
+
+[[region]]
+slug = "dayton-oh-metro"
+kind = "us:metro"
+name = "Dayton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 19430 — Dayton-Kettering-Beavercreek, OH
+
+[[region]]
+slug = "decatur-al-metro"
+kind = "us:metro"
+name = "Decatur Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 19460 — Decatur, AL
+
+[[region]]
+slug = "decatur-il-metro"
+kind = "us:metro"
+name = "Decatur Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il"]
+# Census CBSA 19500 — Decatur, IL
+
+[[region]]
+slug = "deltona-fl-metro"
+kind = "us:metro"
+name = "Deltona Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 19660 — Deltona-Daytona Beach-Ormond Beach, FL
+
+[[region]]
+slug = "denver-co-metro"
+kind = "us:metro"
+name = "Denver Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["co"]
+# Census CBSA 19740 — Denver-Aurora-Centennial, CO
+
+[[region]]
+slug = "des-moines-ia-metro"
+kind = "us:metro"
+name = "Des Moines Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia"]
+# Census CBSA 19780 — Des Moines-West Des Moines, IA
+
+[[region]]
+slug = "detroit-mi-metro"
+kind = "us:metro"
+name = "Detroit Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 19820 — Detroit-Warren-Dearborn, MI
+
+[[region]]
+slug = "dothan-al-metro"
+kind = "us:metro"
+name = "Dothan Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 20020 — Dothan, AL
+
+[[region]]
+slug = "dover-de-metro"
+kind = "us:metro"
+name = "Dover Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["de-state"]
+# Census CBSA 20100 — Dover, DE
+
+[[region]]
+slug = "dubuque-ia-metro"
+kind = "us:metro"
+name = "Dubuque Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia"]
+# Census CBSA 20220 — Dubuque, IA
+
+[[region]]
+slug = "duluth-mn-metro"
+kind = "us:metro"
+name = "Duluth Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "wi"]
+# Census CBSA 20260 — Duluth, MN-WI
+
+[[region]]
+slug = "durham-nc-metro"
+kind = "us:metro"
+name = "Durham Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 20500 — Durham-Chapel Hill, NC
+
+[[region]]
+slug = "eagle-pass-tx-metro"
+kind = "us:metro"
+name = "Eagle Pass Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 20580 — Eagle Pass, TX
+
+[[region]]
+slug = "eau-claire-wi-metro"
+kind = "us:metro"
+name = "Eau Claire Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 20740 — Eau Claire, WI
+
+[[region]]
+slug = "el-centro-ca-metro"
+kind = "us:metro"
+name = "El Centro Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 20940 — El Centro, CA
+
+[[region]]
+slug = "el-paso-tx-metro"
+kind = "us:metro"
+name = "El Paso Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 21340 — El Paso, TX
+
+[[region]]
+slug = "elizabethtown-ky-metro"
+kind = "us:metro"
+name = "Elizabethtown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky"]
+# Census CBSA 21060 — Elizabethtown, KY
+
+[[region]]
+slug = "elkhart-in-metro"
+kind = "us:metro"
+name = "Elkhart Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 21140 — Elkhart-Goshen, IN
+
+[[region]]
+slug = "elmira-ny-metro"
+kind = "us:metro"
+name = "Elmira Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 21300 — Elmira, NY
+
+[[region]]
+slug = "enid-ok-metro"
+kind = "us:metro"
+name = "Enid Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ok"]
+# Census CBSA 21420 — Enid, OK
+
+[[region]]
+slug = "erie-pa-metro"
+kind = "us:metro"
+name = "Erie Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 21500 — Erie, PA
+
+[[region]]
+slug = "eugene-or-metro"
+kind = "us:metro"
+name = "Eugene Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or"]
+# Census CBSA 21660 — Eugene-Springfield, OR
+
+[[region]]
+slug = "evansville-in-metro"
+kind = "us:metro"
+name = "Evansville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 21780 — Evansville, IN
+
+[[region]]
+slug = "fairbanks-ak-metro"
+kind = "us:metro"
+name = "Fairbanks Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ak"]
+# Census CBSA 21820 — Fairbanks-College, AK
+
+[[region]]
+slug = "fargo-nd-metro"
+kind = "us:metro"
+name = "Fargo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nd", "mn"]
+# Census CBSA 22020 — Fargo, ND-MN
+
+[[region]]
+slug = "farmington-nm-metro"
+kind = "us:metro"
+name = "Farmington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nm"]
+# Census CBSA 22140 — Farmington, NM
+
+[[region]]
+slug = "fayetteville-ar-metro"
+kind = "us:metro"
+name = "Fayetteville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar"]
+# Census CBSA 22220 — Fayetteville-Springdale-Rogers, AR
+
+[[region]]
+slug = "fayetteville-nc-metro"
+kind = "us:metro"
+name = "Fayetteville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 22180 — Fayetteville, NC
+
+[[region]]
+slug = "flagstaff-az-metro"
+kind = "us:metro"
+name = "Flagstaff Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["az"]
+# Census CBSA 22380 — Flagstaff, AZ
+
+[[region]]
+slug = "flint-mi-metro"
+kind = "us:metro"
+name = "Flint Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 22420 — Flint, MI
+
+[[region]]
+slug = "florence-al-metro"
+kind = "us:metro"
+name = "Florence Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 22520 — Florence-Muscle Shoals, AL
+
+[[region]]
+slug = "florence-sc-metro"
+kind = "us:metro"
+name = "Florence Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 22500 — Florence, SC
+
+[[region]]
+slug = "fond-du-lac-wi-metro"
+kind = "us:metro"
+name = "Fond du Lac Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 22540 — Fond du Lac, WI
+
+[[region]]
+slug = "fort-collins-co-metro"
+kind = "us:metro"
+name = "Fort Collins Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["co"]
+# Census CBSA 22660 — Fort Collins-Loveland, CO
+
+[[region]]
+slug = "fort-smith-ar-metro"
+kind = "us:metro"
+name = "Fort Smith Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar", "ok"]
+# Census CBSA 22900 — Fort Smith, AR-OK
+
+[[region]]
+slug = "fort-wayne-in-metro"
+kind = "us:metro"
+name = "Fort Wayne Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 23060 — Fort Wayne, IN
+
+[[region]]
+slug = "fresno-ca-metro"
+kind = "us:metro"
+name = "Fresno Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 23420 — Fresno, CA
+
+[[region]]
+slug = "gadsden-al-metro"
+kind = "us:metro"
+name = "Gadsden Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 23460 — Gadsden, AL
+
+[[region]]
+slug = "gainesville-fl-metro"
+kind = "us:metro"
+name = "Gainesville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 23540 — Gainesville, FL
+
+[[region]]
+slug = "gainesville-ga-metro"
+kind = "us:metro"
+name = "Gainesville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 23580 — Gainesville, GA
+
+[[region]]
+slug = "gettysburg-pa-metro"
+kind = "us:metro"
+name = "Gettysburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 23900 — Gettysburg, PA
+
+[[region]]
+slug = "glens-falls-ny-metro"
+kind = "us:metro"
+name = "Glens Falls Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 24020 — Glens Falls, NY
+
+[[region]]
+slug = "goldsboro-nc-metro"
+kind = "us:metro"
+name = "Goldsboro Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 24140 — Goldsboro, NC
+
+[[region]]
+slug = "grand-forks-nd-metro"
+kind = "us:metro"
+name = "Grand Forks Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nd", "mn"]
+# Census CBSA 24220 — Grand Forks, ND-MN
+
+[[region]]
+slug = "grand-island-ne-metro"
+kind = "us:metro"
+name = "Grand Island Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ne"]
+# Census CBSA 24260 — Grand Island, NE
+
+[[region]]
+slug = "grand-junction-co-metro"
+kind = "us:metro"
+name = "Grand Junction Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["co"]
+# Census CBSA 24300 — Grand Junction, CO
+
+[[region]]
+slug = "grand-rapids-mi-metro"
+kind = "us:metro"
+name = "Grand Rapids Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 24340 — Grand Rapids-Wyoming-Kentwood, MI
+
+[[region]]
+slug = "grants-pass-or-metro"
+kind = "us:metro"
+name = "Grants Pass Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or"]
+# Census CBSA 24420 — Grants Pass, OR
+
+[[region]]
+slug = "great-falls-mt-metro"
+kind = "us:metro"
+name = "Great Falls Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mt"]
+# Census CBSA 24500 — Great Falls, MT
+
+[[region]]
+slug = "greater-boston"
+kind = "us:metro"
+name = "Greater Boston"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+# Census CBSA 14460 — Boston-Cambridge-Newton, MA-NH
+
+[[region]]
+slug = "greater-la"
+kind = "us:metro"
+name = "Greater Los Angeles"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+# Census CBSA 31080 — Los Angeles-Long Beach-Anaheim, CA
+
+[[region]]
+slug = "greater-miami"
+kind = "us:metro"
+name = "Greater Miami"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+# Census CBSA 33100 — Miami-Fort Lauderdale-West Palm Beach, FL
+
+[[region]]
+slug = "greeley-co-metro"
+kind = "us:metro"
+name = "Greeley Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["co"]
+# Census CBSA 24540 — Greeley, CO
+
+[[region]]
+slug = "green-bay-wi-metro"
+kind = "us:metro"
+name = "Green Bay Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 24580 — Green Bay, WI
+
+[[region]]
+slug = "greensboro-nc-metro"
+kind = "us:metro"
+name = "Greensboro Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 24660 — Greensboro-High Point, NC
+
+[[region]]
+slug = "greenville-nc-metro"
+kind = "us:metro"
+name = "Greenville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 24780 — Greenville, NC
+
+[[region]]
+slug = "greenville-sc-metro"
+kind = "us:metro"
+name = "Greenville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 24860 — Greenville-Anderson-Greer, SC
+
+[[region]]
+slug = "guayama-pr-metro"
+kind = "us:metro"
+name = "Guayama Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pr"]
+# Census CBSA 25020 — Guayama, PR
+
+[[region]]
+slug = "gulfport-ms-metro"
+kind = "us:metro"
+name = "Gulfport Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ms"]
+# Census CBSA 25060 — Gulfport-Biloxi, MS
+
+[[region]]
+slug = "hagerstown-md-metro"
+kind = "us:metro"
+name = "Hagerstown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["md", "wv"]
+# Census CBSA 25180 — Hagerstown-Martinsburg, MD-WV
+
+[[region]]
+slug = "hammond-la-metro"
+kind = "us:metro"
+name = "Hammond Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 25220 — Hammond, LA
+
+[[region]]
+slug = "hanford-ca-metro"
+kind = "us:metro"
+name = "Hanford Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 25260 — Hanford-Corcoran, CA
+
+[[region]]
+slug = "harrisburg-pa-metro"
+kind = "us:metro"
+name = "Harrisburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 25420 — Harrisburg-Carlisle, PA
+
+[[region]]
+slug = "harrisonburg-va-metro"
+kind = "us:metro"
+name = "Harrisonburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va"]
+# Census CBSA 25500 — Harrisonburg, VA
+
+[[region]]
+slug = "hartford-ct-metro"
+kind = "us:metro"
+name = "Hartford Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ct"]
+# Census CBSA 25540 — Hartford-West Hartford-East Hartford, CT
+
+[[region]]
+slug = "hattiesburg-ms-metro"
+kind = "us:metro"
+name = "Hattiesburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ms"]
+# Census CBSA 25620 — Hattiesburg, MS
+
+[[region]]
+slug = "helena-mt-metro"
+kind = "us:metro"
+name = "Helena Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mt"]
+# Census CBSA 25740 — Helena, MT
+
+[[region]]
+slug = "hickory-nc-metro"
+kind = "us:metro"
+name = "Hickory Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 25860 — Hickory-Lenoir-Morganton, NC
+
+[[region]]
+slug = "hilton-head-island-sc-metro"
+kind = "us:metro"
+name = "Hilton Head Island Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 25940 — Hilton Head Island-Bluffton-Port Royal, SC
+
+[[region]]
+slug = "hinesville-ga-metro"
+kind = "us:metro"
+name = "Hinesville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 25980 — Hinesville, GA
+
+[[region]]
+slug = "homosassa-springs-fl-metro"
+kind = "us:metro"
+name = "Homosassa Springs Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 26140 — Homosassa Springs, FL
+
+[[region]]
+slug = "hot-springs-ar-metro"
+kind = "us:metro"
+name = "Hot Springs Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar"]
+# Census CBSA 26300 — Hot Springs, AR
+
+[[region]]
+slug = "houma-la-metro"
+kind = "us:metro"
+name = "Houma Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 26380 — Houma-Bayou Cane-Thibodaux, LA
+
+[[region]]
+slug = "houston-tx-metro"
+kind = "us:metro"
+name = "Houston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 26420 — Houston-Pasadena-The Woodlands, TX
+
+[[region]]
+slug = "huntington-wv-metro"
+kind = "us:metro"
+name = "Huntington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "ky", "oh"]
+# Census CBSA 26580 — Huntington-Ashland, WV-KY-OH
+
+[[region]]
+slug = "huntsville-al-metro"
+kind = "us:metro"
+name = "Huntsville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 26620 — Huntsville, AL
+
+[[region]]
+slug = "idaho-falls-id-metro"
+kind = "us:metro"
+name = "Idaho Falls Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id"]
+# Census CBSA 26820 — Idaho Falls, ID
+
+[[region]]
+slug = "indianapolis-in-metro"
+kind = "us:metro"
+name = "Indianapolis Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 26900 — Indianapolis-Carmel-Greenwood, IN
+
+[[region]]
+slug = "iowa-city-ia-metro"
+kind = "us:metro"
+name = "Iowa City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia"]
+# Census CBSA 26980 — Iowa City, IA
+
+[[region]]
+slug = "ithaca-ny-metro"
+kind = "us:metro"
+name = "Ithaca Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 27060 — Ithaca, NY
+
+[[region]]
+slug = "jackson-mi-metro"
+kind = "us:metro"
+name = "Jackson Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 27100 — Jackson, MI
+
+[[region]]
+slug = "jackson-ms-metro"
+kind = "us:metro"
+name = "Jackson Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ms"]
+# Census CBSA 27140 — Jackson, MS
+
+[[region]]
+slug = "jackson-tn-metro"
+kind = "us:metro"
+name = "Jackson Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn"]
+# Census CBSA 27180 — Jackson, TN
+
+[[region]]
+slug = "jacksonville-fl-metro"
+kind = "us:metro"
+name = "Jacksonville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 27260 — Jacksonville, FL
+
+[[region]]
+slug = "jacksonville-nc-metro"
+kind = "us:metro"
+name = "Jacksonville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 27340 — Jacksonville, NC
+
+[[region]]
+slug = "janesville-wi-metro"
+kind = "us:metro"
+name = "Janesville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 27500 — Janesville-Beloit, WI
+
+[[region]]
+slug = "jefferson-city-mo-metro"
+kind = "us:metro"
+name = "Jefferson City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo"]
+# Census CBSA 27620 — Jefferson City, MO
+
+[[region]]
+slug = "johnson-city-tn-metro"
+kind = "us:metro"
+name = "Johnson City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn"]
+# Census CBSA 27740 — Johnson City, TN
+
+[[region]]
+slug = "johnstown-pa-metro"
+kind = "us:metro"
+name = "Johnstown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 27780 — Johnstown, PA
+
+[[region]]
+slug = "jonesboro-ar-metro"
+kind = "us:metro"
+name = "Jonesboro Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar"]
+# Census CBSA 27860 — Jonesboro, AR
+
+[[region]]
+slug = "joplin-mo-metro"
+kind = "us:metro"
+name = "Joplin Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "ks"]
+# Census CBSA 27900 — Joplin, MO-KS
+
+[[region]]
+slug = "kahului-hi-metro"
+kind = "us:metro"
+name = "Kahului Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["hi"]
+# Census CBSA 27980 — Kahului-Wailuku, HI
+
+[[region]]
+slug = "kalamazoo-mi-metro"
+kind = "us:metro"
+name = "Kalamazoo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 28020 — Kalamazoo-Portage, MI
+
+[[region]]
+slug = "kankakee-il-metro"
+kind = "us:metro"
+name = "Kankakee Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il"]
+# Census CBSA 28100 — Kankakee, IL
+
+[[region]]
+slug = "kansas-city-mo-metro"
+kind = "us:metro"
+name = "Kansas City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "ks"]
+# Census CBSA 28140 — Kansas City, MO-KS
+
+[[region]]
+slug = "kennewick-wa-metro"
+kind = "us:metro"
+name = "Kennewick Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 28420 — Kennewick-Richland, WA
+
+[[region]]
+slug = "kenosha-wi-metro"
+kind = "us:metro"
+name = "Kenosha Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 28450 — Kenosha, WI
+
+[[region]]
+slug = "killeen-tx-metro"
+kind = "us:metro"
+name = "Killeen Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 28660 — Killeen-Temple, TX
+
+[[region]]
+slug = "kingsport-tn-metro"
+kind = "us:metro"
+name = "Kingsport Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "va"]
+# Census CBSA 28700 — Kingsport-Bristol, TN-VA
+
+[[region]]
+slug = "kingston-ny-metro"
+kind = "us:metro"
+name = "Kingston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 28740 — Kingston, NY
+
+[[region]]
+slug = "kiryas-joel-ny-metro"
+kind = "us:metro"
+name = "Kiryas Joel Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 28880 — Kiryas Joel-Poughkeepsie-Newburgh, NY
+
+[[region]]
+slug = "knoxville-tn-metro"
+kind = "us:metro"
+name = "Knoxville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn"]
+# Census CBSA 28940 — Knoxville, TN
+
+[[region]]
+slug = "kokomo-in-metro"
+kind = "us:metro"
+name = "Kokomo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 29020 — Kokomo, IN
+
+[[region]]
+slug = "la-crosse-wi-metro"
+kind = "us:metro"
+name = "La Crosse Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi", "mn"]
+# Census CBSA 29100 — La Crosse-Onalaska, WI-MN
+
+[[region]]
+slug = "lafayette-in-metro"
+kind = "us:metro"
+name = "Lafayette Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 29200 — Lafayette-West Lafayette, IN
+
+[[region]]
+slug = "lafayette-la-metro"
+kind = "us:metro"
+name = "Lafayette Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 29180 — Lafayette, LA
+
+[[region]]
+slug = "lake-charles-la-metro"
+kind = "us:metro"
+name = "Lake Charles Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 29340 — Lake Charles, LA
+
+[[region]]
+slug = "lake-havasu-city-az-metro"
+kind = "us:metro"
+name = "Lake Havasu City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["az"]
+# Census CBSA 29420 — Lake Havasu City-Kingman, AZ
+
+[[region]]
+slug = "lakeland-fl-metro"
+kind = "us:metro"
+name = "Lakeland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 29460 — Lakeland-Winter Haven, FL
+
+[[region]]
+slug = "lancaster-pa-metro"
+kind = "us:metro"
+name = "Lancaster Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 29540 — Lancaster, PA
+
+[[region]]
+slug = "lansing-mi-metro"
+kind = "us:metro"
+name = "Lansing Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 29620 — Lansing-East Lansing, MI
+
+[[region]]
+slug = "laredo-tx-metro"
+kind = "us:metro"
+name = "Laredo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 29700 — Laredo, TX
+
+[[region]]
+slug = "las-cruces-nm-metro"
+kind = "us:metro"
+name = "Las Cruces Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nm"]
+# Census CBSA 29740 — Las Cruces, NM
+
+[[region]]
+slug = "las-vegas-nv-metro"
+kind = "us:metro"
+name = "Las Vegas Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nv"]
+# Census CBSA 29820 — Las Vegas-Henderson-North Las Vegas, NV
+
+[[region]]
+slug = "lawrence-ks-metro"
+kind = "us:metro"
+name = "Lawrence Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ks"]
+# Census CBSA 29940 — Lawrence, KS
+
+[[region]]
+slug = "lawton-ok-metro"
+kind = "us:metro"
+name = "Lawton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ok"]
+# Census CBSA 30020 — Lawton, OK
+
+[[region]]
+slug = "lebanon-pa-metro"
+kind = "us:metro"
+name = "Lebanon Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 30140 — Lebanon, PA
+
+[[region]]
+slug = "lewiston-id-metro"
+kind = "us:metro"
+name = "Lewiston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id", "wa"]
+# Census CBSA 30300 — Lewiston, ID-WA
+
+[[region]]
+slug = "lewiston-me-metro"
+kind = "us:metro"
+name = "Lewiston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["me"]
+# Census CBSA 30340 — Lewiston-Auburn, ME
+
+[[region]]
+slug = "lexington-ky-metro"
+kind = "us:metro"
+name = "Lexington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky"]
+# Census CBSA 30460 — Lexington-Fayette, KY
+
+[[region]]
+slug = "lexington-park-md-metro"
+kind = "us:metro"
+name = "Lexington Park Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["md"]
+# Census CBSA 30500 — Lexington Park, MD
+
+[[region]]
+slug = "lima-oh-metro"
+kind = "us:metro"
+name = "Lima Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 30620 — Lima, OH
+
+[[region]]
+slug = "lincoln-ne-metro"
+kind = "us:metro"
+name = "Lincoln Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ne"]
+# Census CBSA 30700 — Lincoln, NE
+
+[[region]]
+slug = "little-rock-ar-metro"
+kind = "us:metro"
+name = "Little Rock Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar"]
+# Census CBSA 30780 — Little Rock-North Little Rock-Conway, AR
+
+[[region]]
+slug = "logan-ut-metro"
+kind = "us:metro"
+name = "Logan Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ut", "id"]
+# Census CBSA 30860 — Logan, UT-ID
+
+[[region]]
+slug = "longview-tx-metro"
+kind = "us:metro"
+name = "Longview Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 30980 — Longview, TX
+
+[[region]]
+slug = "longview-wa-metro"
+kind = "us:metro"
+name = "Longview Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 31020 — Longview-Kelso, WA
+
+[[region]]
+slug = "louisville-jefferson-county-ky-metro"
+kind = "us:metro"
+name = "Louisville/Jefferson County Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "in"]
+# Census CBSA 31140 — Louisville/Jefferson County, KY-IN
+
+[[region]]
+slug = "lubbock-tx-metro"
+kind = "us:metro"
+name = "Lubbock Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 31180 — Lubbock, TX
+
+[[region]]
+slug = "lynchburg-va-metro"
+kind = "us:metro"
+name = "Lynchburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va"]
+# Census CBSA 31340 — Lynchburg, VA
+
+[[region]]
+slug = "macon-ga-metro"
+kind = "us:metro"
+name = "Macon Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 31420 — Macon-Bibb County, GA
+
+[[region]]
+slug = "madison-wi-metro"
+kind = "us:metro"
+name = "Madison Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 31540 — Madison, WI
+
+[[region]]
+slug = "manchester-nh-metro"
+kind = "us:metro"
+name = "Manchester Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nh"]
+# Census CBSA 31700 — Manchester-Nashua, NH
+
+[[region]]
+slug = "manhattan-ks-metro"
+kind = "us:metro"
+name = "Manhattan Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ks"]
+# Census CBSA 31740 — Manhattan, KS
+
+[[region]]
+slug = "mankato-mn-metro"
+kind = "us:metro"
+name = "Mankato Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn"]
+# Census CBSA 31860 — Mankato, MN
+
+[[region]]
+slug = "mansfield-oh-metro"
+kind = "us:metro"
+name = "Mansfield Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 31900 — Mansfield, OH
+
+[[region]]
+slug = "mayaguez-pr-metro"
+kind = "us:metro"
+name = "Mayagüez Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pr"]
+# Census CBSA 32420 — Mayagüez, PR
+
+[[region]]
+slug = "mcallen-tx-metro"
+kind = "us:metro"
+name = "McAllen Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 32580 — McAllen-Edinburg-Mission, TX
+
+[[region]]
+slug = "medford-or-metro"
+kind = "us:metro"
+name = "Medford Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or"]
+# Census CBSA 32780 — Medford, OR
+
+[[region]]
+slug = "memphis-tn-metro"
+kind = "us:metro"
+name = "Memphis Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "ms", "ar"]
+# Census CBSA 32820 — Memphis, TN-MS-AR
+
+[[region]]
+slug = "merced-ca-metro"
+kind = "us:metro"
+name = "Merced Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 32900 — Merced, CA
+
+[[region]]
+slug = "michigan-city-in-metro"
+kind = "us:metro"
+name = "Michigan City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 33140 — Michigan City-La Porte, IN
+
+[[region]]
+slug = "midland-mi-metro"
+kind = "us:metro"
+name = "Midland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 33220 — Midland, MI
+
+[[region]]
+slug = "midland-tx-metro"
+kind = "us:metro"
+name = "Midland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 33260 — Midland, TX
+
+[[region]]
+slug = "milwaukee-wi-metro"
+kind = "us:metro"
+name = "Milwaukee Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 33340 — Milwaukee-Waukesha, WI
+
+[[region]]
+slug = "minneapolis-mn-metro"
+kind = "us:metro"
+name = "Minneapolis Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "wi"]
+# Census CBSA 33460 — Minneapolis-St. Paul-Bloomington, MN-WI
+
+[[region]]
+slug = "minot-nd-metro"
+kind = "us:metro"
+name = "Minot Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nd"]
+# Census CBSA 33500 — Minot, ND
+
+[[region]]
+slug = "missoula-mt-metro"
+kind = "us:metro"
+name = "Missoula Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mt"]
+# Census CBSA 33540 — Missoula, MT
+
+[[region]]
+slug = "mobile-al-metro"
+kind = "us:metro"
+name = "Mobile Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 33660 — Mobile, AL
+
+[[region]]
+slug = "modesto-ca-metro"
+kind = "us:metro"
+name = "Modesto Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 33700 — Modesto, CA
+
+[[region]]
+slug = "monroe-la-metro"
+kind = "us:metro"
+name = "Monroe Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 33740 — Monroe, LA
+
+[[region]]
+slug = "monroe-mi-metro"
+kind = "us:metro"
+name = "Monroe Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 33780 — Monroe, MI
+
+[[region]]
+slug = "montgomery-al-metro"
+kind = "us:metro"
+name = "Montgomery Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 33860 — Montgomery, AL
+
+[[region]]
+slug = "morgantown-wv-metro"
+kind = "us:metro"
+name = "Morgantown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv"]
+# Census CBSA 34060 — Morgantown, WV
+
+[[region]]
+slug = "morristown-tn-metro"
+kind = "us:metro"
+name = "Morristown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn"]
+# Census CBSA 34100 — Morristown, TN
+
+[[region]]
+slug = "mount-vernon-wa-metro"
+kind = "us:metro"
+name = "Mount Vernon Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 34580 — Mount Vernon-Anacortes, WA
+
+[[region]]
+slug = "muncie-in-metro"
+kind = "us:metro"
+name = "Muncie Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 34620 — Muncie, IN
+
+[[region]]
+slug = "muskegon-mi-metro"
+kind = "us:metro"
+name = "Muskegon Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 34740 — Muskegon-Norton Shores, MI
+
+[[region]]
+slug = "myrtle-beach-sc-metro"
+kind = "us:metro"
+name = "Myrtle Beach Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 34820 — Myrtle Beach-Conway-North Myrtle Beach, SC
+
+[[region]]
+slug = "napa-ca-metro"
+kind = "us:metro"
+name = "Napa Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 34900 — Napa, CA
+
+[[region]]
+slug = "naples-fl-metro"
+kind = "us:metro"
+name = "Naples Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 34940 — Naples-Marco Island, FL
+
+[[region]]
+slug = "nashville-tn-metro"
+kind = "us:metro"
+name = "Nashville Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn"]
+# Census CBSA 34980 — Nashville-Davidson--Murfreesboro--Franklin, TN
+
+[[region]]
+slug = "new-haven-ct-metro"
+kind = "us:metro"
+name = "New Haven Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ct"]
+# Census CBSA 35300 — New Haven, CT
+
+[[region]]
+slug = "new-orleans-la-metro"
+kind = "us:metro"
+name = "New Orleans Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 35380 — New Orleans-Metairie, LA
+
+[[region]]
+slug = "niles-mi-metro"
+kind = "us:metro"
+name = "Niles Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 35660 — Niles, MI
+
+[[region]]
+slug = "north-port-fl-metro"
+kind = "us:metro"
+name = "North Port Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 35840 — North Port-Bradenton-Sarasota, FL
+
+[[region]]
+slug = "norwich-ct-metro"
+kind = "us:metro"
+name = "Norwich Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ct"]
+# Census CBSA 35980 — Norwich-New London-Willimantic, CT
+
+[[region]]
+slug = "nyc-metro"
+kind = "us:metro"
+name = "New York Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nyc-tristate"]
+# Census CBSA 35620 — New York-Newark-Jersey City, NY-NJ
+
+[[region]]
+slug = "ocala-fl-metro"
+kind = "us:metro"
+name = "Ocala Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 36100 — Ocala, FL
+
+[[region]]
+slug = "odessa-tx-metro"
+kind = "us:metro"
+name = "Odessa Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 36220 — Odessa, TX
+
+[[region]]
+slug = "ogden-ut-metro"
+kind = "us:metro"
+name = "Ogden Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ut"]
+# Census CBSA 36260 — Ogden, UT
+
+[[region]]
+slug = "oklahoma-city-ok-metro"
+kind = "us:metro"
+name = "Oklahoma City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ok"]
+# Census CBSA 36420 — Oklahoma City, OK
+
+[[region]]
+slug = "olympia-wa-metro"
+kind = "us:metro"
+name = "Olympia Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 36500 — Olympia-Lacey-Tumwater, WA
+
+[[region]]
+slug = "omaha-ne-metro"
+kind = "us:metro"
+name = "Omaha Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ne", "ia"]
+# Census CBSA 36540 — Omaha, NE-IA
+
+[[region]]
+slug = "orlando-fl-metro"
+kind = "us:metro"
+name = "Orlando Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 36740 — Orlando-Kissimmee-Sanford, FL
+
+[[region]]
+slug = "oshkosh-wi-metro"
+kind = "us:metro"
+name = "Oshkosh Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 36780 — Oshkosh-Neenah, WI
+
+[[region]]
+slug = "owensboro-ky-metro"
+kind = "us:metro"
+name = "Owensboro Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky"]
+# Census CBSA 36980 — Owensboro, KY
+
+[[region]]
+slug = "oxnard-ca-metro"
+kind = "us:metro"
+name = "Oxnard Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 37100 — Oxnard-Thousand Oaks-Ventura, CA
+
+[[region]]
+slug = "paducah-ky-metro"
+kind = "us:metro"
+name = "Paducah Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "il"]
+# Census CBSA 37140 — Paducah, KY-IL
+
+[[region]]
+slug = "palm-bay-fl-metro"
+kind = "us:metro"
+name = "Palm Bay Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 37340 — Palm Bay-Melbourne-Titusville, FL
+
+[[region]]
+slug = "panama-city-fl-metro"
+kind = "us:metro"
+name = "Panama City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 37460 — Panama City-Panama City Beach, FL
+
+[[region]]
+slug = "parkersburg-wv-metro"
+kind = "us:metro"
+name = "Parkersburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv"]
+# Census CBSA 37620 — Parkersburg-Vienna, WV
+
+[[region]]
+slug = "pensacola-fl-metro"
+kind = "us:metro"
+name = "Pensacola Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 37860 — Pensacola-Ferry Pass-Brent, FL
+
+[[region]]
+slug = "peoria-il-metro"
+kind = "us:metro"
+name = "Peoria Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il"]
+# Census CBSA 37900 — Peoria, IL
+
+[[region]]
+slug = "philadelphia-pa-metro"
+kind = "us:metro"
+name = "Philadelphia Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa", "nj", "de-state", "md"]
+# Census CBSA 37980 — Philadelphia-Camden-Wilmington, PA-NJ-DE-MD
+
+[[region]]
+slug = "phoenix-az-metro"
+kind = "us:metro"
+name = "Phoenix Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["az"]
+# Census CBSA 38060 — Phoenix-Mesa-Chandler, AZ
+
+[[region]]
+slug = "pinehurst-nc-metro"
+kind = "us:metro"
+name = "Pinehurst Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 38240 — Pinehurst-Southern Pines, NC
+
+[[region]]
+slug = "pittsburgh-pa-metro"
+kind = "us:metro"
+name = "Pittsburgh Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 38300 — Pittsburgh, PA
+
+[[region]]
+slug = "pittsfield-ma-metro"
+kind = "us:metro"
+name = "Pittsfield Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ma"]
+# Census CBSA 38340 — Pittsfield, MA
+
+[[region]]
+slug = "pocatello-id-metro"
+kind = "us:metro"
+name = "Pocatello Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id"]
+# Census CBSA 38540 — Pocatello, ID
+
+[[region]]
+slug = "ponce-pr-metro"
+kind = "us:metro"
+name = "Ponce Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pr"]
+# Census CBSA 38660 — Ponce, PR
+
+[[region]]
+slug = "port-st-lucie-fl-metro"
+kind = "us:metro"
+name = "Port St. Lucie Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 38940 — Port St. Lucie, FL
+
+[[region]]
+slug = "portland-me-metro"
+kind = "us:metro"
+name = "Portland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["me"]
+# Census CBSA 38860 — Portland-South Portland, ME
+
+[[region]]
+slug = "portland-or-metro"
+kind = "us:metro"
+name = "Portland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or", "wa"]
+# Census CBSA 38900 — Portland-Vancouver-Hillsboro, OR-WA
+
+[[region]]
+slug = "prescott-valley-az-metro"
+kind = "us:metro"
+name = "Prescott Valley Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["az"]
+# Census CBSA 39150 — Prescott Valley-Prescott, AZ
+
+[[region]]
+slug = "providence-ri-metro"
+kind = "us:metro"
+name = "Providence Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ri", "ma"]
+# Census CBSA 39300 — Providence-Warwick, RI-MA
+
+[[region]]
+slug = "provo-ut-metro"
+kind = "us:metro"
+name = "Provo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ut"]
+# Census CBSA 39340 — Provo-Orem-Lehi, UT
+
+[[region]]
+slug = "pueblo-co-metro"
+kind = "us:metro"
+name = "Pueblo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["co"]
+# Census CBSA 39380 — Pueblo, CO
+
+[[region]]
+slug = "punta-gorda-fl-metro"
+kind = "us:metro"
+name = "Punta Gorda Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 39460 — Punta Gorda, FL
+
+[[region]]
+slug = "racine-wi-metro"
+kind = "us:metro"
+name = "Racine Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 39540 — Racine-Mount Pleasant, WI
+
+[[region]]
+slug = "raleigh-nc-metro"
+kind = "us:metro"
+name = "Raleigh Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 39580 — Raleigh-Cary, NC
+
+[[region]]
+slug = "rapid-city-sd-metro"
+kind = "us:metro"
+name = "Rapid City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sd"]
+# Census CBSA 39660 — Rapid City, SD
+
+[[region]]
+slug = "reading-pa-metro"
+kind = "us:metro"
+name = "Reading Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 39740 — Reading, PA
+
+[[region]]
+slug = "redding-ca-metro"
+kind = "us:metro"
+name = "Redding Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 39820 — Redding, CA
+
+[[region]]
+slug = "reno-nv-metro"
+kind = "us:metro"
+name = "Reno Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nv"]
+# Census CBSA 39900 — Reno, NV
+
+[[region]]
+slug = "richmond-va-metro"
+kind = "us:metro"
+name = "Richmond Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va"]
+# Census CBSA 40060 — Richmond, VA
+
+[[region]]
+slug = "riverside-ca-metro"
+kind = "us:metro"
+name = "Riverside Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 40140 — Riverside-San Bernardino-Ontario, CA
+
+[[region]]
+slug = "roanoke-va-metro"
+kind = "us:metro"
+name = "Roanoke Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va"]
+# Census CBSA 40220 — Roanoke, VA
+
+[[region]]
+slug = "rochester-mn-metro"
+kind = "us:metro"
+name = "Rochester Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn"]
+# Census CBSA 40340 — Rochester, MN
+
+[[region]]
+slug = "rochester-ny-metro"
+kind = "us:metro"
+name = "Rochester Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 40380 — Rochester, NY
+
+[[region]]
+slug = "rockford-il-metro"
+kind = "us:metro"
+name = "Rockford Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il"]
+# Census CBSA 40420 — Rockford, IL
+
+[[region]]
+slug = "rocky-mount-nc-metro"
+kind = "us:metro"
+name = "Rocky Mount Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 40580 — Rocky Mount, NC
+
+[[region]]
+slug = "rome-ga-metro"
+kind = "us:metro"
+name = "Rome Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 40660 — Rome, GA
+
+[[region]]
+slug = "sacramento-ca-metro"
+kind = "us:metro"
+name = "Sacramento Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 40900 — Sacramento-Roseville-Folsom, CA
+
+[[region]]
+slug = "saginaw-mi-metro"
+kind = "us:metro"
+name = "Saginaw Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 40980 — Saginaw, MI
+
+[[region]]
+slug = "salem-or-metro"
+kind = "us:metro"
+name = "Salem Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or"]
+# Census CBSA 41420 — Salem, OR
+
+[[region]]
+slug = "salinas-ca-metro"
+kind = "us:metro"
+name = "Salinas Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 41500 — Salinas, CA
+
+[[region]]
+slug = "salisbury-md-metro"
+kind = "us:metro"
+name = "Salisbury Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["md"]
+# Census CBSA 41540 — Salisbury, MD
+
+[[region]]
+slug = "salt-lake-city-ut-metro"
+kind = "us:metro"
+name = "Salt Lake City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ut"]
+# Census CBSA 41620 — Salt Lake City-Murray, UT
+
+[[region]]
+slug = "san-angelo-tx-metro"
+kind = "us:metro"
+name = "San Angelo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 41660 — San Angelo, TX
+
+[[region]]
+slug = "san-antonio-tx-metro"
+kind = "us:metro"
+name = "San Antonio Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 41700 — San Antonio-New Braunfels, TX
+
+[[region]]
+slug = "san-diego-ca-metro"
+kind = "us:metro"
+name = "San Diego Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 41740 — San Diego-Chula Vista-Carlsbad, CA
+
+[[region]]
+slug = "san-jose-ca-metro"
+kind = "us:metro"
+name = "San Jose Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 41940 — San Jose-Sunnyvale-Santa Clara, CA
+
+[[region]]
+slug = "san-juan-pr-metro"
+kind = "us:metro"
+name = "San Juan Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pr"]
+# Census CBSA 41980 — San Juan-Bayamón-Caguas, PR
+
+[[region]]
+slug = "san-luis-obispo-ca-metro"
+kind = "us:metro"
+name = "San Luis Obispo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 42020 — San Luis Obispo-Paso Robles, CA
+
+[[region]]
+slug = "sandusky-oh-metro"
+kind = "us:metro"
+name = "Sandusky Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 41780 — Sandusky, OH
+
+[[region]]
+slug = "santa-cruz-ca-metro"
+kind = "us:metro"
+name = "Santa Cruz Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 42100 — Santa Cruz-Watsonville, CA
+
+[[region]]
+slug = "santa-fe-nm-metro"
+kind = "us:metro"
+name = "Santa Fe Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nm"]
+# Census CBSA 42140 — Santa Fe, NM
+
+[[region]]
+slug = "santa-maria-ca-metro"
+kind = "us:metro"
+name = "Santa Maria Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 42200 — Santa Maria-Santa Barbara, CA
+
+[[region]]
+slug = "santa-rosa-ca-metro"
+kind = "us:metro"
+name = "Santa Rosa Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 42220 — Santa Rosa-Petaluma, CA
+
+[[region]]
+slug = "savannah-ga-metro"
+kind = "us:metro"
+name = "Savannah Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 42340 — Savannah, GA
+
+[[region]]
+slug = "scranton-pa-metro"
+kind = "us:metro"
+name = "Scranton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 42540 — Scranton--Wilkes-Barre, PA
+
+[[region]]
+slug = "seattle-metro"
+kind = "us:metro"
+name = "Seattle Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+# Census CBSA 42660 — Seattle-Tacoma-Bellevue, WA
+
+[[region]]
+slug = "sebastian-fl-metro"
+kind = "us:metro"
+name = "Sebastian Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 42680 — Sebastian-Vero Beach-West Vero Corridor, FL
+
+[[region]]
+slug = "sebring-fl-metro"
+kind = "us:metro"
+name = "Sebring Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 42700 — Sebring, FL
+
+[[region]]
+slug = "sf-bay-area"
+kind = "us:metro"
+name = "San Francisco Bay Area"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+# Census CBSA 41860 — San Francisco-Oakland-Fremont, CA
+
+[[region]]
+slug = "sheboygan-wi-metro"
+kind = "us:metro"
+name = "Sheboygan Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 43100 — Sheboygan, WI
+
+[[region]]
+slug = "sherman-tx-metro"
+kind = "us:metro"
+name = "Sherman Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 43300 — Sherman-Denison, TX
+
+[[region]]
+slug = "shreveport-la-metro"
+kind = "us:metro"
+name = "Shreveport Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 43340 — Shreveport-Bossier City, LA
+
+[[region]]
+slug = "sierra-vista-az-metro"
+kind = "us:metro"
+name = "Sierra Vista Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["az"]
+# Census CBSA 43420 — Sierra Vista-Douglas, AZ
+
+[[region]]
+slug = "sioux-city-ia-metro"
+kind = "us:metro"
+name = "Sioux City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia", "ne", "sd"]
+# Census CBSA 43580 — Sioux City, IA-NE-SD
+
+[[region]]
+slug = "sioux-falls-sd-metro"
+kind = "us:metro"
+name = "Sioux Falls Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sd", "mn"]
+# Census CBSA 43620 — Sioux Falls, SD-MN
+
+[[region]]
+slug = "slidell-la-metro"
+kind = "us:metro"
+name = "Slidell Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["la-state"]
+# Census CBSA 43640 — Slidell-Mandeville-Covington, LA
+
+[[region]]
+slug = "south-bend-in-metro"
+kind = "us:metro"
+name = "South Bend Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in", "mi"]
+# Census CBSA 43780 — South Bend-Mishawaka, IN-MI
+
+[[region]]
+slug = "spartanburg-sc-metro"
+kind = "us:metro"
+name = "Spartanburg Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 43900 — Spartanburg, SC
+
+[[region]]
+slug = "spokane-wa-metro"
+kind = "us:metro"
+name = "Spokane Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 44060 — Spokane-Spokane Valley, WA
+
+[[region]]
+slug = "springfield-il-metro"
+kind = "us:metro"
+name = "Springfield Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il"]
+# Census CBSA 44100 — Springfield, IL
+
+[[region]]
+slug = "springfield-ma-metro"
+kind = "us:metro"
+name = "Springfield Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ma"]
+# Census CBSA 44140 — Springfield, MA
+
+[[region]]
+slug = "springfield-mo-metro"
+kind = "us:metro"
+name = "Springfield Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo"]
+# Census CBSA 44180 — Springfield, MO
+
+[[region]]
+slug = "springfield-oh-metro"
+kind = "us:metro"
+name = "Springfield Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 44220 — Springfield, OH
+
+[[region]]
+slug = "st-cloud-mn-metro"
+kind = "us:metro"
+name = "St. Cloud Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn"]
+# Census CBSA 41060 — St. Cloud, MN
+
+[[region]]
+slug = "st-george-ut-metro"
+kind = "us:metro"
+name = "St. George Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ut"]
+# Census CBSA 41100 — St. George, UT
+
+[[region]]
+slug = "st-joseph-mo-metro"
+kind = "us:metro"
+name = "St. Joseph Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "ks"]
+# Census CBSA 41140 — St. Joseph, MO-KS
+
+[[region]]
+slug = "st-louis-mo-metro"
+kind = "us:metro"
+name = "St. Louis Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "il"]
+# Census CBSA 41180 — St. Louis, MO-IL
+
+[[region]]
+slug = "state-college-pa-metro"
+kind = "us:metro"
+name = "State College Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 44300 — State College, PA
+
+[[region]]
+slug = "staunton-va-metro"
+kind = "us:metro"
+name = "Staunton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va"]
+# Census CBSA 44420 — Staunton-Stuarts Draft, VA
+
+[[region]]
+slug = "stockton-ca-metro"
+kind = "us:metro"
+name = "Stockton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 44700 — Stockton-Lodi, CA
+
+[[region]]
+slug = "sumter-sc-metro"
+kind = "us:metro"
+name = "Sumter Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc"]
+# Census CBSA 44940 — Sumter, SC
+
+[[region]]
+slug = "syracuse-ny-metro"
+kind = "us:metro"
+name = "Syracuse Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 45060 — Syracuse, NY
+
+[[region]]
+slug = "tallahassee-fl-metro"
+kind = "us:metro"
+name = "Tallahassee Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 45220 — Tallahassee, FL
+
+[[region]]
+slug = "tampa-fl-metro"
+kind = "us:metro"
+name = "Tampa Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 45300 — Tampa-St. Petersburg-Clearwater, FL
+
+[[region]]
+slug = "terre-haute-in-metro"
+kind = "us:metro"
+name = "Terre Haute Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in"]
+# Census CBSA 45460 — Terre Haute, IN
+
+[[region]]
+slug = "texarkana-tx-metro"
+kind = "us:metro"
+name = "Texarkana Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx", "ar"]
+# Census CBSA 45500 — Texarkana, TX-AR
+
+[[region]]
+slug = "toledo-oh-metro"
+kind = "us:metro"
+name = "Toledo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 45780 — Toledo, OH
+
+[[region]]
+slug = "topeka-ks-metro"
+kind = "us:metro"
+name = "Topeka Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ks"]
+# Census CBSA 45820 — Topeka, KS
+
+[[region]]
+slug = "traverse-city-mi-metro"
+kind = "us:metro"
+name = "Traverse City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi"]
+# Census CBSA 45900 — Traverse City, MI
+
+[[region]]
+slug = "trenton-nj-metro"
+kind = "us:metro"
+name = "Trenton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nj"]
+# Census CBSA 45940 — Trenton-Princeton, NJ
+
+[[region]]
+slug = "tucson-az-metro"
+kind = "us:metro"
+name = "Tucson Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["az"]
+# Census CBSA 46060 — Tucson, AZ
+
+[[region]]
+slug = "tulsa-ok-metro"
+kind = "us:metro"
+name = "Tulsa Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ok"]
+# Census CBSA 46140 — Tulsa, OK
+
+[[region]]
+slug = "tuscaloosa-al-metro"
+kind = "us:metro"
+name = "Tuscaloosa Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al"]
+# Census CBSA 46220 — Tuscaloosa, AL
+
+[[region]]
+slug = "twin-falls-id-metro"
+kind = "us:metro"
+name = "Twin Falls Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id"]
+# Census CBSA 46300 — Twin Falls, ID
+
+[[region]]
+slug = "tyler-tx-metro"
+kind = "us:metro"
+name = "Tyler Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 46340 — Tyler, TX
+
+[[region]]
+slug = "urban-honolulu-hi-metro"
+kind = "us:metro"
+name = "Urban Honolulu Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["hi"]
+# Census CBSA 46520 — Urban Honolulu, HI
+
+[[region]]
+slug = "utica-ny-metro"
+kind = "us:metro"
+name = "Utica Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 46540 — Utica-Rome, NY
+
+[[region]]
+slug = "valdosta-ga-metro"
+kind = "us:metro"
+name = "Valdosta Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 46660 — Valdosta, GA
+
+[[region]]
+slug = "vallejo-ca-metro"
+kind = "us:metro"
+name = "Vallejo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 46700 — Vallejo, CA
+
+[[region]]
+slug = "victoria-tx-metro"
+kind = "us:metro"
+name = "Victoria Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 47020 — Victoria, TX
+
+[[region]]
+slug = "vineland-nj-metro"
+kind = "us:metro"
+name = "Vineland Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nj"]
+# Census CBSA 47220 — Vineland, NJ
+
+[[region]]
+slug = "virginia-beach-va-metro"
+kind = "us:metro"
+name = "Virginia Beach Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va", "nc"]
+# Census CBSA 47260 — Virginia Beach-Chesapeake-Norfolk, VA-NC
+
+[[region]]
+slug = "visalia-ca-metro"
+kind = "us:metro"
+name = "Visalia Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 47300 — Visalia, CA
+
+[[region]]
+slug = "waco-tx-metro"
+kind = "us:metro"
+name = "Waco Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 47380 — Waco, TX
+
+[[region]]
+slug = "walla-walla-wa-metro"
+kind = "us:metro"
+name = "Walla Walla Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 47460 — Walla Walla, WA
+
+[[region]]
+slug = "warner-robins-ga-metro"
+kind = "us:metro"
+name = "Warner Robins Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga"]
+# Census CBSA 47580 — Warner Robins, GA
+
+[[region]]
+slug = "washington-dc-metro"
+kind = "us:metro"
+name = "Washington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["dc", "va", "md", "wv"]
+# Census CBSA 47900 — Washington-Arlington-Alexandria, DC-VA-MD-WV
+
+[[region]]
+slug = "waterbury-ct-metro"
+kind = "us:metro"
+name = "Waterbury Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ct"]
+# Census CBSA 47930 — Waterbury-Shelton, CT
+
+[[region]]
+slug = "waterloo-ia-metro"
+kind = "us:metro"
+name = "Waterloo Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia"]
+# Census CBSA 47940 — Waterloo-Cedar Falls, IA
+
+[[region]]
+slug = "watertown-ny-metro"
+kind = "us:metro"
+name = "Watertown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny"]
+# Census CBSA 48060 — Watertown-Fort Drum, NY
+
+[[region]]
+slug = "wausau-wi-metro"
+kind = "us:metro"
+name = "Wausau Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi"]
+# Census CBSA 48140 — Wausau, WI
+
+[[region]]
+slug = "weirton-wv-metro"
+kind = "us:metro"
+name = "Weirton Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "oh"]
+# Census CBSA 48260 — Weirton-Steubenville, WV-OH
+
+[[region]]
+slug = "wenatchee-wa-metro"
+kind = "us:metro"
+name = "Wenatchee Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 48300 — Wenatchee-East Wenatchee, WA
+
+[[region]]
+slug = "wheeling-wv-metro"
+kind = "us:metro"
+name = "Wheeling Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "oh"]
+# Census CBSA 48540 — Wheeling, WV-OH
+
+[[region]]
+slug = "wichita-falls-tx-metro"
+kind = "us:metro"
+name = "Wichita Falls Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx"]
+# Census CBSA 48660 — Wichita Falls, TX
+
+[[region]]
+slug = "wichita-ks-metro"
+kind = "us:metro"
+name = "Wichita Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ks"]
+# Census CBSA 48620 — Wichita, KS
+
+[[region]]
+slug = "wildwood-fl-metro"
+kind = "us:metro"
+name = "Wildwood Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["fl"]
+# Census CBSA 48680 — Wildwood-The Villages, FL
+
+[[region]]
+slug = "williamsport-pa-metro"
+kind = "us:metro"
+name = "Williamsport Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 48700 — Williamsport, PA
+
+[[region]]
+slug = "wilmington-nc-metro"
+kind = "us:metro"
+name = "Wilmington Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 48900 — Wilmington, NC
+
+[[region]]
+slug = "winchester-va-metro"
+kind = "us:metro"
+name = "Winchester Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va", "wv"]
+# Census CBSA 49020 — Winchester, VA-WV
+
+[[region]]
+slug = "winston-nc-metro"
+kind = "us:metro"
+name = "Winston Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc"]
+# Census CBSA 49180 — Winston-Salem, NC
+
+[[region]]
+slug = "worcester-ma-metro"
+kind = "us:metro"
+name = "Worcester Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ma"]
+# Census CBSA 49340 — Worcester, MA
+
+[[region]]
+slug = "yakima-wa-metro"
+kind = "us:metro"
+name = "Yakima Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa"]
+# Census CBSA 49420 — Yakima, WA
+
+[[region]]
+slug = "york-pa-metro"
+kind = "us:metro"
+name = "York Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa"]
+# Census CBSA 49620 — York-Hanover, PA
+
+[[region]]
+slug = "youngstown-oh-metro"
+kind = "us:metro"
+name = "Youngstown Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh"]
+# Census CBSA 49660 — Youngstown-Warren, OH
+
+[[region]]
+slug = "yuba-city-ca-metro"
+kind = "us:metro"
+name = "Yuba City Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ca-state"]
+# Census CBSA 49700 — Yuba City, CA
+
+[[region]]
+slug = "yuma-az-metro"
+kind = "us:metro"
+name = "Yuma Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["az"]
+# Census CBSA 49740 — Yuma, AZ

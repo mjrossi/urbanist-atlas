@@ -144,6 +144,23 @@ loadpostal src country='US':
 loaddata:
     cd api && go run ./cmd/server loaddata
 
+# fetch upstream Census/StatsCan source files into etl/sources/<country>/
+# and validate checksums against etl/SOURCES.md. Foundation slice
+# (#7.5.1) ships this as a no-op stub; concrete US/CA plans land in
+# slices #7.5.3 / #7.5.4.
+[group('data')]
+[doc('etl: fetch upstream source files for a country (e.g. `just etl-download US`)')]
+etl-download country:
+    cd api && go run ./cmd/server etl download --country {{country}} --src ../etl/sources
+
+# regenerate seed TOML/CSV under api/seed/ from staged etl/sources/
+# data. Reproducible — same upstream vintage produces byte-identical
+# output. No-op stub until #7.5.3/#7.5.4.
+[group('data')]
+[doc('etl: regenerate seed files from staged sources (e.g. `just etl-regenerate US`)')]
+etl-regenerate country:
+    cd api && go run ./cmd/server etl regenerate --country {{country}} --src ../etl/sources --out seed
+
 # ── postgres: dev container lifecycle ─────────────────
 # Local dev Postgres runs in a named docker container with a
 # persistent volume on port 55432 (non-default to avoid clashing

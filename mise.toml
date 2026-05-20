@@ -12,6 +12,12 @@
 # Language runtimes — patch-pinned so reproducibility > convenience.
 go = "1.26.3"
 node = "22.22.3"
+# Python is used by the etl pipeline (slice #7.5.3+) to convert the
+# Census CBSA delineation xlsx into CSV before the Go regenerate step
+# parses it. See etl/scripts/xlsx_to_csv.py and etl/SOURCES.md. Not
+# needed at runtime — only by contributors who run `urbanist etl
+# download` or refresh upstream vintages.
+python = "3.14"
 
 # Project tooling. Pinned versions because reproducibility > convenience.
 # These get added/bumped as they're introduced into the codebase.
@@ -20,6 +26,10 @@ node = "22.22.3"
 "aqua:casey/just" = "1.51.0"
 "go:honnef.co/go/tools/cmd/staticcheck" = "2025.1.1"
 "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" = "2.7.0"
+# Python `openpyxl` is a library (no CLI entry point) so it can't be
+# managed via mise's pipx backend — contributors install it on demand
+# via `pip install -r etl/scripts/requirements.txt` when refreshing
+# the Census xlsx source. Pinned in that requirements file.
 
 [env]
 # Defaults that apply everywhere. Per-env files override these.

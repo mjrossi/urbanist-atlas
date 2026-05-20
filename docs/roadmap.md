@@ -114,6 +114,21 @@ the plan is the *design* view.
   intentionally exempt). Frontend helpers unwrap `data`
   transparently. See
   `docs/superpowers/specs/2026-05-18-odbl-response-shape-design.md`.
+- **Postal-code coverage at scale (slice #7.5, sub-slices #7.5.1–4):**
+  Replaces the 47-row fixture with 33,774 US ZCTAs + 1,643 CA FSAs
+  via the smallest-anchor model. New `internal/etl/{us,ca}` packages
+  parse Census CBSA + ZCTA crosswalks (US) and StatsCan FSA + CMA
+  boundary DBFs (CA), emitting deterministic `regions_us_msas.toml`
+  (393 MSAs), `regions_ca_cmas.toml` (41 CMAs), and per-country
+  `postal_codes_*.csv`. Region taxonomy gains state/province tier
+  (52 US + 13 CA), multistate tier (3 US), and CMA/MSA tier (393 + 41).
+  NYC `nyc` flips to a regional intermediate region above 5 borough
+  leaves; the state edge moves from `nyc → ny` to the borough rows
+  per region-graph rule §1. `loadpostal` switched to batched
+  `unnest` upserts via raw `pgx.Exec` so 33k US rows load in ~3s
+  instead of multi-minute per-row round-trips. `internal/loadregions`
+  gains cross-file parent resolution so multi-tier TOML splits
+  resolve. Design spec: `docs/superpowers/specs/2026-05-19-postal-coverage-design.md`.
 - **X-Atlas-Client shared-secret gate (slice #23):**
   `api/internal/httpapi/clientsecret.go` middleware checks
   `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via
@@ -186,7 +201,11 @@ The rows remain in the tables below for traceability.
 | 4.7 | **Second EU country validation (Spain)** | Repeat the validation exercise for Spain. Adds `regions_es.toml`, `postal_codes_es.csv`, ~5 ES orgs. Specifically validates: autonomous communities (Catalonia, Basque Country with their own transit authorities), the comarca layer in some communities, and Ceuta/Melilla as the analogue of Açores/Madeira. Should be mostly mechanical given #4.6's conventions and loader changes. |
 | 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. Region attachment uses the same `region_slugs` machinery as `orgs.toml`, so submitted orgs can target any region kind in any supported country. |
 | 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. Lookup coverage should include: the national-tier filter (orgs attached to `scope_tier='national'` regions must NOT appear in default results) and the unknown-country fall-through (`country=ZZ` with an unknown postal code returns 404, not 400) — both shipped in slice #4.6 with light coverage in `pipeline_test.go`. |
-| 7.5 | **Full-country postal data ingest** | Replace the bundled fixture CSVs (~30 ZIPs) with real Census ZCTA / StatsCan PCCF reshapes (and OpenPLZ for PT when the directory expands). Out-of-band ETL → 3-column CSVs in the format `loadpostal` already consumes. Documented in [`api/seed/README.md`](../api/seed/README.md). |
+| 7.5 | **Full-country postal data ingest** *(broken into sub-slices below)* | The smallest-anchor design has every US ZIP and CA FSA resolve to the smallest curated region (city leaf → NYC borough → MSA → state/province) — schema unchanged, no app-level fallback logic. Sub-slices below. Design spec: [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md). |
+| 7.5.1 | **Foundation: ETL scaffolding + states/provinces** | Design spec; `etl download`/`etl regenerate` subcommand stubs on the `urbanist` binary; `api/internal/etl/` package skeleton; hand-defined `regions_us_states.toml` (52: 50 states + DC + PR) and `regions_ca_provinces.toml` (13: 10 provinces + 3 territories), with existing state/province entries moved out of `regions_us.toml` and `regions_ca.toml` for cleaner separation. No data-scale change. |
+| 7.5.2 | **NYC borough split** *(shipped)* | Migration `0004_split_nyc.sql` flips `nyc.scope_tier=regional`, drops the `nyc → ny` edge (boroughs carry the state edge per region-graph rule §1), keeps `nyc → nyc-metro`. Borough leaves keep their parents `[nyc, ny]`. Editorial decision: citywide NYC orgs (TransAlt, Riders Alliance, StreetsPAC) stay on `nyc` and bucket as Regional for borough lookups. Place-label heuristic in `pkg/atlas/lookup.go` updated to prefer `IsMetroKind` for the broad slot so labels like "Brooklyn, New York City — New York Metro" survive the regional-tier `nyc`. |
+| 7.5.3 | **US MSAs + ~34k ZCTA postal codes** *(shipped)* | New `internal/etl/us` package parses Census CBSA delineation (xlsx → CSV via `etl/scripts/xlsx_to_csv.py`) + ZCTA-to-place + ZCTA-to-county. Generates `regions_us_msas.toml` (393 entries) using `regions_us_msa_overrides.toml` for the 7 known metros (nyc-metro, chicago-metro, sf-bay-area, greater-boston, greater-miami, seattle-metro, greater-la). Generates `postal_codes_us.csv` (~33.7k rows) via smallest-anchor crosswalk. `loadpostal` switched to batched `unnest` upserts via raw `pgx.Exec` to avoid 33k per-row round-trips on Heroku. New `regions_us_multistate.toml` carved out of `regions_us.toml` to break the circular load order between MSAs and curated leaves. Integration tests passing in ~36s. |
+| 7.5.4 | **CA CMAs + 1,643 FSA postal codes** *(shipped)* | New `internal/etl/ca` package parses the StatsCan FSA + CMA boundary file DBF tables (extracted from the boundary zips inside the ETL; shapefile geometry ignored). Generates `regions_ca_cmas.toml` (41 CMAs filtered to type='B', with overrides for toronto-cma/montreal-cma/metro-vancouver/ottawa-gatineau-cma) and `postal_codes_ca.csv` (1,643 rows). FSA→CMA mapping uses a coarse FSA-prefix table (M, L1/3/4/5/6 → Toronto; H → Montréal; V5-7 → Vancouver; K1-2 + J8-9 → Ottawa-Gatineau; T2-3 → Calgary; T5-6 → Edmonton; L8-9 → Hamilton) in lieu of the restricted-licence PCCF. Minimal stdlib-only DBF reader; Latin-1 → UTF-8 decoding for accented CMA names. Anchor distribution: 10 city-leaf, 522 CMA, 1111 province. Closes #7.5. |
 | 7.6 | **Seed data growth** | Expand `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to the planned ~30–50 across the supported countries. Editorial work, not engineering. |
 
 ## Frontend (React + Vite)

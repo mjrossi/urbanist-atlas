@@ -303,9 +303,16 @@ func regionIDs(regions []atlas.Region) []int64 {
 	return out
 }
 
-// TestStore_AncestorRegions_NYC builds the spec's NYC subset against a
-// real testcontainers Postgres and verifies the recursive-CTE walk:
-// brooklyn → nyc → {nyc-metro, ny} → nyc-tristate.
+// TestStore_AncestorRegions_NYC builds the post-#7.5.2 NYC subgraph
+// against a real testcontainers Postgres and verifies the recursive-CTE
+// walk. After the borough split, the state edge lives on the boroughs
+// (not on `nyc`); `nyc` is a regional intermediate region whose only
+// parent is `nyc-metro`. A Brooklyn ZIP walks:
+//
+//	brooklyn → {nyc, ny} → nyc-metro → nyc-tristate
+//
+// Depth order: brooklyn(0) → nyc(1, sort 15) → ny(1, sort 60) →
+// nyc-metro(2, from nyc) → nyc-tristate(3).
 func TestStore_AncestorRegions_NYC(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
@@ -342,8 +349,8 @@ func TestStore_AncestorRegions_NYC(t *testing.T) {
 	upsert("nyc-tristate", "Tri-State Region", "us:multi-state", "regional", 80)
 	upsert("ny", "New York", "us:state", "regional", 60)
 	upsert("nyc-metro", "New York Metro", "us:metro", "regional", 40, "nyc-tristate")
-	upsert("nyc", "New York City", "us:city", "local", 15, "nyc-metro", "ny")
-	upsert("brooklyn", "Brooklyn", "us:borough", "local", 10, "nyc")
+	upsert("nyc", "New York City", "us:city", "regional", 15, "nyc-metro")
+	upsert("brooklyn", "Brooklyn", "us:borough", "local", 10, "nyc", "ny")
 
 	if err := store.q.UpsertPostalCode(ctx, gen.UpsertPostalCodeParams{
 		Country: "US", PostalCode: "11217", LeafRegionID: rid["brooklyn"],
@@ -367,19 +374,29 @@ func TestStore_AncestorRegions_NYC(t *testing.T) {
 	for i, r := range ancestry {
 		got[i] = r.Slug
 	}
-	want := []string{"brooklyn", "nyc", "nyc-metro", "ny", "nyc-tristate"}
+	want := []string{"brooklyn", "nyc", "ny", "nyc-metro", "nyc-tristate"}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("ancestor order (-want +got):\n%s", diff)
 	}
 
-	// Spot-check parent_slugs hydration on the diamond-junction "nyc" node.
+	// Spot-check parent_slugs hydration on `nyc` — after the split its
+	// only parent is `nyc-metro` (the `ny` edge migrated to the
+	// boroughs).
 	for _, r := range ancestry {
 		if r.Slug == "nyc" {
 			gotParents := append([]string(nil), r.ParentSlugs...)
 			sort.Strings(gotParents)
-			wantParents := []string{"ny", "nyc-metro"}
+			wantParents := []string{"nyc-metro"}
 			if diff := cmp.Diff(wantParents, gotParents); diff != "" {
 				t.Errorf("nyc.parent_slugs (-want +got):\n%s", diff)
+			}
+		}
+		if r.Slug == "brooklyn" {
+			gotParents := append([]string(nil), r.ParentSlugs...)
+			sort.Strings(gotParents)
+			wantParents := []string{"ny", "nyc"}
+			if diff := cmp.Diff(wantParents, gotParents); diff != "" {
+				t.Errorf("brooklyn.parent_slugs (-want +got):\n%s", diff)
 			}
 		}
 	}
