@@ -220,6 +220,25 @@ contact_url = "https://www.calgaryclimatehub.ca/contact"
 tags = ["transit", "climate", "advocacy", "active-transportation"]
 region_slugs = ["calgary-cma"]
 
+# --- Ottawa-Gatineau ---
+
+[[org]]
+slug = "bike-ottawa"
+name = "Bike Ottawa"
+short_desc = "Volunteer-based cycling advocacy group working to make cycling a fun, safe, and easy choice for all ages and abilities across Canada's Capital Region."
+website_url = "https://bikeottawa.ca"
+contact_url = "https://bikeottawa.ca/contact-us/"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["ottawa-gatineau-cma"]
+
+[[org]]
+slug = "ottawa-transit-riders"
+name = "Ottawa Transit Riders"
+short_desc = "Grassroots Ottawa transit-rider advocacy group founded in 2019, organizing around LRT reliability, OC Transpo fares, and accessible transit."
+website_url = "https://www.ottawatransitriders.ca"
+tags = ["transit", "grassroots", "advocacy"]
+region_slugs = ["ottawa-gatineau-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
