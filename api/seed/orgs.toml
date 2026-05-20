@@ -135,6 +135,24 @@ website_url = "https://betterstreetschi.org"
 tags = ["safe-streets", "advocacy", "grassroots"]
 region_slugs = ["chicago"]
 
+# --- Baltimore ---
+
+[[org]]
+slug = "bikemore"
+name = "Bikemore"
+short_desc = "Baltimore's bicycle advocacy nonprofit, organizing for protected bike infrastructure, complete streets, and policy that puts people before cars."
+website_url = "https://www.bikemore.net"
+tags = ["cycling", "safe-streets", "advocacy", "policy"]
+region_slugs = ["baltimore-md-metro"]
+
+[[org]]
+slug = "central-maryland-transportation-alliance"
+name = "Central Maryland Transportation Alliance"
+short_desc = "Regional transportation advocacy organization improving transit, walking, and cycling across Central Maryland; publishes the Baltimore-region Transportation Report Card."
+website_url = "https://cmtalliance.org"
+tags = ["transit", "policy", "research", "regional"]
+region_slugs = ["baltimore-md-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
