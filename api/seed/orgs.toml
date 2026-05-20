@@ -428,6 +428,24 @@ website_url = "https://www.greaterdenvertransit.com"
 tags = ["transit", "grassroots", "advocacy", "regional"]
 region_slugs = ["denver-co-metro"]
 
+# --- St. Louis ---
+
+[[org]]
+slug = "trailnet"
+name = "Trailnet"
+short_desc = "St. Louis nonprofit working to make walking and biking a way of life through better infrastructure, education, and advocacy; supports the Brickline Greenway and bike-network expansion."
+website_url = "https://trailnet.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "greenways"]
+region_slugs = ["st-louis-mo-metro"]
+
+[[org]]
+slug = "citizens-for-modern-transit"
+name = "Citizens for Modern Transit"
+short_desc = "St. Louis-region transit advocacy leading the push to expand light rail and integrated affordable public transit; active on the 2026 Missouri legislative agenda."
+website_url = "https://cmt-stl.org"
+tags = ["transit", "rail", "advocacy", "regional", "policy"]
+region_slugs = ["st-louis-mo-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
