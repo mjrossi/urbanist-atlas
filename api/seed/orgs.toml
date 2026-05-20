@@ -191,7 +191,7 @@ name = "The Street Trust"
 short_desc = "Portland-based multimodal advocacy nonprofit pushing for safer biking, walking, and transit; conducts statewide legislative work and ballot-measure endorsements."
 website_url = "https://www.thestreettrust.org"
 tags = ["transit", "cycling", "walking", "advocacy", "policy", "multimodal"]
-region_slugs = ["portland-or-metro"]
+region_slugs = ["portland-or-metro", "or"]
 
 [[org]]
 slug = "bikeloud-pdx"
@@ -809,6 +809,132 @@ region_slugs = ["ne"]
 # gap: no statewide ped/bike or transit advocacy nonprofit found as of
 # 2026-05-20. SD DOT has a Bicycle/Pedestrian division but no
 # independent statewide 501(c)(3) advocacy organization is active.
+
+# --- Alaska ---
+
+[[org]]
+slug = "alaska-mobility-coalition"
+name = "Alaska Mobility Coalition"
+short_desc = "Alaska statewide coalition promoting coordinated transportation options for residents and visitors; coordinates transit, paratransit, and active-transportation policy across the state."
+website_url = "https://alaskamobility.org"
+tags = ["transit", "mobility", "advocacy", "coalition"]
+region_slugs = ["ak"]
+
+# --- Arizona ---
+
+[[org]]
+slug = "coalition-of-arizona-bicyclists"
+name = "Coalition of Arizona Bicyclists"
+short_desc = "Arizona statewide bicycle advocacy organization (CAzBIKE, rebranding to Active Arizona) since 2002; engaged in the 2026 State Active Transportation Plan."
+website_url = "https://www.cazbike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["az"]
+
+# --- California ---
+
+[[org]]
+slug = "calbike"
+name = "California Bicycle Coalition"
+short_desc = "California's statewide bicycle advocacy coalition (CalBike) since 1994; 2026 California Bicycle Summit in Sacramento (Apr 23-24), Lobby Day, and Active Transportation Program reforms."
+website_url = "https://www.calbike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy", "equity"]
+region_slugs = ["ca"]
+
+# --- Colorado ---
+
+[[org]]
+slug = "bicycle-colorado"
+name = "Bicycle Colorado"
+short_desc = "Colorado statewide 501(c)(3) cycling advocacy nonprofit since the mid-1990s; April 22 2026 Earth Day Capitol remarks, vulnerable-road-user protection campaigns, statewide training network."
+website_url = "https://bicyclecolorado.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["co"]
+
+# --- Hawaii ---
+
+[[org]]
+slug = "hawaii-bicycling-league"
+name = "Hawai'i Bicycling League"
+short_desc = "Hawaii's oldest and largest cycling organization (HBL); enables bicycling for health, recreation, and transportation through advocacy, education, and events; HB2021 e-bike/micromobility bill in 2026 session."
+website_url = "https://hbl.org"
+tags = ["cycling", "advocacy", "education", "policy"]
+region_slugs = ["hi"]
+
+# --- Idaho ---
+
+[[org]]
+slug = "idaho-walk-bike-alliance"
+name = "Idaho Walk Bike Alliance"
+short_desc = "Idaho statewide 501(c)(3) nonprofit (IWBA) based in Boise; February 2026 Safety Resource Hub launch, Boise State / U of Idaho fellowship partnerships, Safe Routes to School."
+website_url = "https://idahowalkbike.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "education"]
+region_slugs = ["id"]
+
+# --- Montana ---
+
+[[org]]
+slug = "bike-walk-montana"
+name = "Bike Walk Montana"
+short_desc = "Montana statewide not-for-profit advocacy organization working to make biking and walking safe and accessible across the state."
+website_url = "https://www.bikewalkmontana.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["mt"]
+
+# --- Nevada ---
+# gap: no clean statewide ped/bike or transit advocacy nonprofit as of
+# 2026-05-20. Southern Nevada Bicycle Coalition exists but is
+# Las-Vegas-area only and lacks a statewide remit. RTC Snv runs the
+# Southern Nevada transit system but is not an advocacy entity.
+
+# --- New Mexico ---
+
+[[org]]
+slug = "bike-abq"
+name = "BikeABQ"
+short_desc = "Albuquerque cycling advocacy nonprofit since 1999; carries forward founder Gail Ryba's vision (also founded Bicycle Coalition of New Mexico) and serves as the de facto NM-statewide cycling voice."
+website_url = "https://www.bikeabq.org"
+tags = ["cycling", "advocacy", "safe-streets", "education"]
+region_slugs = ["nm"]
+
+# --- Oregon ---
+# Coverage satisfied by The Street Trust (see Portland OR section
+# above), which is multi-anchored at portland-or-metro AND or state
+# because it explicitly conducts statewide legislative work alongside
+# its Portland-metro programs.
+
+# --- Utah ---
+
+[[org]]
+slug = "bike-utah"
+name = "Bike Utah"
+short_desc = "Utah's statewide bicycle advocacy and education nonprofit working to integrate cycling into Utah's everyday culture; 2026 Bill Tracker, 2026 Utah Legislative Session engagement."
+website_url = "https://www.bikeutah.org"
+tags = ["cycling", "advocacy", "safe-streets", "education", "policy"]
+region_slugs = ["ut"]
+
+# --- Washington ---
+
+[[org]]
+slug = "washington-bikes"
+name = "Washington Bikes"
+short_desc = "Washington statewide bicycle advocacy 501(c)(4) (sister of Cascade Bicycle Club); co-hosts the WA Bike Walk Roll Summit (Apr 1-3 2026) and statewide Bike Everywhere Challenge."
+website_url = "https://wabikes.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["wa"]
+
+# --- Wyoming ---
+# gap: no statewide ped/bike or transit advocacy nonprofit found as of
+# 2026-05-20. Local advocates exist (e.g., the visionary work behind
+# the Jackson Hole Community Pathway System) but no statewide 501(c)(3)
+# is active. Revisit if a maintainer has local sources.
+
+# --- Puerto Rico ---
+# gap: Puerto Rico Bicycle Coalition (Coalición Ciclistas PR) maintains
+# a Facebook presence but no clear website was located, and recent
+# activity could not be verified to the 12-month bar without
+# Facebook-side inspection. Worth re-verifying with social-media
+# checks; PR is a single-jurisdiction territory so an org anchored at
+# `pr` would cover all PR ZIPs.
 
 # --- Canada ---
 

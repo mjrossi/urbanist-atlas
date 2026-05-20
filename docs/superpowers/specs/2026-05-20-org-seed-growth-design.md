@@ -337,3 +337,18 @@ during the editorial pass.)
   transit advocacy nonprofit found.
 - **South Dakota (SD)** — no independent statewide ped/bike or
   transit advocacy nonprofit found.
+- **Nevada (NV)** — no clean statewide entity. Southern Nevada Bicycle
+  Coalition exists but is Las-Vegas-area only.
+- **Wyoming (WY)** — no statewide ped/bike or transit advocacy
+  nonprofit. Local advocates exist (Jackson Hole Community Pathway
+  System) but no statewide 501(c)(3).
+- **Puerto Rico (PR)** — Puerto Rico Bicycle Coalition has a Facebook
+  presence but no clear website; recent activity not verifiable to
+  the 12-month bar from search alone. Worth a Facebook-side check.
+
+### Multi-anchored orgs (cover both metro + state in one entry)
+
+- **The Street Trust** → `[portland-or-metro, or]`. Conducts statewide
+  legislative work alongside Portland-metro programs; multi-anchored
+  to satisfy both the Portland metro gate and the Oregon state floor
+  without a duplicate entry.
