@@ -1,0 +1,127 @@
+# Province/territory-tier regions for Canada.
+#
+# 10 provinces + 3 territories = 13 entries.
+# All scope_tier='regional', sort_priority=60 per the bands in
+# docs/region-graph.md §9. No parents — provinces sit at the top of
+# the CA subgraph.
+#
+# This file loads BEFORE regions_ca.toml in just loaddata / loaddata
+# orchestration. Leaves in regions_ca.toml may reference these slugs
+# as parents via cross-file resolution (internal/loadregions/write.go
+# falls back to RegionIDBySlug when a parent isn't in the same file).
+#
+# Slug convention: lowercase 2-letter postal abbreviation, except:
+#   - 'nl-province' for Newfoundland and Labrador (the bare 'nl'
+#     collides with the country code for the Netherlands).
+#
+# Kinds:
+#   - ca:province for the 10 provinces
+#   - ca:territory for the 3 territories
+
+# --- Provinces (10, alphabetical by slug) ---
+
+[[region]]
+slug = "ab"
+kind = "ca:province"
+name = "Alberta"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "bc"
+kind = "ca:province"
+name = "British Columbia"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "mb"
+kind = "ca:province"
+name = "Manitoba"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nb"
+kind = "ca:province"
+name = "New Brunswick"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nl-province"
+kind = "ca:province"
+name = "Newfoundland and Labrador"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ns"
+kind = "ca:province"
+name = "Nova Scotia"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "on"
+kind = "ca:province"
+name = "Ontario"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "pe"
+kind = "ca:province"
+name = "Prince Edward Island"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "qc"
+kind = "ca:province"
+name = "Québec"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "sk"
+kind = "ca:province"
+name = "Saskatchewan"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+# --- Territories (3, alphabetical by slug) ---
+
+[[region]]
+slug = "nt"
+kind = "ca:territory"
+name = "Northwest Territories"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nu"
+kind = "ca:territory"
+name = "Nunavut"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "yt"
+kind = "ca:territory"
+name = "Yukon"
+scope_tier = "regional"
+sort_priority = 60
+parents = []

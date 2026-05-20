@@ -36,7 +36,9 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
+	usStates := repoFile(t, "seed", "regions_us_states.toml")
 	usRegions := repoFile(t, "seed", "regions_us.toml")
+	caProvinces := repoFile(t, "seed", "regions_ca_provinces.toml")
 	caRegions := repoFile(t, "seed", "regions_ca.toml")
 	ptRegions := repoFile(t, "seed", "regions_pt.toml")
 	usCSV := repoFile(t, "seed", "postal_codes_us.csv")
@@ -48,8 +50,19 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	// orgs.toml has US/CA/PT entries — all three countries' regions must
 	// be present before seed, or the seed loader fails on missing
 	// region_slugs.
+	//
+	// State/province-tier files load BEFORE each country's main regions
+	// file so the main file's leaves can parent under the states via
+	// cross-file resolution (internal/loadregions/write.go's
+	// RegionIDBySlug fallback).
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
+		t.Fatalf("loadregions US states: %v", err)
+	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caProvinces, "CA"); err != nil {
+		t.Fatalf("loadregions CA provinces: %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA: %v", err)
@@ -116,8 +129,14 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	// counts. Snapshot row counts → run again → compare.
 	before := snapshotCounts(ctx, t, store)
 
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
+		t.Fatalf("loadregions US states (2nd): %v", err)
+	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caProvinces, "CA"); err != nil {
+		t.Fatalf("loadregions CA provinces (2nd): %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA (2nd): %v", err)
@@ -237,7 +256,13 @@ func TestPipeline_WorkedCities(t *testing.T) {
 	}
 
 	// orgs.toml has US/CA/PT entries; PT regions must exist before seed.
-	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	// State/province-tier files load before each country's main file
+	// (their slugs are referenced as parents via cross-file resolution).
+	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_states.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_provinces.toml"), "CA")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
 	must(err)
@@ -356,7 +381,13 @@ func TestPipeline_PT_ValidationFixture(t *testing.T) {
 	// references US/CA region slugs that must exist or the org seed
 	// loader fails. The PT-specific assertions below only inspect PT
 	// state, so the additional US/CA load is just a no-op precondition.
-	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	// State/province-tier files load before each country's main file
+	// so cross-file parent references resolve.
+	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_states.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_provinces.toml"), "CA")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
 	must(err)

@@ -6,9 +6,12 @@
 // `loaddata` subcommand and the integration suite uses it directly.
 //
 // Adding a new country: drop seed/regions_<cc>.toml and
-// seed/postal_codes_<cc>.csv into api/seed/, then append a {code,
-// suffix} pair to countries below. The pipeline test exercises every
-// listed country end-to-end, so coverage stays automatic.
+// seed/postal_codes_<cc>.csv into api/seed/, then append a
+// {code, regionFiles, postal} entry to countries below. The pipeline
+// test exercises every listed country end-to-end, so coverage stays
+// automatic. If the new country has a state-tier file (e.g.,
+// regions_<cc>_states.toml), list it before the main file in
+// regionFiles so the main file's leaves can parent under the states.
 package loaddata
 
 import (
@@ -26,16 +29,24 @@ import (
 )
 
 // countries lists every country whose bundled seed (regions + postal
-// codes) gets loaded by LoadAll. `code` is the canonical upper-case
-// country code stamped on every row; `suffix` matches the seed
-// filename convention (regions_<suffix>.toml, postal_codes_<suffix>.csv).
+// codes) gets loaded by LoadAll.
+//
+//   - code:        canonical upper-case country code stamped on every row.
+//   - regionFiles: file suffixes for regions_<suffix>.toml, in load
+//     order. Earlier files load first; later files may reference
+//     earlier-loaded regions as parents via cross-file resolution
+//     (see internal/loadregions/write.go's RegionIDBySlug fallback).
+//     For US/CA the convention is to load the state/province tier
+//     before the main file so leaves can parent under them.
+//   - postal:      file suffix for postal_codes_<suffix>.csv.
 var countries = []struct {
-	code   string
-	suffix string
+	code        string
+	regionFiles []string
+	postal      string
 }{
-	{"US", "us"},
-	{"CA", "ca"},
-	{"PT", "pt"},
+	{"US", []string{"us_states", "us"}, "us"},
+	{"CA", []string{"ca_provinces", "ca"}, "ca"},
+	{"PT", []string{"pt"}, "pt"},
 }
 
 // Countries returns the country codes whose seed files LoadAll loads,
@@ -67,13 +78,15 @@ func Countries() []string {
 // scratch.
 func LoadAll(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, seedDir string) error {
 	for _, c := range countries {
-		path := filepath.Join(seedDir, "regions_"+c.suffix+".toml")
-		if _, err := loadregions.LoadFile(ctx, pool, logger, path, c.code); err != nil {
-			return fmt.Errorf("loaddata: regions %s: %w", c.code, err)
+		for _, suffix := range c.regionFiles {
+			path := filepath.Join(seedDir, "regions_"+suffix+".toml")
+			if _, err := loadregions.LoadFile(ctx, pool, logger, path, c.code); err != nil {
+				return fmt.Errorf("loaddata: regions %s/%s: %w", c.code, suffix, err)
+			}
 		}
 	}
 	for _, c := range countries {
-		path := filepath.Join(seedDir, "postal_codes_"+c.suffix+".csv")
+		path := filepath.Join(seedDir, "postal_codes_"+c.postal+".csv")
 		if _, err := loadpostal.LoadFile(ctx, pool, logger, path, atlas.Country(c.code)); err != nil {
 			return fmt.Errorf("loaddata: postal %s: %w", c.code, err)
 		}

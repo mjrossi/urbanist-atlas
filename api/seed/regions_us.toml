@@ -1,7 +1,13 @@
-# Region taxonomy for the United States.
+# Region taxonomy for the United States (leaves + intermediate
+# regions). The state tier lives in regions_us_states.toml and loads
+# first; entries here reference state slugs as parents via cross-file
+# resolution.
+#
 # Each [[region]] entry creates one row in `regions`; the `parents`
 # array creates rows in `region_parents`. A region may appear before
 # its parents in the file — loadregions resolves slugs after parsing.
+# Parents not defined in this file are resolved from the DB at write
+# time (see internal/loadregions/write.go's RegionIDBySlug fallback).
 #
 # See docs/region-graph.md for modeling conventions, including:
 #   - State edges live on the leaf (city), not on the metro.
@@ -10,96 +16,14 @@
 #   - Transit federations are siblings of states, parented under the
 #     leaves they serve.
 #
-# Recommended sort_priority ranges:
+# Recommended sort_priority ranges (see docs/region-graph.md §9):
 #   10  borough / neighborhood
 #   15  consolidated city
 #   20  county
 #   40  metro
 #   50  transit federation / RTA-style region
-#   60  state / province
+#   60  state / province  (defined in regions_us_states.toml)
 #   80  multi-state / multi-province
-
-# --- States (parents of nothing in v1; national tier excluded) ---
-
-[[region]]
-slug = "ny"
-kind = "us:state"
-name = "New York"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "nj"
-kind = "us:state"
-name = "New Jersey"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "ct"
-kind = "us:state"
-name = "Connecticut"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "il"
-kind = "us:state"
-name = "Illinois"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "in"
-kind = "us:state"
-name = "Indiana"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "wi"
-kind = "us:state"
-name = "Wisconsin"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "ca-state"
-kind = "us:state"
-name = "California"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "ma"
-kind = "us:state"
-name = "Massachusetts"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "fl"
-kind = "us:state"
-name = "Florida"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "wa"
-kind = "us:state"
-name = "Washington"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
 
 # --- Multi-state and federation regions ---
 

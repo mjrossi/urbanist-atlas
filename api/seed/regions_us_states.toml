@@ -1,0 +1,446 @@
+# State-tier regions for the United States.
+#
+# 50 states + the District of Columbia + Puerto Rico = 52 entries.
+# All scope_tier='regional', sort_priority=60 per the bands in
+# docs/region-graph.md §9 (state/province band). No parents — states
+# sit at the top of the US subgraph.
+#
+# This file loads BEFORE regions_us.toml in just loaddata / loaddata
+# orchestration. Leaves in regions_us.toml may reference these slugs
+# as parents via cross-file resolution (internal/loadregions/write.go
+# falls back to RegionIDBySlug when a parent isn't in the same file).
+#
+# Slug convention: lowercase 2-letter postal code, except:
+#   - 'ca-state' for California (the bare 'ca' collides with the
+#     country code for Canada).
+#   - 'de-state' for Delaware (collides with the country code for
+#     Germany).
+#   - 'la-state' for Louisiana (avoids confusion with the LA metro).
+# DC and PR get descriptive slugs.
+#
+# Kinds:
+#   - us:state for the 50 states
+#   - us:federal-district for DC
+#   - us:territory for PR
+
+# --- States (50, alphabetical by slug) ---
+
+[[region]]
+slug = "ak"
+kind = "us:state"
+name = "Alaska"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "al"
+kind = "us:state"
+name = "Alabama"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ar"
+kind = "us:state"
+name = "Arkansas"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "az"
+kind = "us:state"
+name = "Arizona"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ca-state"
+kind = "us:state"
+name = "California"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "co"
+kind = "us:state"
+name = "Colorado"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ct"
+kind = "us:state"
+name = "Connecticut"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "de-state"
+kind = "us:state"
+name = "Delaware"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "fl"
+kind = "us:state"
+name = "Florida"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ga"
+kind = "us:state"
+name = "Georgia"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "hi"
+kind = "us:state"
+name = "Hawaii"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ia"
+kind = "us:state"
+name = "Iowa"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "id"
+kind = "us:state"
+name = "Idaho"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "il"
+kind = "us:state"
+name = "Illinois"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "in"
+kind = "us:state"
+name = "Indiana"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ks"
+kind = "us:state"
+name = "Kansas"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ky"
+kind = "us:state"
+name = "Kentucky"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "la-state"
+kind = "us:state"
+name = "Louisiana"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ma"
+kind = "us:state"
+name = "Massachusetts"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "md"
+kind = "us:state"
+name = "Maryland"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "me"
+kind = "us:state"
+name = "Maine"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "mi"
+kind = "us:state"
+name = "Michigan"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "mn"
+kind = "us:state"
+name = "Minnesota"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "mo"
+kind = "us:state"
+name = "Missouri"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ms"
+kind = "us:state"
+name = "Mississippi"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "mt"
+kind = "us:state"
+name = "Montana"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nc"
+kind = "us:state"
+name = "North Carolina"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nd"
+kind = "us:state"
+name = "North Dakota"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ne"
+kind = "us:state"
+name = "Nebraska"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nh"
+kind = "us:state"
+name = "New Hampshire"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nj"
+kind = "us:state"
+name = "New Jersey"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nm"
+kind = "us:state"
+name = "New Mexico"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "nv"
+kind = "us:state"
+name = "Nevada"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ny"
+kind = "us:state"
+name = "New York"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "oh"
+kind = "us:state"
+name = "Ohio"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ok"
+kind = "us:state"
+name = "Oklahoma"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "or"
+kind = "us:state"
+name = "Oregon"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "pa"
+kind = "us:state"
+name = "Pennsylvania"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ri"
+kind = "us:state"
+name = "Rhode Island"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "sc"
+kind = "us:state"
+name = "South Carolina"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "sd"
+kind = "us:state"
+name = "South Dakota"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "tn"
+kind = "us:state"
+name = "Tennessee"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "tx"
+kind = "us:state"
+name = "Texas"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "ut"
+kind = "us:state"
+name = "Utah"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "va"
+kind = "us:state"
+name = "Virginia"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "vt"
+kind = "us:state"
+name = "Vermont"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "wa"
+kind = "us:state"
+name = "Washington"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "wi"
+kind = "us:state"
+name = "Wisconsin"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "wv"
+kind = "us:state"
+name = "West Virginia"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+[[region]]
+slug = "wy"
+kind = "us:state"
+name = "Wyoming"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+# --- Federal district (DC) ---
+
+[[region]]
+slug = "dc"
+kind = "us:federal-district"
+name = "District of Columbia"
+scope_tier = "regional"
+sort_priority = 60
+parents = []
+
+# --- Territory (PR) ---
+
+[[region]]
+slug = "pr"
+kind = "us:territory"
+name = "Puerto Rico"
+scope_tier = "regional"
+sort_priority = 60
+parents = []

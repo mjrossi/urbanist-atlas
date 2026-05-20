@@ -1,31 +1,8 @@
-# Region taxonomy for Canada. No county tier (CA uses regional
-# districts instead); no country tier (per v1 scope).
-
-# --- Provinces ---
-
-[[region]]
-slug = "bc"
-kind = "ca:province"
-name = "British Columbia"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "on"
-kind = "ca:province"
-name = "Ontario"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "qc"
-kind = "ca:province"
-name = "Québec"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
+# Region taxonomy for Canada (leaves + intermediate regions). The
+# province/territory tier lives in regions_ca_provinces.toml and loads
+# first; entries here reference province slugs as parents via
+# cross-file resolution. No county tier (CA uses regional districts
+# instead); no country tier (per v1 scope).
 
 # --- Regional districts (BC) / CMAs (StatsCan) ---
 

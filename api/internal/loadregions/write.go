@@ -2,6 +2,7 @@ package loadregions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -61,7 +62,18 @@ func LoadFile(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, path
 		for _, ps := range r.Parents {
 			pid, ok := rid[ps]
 			if !ok {
-				return Summary{}, fmt.Errorf("loadregions: parent %q not found while wiring %q", ps, r.Slug)
+				// Parent not in this file; look it up in the DB. This
+				// is the canonical path for cross-file parent edges
+				// (e.g., regions_us.toml's leaves referencing states
+				// loaded earlier from regions_us_states.toml).
+				id, err := q.RegionIDBySlug(ctx, ps)
+				if err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return Summary{}, fmt.Errorf("loadregions: parent %q not found in file or DB while wiring %q (load the file that defines %q first)", ps, r.Slug, ps)
+					}
+					return Summary{}, fmt.Errorf("loadregions: lookup parent %q for %q: %w", ps, r.Slug, err)
+				}
+				pid = id
 			}
 			if err := q.InsertRegionParent(ctx, gen.InsertRegionParentParams{
 				RegionID:       rid[r.Slug],
