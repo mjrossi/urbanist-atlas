@@ -209,6 +209,24 @@ website_url = "https://www.opalpdx.org"
 tags = ["transit", "equity", "environmental-justice", "grassroots"]
 region_slugs = ["portland-or-metro"]
 
+# --- Dallas-Fort Worth ---
+
+[[org]]
+slug = "bike-dfw"
+name = "BikeDFW"
+short_desc = "Dallas-Fort Worth regional cycling nonprofit running youth bike rodeos, adult skills classes, and safer-streets advocacy across North Texas."
+website_url = "https://www.bikedfw.org"
+tags = ["cycling", "safe-streets", "advocacy", "education"]
+region_slugs = ["dallas-tx-metro"]
+
+[[org]]
+slug = "dallas-bicycle-coalition"
+name = "Dallas Bicycle Coalition"
+short_desc = "Dallas grassroots cycling advocacy group that helped pass the Dallas Bike Plan in May 2025; organizes rides, public-meeting turnout, and infrastructure campaigns."
+website_url = "https://dallasbicyclecoalition.org"
+tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
+region_slugs = ["dallas-tx-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
