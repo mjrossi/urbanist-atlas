@@ -694,6 +694,122 @@ website_url = "https://www.biketexas.org"
 tags = ["cycling", "advocacy", "safe-streets", "education", "policy"]
 region_slugs = ["tx"]
 
+# --- Illinois ---
+
+[[org]]
+slug = "ride-illinois"
+name = "Ride Illinois"
+short_desc = "Illinois statewide nonprofit (formerly League of Illinois Bicyclists) advancing safe, accessible everyday bicycling through advocacy, education, and public awareness."
+website_url = "https://www.rideillinois.org"
+tags = ["cycling", "advocacy", "safe-streets", "education"]
+region_slugs = ["il"]
+
+# --- Indiana ---
+
+[[org]]
+slug = "bicycle-indiana"
+name = "Bicycle Indiana"
+short_desc = "Indiana statewide nonprofit making cycling safe and equitable for all Hoosiers through education and advocacy; pushing for Vulnerable Road User law (2025 HB 1331)."
+website_url = "https://www.bicycleindiana.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy", "education"]
+region_slugs = ["in"]
+
+# --- Michigan ---
+
+[[org]]
+slug = "league-of-michigan-bicyclists"
+name = "League of Michigan Bicyclists"
+short_desc = "Michigan statewide cycling advocacy nonprofit (LMB) lobbying for bicycle-friendly policy at the State Capitol; hosts annual Advocacy Day and multi-day cycling tours."
+website_url = "https://lmb.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy", "education"]
+region_slugs = ["mi"]
+
+# --- Ohio ---
+
+[[org]]
+slug = "all-aboard-ohio"
+name = "All Aboard Ohio"
+short_desc = "Ohio's largest transit advocacy 501(c)(3); 50+ years advocating for passenger rail and a connected Midwest, including the 3C+D corridor (Cleveland-Columbus-Dayton-Cincinnati)."
+website_url = "https://www.allaboardohio.org"
+tags = ["transit", "rail", "advocacy", "policy"]
+region_slugs = ["oh"]
+
+[[org]]
+slug = "ohio-bicycle-federation"
+name = "Ohio Bicycle Federation"
+short_desc = "Ohio's statewide bicycle advocacy organization (OBF) representing cyclists at the state level; publishes the Ohio Bicycle Communicator newsletter and proposes Ohio bicycle law reforms."
+website_url = "https://www.ohiobike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["oh"]
+
+# --- Wisconsin ---
+
+[[org]]
+slug = "wisconsin-bike-fed"
+name = "Wisconsin Bike Fed"
+short_desc = "Wisconsin's statewide membership-based bicycle advocacy nonprofit (Bicycle Federation of Wisconsin); organizes Wisconsin Bike Week and the annual Ride Across Wisconsin."
+website_url = "https://wisconsinbikefed.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["wi"]
+
+# --- Iowa ---
+
+[[org]]
+slug = "iowa-bicycle-coalition"
+name = "Iowa Bicycle Coalition"
+short_desc = "Iowa 501(c)(3) statewide nonprofit promoting safe and enjoyable bicycling through education, events, better policy, and a growing community of supporters."
+website_url = "https://iowabicyclecoalition.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy", "education"]
+region_slugs = ["ia"]
+
+# --- Kansas ---
+# gap: no clearly active statewide ped/bike advocacy nonprofit as of
+# 2026-05-20. BikeWalkKC (Kansas City) does some Kansas statewide work
+# (KDOT plan engagement, partner network) but is structurally a KC-metro
+# org. "Biking Across Kansas" is an annual tour, not an advocacy 501(c)(3).
+# Revisit if a clean KS-statewide advocacy entity surfaces.
+
+# --- Minnesota ---
+
+[[org]]
+slug = "bike-minnesota"
+name = "Bicycle Alliance of Minnesota"
+short_desc = "Minnesota 501(c)(3) statewide nonprofit (BikeMN) working to make walking and biking a frequent means of mobility within communities throughout the state."
+website_url = "https://www.bikemn.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["mn"]
+
+# --- Missouri ---
+
+[[org]]
+slug = "mobikefed"
+name = "Missouri Bicycle and Pedestrian Federation"
+short_desc = "Missouri statewide group (MoBikeFed) working for better bicycling, walking, and trails across the state through advocacy, policy, and trail-network planning."
+website_url = "https://mobikefed.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
+region_slugs = ["mo"]
+
+# --- Nebraska ---
+
+[[org]]
+slug = "bike-walk-nebraska"
+name = "Bike Walk Nebraska"
+short_desc = "Nebraska's only statewide active-transportation advocacy organization; most advocacy happens at the state Legislature and Nebraska DOT."
+website_url = "https://www.bikewalknebraska.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ne"]
+
+# --- North Dakota ---
+# gap: no statewide ped/bike or transit advocacy nonprofit found as of
+# 2026-05-20. ND Parks and Recreation runs recreational biking
+# infrastructure but no independent advocacy entity surfaces in
+# research. Revisit if a maintainer has local sources.
+
+# --- South Dakota ---
+# gap: no statewide ped/bike or transit advocacy nonprofit found as of
+# 2026-05-20. SD DOT has a Bicycle/Pedestrian division but no
+# independent statewide 501(c)(3) advocacy organization is active.
+
 # --- Canada ---
 
 # --- Toronto ---

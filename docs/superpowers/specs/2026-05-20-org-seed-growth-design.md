@@ -330,3 +330,10 @@ during the editorial pass.)
   dissolving and transferring assets to the Oklahoma Bicycle Summit,
   Inc. No replacement statewide advocacy 501(c)(3) active as of
   2026-05-20.
+- **Kansas (KS)** — no clean statewide advocacy entity. BikeWalkKC
+  does some Kansas statewide work but is structurally a KC-metro
+  org; Biking Across Kansas is an annual tour, not advocacy.
+- **North Dakota (ND)** — no independent statewide ped/bike or
+  transit advocacy nonprofit found.
+- **South Dakota (SD)** — no independent statewide ped/bike or
+  transit advocacy nonprofit found.
