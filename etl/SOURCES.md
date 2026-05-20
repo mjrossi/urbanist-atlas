@@ -61,15 +61,45 @@ See `LICENSE-DATA` for attribution recommendation.
 
 ## CA
 
-Concrete plan lands in slice #7.5.4. The expected sources are:
+Sources pinned by slice #7.5.4. Files live under `etl/sources/ca/`
+(gitignored). The Postal Code Conversion File (PCCF, 92-154-X) is
+licensed under restricted terms; we sidestep it by using the publicly
+licensed FSA and CMA boundary files instead. FSA → CMA mapping is
+done via a coarse prefix table in `api/internal/etl/ca/mappings.go`
+rather than per-FSA spatial join (which would require the PCCF or a
+shapefile-aware spatial library). A future slice can refine the
+mapping if the PCCF terms change or a spatial-join workflow is added.
 
-| File                              | Vintage     | URL                                                                                                                          | sha256          |
-| --------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `pccf.zip` (filtered at parse)    | 2025-Q1     | https://www150.statcan.gc.ca/n1/en/catalogue/92-154-X                                                                        | _(TBD #7.5.4)_  |
-| `cma-reference.csv`               | 2021 census | https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/cma-rmr/index2021-eng.cfm                                    | _(TBD #7.5.4)_  |
+| File                              | Vintage          | URL                                                                                                                  | sha256 |
+| --------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------- | ------ |
+| `lfsa000b21a_e.zip`               | StatsCan FSA boundary, 2021 census | https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip   | `9fd2b6adf66e5716d06f91ebdcdb5d8a4e8b9eeb520f8b4285030d34319959db` |
+| `lcma000b21a_e.zip`               | StatsCan CMA boundary, 2021 census | https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip   | `a12dd39b3262edb48f9490b435d2f43b0327cc4af7d829f32aebae4d4b9f8fa0` |
 
-Statistics Canada Open License requires attribution — `LICENSE-DATA`
-will carry the required text once #7.5.4 ships.
+The ETL parses only the DBF attribute table inside each zip (~150KB
+extracted from a ~162MB zip for FSAs); the shapefile geometry is
+ignored. Reading from inside the zip avoids polluting the repo with
+extracted multi-MB artifacts.
+
+### Manual refresh workflow
+
+```sh
+# 1. mise install (one time) provisions Go.
+
+# 2. Fetch upstream files into etl/sources/ca/.
+mkdir -p etl/sources/ca && cd etl/sources/ca
+curl -O https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip
+curl -O https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip
+
+# 3. Verify checksums.
+shasum -a 256 *.zip
+
+# 4. Run the ETL.
+cd ../../../api
+go run ./cmd/server etl regenerate --country=CA --src=../etl/sources --out=seed
+```
+
+StatsCan boundary files are released under the Statistics Canada
+Open License (attribution required). See `LICENSE-DATA`.
 
 ## Vintage upgrade workflow
 

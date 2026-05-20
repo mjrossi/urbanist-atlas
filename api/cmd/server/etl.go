@@ -13,6 +13,7 @@ import (
 
 	// Blank-import per-country plans so their init() blocks register
 	// with etl.Plans. Adding a new country = add a blank import here.
+	_ "github.com/mjrossi/urbanist-atlas/api/internal/etl/ca"
 	_ "github.com/mjrossi/urbanist-atlas/api/internal/etl/us"
 )
 

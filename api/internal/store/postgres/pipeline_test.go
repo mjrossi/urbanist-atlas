@@ -41,6 +41,7 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	usMSAs := repoFile(t, "seed", "regions_us_msas.toml")
 	usRegions := repoFile(t, "seed", "regions_us.toml")
 	caProvinces := repoFile(t, "seed", "regions_ca_provinces.toml")
+	caCMAs := repoFile(t, "seed", "regions_ca_cmas.toml")
 	caRegions := repoFile(t, "seed", "regions_ca.toml")
 	ptRegions := repoFile(t, "seed", "regions_pt.toml")
 	usCSV := repoFile(t, "seed", "postal_codes_us.csv")
@@ -71,6 +72,9 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caProvinces, "CA"); err != nil {
 		t.Fatalf("loadregions CA provinces: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caCMAs, "CA"); err != nil {
+		t.Fatalf("loadregions CA cmas: %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA: %v", err)
@@ -158,6 +162,9 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caProvinces, "CA"); err != nil {
 		t.Fatalf("loadregions CA provinces (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caCMAs, "CA"); err != nil {
+		t.Fatalf("loadregions CA cmas (2nd): %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA (2nd): %v", err)
@@ -288,6 +295,8 @@ func TestPipeline_WorkedCities(t *testing.T) {
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_provinces.toml"), "CA")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_cmas.toml"), "CA")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
 	must(err)
@@ -421,6 +430,8 @@ func TestPipeline_PT_ValidationFixture(t *testing.T) {
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_provinces.toml"), "CA")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_cmas.toml"), "CA")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
 	must(err)

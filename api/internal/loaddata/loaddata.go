@@ -45,7 +45,7 @@ var countries = []struct {
 	postal      string
 }{
 	{"US", []string{"us_states", "us_multistate", "us_msas", "us"}, "us"},
-	{"CA", []string{"ca_provinces", "ca"}, "ca"},
+	{"CA", []string{"ca_provinces", "ca_cmas", "ca"}, "ca"},
 	{"PT", []string{"pt"}, "pt"},
 }
 
