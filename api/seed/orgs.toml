@@ -308,6 +308,25 @@ website_url = "https://www.martaarmy.org"
 tags = ["transit", "grassroots", "advocacy", "tactical-urbanism"]
 region_slugs = ["atlanta-ga-metro"]
 
+# --- Phoenix ---
+
+[[org]]
+slug = "phoenix-spokes-people"
+name = "Phoenix Spokes People"
+short_desc = "Phoenix cycling advocacy nonprofit pushing for bicycle infrastructure, T2050 implementation, and Vision Zero Road Safety Action Plan at City Hall."
+website_url = "https://www.phoenixspokespeople.org"
+contact_url = "https://www.phoenixspokespeople.org/contact/"
+tags = ["cycling", "advocacy", "safe-streets", "vision-zero"]
+region_slugs = ["phoenix-az-metro"]
+
+[[org]]
+slug = "friends-of-transit"
+name = "Friends of Transit"
+short_desc = "Greater Phoenix nonprofit educating residents on transit benefits and advocating for accessible mass transit; founded 2001, active on light-rail extensions and regional transit policy."
+website_url = "https://www.friendsoftransit.org"
+tags = ["transit", "advocacy", "education", "rail"]
+region_slugs = ["phoenix-az-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
