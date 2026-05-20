@@ -201,6 +201,25 @@ website_url = "https://www.cremtl.org"
 tags = ["transit", "policy", "regional", "environment", "advocacy"]
 region_slugs = ["montreal-cma"]
 
+# --- Calgary ---
+
+[[org]]
+slug = "bike-calgary"
+name = "Bike Calgary"
+short_desc = "Volunteer-run cycling society advocating for better bike infrastructure, education, and community across the Calgary metro since 2008."
+website_url = "https://bikecalgary.org"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["calgary-cma"]
+
+[[org]]
+slug = "calgary-climate-hub"
+name = "Calgary Climate Hub"
+short_desc = "Calgary climate-justice organization running ongoing transit, active-transportation, and city-hall-watch advocacy as part of broader municipal climate action."
+website_url = "https://www.calgaryclimatehub.ca"
+contact_url = "https://www.calgaryclimatehub.ca/contact"
+tags = ["transit", "climate", "advocacy", "active-transportation"]
+region_slugs = ["calgary-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
