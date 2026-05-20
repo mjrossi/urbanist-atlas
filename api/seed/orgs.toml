@@ -272,6 +272,24 @@ website_url = "https://ggwash.org"
 tags = ["transit", "media", "policy", "advocacy", "regional"]
 region_slugs = ["washington-dc-metro"]
 
+# --- Philadelphia ---
+
+[[org]]
+slug = "bicycle-coalition-greater-philadelphia"
+name = "Bicycle Coalition of Greater Philadelphia"
+short_desc = "Regional cycling and transit advocacy nonprofit hosting the annual Vision Zero PHL Conference, the BCYC youth advisory council, and the Transit Forward Philadelphia coalition."
+website_url = "https://bicyclecoalition.org"
+tags = ["cycling", "transit", "safe-streets", "advocacy", "vision-zero", "regional"]
+region_slugs = ["philadelphia-pa-metro"]
+
+[[org]]
+slug = "5th-square"
+name = "5th Square"
+short_desc = "Philadelphia urbanist political-action committee organizing riders, lobbying for transit improvements, and pushing SEPTA Board accountability and real-time bus information."
+website_url = "https://www.5thsqadvocacy.org"
+tags = ["transit", "urbanism", "political", "advocacy", "policy"]
+region_slugs = ["philadelphia-pa-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
