@@ -183,6 +183,32 @@ region_slugs = ["orlando-fl-metro"]
 # (BikeTexas) through the recursive-CTE ancestor walk. Revisit if a
 # maintainer with local knowledge surfaces an active SA advocacy org.
 
+# --- Portland OR ---
+
+[[org]]
+slug = "street-trust"
+name = "The Street Trust"
+short_desc = "Portland-based multimodal advocacy nonprofit pushing for safer biking, walking, and transit; conducts statewide legislative work and ballot-measure endorsements."
+website_url = "https://www.thestreettrust.org"
+tags = ["transit", "cycling", "walking", "advocacy", "policy", "multimodal"]
+region_slugs = ["portland-or-metro"]
+
+[[org]]
+slug = "bikeloud-pdx"
+name = "BikeLoud PDX"
+short_desc = "Portland grassroots cycling advocacy group; won a $6M Bicycle Bill settlement against the city in 2022 and runs the BikeLane Sweepers and Bike Buddy programs."
+website_url = "https://bikeloudpdx.org"
+tags = ["cycling", "advocacy", "grassroots"]
+region_slugs = ["portland-or-metro"]
+
+[[org]]
+slug = "opal-environmental-justice"
+name = "OPAL Environmental Justice Oregon"
+short_desc = "Portland environmental-justice nonprofit organizing transit-equity, low-fare, and Bus Riders Unite campaigns to expand affordable, accessible TriMet service for frontline communities."
+website_url = "https://www.opalpdx.org"
+tags = ["transit", "equity", "environmental-justice", "grassroots"]
+region_slugs = ["portland-or-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
