@@ -137,7 +137,7 @@ Québec. Territories YT/NT/NU expected to land as documented gaps.
 **Net-new state/province orgs:** ~51 US + 12 CA = **~63**, of which
 ~3–8 expected to end as `# gap` comments rather than seeded entries.
 (Closing the slice: 13 gaps landed — 9 US (WV, AR, OK, KS, ND, SD, NV,
-WY, PR) and 4 CA blocks (PE, NL-province, NB, plus YT/NT/NU
+WY, PR) and 4 CA blocks (PE, SK, NB, plus YT/NT/NU
 consolidated). Research surfaced fewer demonstrably-active statewide
 safe-streets nonprofits than the upper-bound estimate anticipated,
 especially in low-density states.)
