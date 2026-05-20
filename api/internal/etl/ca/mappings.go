@@ -97,7 +97,9 @@ var provinceUIDToSlug = map[string]string{
 // match fall through to province.
 //
 // Future slices with PCCF or spatial-join data can replace this with
-// a per-FSA mapping for full CMA accuracy.
+// a per-FSA mapping for full CMA accuracy. The trade-off is discussed
+// in detail in docs/superpowers/specs/2026-05-19-postal-coverage-design.md
+// under "FSA → CMA mapping without PCCF" (Open Question §4).
 var fsaPrefixToCMA = map[string]string{
 	// Toronto CMA — M (Toronto proper) + suburbs in the L block
 	// (Pickering/Ajax/Whitby/Oshawa L1; Markham/Stouffville L3;

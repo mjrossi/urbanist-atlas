@@ -21,11 +21,12 @@ type CMAAssignment struct {
 }
 
 // assignCMAs produces one assignment per CMA in canonical order
-// (sorted by slug). Slug overrides (cmaUIDToSlugOverride) and kind
-// overrides (cmaUIDToKindOverride) take precedence; otherwise the
-// slug is "<slugified-name>-cma" and the kind is "ca:cma". Parents
-// are derived from ProvinceUIDs (single-province → [province slug];
-// multi-province like Ottawa-Gatineau → [primary, secondary]).
+// (sorted by slug). Entries in cmaOverrides (keyed by CMA UID)
+// supply slug/name/kind overrides; missing fields fall back to
+// auto-generated values (slug = "<slugified-name>-cma", kind =
+// "ca:cma", name = StatsCan name). Parents are derived from
+// ProvinceUIDs (single-province → [province slug]; multi-province
+// like Ottawa-Gatineau → [primary, secondary]).
 func assignCMAs(cmas []CMA) []CMAAssignment {
 	out := make([]CMAAssignment, 0, len(cmas))
 	for _, c := range cmas {
@@ -198,8 +199,8 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 # regenerate --country=CA.
 #
 # Edit policy: do NOT hand-edit this file. Editorial overrides for
-# slug + kind live in api/internal/etl/ca/mappings.go (cmaUIDToSlugOverride,
-# cmaUIDToKindOverride); change those and re-run etl regenerate.
+# slug/name/kind live in api/internal/etl/ca/mappings.go (cmaOverrides,
+# keyed by StatsCan CMA UID); change those and re-run etl regenerate.
 #
 # Filtering: only CMATYPE='B' rows from the StatsCan boundary file
 # (true Census Metropolitan Areas, population ≥100k) are emitted.

@@ -109,8 +109,8 @@ func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err erro
 		}
 		// FIPS codes in the delineation file are zero-padded already
 		// (e.g., "06" "037") but we normalise just in case.
-		stateFIPS = leftpad(stateFIPS, 2)
-		countyFIPS = leftpad(countyFIPS, 3)
+		stateFIPS = fmt.Sprintf("%0*s", 2, stateFIPS)
+		countyFIPS = fmt.Sprintf("%0*s", 3, countyFIPS)
 		geoID := stateFIPS + countyFIPS
 
 		v, ok := agg[code]
@@ -179,9 +179,3 @@ func allAlphaUpper(s string) bool {
 	return true
 }
 
-func leftpad(s string, n int) string {
-	if len(s) >= n {
-		return s
-	}
-	return strings.Repeat("0", n-len(s)) + s
-}

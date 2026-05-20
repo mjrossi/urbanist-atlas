@@ -28,24 +28,19 @@
 
 -- +goose Up
 
--- +goose StatementBegin
 -- nyc flips from local leaf to regional intermediate.
 UPDATE regions
    SET scope_tier = 'regional'
  WHERE slug = 'nyc'
    AND scope_tier = 'local';
--- +goose StatementEnd
 
--- +goose StatementBegin
 -- Drop the (nyc, ny) parent edge: post-split, boroughs carry the
 -- state edge instead. Subquery returns 0 rows on a fresh DB; the
 -- DELETE then matches 0 rows.
 DELETE FROM region_parents
  WHERE region_id        = (SELECT id FROM regions WHERE slug = 'nyc')
    AND parent_region_id = (SELECT id FROM regions WHERE slug = 'ny');
--- +goose StatementEnd
 
--- +goose StatementBegin
 -- Add (borough, ny) parent edges for each of the 5 boroughs that
 -- exist in the DB. ON CONFLICT DO NOTHING keeps re-runs harmless; on
 -- a fresh DB the SELECT side is empty so no rows are inserted.
@@ -56,11 +51,9 @@ SELECT b.id, ny.id
  WHERE ny.slug = 'ny'
    AND b.slug IN ('brooklyn', 'manhattan', 'queens', 'bronx', 'staten-island')
 ON CONFLICT DO NOTHING;
--- +goose StatementEnd
 
 -- +goose Down
 
--- +goose StatementBegin
 -- Drop the borough → ny edges that the Up step added (or that an
 -- equivalent loaddata run would have added).
 DELETE FROM region_parents
@@ -69,20 +62,15 @@ DELETE FROM region_parents
         SELECT id FROM regions
          WHERE slug IN ('brooklyn', 'manhattan', 'queens', 'bronx', 'staten-island')
    );
--- +goose StatementEnd
 
--- +goose StatementBegin
 -- Restore the (nyc, ny) parent edge.
 INSERT INTO region_parents (region_id, parent_region_id)
 SELECT nyc.id, ny.id
   FROM regions nyc, regions ny
  WHERE nyc.slug = 'nyc' AND ny.slug = 'ny'
 ON CONFLICT DO NOTHING;
--- +goose StatementEnd
 
--- +goose StatementBegin
 UPDATE regions
    SET scope_tier = 'local'
  WHERE slug = 'nyc'
    AND scope_tier = 'regional';
--- +goose StatementEnd
