@@ -54,6 +54,9 @@ api/.fly/
 .claude/
 .worktrees/
 
+# ── ETL: upstream source files (regenerated outputs live in api/seed/) ──
+etl/sources/
+
 # ── Misc build / edit artifacts ─────────────────────
 *.log
 *.bak

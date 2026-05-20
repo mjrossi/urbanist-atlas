@@ -8,6 +8,7 @@
 //	urbanist-atlas-server loadpostal --src ./data/postal_us.csv
 //	urbanist-atlas-server seed
 //	urbanist-atlas-server loaddata
+//	urbanist-atlas-server etl regenerate --country US
 package main
 
 import (
@@ -52,6 +53,7 @@ func newRootCommand() *cli.Command {
 			loadpostalCommand(),
 			seedCommand(),
 			loaddataCommand(),
+			etlCommand(),
 		},
 	}
 }
