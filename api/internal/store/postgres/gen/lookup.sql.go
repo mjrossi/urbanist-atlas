@@ -22,9 +22,14 @@ WITH RECURSIVE ancestors(id, country, kind, name, slug, scope_tier, sort_priorit
     JOIN region_parents rp ON rp.parent_region_id = r.id
     JOIN ancestors a       ON rp.region_id = a.id
     WHERE r.scope_tier <> 'national'
+),
+deduped AS (
+    SELECT DISTINCT ON (id) id, country, kind, name, slug, scope_tier, sort_priority, depth
+    FROM ancestors
+    ORDER BY id, depth ASC
 )
 SELECT id, country, kind, name, slug, scope_tier, sort_priority
-FROM ancestors
+FROM deduped
 ORDER BY depth ASC, sort_priority ASC, id ASC
 `
 
@@ -39,8 +44,15 @@ type AncestorRegionsRow struct {
 }
 
 // Returns the leaf followed by all transitive ancestors, ordered
-// most-specific first (BFS layer order). UNION (not UNION ALL)
-// deduplicates DAG diamonds and gives Postgres the termination signal.
+// most-specific first (BFS layer order). UNION (not UNION ALL) in the
+// recursion gives Postgres the termination signal, but UNION dedupes on
+// the full tuple including `depth` — so a region reachable at multiple
+// depths via a DAG diamond surfaces as multiple rows. The outer
+// DISTINCT ON (id) collapses those, keeping the smallest depth (i.e.
+// the most-specific traversal). Example: ZIP 20017's leaf is
+// `washington-dc`, whose parents are `[washington-dc-metro, dc]`; the
+// metro's parents include `dc` again, so `dc` is reachable at depth 1
+// and depth 2. We want it once, at depth 1.
 //
 // Excludes scope_tier='national' regions from both branches: national
 // regions are filtered out of the default lookup surface (see

@@ -412,6 +412,22 @@ func TestPipeline_WorkedCities(t *testing.T) {
 				t.Errorf("DC 20017 ancestry missing %q; got %v", expected, ancestrySlugs)
 			}
 		}
+		// Diamond dedup: `dc` is reachable both at depth 1 (direct
+		// parent of the washington-dc city leaf) and depth 2 (parent
+		// of washington-dc-metro, which is itself a depth-1 parent).
+		// The recursive CTE's UNION dedupes on the full tuple including
+		// depth, so without the outer DISTINCT ON (id) in
+		// queries/lookup.sql the same region surfaces twice. Lock that
+		// behavior in.
+		counts := map[string]int{}
+		for _, s := range ancestrySlugs {
+			counts[s]++
+		}
+		for slug, n := range counts {
+			if n > 1 {
+				t.Errorf("DC 20017 ancestry contains %q %d times; want exactly once (DAG-diamond dedup regression)", slug, n)
+			}
+		}
 		// Place label: "Washington — Washington Metro" (broad = the
 		// us:metro ancestor; inner is empty because dc is sort 60, at
 		// the state-tier exclusion line in placeLabel).
