@@ -8,22 +8,31 @@ package us
 // GEOID_PLACE_20 column) and add an entry here so future ETL runs
 // anchor that city's ZIPs at the leaf.
 //
+// The crosswalk uses Census's "primary place" for each ZCTA (the place
+// with the largest land-area overlap, AREALAND_PART). A ZCTA whose
+// primary place is *not* one of the cities below — even if the ZIP
+// physically overlaps that city — won't anchor at that leaf. Example:
+// ZIP 07302 covers parts of Hoboken but its primary place is Jersey
+// City, so it anchors at nyc-metro, not at hoboken. Adding an entry
+// here only catches ZCTAs whose primary place matches.
+//
 // "New York city" (3651000) is intentionally NOT mapped here. NYC ZIPs
 // anchor at borough leaves via nycBoroughCounty below — boroughs are
 // counties, so the ZCTA-to-county crosswalk distinguishes them
 // naturally where the place crosswalk can't.
 var placeToLeaf = map[string]string{
-	"0667000": "sf",           // San Francisco city, CA
-	"2511000": "cambridge-ma", // Cambridge city, MA
-	"2507000": "boston",       // Boston city, MA
-	"1714000": "chicago",      // Chicago city, IL
-	"1754885": "oak-park",     // Oak Park village, IL
-	"1827000": "gary",         // Gary city, IN
-	"1245000": "miami",        // Miami city, FL
-	"5363000": "seattle",      // Seattle city, WA
-	"0644000": "los-angeles",  // Los Angeles city, CA
-	"0908000": "bridgeport",   // Bridgeport city, CT
-	"3432250": "hoboken",      // Hoboken city, NJ
+	"0667000": "sf",            // San Francisco city, CA
+	"2511000": "cambridge-ma",  // Cambridge city, MA
+	"2507000": "boston",        // Boston city, MA
+	"1714000": "chicago",       // Chicago city, IL
+	"1754885": "oak-park",      // Oak Park village, IL
+	"1827000": "gary",          // Gary city, IN
+	"1245000": "miami",         // Miami city, FL
+	"5363000": "seattle",       // Seattle city, WA
+	"0644000": "los-angeles",   // Los Angeles city, CA
+	"0908000": "bridgeport",    // Bridgeport city, CT
+	"3432250": "hoboken",       // Hoboken city, NJ
+	"1150000": "washington-dc", // Washington city, DC
 }
 
 // nycBoroughCounty maps the 5 NYC borough county GEOIDs (state FIPS +

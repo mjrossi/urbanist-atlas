@@ -208,3 +208,18 @@ name = "Los Angeles"
 scope_tier = "local"
 sort_priority = 10
 parents = ["greater-la", "ca-state"]
+
+[[region]]
+slug = "washington-dc"
+kind = "us:city"
+name = "Washington"
+scope_tier = "local"
+sort_priority = 10
+parents = ["washington-dc-metro", "dc"]
+# DC is a federal district that is its own state-equivalent. Without
+# this leaf, every DC ZIP would anchor at washington-dc-metro and the
+# breadcrumb walk would surface the metro's other state parents (MD,
+# VA, WV) ahead of DC itself (tied at sort_priority=60, ordered by id
+# which reflects load order — see api/internal/store/postgres/queries
+# /lookup.sql). With the city leaf in place, DC ZIPs land here first
+# and the metro/state parents bridge in at depth 1.
