@@ -164,6 +164,16 @@ contact_url = "https://sustaincharlotte.org/contact/"
 tags = ["transit", "walking", "cycling", "advocacy", "sustainability", "policy"]
 region_slugs = ["charlotte-nc-metro"]
 
+# --- Orlando ---
+
+[[org]]
+slug = "bike-walk-central-florida"
+name = "Bike/Walk Central Florida"
+short_desc = "Central Florida nonprofit advocating for safer streets through Best Foot Forward (pedestrian-crosswalk safety), the BIKE 5 community ride, and Bike/Walk Kids education."
+website_url = "https://www.bikewalkcentralflorida.org"
+tags = ["cycling", "walking", "pedestrian", "safe-streets", "advocacy"]
+region_slugs = ["orlando-fl-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
