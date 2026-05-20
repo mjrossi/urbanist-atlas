@@ -446,6 +446,104 @@ website_url = "https://cmt-stl.org"
 tags = ["transit", "rail", "advocacy", "regional", "policy"]
 region_slugs = ["st-louis-mo-metro"]
 
+# --- US States (statewide) ---
+#
+# State-tier orgs satisfy the universal coverage floor — every US ZIP
+# that doesn't reach a city or metro org via the ancestor walk resolves
+# at the state tier. Per the slice #7.6 design spec, states with no
+# demonstrably-active statewide advocacy org get a `# gap` comment
+# instead of an entry.
+
+# --- Connecticut ---
+
+[[org]]
+slug = "bike-walk-connecticut"
+name = "Bike Walk Connecticut"
+short_desc = "Connecticut's statewide bicycle and pedestrian advocacy nonprofit, championing safer streets, policies, and the Share the Road campaign; runs a biennial statewide summit."
+website_url = "https://bikewalkct.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ct"]
+
+# --- Maine ---
+
+[[org]]
+slug = "bicycle-coalition-of-maine"
+name = "Bicycle Coalition of Maine"
+short_desc = "Maine's leading bicycle and pedestrian advocacy organization since 1992, working to make the state safer for biking, walking, and rolling."
+website_url = "https://www.bikemaine.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["me"]
+
+# --- Massachusetts ---
+
+[[org]]
+slug = "massbike"
+name = "Massachusetts Bicycle Coalition"
+short_desc = "Massachusetts statewide bicycle advocacy group (MassBike) pushing the MassDOT Bike Plan, e-bike incentive program, and Ride Safe Act; runs the Council of Advocates."
+website_url = "https://www.massbike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ma"]
+
+# --- New Hampshire ---
+
+[[org]]
+slug = "bike-walk-alliance-nh"
+name = "Bike-Walk Alliance of New Hampshire"
+short_desc = "Statewide focal point for New Hampshire bicycle and pedestrian advocacy, safety, and education; coordinates with municipalities and statewide programs."
+website_url = "https://www.bwanh.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "education"]
+region_slugs = ["nh"]
+
+# --- New Jersey ---
+
+[[org]]
+slug = "new-jersey-bike-walk-coalition"
+name = "New Jersey Bike & Walk Coalition"
+short_desc = "Statewide New Jersey bike and pedestrian advocacy coalition; hosts the annual NJ Bike & Walk Summit (15th annual in March 2026, Princeton) and active-mobility programs."
+website_url = "https://njbwc.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
+region_slugs = ["nj"]
+
+# --- New York ---
+
+[[org]]
+slug = "new-york-bicycling-coalition"
+name = "New York Bicycling Coalition"
+short_desc = "New York's statewide cycling advocacy organization, pushing for Defined Safe Passing legislation and statewide bicycle-friendly policy from Albany."
+website_url = "https://nybc.net"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ny"]
+
+# --- Pennsylvania ---
+
+[[org]]
+slug = "pa-walks-and-bikes"
+name = "PA Walks and Bikes"
+short_desc = "Statewide Pennsylvania pedestrian and bicycle advocacy nonprofit working from Harrisburg to make the Commonwealth safer for walking and biking."
+website_url = "https://www.pawalksandbikes.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
+region_slugs = ["pa"]
+
+# --- Rhode Island ---
+
+[[org]]
+slug = "rhode-island-bicycle-coalition"
+name = "Rhode Island Bicycle Coalition"
+short_desc = "Rhode Island's statewide bicycle advocacy nonprofit (RIBike), enacting laws and capital spending to make cycling realistic for commuting, errands, and recreation."
+website_url = "https://ribike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ri"]
+
+# --- Vermont ---
+
+[[org]]
+slug = "local-motion"
+name = "Local Motion"
+short_desc = "Vermont's Walk-Bike Coalition; statewide active-mobility advocacy nonprofit hosting the Vermont Walk/Bike Summit and supporting local walk/bike committees."
+website_url = "https://www.localmotion.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["vt"]
+
 # --- Canada ---
 
 # --- Toronto ---
