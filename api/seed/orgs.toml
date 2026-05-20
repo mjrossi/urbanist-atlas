@@ -555,7 +555,7 @@ name = "Bike Delaware"
 short_desc = "Delaware 501(c)(3) nonprofit advocating for safe, convenient cycling and walking statewide; organizes the #RideforPie Amish Country Bike Tour and policy advocacy."
 website_url = "https://www.bikede.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets"]
-region_slugs = ["de"]
+region_slugs = ["de-state"]
 
 # --- Maryland ---
 
@@ -678,7 +678,7 @@ name = "Bike Easy"
 short_desc = "Greater New Orleans bicycle education and advocacy nonprofit; serves as Louisiana's de facto statewide voice at the National Bike Summit and on state policy."
 website_url = "https://bikeeasy.org"
 tags = ["cycling", "advocacy", "safe-streets", "education"]
-region_slugs = ["la"]
+region_slugs = ["la-state"]
 
 # --- Oklahoma ---
 # gap: BikeOklahoma (Oklahoma Bicycling Coalition) is in the process of
@@ -841,7 +841,7 @@ name = "California Bicycle Coalition"
 short_desc = "California's statewide bicycle advocacy coalition (CalBike) since 1994; 2026 California Bicycle Summit in Sacramento (Apr 23-24), Lobby Day, and Active Transportation Program reforms."
 website_url = "https://www.calbike.org"
 tags = ["cycling", "advocacy", "safe-streets", "policy", "equity"]
-region_slugs = ["ca"]
+region_slugs = ["ca-state"]
 
 # --- Colorado ---
 
@@ -1121,7 +1121,7 @@ name = "Bicycle Newfoundland and Labrador"
 short_desc = "Provincial cycling advocacy nonprofit (BNL); 2022-2026 strategic plan covering Newfoundland T'Railway development, St. John's bike infrastructure, and federal active-transport advocacy."
 website_url = "https://bicyclenl.com"
 tags = ["cycling", "advocacy", "safe-streets", "policy"]
-region_slugs = ["nl"]
+region_slugs = ["nl-province"]
 
 # --- Prince Edward Island (provincial) ---
 # gap: Cycling PEI exists but is primarily sport/recreational (Cycling
