@@ -189,7 +189,110 @@ a US user's would feel distant), not the default display rules.
 attached directly. The ancestor walk reaches them through their
 children. Orgs attached to abstract regions still surface correctly.
 
-### 7. Sort priority is a hint, not a contract
+### 7. Postal codes anchor at the smallest curated region
+
+`postal_codes.leaf_region_id` is a misnomer — the schema doesn't
+constrain that referenced row to be a leaf in the DAG sense. The
+recursive ancestor walk works from any region. So the convention is:
+**every postal code anchors at the smallest curated region for its
+area**, and granularity grows organically per-ZIP as we curate more
+leaves.
+
+Resolution priority, applied at seed-time:
+
+```
+if curated city leaf exists for ZCTA's place        → anchor = city leaf
+elif ZCTA is in an NYC borough county               → anchor = borough leaf
+elif ZCTA is in a curated MSA                       → anchor = MSA region
+else                                                → anchor = state/province
+```
+
+Worked examples:
+
+| Postal code | Anchor       | Why                                                |
+|---|---|---|
+| 10001 (NYC) | `manhattan`  | NYC borough county = New York County               |
+| 94110 (SF)  | `sf`         | SF is a curated city leaf                          |
+| 33401 (WPB) | `miami-msa`  | West Palm Beach is in the Miami MSA, no city leaf  |
+| 83702 (ID)  | `id` (state) | No leaf, not in a curated MSA; state fallback      |
+
+The lookup-side ancestor walk is unchanged: from whichever anchor the
+postal code points at, walk up via `region_parents`, gather ancestors,
+join orgs. No app-level fallback logic.
+
+The full design rationale is at
+[`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md).
+
+### 8. NYC is the only US city we model sub-municipally at v1
+
+NYC's five boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten
+Island) exist as separate leaves under a single `nyc` regional
+intermediate region. This is the **only sub-municipal split in the
+US seed at v1**.
+
+Three things converge to make NYC structurally splittable:
+
+1. **NYC boroughs are counties.** Manhattan = New York County,
+   Brooklyn = Kings County, Queens = Queens County, Bronx = Bronx
+   County, Staten Island = Richmond County. The Census ZCTA-to-county
+   crosswalk hands us borough resolution for free.
+2. **Each borough has distinct civic identity** — Borough President,
+   council districts, etc. Most other US "city subdivisions" (LA
+   neighborhoods, Chicago community areas, DC wards, Boston
+   neighborhoods) lack distinct civic governance.
+3. **Borough-specific advocacy ecosystems exist** (e.g., Brooklyn
+   Spoke is borough-only). The split gives them a natural
+   attachment point.
+
+The DAG shape:
+
+```mermaid
+graph BT
+  manhattan[Manhattan<br/>local · 10]
+  brooklyn[Brooklyn<br/>local · 10]
+  queens[Queens<br/>local · 10]
+  bronx[The Bronx<br/>local · 10]
+  staten[Staten Island<br/>local · 10]
+  nyc[NYC<br/>REGIONAL · 15]
+  nycmetro[NYC Metro<br/>regional · 40]
+  ny[New York<br/>regional · 60]
+
+  manhattan --> nyc
+  brooklyn --> nyc
+  queens --> nyc
+  bronx --> nyc
+  staten --> nyc
+  manhattan --> ny
+  brooklyn --> ny
+  queens --> ny
+  bronx --> ny
+  staten --> ny
+  nyc --> nycmetro
+```
+
+Note: `nyc.scope_tier = regional` even though `kind = us:city` —
+similar to Berlin's `kind = de:land` / `scope_tier = local`
+exception. The scope_tier-vs-kind decoupling earns its keep here.
+
+The state edge (`ny`) lives on each borough leaf, **not** on `nyc`
+itself, per [rule §1](#1-state-edges-live-on-the-leaf-not-on-the-metro).
+A Manhattan lookup walks `manhattan → {nyc, ny} → nyc-metro →
+nyc-tristate`; the orgs at each tier surface in the right bucket.
+
+**Citywide NYC orgs attach to `nyc`** (regional) — TransitCenter,
+Transportation Alternatives, Riders Alliance. **Borough-only orgs
+attach to the specific borough leaf** (Brooklyn Spoke → `brooklyn`).
+**Metro-wide orgs attach to `nyc-metro`** (Regional Plan
+Association).
+
+Other US cities (LA, Chicago, Boston, SF, Miami, etc.) stay as a
+single leaf at v1, even where neighborhood identity is strong. The
+ZCTA-to-county crosswalk would give them a single shared county, not
+neighborhood-level granularity. Promotion to multi-leaf would
+require additional editorial work + ZIP-to-neighborhood crosswalks
+with fuzzy boundaries. Deferred until org density warrants.
+
+### 9. Sort priority is a hint, not a contract
 
 `sort_priority` orders orgs within the Regional bucket. Lower = more
 specific = sorts earlier. Recommended ranges:
@@ -434,7 +537,7 @@ contributors don't need to re-decide them.
    country-prefix unless forced.
 2. **Kind**: always country-prefixed (`pt:municipio`, `us:state`,
    `ca:province`).
-3. **`sort_priority`**: use the bands documented in §7 above. New
+3. **`sort_priority`**: use the bands documented in §9 above. New
    country fits or documents a deviation in its design spec.
 4. **`scope_tier`**: editorial per rule §4 (local = city/neighborhood;
    regional = region/metro/state; national = country-wide umbrella per
