@@ -246,6 +246,32 @@ website_url = "https://linkhouston.org"
 tags = ["transit", "equity", "advocacy", "policy", "research"]
 region_slugs = ["houston-tx-metro"]
 
+# --- Washington DC ---
+
+[[org]]
+slug = "waba"
+name = "Washington Area Bicyclist Association"
+short_desc = "Regional cycling, walking, and transit advocacy nonprofit serving DC, Maryland, and Virginia; 5,000 members, FY27 DDOT budget testimony, Transportation Equity Platform."
+website_url = "https://waba.org"
+tags = ["cycling", "walking", "transit", "advocacy", "safe-streets", "regional"]
+region_slugs = ["washington-dc-metro"]
+
+[[org]]
+slug = "coalition-for-smarter-growth"
+name = "Coalition for Smarter Growth"
+short_desc = "Leading DC-region smart-growth advocacy organization since 1997; fights for Metro funding, bus transformation, transit-oriented housing, and safer streets."
+website_url = "https://www.smartergrowth.net"
+tags = ["transit", "smart-growth", "advocacy", "policy", "regional"]
+region_slugs = ["washington-dc-metro"]
+
+[[org]]
+slug = "greater-greater-washington"
+name = "Greater Greater Washington"
+short_desc = "DC-region urbanist news and advocacy nonprofit publishing daily on transit, housing, and transportation policy; hosts candidate forums and ballot-measure advocacy."
+website_url = "https://ggwash.org"
+tags = ["transit", "media", "policy", "advocacy", "regional"]
+region_slugs = ["washington-dc-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
