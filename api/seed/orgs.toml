@@ -355,6 +355,24 @@ website_url = "https://detroitgreenways.org"
 tags = ["cycling", "walking", "advocacy", "greenways", "safe-streets"]
 region_slugs = ["detroit-mi-metro"]
 
+# --- Minneapolis-St. Paul ---
+
+[[org]]
+slug = "move-minnesota"
+name = "Move Minnesota"
+short_desc = "Twin Cities transit, biking, and walking advocacy nonprofit fighting for road-maintenance priorities, MnDOT accountability, and the 2026 legislative reform agenda."
+website_url = "https://www.movemn.org"
+tags = ["transit", "cycling", "walking", "advocacy", "policy", "regional"]
+region_slugs = ["minneapolis-mn-metro"]
+
+[[org]]
+slug = "our-streets-minneapolis"
+name = "Our Streets Minneapolis"
+short_desc = "Minneapolis nonprofit (formerly Minneapolis Bicycle Coalition) promoting safe biking, walking, and rolling; led April 2026 transportation reform hearing in the MN Senate."
+website_url = "https://www.ourstreetsmn.org"
+tags = ["cycling", "walking", "safe-streets", "advocacy"]
+region_slugs = ["minneapolis-mn-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
