@@ -1050,6 +1050,90 @@ website_url = "https://trajectoire.quebec"
 tags = ["transit", "advocacy"]
 region_slugs = ["qc"]
 
+# --- Ontario (provincial) ---
+
+[[org]]
+slug = "share-the-road-cycling-coalition"
+name = "Share the Road Cycling Coalition"
+short_desc = "Ontario's provincial cycling advocacy coalition; hosts the Ontario Bike Summit (Sep 22-24 2026, Toronto) and the Bicycle Friendly Communities program."
+website_url = "https://sharetheroad.ca"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["on"]
+
+# --- British Columbia (provincial) ---
+
+[[org]]
+slug = "bc-cycling-coalition"
+name = "BC Cycling Coalition"
+short_desc = "British Columbia provincial cycling coalition providing public education, advocacy, and active-transportation programs; administers the BC Bike Valet Grant program."
+website_url = "https://bccycling.ca"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["bc"]
+
+# --- Alberta (provincial) ---
+
+[[org]]
+slug = "alberta-cycling-coalition"
+name = "Alberta Cycling Coalition"
+short_desc = "Alberta provincial advocacy coalition uniting stakeholders across the province to advocate for and educate on cycling; proposes Traffic Safety Act amendments."
+website_url = "https://albertacyclingcoalition.com"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ab"]
+
+# --- Manitoba (provincial) ---
+
+[[org]]
+slug = "bike-winnipeg"
+name = "Bike Winnipeg"
+short_desc = "Winnipeg-based cycling advocacy nonprofit presenting recommendations to municipal and provincial governments; serves as Manitoba's de facto provincial cycling-advocacy voice."
+website_url = "https://www.bikewinnipeg.ca"
+tags = ["cycling", "advocacy", "safe-streets"]
+region_slugs = ["mb"]
+
+# --- Saskatchewan (provincial) ---
+# gap: Saskatchewan Cycling Association is the provincial branch of
+# Cycling Canada but is sport-focused (racing, club programs) rather
+# than safe-streets advocacy. No clean advocacy entity at the
+# provincial level as of 2026-05-20.
+
+# --- Nova Scotia (provincial) ---
+
+[[org]]
+slug = "bicycle-nova-scotia"
+name = "Bicycle Nova Scotia"
+short_desc = "Nova Scotia provincial nonprofit representing and rallying for cycling across the province; partners with government to expand cycling capacity for all types of riders."
+website_url = "https://bicycle.ns.ca"
+tags = ["cycling", "advocacy", "safe-streets"]
+region_slugs = ["ns"]
+
+# --- New Brunswick (provincial) ---
+# gap: no clear provincial ped/bike or transit advocacy nonprofit
+# found as of 2026-05-20. Revisit if a maintainer has local sources.
+
+# --- Newfoundland and Labrador (provincial) ---
+
+[[org]]
+slug = "bicycle-newfoundland-and-labrador"
+name = "Bicycle Newfoundland and Labrador"
+short_desc = "Provincial cycling advocacy nonprofit (BNL); 2022-2026 strategic plan covering Newfoundland T'Railway development, St. John's bike infrastructure, and federal active-transport advocacy."
+website_url = "https://bicyclenl.com"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["nl"]
+
+# --- Prince Edward Island (provincial) ---
+# gap: Cycling PEI exists but is primarily sport/recreational (Cycling
+# Canada provincial branch) rather than safe-streets advocacy.
+# Charlottetown adopted an active-transportation plan in 2025 but no
+# independent provincial advocacy nonprofit is active as of 2026-05-20.
+
+# --- Yukon, Northwest Territories, Nunavut (territories) ---
+# gap: no provincial/territorial ped/bike or transit advocacy
+# nonprofits found for YT, NT, or NU as of 2026-05-20. Population
+# density and advocacy ecosystem in the Canadian North make this
+# expected; ZIPs in these territories return empty `local`/`regional`
+# arrays at the territory-tier ancestor walk per the empty-state
+# policy in the design spec.
+
 # --- Portugal (slice #4.6 validation fixture) ---
 #
 # Local chapters of national federations are modeled separately from

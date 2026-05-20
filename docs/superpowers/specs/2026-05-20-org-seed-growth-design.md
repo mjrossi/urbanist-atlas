@@ -352,3 +352,17 @@ during the editorial pass.)
   legislative work alongside Portland-metro programs; multi-anchored
   to satisfy both the Portland metro gate and the Oregon state floor
   without a duplicate entry.
+
+### CA province floor gaps
+
+- **Saskatchewan (SK)** — Saskatchewan Cycling Association is sport-
+  focused (Cycling Canada provincial branch), not safe-streets
+  advocacy.
+- **New Brunswick (NB)** — no provincial advocacy nonprofit found.
+- **Prince Edward Island (PE)** — Cycling PEI is sport-focused;
+  Charlottetown has a 2025 active-transportation plan but no
+  independent provincial advocacy nonprofit.
+- **Yukon (YT) / Northwest Territories (NT) / Nunavut (NU)** — no
+  territorial-tier ped/bike or transit advocacy nonprofits found.
+  Expected given population density and advocacy ecosystem in the
+  Canadian North.
