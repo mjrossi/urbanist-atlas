@@ -265,7 +265,7 @@ name = "Coalition for Smarter Growth"
 short_desc = "Leading DC-region smart-growth advocacy organization since 1997; fights for Metro funding, bus transformation, transit-oriented housing, and safer streets."
 website_url = "https://www.smartergrowth.net"
 tags = ["transit", "smart-growth", "advocacy", "policy", "regional"]
-region_slugs = ["washington-dc-metro"]
+region_slugs = ["washington-dc-metro", "dc"]
 
 [[org]]
 slug = "greater-greater-washington"
@@ -273,7 +273,7 @@ name = "Greater Greater Washington"
 short_desc = "DC-region urbanist news and advocacy nonprofit publishing daily on transit, housing, and transportation policy; hosts candidate forums and ballot-measure advocacy."
 website_url = "https://ggwash.org"
 tags = ["transit", "media", "policy", "advocacy", "regional"]
-region_slugs = ["washington-dc-metro"]
+region_slugs = ["washington-dc-metro", "dc"]
 
 # --- Philadelphia ---
 
@@ -566,6 +566,12 @@ short_desc = "Maryland statewide bicycle advocacy nonprofit organizing the annua
 website_url = "https://www.bikemaryland.org"
 tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["md"]
+
+# --- District of Columbia ---
+# DC state-floor coverage comes from coalition-for-smarter-growth and
+# greater-greater-washington (multi-anchored at washington-dc-metro + dc
+# in the Washington DC metro section above). DC is a federal district
+# without a separate statewide org distinct from the metro orgs.
 
 # --- Virginia ---
 

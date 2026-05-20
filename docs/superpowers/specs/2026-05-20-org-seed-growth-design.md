@@ -4,10 +4,10 @@
 
 The Urbanist Atlas API currently ships with 23 hand-curated orgs (19
 US/CA + 4 PT) in `api/seed/orgs.toml`, loaded by
-`api/internal/seed/orgs.go`. The roadmap entry for slice 7.6
-(`docs/roadmap.md`, line 209) calls for "Editorial work, not
-engineering" to expand the dataset toward 30–50 orgs across the
-supported countries before Phase 1 dogfooding begins.
+`api/internal/seed/orgs.go`. The roadmap entry for slice 7.6 in
+`docs/roadmap.md` calls for "Editorial work, not engineering" to expand
+the dataset toward 30–50 orgs across the supported countries before
+Phase 1 dogfooding begins.
 
 This design extends slice 7.6 beyond the original count target. The
 driving editorial decisions:
@@ -120,14 +120,27 @@ slugs verified against `api/seed/regions_us_msas.toml` and
 ## State/province floor
 
 **US:** all 50 states + PR each need ≥1 statewide-anchored org. DC's
-universal coverage is satisfied by the `washington-dc` city org (every
-DC ZIP walks up to it via ancestor walk).
+coverage is satisfied by multi-anchoring two of the three
+`washington-dc-metro` orgs (Coalition for Smarter Growth, Greater
+Greater Washington) at both the metro and the `dc` region. DC ZIPs
+anchor at the `washington-dc` city leaf; the ancestor walk reaches
+`washington-dc-metro` and `dc` at depth 1, then surfaces the metro's
+other state parents (`va`, `md`, `wv`) at depth 2 — this is the
+intended DC-metro graph behavior (the MSA genuinely spans four
+jurisdictions, so Arlington/Bethesda ZIPs need MD/VA state-floor
+content). Putting DC-region orgs at both anchors keeps DC content in
+front of MD/VA content in the breadcrumb.
 
 **CA:** all 10 provinces need ≥1 org; QC already covered by Trajectoire
 Québec. Territories YT/NT/NU expected to land as documented gaps.
 
 **Net-new state/province orgs:** ~51 US + 12 CA = **~63**, of which
 ~3–8 expected to end as `# gap` comments rather than seeded entries.
+(Closing the slice: 13 gaps landed — 9 US (WV, AR, OK, KS, ND, SD, NV,
+WY, PR) and 4 CA blocks (PE, NL-province, NB, plus YT/NT/NU
+consolidated). Research surfaced fewer demonstrably-active statewide
+safe-streets nonprofits than the upper-bound estimate anticipated,
+especially in low-density states.)
 
 ## Total scope estimate
 
