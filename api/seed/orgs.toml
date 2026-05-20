@@ -290,6 +290,24 @@ website_url = "https://www.5thsqadvocacy.org"
 tags = ["transit", "urbanism", "political", "advocacy", "policy"]
 region_slugs = ["philadelphia-pa-metro"]
 
+# --- Atlanta ---
+
+[[org]]
+slug = "propel-atl"
+name = "Propel ATL"
+short_desc = "Atlanta multimodal advocacy nonprofit (2021 merger of Atlanta Bicycle Coalition + PEDS) transforming streets into safer spaces for biking, walking, and rolling."
+website_url = "https://www.letspropelatl.org"
+tags = ["cycling", "walking", "pedestrian", "safe-streets", "advocacy", "vision-zero"]
+region_slugs = ["atlanta-ga-metro"]
+
+[[org]]
+slug = "marta-army"
+name = "MARTA Army"
+short_desc = "Atlanta grassroots transit-rider organization using tactical urbanism — bus timetables, trash cans, rider-experience improvements — to enhance MARTA from the bottom up."
+website_url = "https://www.martaarmy.org"
+tags = ["transit", "grassroots", "advocacy", "tactical-urbanism"]
+region_slugs = ["atlanta-ga-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
