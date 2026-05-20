@@ -109,8 +109,15 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup 11217: %v", err)
 	}
-	if !containsSlug(res.Local, "transportation-alternatives") {
-		t.Errorf("11217 local: missing transportation-alternatives; got %v", orgSlugList(res.Local))
+	// Post-#7.5.2 borough split: citywide NYC orgs (TransAlt, Riders
+	// Alliance, StreetsPAC) attach to the regional `nyc` node and
+	// surface in the Regional bucket for borough lookups. Borough-only
+	// orgs (none in the seed currently) would be Local.
+	if !containsSlug(res.Regional, "transportation-alternatives") {
+		t.Errorf("11217 regional: missing transportation-alternatives; got %v", orgSlugList(res.Regional))
+	}
+	if containsSlug(res.Local, "transportation-alternatives") {
+		t.Errorf("11217 local: transportation-alternatives must NOT appear here post-#7.5.2 split; got %v", orgSlugList(res.Local))
 	}
 	if len(res.Regional) == 0 {
 		t.Errorf("11217 regional: want >=1 org, got 0")
@@ -287,12 +294,16 @@ func TestPipeline_WorkedCities(t *testing.T) {
 		mustNotAny   []string
 	}{
 		{
+			// Post-#7.5.2 borough split: citywide NYC orgs (TransAlt,
+			// Riders Alliance, StreetsPAC) attach to the regional `nyc`
+			// node and bucket as Regional. There are no borough-only
+			// orgs in the seed yet, so the Local bucket is currently
+			// empty for borough ZIPs.
 			name:         "NYC 11217 (Brooklyn)",
 			postal:       "11217",
 			country:      atlas.CountryUS,
-			mustLocal:    []string{"transportation-alternatives"},
-			mustRegional: []string{"transitcenter", "tri-state-transportation-campaign"},
-			mustNotLocal: []string{"tri-state-transportation-campaign"},
+			mustRegional: []string{"transportation-alternatives", "transitcenter", "tri-state-transportation-campaign"},
+			mustNotLocal: []string{"transportation-alternatives", "tri-state-transportation-campaign"},
 		},
 		{
 			name:         "Hoboken 07302",

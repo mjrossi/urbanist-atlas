@@ -127,17 +127,28 @@ scope_tier = "local"
 sort_priority = 20
 parents = ["chicago-metro", "in"]
 
-# --- Consolidated cities (NYC is the only weird one in v1) ---
+# --- NYC: borough split (slice #7.5.2) ---
+#
+# `nyc` is the only US city we model sub-municipally at v1 — its
+# boroughs are also counties (the Census ZCTA-to-county crosswalk
+# naturally distinguishes them) and each has a distinct civic
+# identity + advocacy ecosystem. See docs/region-graph.md §8.
+#
+# After the split:
+#   - `nyc` is a regional intermediate region (between borough leaves
+#     and `nyc-metro`); its only parent is `nyc-metro`. Citywide NYC
+#     orgs attach here (TransitCenter, Transportation Alternatives,
+#     Riders Alliance).
+#   - Boroughs are local leaves; they carry the state edge (`ny`)
+#     directly per rule §1.
 
 [[region]]
 slug = "nyc"
 kind = "us:city"
 name = "New York City"
-scope_tier = "local"
+scope_tier = "regional"
 sort_priority = 15
-parents = ["nyc-metro", "ny"]
-
-# --- Boroughs (NYC) and cities ---
+parents = ["nyc-metro"]
 
 [[region]]
 slug = "brooklyn"
@@ -145,7 +156,7 @@ kind = "us:borough"
 name = "Brooklyn"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "manhattan"
@@ -153,7 +164,7 @@ kind = "us:borough"
 name = "Manhattan"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "queens"
@@ -161,7 +172,7 @@ kind = "us:borough"
 name = "Queens"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "bronx"
@@ -169,7 +180,7 @@ kind = "us:borough"
 name = "The Bronx"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "staten-island"
@@ -177,7 +188,9 @@ kind = "us:borough"
 name = "Staten Island"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
+
+# --- Cities (non-NYC) ---
 
 [[region]]
 slug = "hoboken"
