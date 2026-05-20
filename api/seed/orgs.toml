@@ -227,6 +227,25 @@ website_url = "https://dallasbicyclecoalition.org"
 tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
 region_slugs = ["dallas-tx-metro"]
 
+# --- Houston ---
+
+[[org]]
+slug = "bikehouston"
+name = "BikeHouston"
+short_desc = "Houston nonprofit working to make the city bike-friendly for everyone; advocates for the Houston Bike Plan, runs Gear Shifters volunteer corps, and builds The Orbit multi-use path coalition."
+website_url = "https://www.bikehouston.org"
+contact_url = "https://bikehouston.org/contact"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["houston-tx-metro"]
+
+[[org]]
+slug = "link-houston"
+name = "LINK Houston"
+short_desc = "Houston transportation-equity nonprofit advocating for robust, equitable transit, walking, and biking access; publishes the Equity in Transit report and METRO budget advocacy."
+website_url = "https://linkhouston.org"
+tags = ["transit", "equity", "advocacy", "policy", "research"]
+region_slugs = ["houston-tx-metro"]
+
 # --- Canada ---
 
 # --- Toronto ---
