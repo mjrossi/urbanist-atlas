@@ -40,6 +40,16 @@ type Row struct {
 // Summary is the per-run report returned by LoadFile.
 type Summary struct {
 	PostalCodes int
+	// DistinctSlugs is the number of unique leaf_region_slug values
+	// resolved during the load. Exposed so callers (and tests) can
+	// confirm the in-memory slug cache short-circuited as expected —
+	// 33k US ZCTAs typically resolve to a few hundred distinct
+	// region slugs (states + MSAs + curated leaves).
+	DistinctSlugs int
+	// Batches is the number of UNNEST upsert chunks issued. For N
+	// rows this is ceil(N / batchSize). Exposed so a regression that
+	// reverted to per-row Exec calls fails a count-based assertion.
+	Batches int
 }
 
 var header = []string{"postal_code", "country", "leaf_region_slug"}
@@ -133,10 +143,12 @@ func LoadFile(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, path
 			return Summary{}, fmt.Errorf("loadpostal: batch upsert rows [%d:%d): %w", start, end, err)
 		}
 		summary.PostalCodes += len(chunk)
+		summary.Batches++
 		if logger != nil && summary.PostalCodes%5000 == 0 {
 			logger.Info("loadpostal: progress", "rows", summary.PostalCodes, "total", len(rows))
 		}
 	}
+	summary.DistinctSlugs = len(slugCache)
 	if err := tx.Commit(ctx); err != nil {
 		return Summary{}, fmt.Errorf("loadpostal: commit: %w", err)
 	}

@@ -90,6 +90,17 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	if usSum.PostalCodes == 0 {
 		t.Fatal("US load wrote zero postal codes")
 	}
+	// Batched-load assertions. The US ETL produces ~33k rows so the
+	// batched path must run multiple chunks (not a single big Exec) and
+	// the in-memory slug cache must keep distinct-slug count to the
+	// low hundreds (states + MSAs + curated leaves). A regression that
+	// reverted to per-row Exec calls would show Batches == PostalCodes.
+	if usSum.Batches <= 1 || usSum.Batches >= usSum.PostalCodes {
+		t.Errorf("US batching: Batches=%d, PostalCodes=%d (expected many batches but << per-row)", usSum.Batches, usSum.PostalCodes)
+	}
+	if usSum.DistinctSlugs == 0 || usSum.DistinctSlugs > 1000 {
+		t.Errorf("US distinct slug cache: DistinctSlugs=%d (expected low hundreds — states + MSAs + leaves)", usSum.DistinctSlugs)
+	}
 	caSum, err := loadpostal.LoadFile(ctx, store.Pool(), nil, caCSV, atlas.CountryCA)
 	if err != nil {
 		t.Fatalf("loadpostal CA: %v", err)
@@ -376,6 +387,45 @@ func TestPipeline_WorkedCities(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("DC 20017 anchors at washington-dc city leaf, not at the multi-state metro", func(t *testing.T) {
+		got, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "20017", Country: atlas.CountryUS})
+		if err != nil {
+			t.Fatalf("Lookup 20017: %v", err)
+		}
+		if len(got.ResolvedAncestry) == 0 || got.ResolvedAncestry[0].Slug != "washington-dc" {
+			t.Errorf("DC 20017 leaf = %q, want washington-dc (anchored at the city leaf added in slice #7.5 follow-up; without it ZIP 20017 falls back to washington-dc-metro and the breadcrumb buries DC after MD/VA/WV)", firstSlug(got.ResolvedAncestry))
+		}
+		ancestrySlugs := make([]string, len(got.ResolvedAncestry))
+		for i, r := range got.ResolvedAncestry {
+			ancestrySlugs[i] = r.Slug
+		}
+		for _, expected := range []string{"washington-dc", "washington-dc-metro", "dc"} {
+			found := false
+			for _, s := range ancestrySlugs {
+				if s == expected {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("DC 20017 ancestry missing %q; got %v", expected, ancestrySlugs)
+			}
+		}
+		// Place label: "Washington — Washington Metro" (broad = the
+		// us:metro ancestor; inner is empty because dc is sort 60, at
+		// the state-tier exclusion line in placeLabel).
+		if want := "Washington — Washington Metro"; got.ResolvedPlaceLabel != want {
+			t.Errorf("DC 20017 place label = %q, want %q", got.ResolvedPlaceLabel, want)
+		}
+	})
+}
+
+func firstSlug(rs []atlas.Region) string {
+	if len(rs) == 0 {
+		return ""
+	}
+	return rs[0].Slug
 }
 
 func slugSet(orgs []atlas.Org) map[string]bool {
