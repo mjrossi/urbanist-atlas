@@ -321,6 +321,65 @@ NYC postal codes resolve at borough granularity. SF and Boston at
 city level. Most other big-city ZIPs at city level where we curate
 the leaf; at MSA level where we don't.
 
+#### Two-source pipeline (ZCTA + HUD) — slice #7.5.5
+
+Census ZCTA omits three ZIP categories: P.O. Box-only ZIPs (no
+addressable buildings — e.g., 20811 covering NIH/Walter Reed in
+Bethesda), single-building ZIPs (high-volume mail receivers like
+big-corp HQs that USPS assigns a dedicated ZIP), and APO/FPO military
+ZIPs. A ZCTA-only pipeline returns `postal-code-not-found` for any
+address in those buckets.
+
+Slice #7.5.5 adds HUD's quarterly USPS ZIP-to-County crosswalk as a
+second US ETL source. The pipeline is **additive**:
+
+1. **ZCTA is primary.** The existing 6-tier crosswalk
+   (`api/internal/etl/us/crosswalk.go:Crosswalk`) runs unchanged and
+   continues to produce ~33,700 anchors with city-leaf precision where
+   curated.
+2. **HUD is additive backfill** for ZIPs not already in the ZCTA
+   output. `CrosswalkHUDBackfill` groups HUD rows by ZIP, picks the
+   row with `max(TOT_RATIO)` per ZIP, and walks the county FIPS
+   through the existing fallback chain (NYC borough → countyToLeaf →
+   countyToMSA → stateFIPSToSlug).
+3. **HUD-only anchors lack the city-leaf tier.** HUD ZIP-County
+   doesn't carry a place GEOID, so the tier-1 city-leaf anchor isn't
+   available for HUD-source ZIPs. A ZIP that would ideally land at a
+   curated city leaf will anchor at the county leaf or MSA instead —
+   acceptable for the P.O. Box / single-building cohort.
+4. **TOT_RATIO selection is correct for P.O. Box-only ZIPs.** A
+   `max(RES_RATIO)` pick would be undefined for ZIPs where every row
+   has `RES_RATIO ≈ 0`. `TOT_RATIO` weights residential + business +
+   other together and always identifies a meaningful primary county.
+5. **The writer dedups defensively, with ZCTA winning.** If a ZIP
+   somehow appears in both sources (e.g., a future Census update
+   re-includes a ZIP HUD had been backfilling), the ZCTA-source row
+   wins the (country, postal_code) tie at `WritePostalCodesCSV` time.
+
+**Canonical example: ZIP 20811 → washington-dc-metro.** Bethesda's
+NIH/Walter Reed P.O. Box ZIP is omitted from Census ZCTA but present
+in HUD; its primary HUD row maps to Montgomery County, MD (FIPS
+24031) which is in CBSA 47900 (Washington-Arlington-Alexandria MSA →
+slug `washington-dc-metro`). A `GET /api/v1/lookup?postal_code=20811`
+that used to 404 now returns DC-metro orgs in the Regional bucket.
+
+**APO/FPO note.** Military overseas ZIPs (090xx, 962xx, etc.) appear
+in HUD but map to unusual county FIPS (`999xx`, etc.) that don't
+exist in the US county set. The fallback chain silently drops these
+— overseas military bases anchoring to a US state is editorially
+wrong, and we have no advocacy orgs to surface for them in v1
+anyway.
+
+**Operator workflow.** HUD's USPS Crosswalk requires a HUDUser
+account; the download URL is account-scoped, so we can't auto-fetch
+it the way Census files allow. The operator runs the manual download
+(documented in `etl/SOURCES.md` → *HUD download — operator note*),
+saves the CSV under `etl/sources/us/hud_zip_county_<vintage>.csv`,
+pins the sha256 in both `etl/SOURCES.md` and `api/internal/etl/us/us.go`,
+then runs `etl regenerate --country=US`. Absence of the HUD CSV is
+not an error — the orchestrator logs a hint and produces a ZCTA-only
+`postal_codes_us.csv`.
+
 ---
 
 ## ETL pipeline
