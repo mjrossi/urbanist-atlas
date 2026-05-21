@@ -51,8 +51,51 @@ keyed on `region_slugs`; this slice fills the table.
 ## Activity bar
 
 Any one of — site updated / blog or news post / social post / event —
-within the last 12 months as of the verification date. Maintainer
-spot-checks each candidate during the review pass.
+within the last 12 months as of the verification date. Acceptable
+surfaces: the org's own website (blog, news, statements, events,
+press), the org's owned social-media account, the org's mailing list
+or newsletter, or a known third-party platform the org owns its
+presence on (e.g., Action Network campaign page, Instagram). External
+press alone is NOT sufficient — chapters and grassroots groups whose
+own surfaces have stale content fail this bar even when external
+coverage exists. Maintainer spot-checks each candidate during the
+review pass.
+
+## Scope precedents (locked in slice 7.7)
+
+The slice 7.6 + 7.7 editorial passes admitted several org shapes that
+warrant explicit precedents for future passes:
+
+- **Public-agency oversight bodies.** Legislatively-created bodies
+  that publish independent oversight of a transit/streets operator
+  (e.g., MBTA Advisory Board, M.G.L. ch. 161A § 7) are admitted when
+  they maintain their own public-facing oversight work distinct from
+  the agency they oversee. City-internal advisory committees inside
+  the operating agency (e.g., Phoenix Vision Zero Community Advisory
+  Committee, PSTA TRAC) are NOT admitted — they sit inside an agency,
+  not outside it.
+- **Multi-issue 501(c)(3)s with named transit/safe-streets programs.**
+  Orgs whose primary mission is broader (disability rights, Center
+  for Independent Living, etc.) but which run a named, ongoing,
+  substantial transit/streets advocacy program are admitted (e.g.,
+  Detroit Disability Power; Paraquad's S.M.A.R.T. coalition). The
+  named-program test distinguishes these from generic civic groups
+  where transit is one of many incidental topics.
+- **Publication/advocacy hybrid 501(c)(3)s.** 501(c)(3) publications
+  whose programming extends beyond pure publishing — into events,
+  campaigns, or organized advocacy — are admitted (e.g., Streets.mn).
+  Pure publications without programming arms (NextSTL; Streetsblog
+  regional sub-sites that are publishing-only) are NOT admitted.
+- **Chapter / affiliate organizations.** Chapters of a parent 501(c)(3)
+  without independent incorporation (e.g., SAFE Inland Empire as a
+  chapter of SAFE LA; Sierra Club regional chapters) are NOT
+  separately admitted unless the chapter has its own 501(c)(3) status,
+  its own dated content on its own site, AND substantive editorial
+  independence. Otherwise the parent already covers the geography via
+  its primary anchor.
+
+These precedents do not relax the activity bar — each admitted org
+must still show dated 12-month activity on its own website.
 
 ## Empty-state policy
 
@@ -314,7 +357,14 @@ cover the loader + lookup paths; they fail at `pg-reset` time if any
   exists or gets added, its empty-state UI for gap states is its own
   slice.
 - **Tag taxonomy lockdown.** Open vocabulary preserved; controlled
-  taxonomy is a v1.1+ refinement.
+  taxonomy is a v1.1+ refinement. Slice #7.7 (incl. followup pass)
+  introduced new tag values: `oversight`, `rider-union`,
+  `accountability`, `media`, `land-use`, `accessibility`, `paratransit`,
+  `walkability`. Future lockdown should normalize these against
+  existing tags (e.g., `walkability` vs `walking`, `media` vs an
+  implicit "publication" facet) and decide whether org-shape facets
+  (`oversight`, `rider-union`) belong in the tag namespace or a
+  separate field.
 - **Per-org `verified_at` field on the schema.** Global header
   comment is enough for now.
 - **ES expansion** — slice 4.7 territory.
