@@ -8,6 +8,9 @@
 # automatically. Use `mise.local.toml` (gitignored) for machine-specific
 # overrides on top of this.
 
+[tools]
+"aqua:concourse/concourse/fly" = "latest"
+
 [env]
 # Human-friendly logs in dev; production stays JSON via mise.toml's default.
 URBANIST_LOG_FORMAT = "text"
