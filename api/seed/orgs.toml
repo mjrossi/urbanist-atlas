@@ -152,6 +152,23 @@ website_url = "https://seattlesubway.org"
 tags = ["transit", "grassroots", "rail"]
 region_slugs = ["seattle-metro"]
 
+[[org]]
+slug = "seattle-streets-alliance"
+name = "Seattle Streets Alliance"
+short_desc = "Seattle safe-streets nonprofit (rebranded 2026 from Seattle Neighborhood Greenways after 15 years); organizes neighbors for safer speeds, better crossings, biking-network gap-fills, and equity-centered Vision Zero work."
+website_url = "https://www.streetsalliance.org"
+contact_url = "https://www.streetsalliance.org/who-we-are/contact-us/"
+tags = ["safe-streets", "vision-zero", "advocacy", "cycling", "walking", "equity"]
+region_slugs = ["seattle"]
+
+[[org]]
+slug = "transit-riders-union"
+name = "Transit Riders Union"
+short_desc = "Independent, member-run union of Seattle/King County transit riders; wins include the low-income ORCA LIFT fare and statewide minimum-wage initiatives; runs candidate endorsements and rider-experience campaigns."
+website_url = "https://www.transitriders.org"
+tags = ["transit", "grassroots", "advocacy", "rider-union", "equity"]
+region_slugs = ["seattle"]
+
 # --- LA ---
 
 [[org]]
