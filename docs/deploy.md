@@ -109,6 +109,24 @@ Verify Postgres came up:
 
 ```sh
 flyctl status -a urbanist-atlas-db
+```
+
+**Gotcha:** the sibling Postgres app has no `[[services]]` /
+`[http_service]` block (it's internal-only), so Fly's "rolling deploy
+strategy" has nothing to health-check and exits after clearing the
+lease — leaving the machine in whatever state it was in. Because
+`flyctl launch --no-deploy` creates the machine in `stopped` state,
+the first deploy may leave it stopped. If `flyctl status` shows
+`STATE=stopped`, start it explicitly:
+
+```sh
+flyctl machines start -a urbanist-atlas-db
+flyctl status -a urbanist-atlas-db     # confirm STATE=started
+```
+
+Sanity-check the database:
+
+```sh
 flyctl ssh console -a urbanist-atlas-db -C \
     "psql -U urbanist -d urbanist_atlas -c 'select version();'"
 ```
