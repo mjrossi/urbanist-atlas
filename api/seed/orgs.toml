@@ -397,6 +397,14 @@ website_url = "https://www.martaarmy.org"
 tags = ["transit", "grassroots", "advocacy", "tactical-urbanism"]
 region_slugs = ["atlanta-ga-metro"]
 
+[[org]]
+slug = "beltline-rail-now"
+name = "BeltLine Rail Now"
+short_desc = "Atlanta grassroots nonprofit with 10,000+ supporters organizing for equitable, urgent delivery of light rail on the 22-mile Beltline corridor; partners with MARTA and Atlanta BeltLine Inc. on the citywide rail commitment."
+website_url = "https://beltlinerailnow.com"
+tags = ["transit", "rail", "advocacy", "grassroots"]
+region_slugs = ["atlanta-ga-metro"]
+
 # --- Phoenix ---
 
 [[org]]
