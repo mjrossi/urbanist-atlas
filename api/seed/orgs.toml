@@ -318,6 +318,14 @@ website_url = "https://linkhouston.org"
 tags = ["transit", "equity", "advocacy", "policy", "research"]
 region_slugs = ["houston-tx-metro"]
 
+[[org]]
+slug = "a-tale-of-two-bridges"
+name = "A Tale of Two Bridges"
+short_desc = "Houston urbanism nonprofit (ATOTB) for walkable, equitable streets; publishes the Houston Urbanism Guide, organizes Heights traffic-calming campaigns, and tracks Houston City Council district transportation issues."
+website_url = "https://atotb.org"
+tags = ["walking", "cycling", "transit", "urbanism", "advocacy", "safe-streets"]
+region_slugs = ["houston-tx-metro"]
+
 # --- Washington DC ---
 
 [[org]]
