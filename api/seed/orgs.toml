@@ -689,6 +689,14 @@ website_url = "https://cmt-stl.org"
 tags = ["transit", "rail", "advocacy", "regional", "policy"]
 region_slugs = ["st-louis-mo-metro"]
 
+[[org]]
+slug = "paraquad"
+name = "Paraquad"
+short_desc = "St. Louis-region Center for Independent Living (founded 1970) whose public-policy program convenes the S.M.A.R.T. coalition (St. Louis Metropolitan Alliance for Reliable Transit), advocating for safe, accessible, and affordable public transit including paratransit service; St. Louis was the first US city with lift-equipped public buses in 1977 through Paraquad's advocacy."
+website_url = "https://paraquad.org"
+tags = ["transit", "accessibility", "advocacy", "paratransit", "regional"]
+region_slugs = ["st-louis-mo-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
