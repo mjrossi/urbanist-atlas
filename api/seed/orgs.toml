@@ -4,10 +4,11 @@
 #
 # Inclusion criteria: transit and/or safe-streets advocacy in the US
 # or Canada. Housing-only / YIMBY-only orgs are out of scope per
-# CLAUDE.md. URLs are real and were last spot-checked on 2026-05-20
-# during the slice #7.6 editorial pass (see docs/superpowers/specs/
-# 2026-05-20-org-seed-growth-design.md for the two-gate coverage
-# design and the Canvas Adjustments log of documented gaps).
+# CLAUDE.md. URLs are real and were last spot-checked on 2026-05-21
+# during the slice #7.7 editorial pass (top-20 metro depth uplift —
+# see docs/superpowers/specs/2026-05-20-org-seed-growth-design.md
+# for the coverage-gate design, raised to ≥3 orgs per top-20 metro
+# in slice 7.7, and the Canvas Adjustments log of documented gaps).
 
 # --- NYC region ---
 
@@ -89,6 +90,31 @@ short_desc = "Cambridge-based nonprofit advocating for innovative transportation
 website_url = "https://www.livablestreets.info"
 tags = ["safe-streets", "transit", "cycling", "walking"]
 region_slugs = ["cambridge-ma"]
+
+[[org]]
+slug = "boston-cyclists-union"
+name = "Boston Cyclists Union"
+short_desc = "Boston cycling advocacy nonprofit transforming Greater Boston streets into equitable, people-centered spaces through policy campaigns, bike-parking advocacy, and a free community bike repair program."
+website_url = "https://bostoncyclistsunion.org"
+contact_url = "https://bostoncyclistsunion.org/about_us/contact"
+tags = ["cycling", "safe-streets", "advocacy"]
+region_slugs = ["boston"]
+
+[[org]]
+slug = "a-better-city"
+name = "A Better City"
+short_desc = "Greater Boston business-aligned advocacy coalition pushing transit, climate, and land-use solutions; works on the I-90 Allston Multimodal Project, Bluebikes expansion, and Greening the Blue Line."
+website_url = "https://www.abettercity.org"
+tags = ["transit", "policy", "regional", "advocacy"]
+region_slugs = ["greater-boston"]
+
+[[org]]
+slug = "mbta-advisory-board"
+name = "MBTA Advisory Board"
+short_desc = "Independent Boston-region transit advisory board and watchdog for MBTA riders, taxpayers, and the public; monitors fare changes, capital and operating budgets, and service quality across rapid transit, buses, commuter rail, and ferry."
+website_url = "https://mbtaadvisoryboard.org"
+tags = ["transit", "advocacy", "oversight", "regional"]
+region_slugs = ["greater-boston"]
 
 # --- Miami ---
 
@@ -485,6 +511,15 @@ name = "Massachusetts Bicycle Coalition"
 short_desc = "Massachusetts statewide bicycle advocacy group (MassBike) pushing the MassDOT Bike Plan, e-bike incentive program, and Ride Safe Act; runs the Council of Advocates."
 website_url = "https://www.massbike.org"
 tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ma"]
+
+[[org]]
+slug = "walk-massachusetts"
+name = "WalkMassachusetts"
+short_desc = "Massachusetts statewide pedestrian advocacy nonprofit (formerly WalkBoston) since 1990; conducts community walk audits, advances pedestrian-safety legislation, and runs the WalkMA Network of municipal walk/bike committees."
+website_url = "https://walkmass.org"
+contact_url = "https://walkmass.org/contact-us/"
+tags = ["walking", "pedestrian", "safe-streets", "advocacy", "policy"]
 region_slugs = ["ma"]
 
 # --- New Hampshire ---
