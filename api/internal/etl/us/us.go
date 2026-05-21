@@ -1,6 +1,9 @@
 // Package us implements the United States ETL plan for the urbanist
-// atlas postal-coverage pipeline (slice #7.5.3). It reads three Census
-// Bureau reference files staged under etl/sources/us/:
+// atlas postal-coverage pipeline (slices #7.5.3 + #7.5.5). It reads
+// upstream reference files staged under etl/sources/us/ from two
+// complementary sources:
+//
+// Census Bureau (primary — slice #7.5.3):
 //
 //   - list1_2023.csv             — CBSA delineation (xlsx → CSV via
 //     etl/scripts/xlsx_to_csv.py;
@@ -8,11 +11,19 @@
 //   - tab20_zcta520_place20_natl.txt  — ZCTA-to-place crosswalk
 //   - tab20_zcta520_county20_natl.txt — ZCTA-to-county crosswalk
 //
-// and produces two deterministic seed files under api/seed/:
+// HUD (additive backfill — slice #7.5.5):
+//
+//   - hud_zip_county_<vintage>.csv — USPS ZIP-to-County crosswalk
+//     covering operational ZIPs Census ZCTA omits (P.O. Box-only,
+//     single-building, APO/FPO). Optional — the orchestrator
+//     gracefully degrades to ZCTA-only when the file is absent.
+//
+// It produces two deterministic seed files under api/seed/:
 //
 //   - regions_us_msas.toml       — one [[region]] per Metropolitan
 //     Statistical Area
-//   - postal_codes_us.csv        — ZIP → smallest-curated-anchor slug
+//   - postal_codes_us.csv        — ZIP → smallest-curated-anchor slug,
+//     merged from ZCTA + HUD passes
 //
 // Importing the package (or blank-importing it, as cmd/server/etl.go
 // does) registers the US plan with etl.Plans via init().
@@ -24,6 +35,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
@@ -56,10 +68,28 @@ func init() {
 				SHA256:   "3ed41278d637dc249e0323306f68be8a6c234e3090f4de88ef328dee71aeaaaf",
 				Vintage:  "Census ZCTA-to-county relationship, 2020 vintage",
 			},
+			{
+				// HUD USPS ZIP-to-County crosswalk (slice #7.5.5). The
+				// canonical download URL is account-scoped behind the
+				// HUDUser portal; the operator pins the sha256 below
+				// on first download. URL points at the portal landing
+				// page so the operator has a one-click entry point;
+				// the actual download is manual. The downloader's
+				// sha256 check is skipped when SHA256 is empty, so
+				// pre-pinning the file is the operator's only required
+				// step before `etl regenerate`.
+				Filename: "hud_zip_county_2026q1.csv",
+				URL:      "https://www.huduser.gov/portal/dataset/uspszip-api.html",
+				SHA256:   "", // TBD — operator pins on first download; see etl/SOURCES.md
+				Vintage:  "HUD USPS ZIP-to-County crosswalk, 2026-Q1 (operator-downloaded; HUD account required)",
+			},
 		},
 		Targets: []etl.OutputTarget{
 			{Path: "regions_us_msas.toml", Format: "toml", MinRows: 380, MaxRows: 400},
-			{Path: "postal_codes_us.csv", Format: "csv", MinRows: 30000, MaxRows: 35000},
+			// Row band widened from 30000-35000 in slice #7.5.5 to
+			// accommodate the additive HUD backfill (~5-10k net-new
+			// rows; ZCTA-source rows unchanged).
+			{Path: "postal_codes_us.csv", Format: "csv", MinRows: 30000, MaxRows: 45000},
 		},
 		Regenerate: Regenerate,
 	}
@@ -75,7 +105,15 @@ func init() {
 //     (relative to outDir).
 //  4. Assign slugs/names/parents to every MSA (overrides win).
 //  5. Run the smallest-anchor crosswalk over every ZCTA → anchor slug.
-//  6. Write regions_us_msas.toml + postal_codes_us.csv under outDir.
+//  6. (Slice #7.5.5) If a HUD ZIP-County CSV is staged under srcDir,
+//     parse it and run CrosswalkHUDBackfill against the post-ZCTA
+//     anchor set to produce additional anchors for ZIPs Census ZCTA
+//     omits (P.O. Box-only, single-building, APO/FPO). The HUD CSV is
+//     account-gated so its absence is not an error — the flow
+//     degrades to ZCTA-only.
+//  7. Write regions_us_msas.toml + postal_codes_us.csv under outDir.
+//     The CSV writer merges ZCTA + HUD anchor slices with ZCTA
+//     winning any (country, postal_code) tie.
 //
 // Logs row counts and reason-bucket counts (city-leaf, nyc-borough,
 // county-leaf, msa, state) so the maintainer can spot coverage gaps.
@@ -122,13 +160,70 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 	logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "count", len(msas))
 
 	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, cbsaToSlug)
+
+	hudPath := findHUDFile(srcDir)
+	var hudAnchors []PostalAnchor
+	hudReasons := map[string]int{}
+	if hudPath == "" {
+		logger.Info("etl us: no HUD ZIP-County CSV found in src dir — skipping non-ZCTA backfill",
+			"src_dir", srcDir,
+			"hint", "place hud_zip_county_<vintage>.csv under etl/sources/us/ to enable",
+		)
+	} else {
+		huds, err := loadHUD(hudPath)
+		if err != nil {
+			return err
+		}
+		logger.Info("etl us: parsed HUD ZIP-County", "rows", len(huds), "path", hudPath)
+		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug)
+		logger.Info(fmt.Sprintf("etl us: hud backfill: added %d anchors across %+v", len(hudAnchors), hudReasons),
+			"added", len(hudAnchors),
+			"borough_count", hudReasons["hud:nyc-borough"],
+			"county_leaf_count", hudReasons["hud:county-leaf"],
+			"msa_count", hudReasons["hud:msa"],
+			"state_count", hudReasons["hud:state"],
+			"unknown_count", hudReasons["hud:unknown"],
+		)
+	}
+
 	csvPath := filepath.Join(outDir, "postal_codes_us.csv")
-	if err := writeCSV(csvPath, anchors); err != nil {
+	if err := writeCSV(csvPath, anchors, hudAnchors); err != nil {
 		return err
 	}
-	logger.Info("etl us: wrote postal codes", "path", csvPath, "count", len(anchors), "by_reason", fmt.Sprintf("%+v", reasons))
+	logger.Info("etl us: wrote postal codes",
+		"path", csvPath,
+		"zcta_count", len(anchors),
+		"hud_count", len(hudAnchors),
+		"total", len(anchors)+len(hudAnchors),
+		"by_reason", fmt.Sprintf("%+v", reasons),
+		"by_hud_reason", fmt.Sprintf("%+v", hudReasons),
+	)
 
 	return nil
+}
+
+// findHUDFile scans srcDir for any file matching the HUD ZIP-County
+// naming convention "hud_zip_county_*.csv" and returns the path to
+// the latest match (sorted ASC by name, so the lexicographically
+// last entry — typically the most recent vintage — wins when
+// multiple exist). Returns "" when no match is found — the caller
+// treats that as "no HUD backfill" and emits a ZCTA-only CSV.
+func findHUDFile(srcDir string) string {
+	matches, err := filepath.Glob(filepath.Join(srcDir, "hud_zip_county_*.csv"))
+	if err != nil || len(matches) == 0 {
+		return ""
+	}
+	sort.Strings(matches)
+	return matches[len(matches)-1]
+}
+
+func loadHUD(path string) ([]HUDZipCounty, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("etl us: open hud %s: %w", path, err)
+	}
+	defer f.Close()
+	return ParseHUDZipCounty(f)
 }
 
 func loadCBSA(path string) ([]MSA, map[string]string, error) {
@@ -167,11 +262,11 @@ func writeMSAs(path string, msas []MSA, assignments map[string]MSAOverride) erro
 	return WriteMSAsTOML(f, msas, assignments)
 }
 
-func writeCSV(path string, anchors []PostalAnchor) error {
+func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("etl us: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WritePostalCodesCSV(f, anchors)
+	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors)
 }

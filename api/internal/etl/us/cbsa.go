@@ -178,4 +178,3 @@ func allAlphaUpper(s string) bool {
 	}
 	return true
 }
-
