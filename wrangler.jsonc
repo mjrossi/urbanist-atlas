@@ -2,10 +2,14 @@
 //
 // Cloudflare has unified Pages into Workers + Pages. We deploy the
 // Vite-built SPA as Workers Static Assets (no Worker code — pure
-// static serving with SPA fallback). The slice #21 `_redirects` file
-// at web/public/_redirects is left in place for documentation and as
-// a tripwire if Cloudflare ever switches the SPA fallback back to
-// Pages semantics, but the LOAD-BEARING SPA fallback config is
+// static serving with SPA fallback).
+//
+// The slice #21 `_redirects` file at web/public/_redirects was
+// designed for the Pages product. Workers Static Assets' validator
+// rejects its `/* /index.html 200` catch-all as a self-referential
+// rewrite ("Infinite loop detected... would cause a redirect to
+// strip `.html` or `/index` and end up triggering this rule again"),
+// so we deleted it. SPA fallback now comes exclusively from
 // `assets.not_found_handling` below.
 //
 // Design doc: docs/superpowers/specs/2026-05-21-fly-redeploy-design.md
