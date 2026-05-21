@@ -360,6 +360,7 @@ Files updated by the same PR:
 | `Dockerfile` (new, repo root) | Multi-stage Go build (per § Build mechanism) |
 | `fly.toml` (new, repo root) | API app config (per § Procfile → fly.toml) |
 | `infra/postgres/fly.toml` (new) | Sibling DB app config (per § Sibling Postgres app) |
+| `infra/postgres/Dockerfile` + `entrypoint-fly.sh` (new) | Thin wrapper over `postgres:17-alpine`; root-stage `chown` so the `postgres` user can write the PGDATA subdir on a Fly volume |
 | `.github/workflows/backup.yml` (new) | Nightly cron + workflow_dispatch (per § Backups) |
 | `justfile` | Delete `[group('heroku')]` lines 274-316; add `[group('fly')]` + refreshed `[group('smoke')]` (per § Justfile) |
 | `Procfile` | **Delete** — Heroku-only artifact |
