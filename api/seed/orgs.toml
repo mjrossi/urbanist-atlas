@@ -117,6 +117,14 @@ tags = ["transit", "advocacy", "oversight", "regional"]
 region_slugs = ["greater-boston"]
 
 # --- Miami ---
+# Greater-Miami coverage is at 2 metro-level orgs after slice #7.7.
+# Third-org gap researched 2026-05-21: Transit Alliance Miami is the
+# dominant metro org; Bike Walk Coral Gables added below as a city-leaf
+# anchor. Healthy Little Havana's transit/safe-streets work (Little
+# Havana Moves) is partner-only with Transit Alliance and no separately-
+# active web presence verified. Bike Miami (Friendship Circle) is a
+# fundraising-events org, not advocacy. Maintainer-side knowledge of
+# active Miami-Dade ped/bike/transit advocacy welcome.
 
 [[org]]
 slug = "transit-alliance-miami"
@@ -124,6 +132,14 @@ name = "Transit Alliance Miami"
 short_desc = "Grassroots advocacy organization working to make Miami a more walkable, bikeable, transit-friendly community."
 website_url = "https://transitalliance.miami"
 tags = ["transit", "advocacy", "safe-streets"]
+region_slugs = ["miami"]
+
+[[org]]
+slug = "bike-walk-coral-gables"
+name = "Bike Walk Coral Gables"
+short_desc = "Coral Gables 501(c)(3) promoting cycling and walking as safe, healthy forms of transportation; runs monthly Gables Bike Tours, the annual Gables Bike Day ciclovia, Bike to Work Day, and PARK(ing) Day."
+website_url = "https://bikewalkcoralgables.org"
+tags = ["cycling", "walking", "safe-streets", "advocacy"]
 region_slugs = ["miami"]
 
 # --- Seattle ---
