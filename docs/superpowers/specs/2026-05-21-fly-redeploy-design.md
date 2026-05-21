@@ -220,6 +220,12 @@ primary_region = "iad"
   source = "pgdata"
   destination = "/var/lib/postgresql/data"
 
+# Default `on-failure max_retries=10` would let a transient blip
+# strand the DB stopped indefinitely. `always` keeps Fly restarting;
+# the data lives on the pgdata volume so restarts are safe.
+[restart]
+  policy = "always"
+
 [[vm]]
   cpu_kind = "shared"
   cpus = 1

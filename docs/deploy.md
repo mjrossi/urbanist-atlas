@@ -124,6 +124,13 @@ flyctl machines start -a urbanist-atlas-db
 flyctl status -a urbanist-atlas-db     # confirm STATE=started
 ```
 
+After this first-boot bring-up, the `[restart] policy = "always"`
+block in `infra/postgres/fly.toml` keeps Fly auto-restarting any
+crashed machine indefinitely (Fly's default of `on-failure
+max_retries=10` would otherwise strand the DB stopped after a bug
+storm). Manually `flyctl machine stop` still works for maintenance —
+the `always` policy doesn't override an explicit stop.
+
 Sanity-check the database:
 
 ```sh

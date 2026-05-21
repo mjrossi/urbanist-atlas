@@ -23,6 +23,16 @@ primary_region = 'iad'
   source = 'pgdata'
   destination = '/var/lib/postgresql/data'
 
+# Fly's default restart policy for headless apps (no [[services]] /
+# [http_service]) is `on-failure` with max_retries=10. Hitting the
+# max once leaves the machine in `stopped` state until manually
+# restarted — fine during initial bring-up bugs, bad for ongoing
+# operations where any transient blip could take the DB offline
+# permanently. `always` keeps Fly restarting indefinitely; the data
+# lives on the `pgdata` volume so restarts are safe.
+[restart]
+  policy = 'always'
+
 [[vm]]
   cpu_kind = 'shared'
   cpus = 1
