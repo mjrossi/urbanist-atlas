@@ -36,7 +36,12 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
+	usStates := repoFile(t, "seed", "regions_us_states.toml")
+	usMultistate := repoFile(t, "seed", "regions_us_multistate.toml")
+	usMSAs := repoFile(t, "seed", "regions_us_msas.toml")
 	usRegions := repoFile(t, "seed", "regions_us.toml")
+	caProvinces := repoFile(t, "seed", "regions_ca_provinces.toml")
+	caCMAs := repoFile(t, "seed", "regions_ca_cmas.toml")
 	caRegions := repoFile(t, "seed", "regions_ca.toml")
 	ptRegions := repoFile(t, "seed", "regions_pt.toml")
 	usCSV := repoFile(t, "seed", "postal_codes_us.csv")
@@ -48,8 +53,28 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	// orgs.toml has US/CA/PT entries — all three countries' regions must
 	// be present before seed, or the seed loader fails on missing
 	// region_slugs.
+	//
+	// State/province-tier files load BEFORE each country's main regions
+	// file so the main file's leaves can parent under the states via
+	// cross-file resolution (internal/loadregions/write.go's
+	// RegionIDBySlug fallback).
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
+		t.Fatalf("loadregions US states: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMultistate, "US"); err != nil {
+		t.Fatalf("loadregions US multistate: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMSAs, "US"); err != nil {
+		t.Fatalf("loadregions US msas: %v", err)
+	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caProvinces, "CA"); err != nil {
+		t.Fatalf("loadregions CA provinces: %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caCMAs, "CA"); err != nil {
+		t.Fatalf("loadregions CA cmas: %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA: %v", err)
@@ -64,6 +89,17 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	}
 	if usSum.PostalCodes == 0 {
 		t.Fatal("US load wrote zero postal codes")
+	}
+	// Batched-load assertions. The US ETL produces ~33k rows so the
+	// batched path must run multiple chunks (not a single big Exec) and
+	// the in-memory slug cache must keep distinct-slug count to the
+	// low hundreds (states + MSAs + curated leaves). A regression that
+	// reverted to per-row Exec calls would show Batches == PostalCodes.
+	if usSum.Batches <= 1 || usSum.Batches >= usSum.PostalCodes {
+		t.Errorf("US batching: Batches=%d, PostalCodes=%d (expected many batches but << per-row)", usSum.Batches, usSum.PostalCodes)
+	}
+	if usSum.DistinctSlugs == 0 || usSum.DistinctSlugs > 1000 {
+		t.Errorf("US distinct slug cache: DistinctSlugs=%d (expected low hundreds — states + MSAs + leaves)", usSum.DistinctSlugs)
 	}
 	caSum, err := loadpostal.LoadFile(ctx, store.Pool(), nil, caCSV, atlas.CountryCA)
 	if err != nil {
@@ -96,8 +132,15 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup 11217: %v", err)
 	}
-	if !containsSlug(res.Local, "transportation-alternatives") {
-		t.Errorf("11217 local: missing transportation-alternatives; got %v", orgSlugList(res.Local))
+	// Post-#7.5.2 borough split: citywide NYC orgs (TransAlt, Riders
+	// Alliance, StreetsPAC) attach to the regional `nyc` node and
+	// surface in the Regional bucket for borough lookups. Borough-only
+	// orgs (none in the seed currently) would be Local.
+	if !containsSlug(res.Regional, "transportation-alternatives") {
+		t.Errorf("11217 regional: missing transportation-alternatives; got %v", orgSlugList(res.Regional))
+	}
+	if containsSlug(res.Local, "transportation-alternatives") {
+		t.Errorf("11217 local: transportation-alternatives must NOT appear here post-#7.5.2 split; got %v", orgSlugList(res.Local))
 	}
 	if len(res.Regional) == 0 {
 		t.Errorf("11217 regional: want >=1 org, got 0")
@@ -116,8 +159,23 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	// counts. Snapshot row counts → run again → compare.
 	before := snapshotCounts(ctx, t, store)
 
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
+		t.Fatalf("loadregions US states (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMultistate, "US"); err != nil {
+		t.Fatalf("loadregions US multistate (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMSAs, "US"); err != nil {
+		t.Fatalf("loadregions US msas (2nd): %v", err)
+	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caProvinces, "CA"); err != nil {
+		t.Fatalf("loadregions CA provinces (2nd): %v", err)
+	}
+	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caCMAs, "CA"); err != nil {
+		t.Fatalf("loadregions CA cmas (2nd): %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, caRegions, "CA"); err != nil {
 		t.Fatalf("loadregions CA (2nd): %v", err)
@@ -237,7 +295,19 @@ func TestPipeline_WorkedCities(t *testing.T) {
 	}
 
 	// orgs.toml has US/CA/PT entries; PT regions must exist before seed.
-	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	// US load order: states → multistate → msas → us (cross-file parent
+	// references resolve via the loader's DB lookup fallback).
+	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_states.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_multistate.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_msas.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_provinces.toml"), "CA")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_cmas.toml"), "CA")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
 	must(err)
@@ -262,12 +332,16 @@ func TestPipeline_WorkedCities(t *testing.T) {
 		mustNotAny   []string
 	}{
 		{
+			// Post-#7.5.2 borough split: citywide NYC orgs (TransAlt,
+			// Riders Alliance, StreetsPAC) attach to the regional `nyc`
+			// node and bucket as Regional. There are no borough-only
+			// orgs in the seed yet, so the Local bucket is currently
+			// empty for borough ZIPs.
 			name:         "NYC 11217 (Brooklyn)",
 			postal:       "11217",
 			country:      atlas.CountryUS,
-			mustLocal:    []string{"transportation-alternatives"},
-			mustRegional: []string{"transitcenter", "tri-state-transportation-campaign"},
-			mustNotLocal: []string{"tri-state-transportation-campaign"},
+			mustRegional: []string{"transportation-alternatives", "transitcenter", "tri-state-transportation-campaign"},
+			mustNotLocal: []string{"transportation-alternatives", "tri-state-transportation-campaign"},
 		},
 		{
 			name:         "Hoboken 07302",
@@ -313,6 +387,114 @@ func TestPipeline_WorkedCities(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("DC 20017 anchors at washington-dc city leaf, not at the multi-state metro", func(t *testing.T) {
+		got, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "20017", Country: atlas.CountryUS})
+		if err != nil {
+			t.Fatalf("Lookup 20017: %v", err)
+		}
+		if len(got.ResolvedAncestry) == 0 || got.ResolvedAncestry[0].Slug != "washington-dc" {
+			t.Errorf("DC 20017 leaf = %q, want washington-dc (anchored at the city leaf added in slice #7.5 follow-up; without it ZIP 20017 falls back to washington-dc-metro and the breadcrumb buries DC after MD/VA/WV)", firstSlug(got.ResolvedAncestry))
+		}
+		ancestrySlugs := make([]string, len(got.ResolvedAncestry))
+		for i, r := range got.ResolvedAncestry {
+			ancestrySlugs[i] = r.Slug
+		}
+		for _, expected := range []string{"washington-dc", "washington-dc-metro", "dc"} {
+			found := false
+			for _, s := range ancestrySlugs {
+				if s == expected {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("DC 20017 ancestry missing %q; got %v", expected, ancestrySlugs)
+			}
+		}
+		// Diamond dedup: `dc` is reachable both at depth 1 (direct
+		// parent of the washington-dc city leaf) and depth 2 (parent
+		// of washington-dc-metro, which is itself a depth-1 parent).
+		// The recursive CTE's UNION dedupes on the full tuple including
+		// depth, so without the outer DISTINCT ON (id) in
+		// queries/lookup.sql the same region surfaces twice. Lock that
+		// behavior in.
+		counts := map[string]int{}
+		for _, s := range ancestrySlugs {
+			counts[s]++
+		}
+		for slug, n := range counts {
+			if n > 1 {
+				t.Errorf("DC 20017 ancestry contains %q %d times; want exactly once (DAG-diamond dedup regression)", slug, n)
+			}
+		}
+		// Place label: "Washington — Washington Metro" (broad = the
+		// us:metro ancestor; inner is empty because dc is sort 60, at
+		// the state-tier exclusion line in placeLabel).
+		if want := "Washington — Washington Metro"; got.ResolvedPlaceLabel != want {
+			t.Errorf("DC 20017 place label = %q, want %q", got.ResolvedPlaceLabel, want)
+		}
+	})
+
+	t.Run("gap-state ZIPs return graceful empty (Local + Regional both empty, no error)", func(t *testing.T) {
+		// Slice #7.6 documented 9 US states + 4 CA province/territory
+		// blocks as state-floor gaps (no demonstrably-active statewide
+		// advocacy org as of 2026-05-20). The /lookup contract for ZIPs
+		// in these regions is: 200 OK with empty Local + empty Regional
+		// — graceful empty, not an error and not a fallback to a
+		// national umbrella. This test locks in that contract.
+		//
+		// 82001 (Cheyenne, WY) anchors at cheyenne-wy-metro, walks up
+		// to wy. Neither node has any anchored org.
+		// X0A (Iqaluit-area FSA, NU) anchors directly at nu (no CMA
+		// in scope for NU). NU is a documented territory gap.
+		//
+		// If a future seed edit attaches an org to wy / cheyenne-wy-
+		// metro / nu (closing a gap), this test will fail and the
+		// orgs.toml `# gap` comment for that region needs to be
+		// removed in the same change.
+		cases := []struct {
+			name                 string
+			postal               string
+			country              atlas.Country
+			wantAncestryContains string
+		}{
+			{"WY (state-floor gap, metro→state walk)", "82001", atlas.CountryUS, "wy"},
+			{"NU (CA territory gap, direct anchor)", "X0A", atlas.CountryCA, "nu"},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				got, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: c.postal, Country: c.country})
+				if err != nil {
+					t.Fatalf("Lookup %s: %v", c.postal, err)
+				}
+				if len(got.Local) != 0 {
+					t.Errorf("Lookup %s: Local must be empty for gap state; got %v", c.postal, orgSlugList(got.Local))
+				}
+				if len(got.Regional) != 0 {
+					t.Errorf("Lookup %s: Regional must be empty for gap state; got %v", c.postal, orgSlugList(got.Regional))
+				}
+				// Distinguish "graceful empty for gap state" from "no
+				// leaf found at all" — confirm the ancestor walk
+				// actually reached the gap region.
+				ancestrySlugs := make(map[string]bool, len(got.ResolvedAncestry))
+				for _, r := range got.ResolvedAncestry {
+					ancestrySlugs[r.Slug] = true
+				}
+				if !ancestrySlugs[c.wantAncestryContains] {
+					t.Errorf("Lookup %s: ancestry must include %q to confirm gap-region walk happened; got %v",
+						c.postal, c.wantAncestryContains, keysOf(ancestrySlugs))
+				}
+			})
+		}
+	})
+}
+
+func firstSlug(rs []atlas.Region) string {
+	if len(rs) == 0 {
+		return ""
+	}
+	return rs[0].Slug
 }
 
 func slugSet(orgs []atlas.Org) map[string]bool {
@@ -356,7 +538,19 @@ func TestPipeline_PT_ValidationFixture(t *testing.T) {
 	// references US/CA region slugs that must exist or the org seed
 	// loader fails. The PT-specific assertions below only inspect PT
 	// state, so the additional US/CA load is just a no-op precondition.
-	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	// US load order: states → multistate → msas → us; cross-file parent
+	// references resolve via the loader's DB lookup fallback.
+	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_states.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_multistate.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_msas.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_provinces.toml"), "CA")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca_cmas.toml"), "CA")
 	must(err)
 	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_ca.toml"), "CA")
 	must(err)
@@ -575,5 +769,82 @@ func TestPipeline_NationalTierAncestor_FilteredByCTE(t *testing.T) {
 	if !all["leaf-spoke"] {
 		t.Errorf("leaf-spoke missing from default lookup; got Local=%v Regional=%v",
 			orgSlugList(res.Local), orgSlugList(res.Regional))
+	}
+}
+
+// TestPipeline_HUDBackfill_ZIP20811 is the integration regression for
+// slice #7.5.5. ZIP 20811 (a Bethesda P.O. Box covering NIH/Walter
+// Reed) is excluded from Census ZCTA, so a ZCTA-only postal pipeline
+// returns postal-code-not-found. The HUD backfill anchors it at
+// washington-dc-metro via Montgomery County, MD (FIPS 24031 → CBSA
+// 47900 → slug washington-dc-metro).
+//
+// This test does NOT rely on the operator having run `etl regenerate`
+// with real HUD data — that file is gitignored and HUDUser-gated. It
+// instead injects a synthetic postal_codes row pointing at the real
+// washington-dc-metro region (already loaded from regions_us_msas.toml)
+// so the Lookup → AncestorRegions → org-attachment path is exercised
+// end-to-end. Unit-level proof that the HUD parser + crosswalk
+// produce the right anchor for 20811 lives in
+// api/internal/etl/us/{hud,crosswalk}_test.go (golden cases).
+func TestPipeline_HUDBackfill_ZIP20811(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err := loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_states.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_multistate.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us_msas.toml"), "US")
+	must(err)
+	_, err = loadregions.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "regions_us.toml"), "US")
+	must(err)
+	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_us.csv"), atlas.CountryUS)
+	must(err)
+
+	// Pre-condition: 20811 must not currently be in the seed CSV.
+	// (If it ever is, this test loses its meaning — fail loudly so the
+	// fixture can be re-thought.)
+	var existing int
+	if err := store.Pool().QueryRow(ctx, `
+		SELECT COUNT(*) FROM postal_codes WHERE postal_code = '20811' AND country = 'US'
+	`).Scan(&existing); err != nil {
+		t.Fatalf("count 20811 pre-state: %v", err)
+	}
+	if existing != 0 {
+		t.Fatalf("pre-condition violated: 20811 is already in the seed (count=%d); this test assumes the slice #7.5.5 code shipped but the operator hasn't yet landed the regenerated postal_codes_us.csv diff", existing)
+	}
+
+	// Synthetic HUD-style row: 20811 → washington-dc-metro. This
+	// mirrors what `etl regenerate` with real HUD data on disk
+	// would produce; we inject it directly via SQL so the test
+	// doesn't depend on an account-gated upstream.
+	if _, err := store.Pool().Exec(ctx, `
+		INSERT INTO postal_codes (postal_code, country, leaf_region_id)
+		SELECT '20811', 'US', id FROM regions WHERE slug = 'washington-dc-metro' AND country = 'US'
+		ON CONFLICT (postal_code, country) DO UPDATE SET leaf_region_id = EXCLUDED.leaf_region_id
+	`); err != nil {
+		t.Fatalf("inject synthetic HUD anchor for 20811: %v", err)
+	}
+
+	res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "20811", Country: atlas.CountryUS})
+	if err != nil {
+		t.Fatalf("Lookup 20811: %v", err)
+	}
+	ancestrySlugs := make(map[string]bool, len(res.ResolvedAncestry))
+	for _, r := range res.ResolvedAncestry {
+		ancestrySlugs[r.Slug] = true
+	}
+	if !ancestrySlugs["washington-dc-metro"] {
+		t.Errorf("20811 ancestry missing washington-dc-metro; got %v", keysOf(ancestrySlugs))
 	}
 }
