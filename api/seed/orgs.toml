@@ -180,6 +180,24 @@ website_url = "https://betterstreetschi.org"
 tags = ["safe-streets", "advocacy", "grassroots"]
 region_slugs = ["chicago"]
 
+[[org]]
+slug = "commuters-take-action"
+name = "Commuters Take Action"
+short_desc = "Chicago transit-rider collective monitoring CTA reliability; publishes data, collects rider testimonials, testifies at board meetings, and organizes protests against the 22% rail and 5% bus service cuts since 2020."
+website_url = "https://www.ctaction.org"
+contact_url = "https://www.ctaction.org/contact-us/contact-form"
+tags = ["transit", "grassroots", "advocacy", "accountability"]
+region_slugs = ["chicago"]
+
+[[org]]
+slug = "chicago-bike-grid-now"
+name = "Chicago, Bike Grid Now!"
+short_desc = "Chicago grassroots cycling advocacy group mobilizing for 450 miles of cyclist- and pedestrian-prioritized roads; fights to rectify inequitable infrastructure distribution to the South and West Sides via traffic calming and lower speed limits."
+website_url = "https://bikegridnow.org"
+contact_url = "https://bikegridnow.org/contact-us/"
+tags = ["cycling", "safe-streets", "advocacy", "grassroots", "equity"]
+region_slugs = ["chicago"]
+
 # --- Baltimore ---
 
 [[org]]
