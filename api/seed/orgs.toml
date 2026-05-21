@@ -370,6 +370,15 @@ website_url = "https://www.5thsqadvocacy.org"
 tags = ["transit", "urbanism", "political", "advocacy", "policy"]
 region_slugs = ["philadelphia-pa-metro"]
 
+[[org]]
+slug = "clean-air-council"
+name = "Clean Air Council"
+short_desc = "Philadelphia-based environmental nonprofit running the city's biking/walking advocacy programs; sponsors Feet First Philly (pedestrian advocacy), operates GoPhillyGo trip planner, and works the High Injury Network corridors and Cobbs Creek Trail expansion."
+website_url = "https://cleanair.org"
+contact_url = "https://cleanair.org/contact-us/"
+tags = ["cycling", "walking", "transit", "safe-streets", "vision-zero", "advocacy", "policy"]
+region_slugs = ["philadelphia-pa-metro"]
+
 # --- Atlanta ---
 
 [[org]]
