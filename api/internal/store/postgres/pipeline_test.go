@@ -773,20 +773,20 @@ func TestPipeline_NationalTierAncestor_FilteredByCTE(t *testing.T) {
 }
 
 // TestPipeline_HUDBackfill_ZIP20811 is the integration regression for
-// slice #7.5.5. ZIP 20811 (a Bethesda P.O. Box covering NIH/Walter
-// Reed) is excluded from Census ZCTA, so a ZCTA-only postal pipeline
-// returns postal-code-not-found. The HUD backfill anchors it at
-// washington-dc-metro via Montgomery County, MD (FIPS 24031 → CBSA
-// 47900 → slug washington-dc-metro).
+// the slice #7.5.5 HUD backfill. ZIP 20811 (a Bethesda P.O. Box
+// covering NIH/Walter Reed) is excluded from Census ZCTA, so a
+// ZCTA-only postal pipeline returns postal-code-not-found. The HUD
+// backfill anchors it at washington-dc-metro via Montgomery County,
+// MD (FIPS 24031 → CBSA 47900 → slug washington-dc-metro).
 //
-// This test does NOT rely on the operator having run `etl regenerate`
-// with real HUD data — that file is gitignored and HUDUser-gated. It
-// instead injects a synthetic postal_codes row pointing at the real
-// washington-dc-metro region (already loaded from regions_us_msas.toml)
-// so the Lookup → AncestorRegions → org-attachment path is exercised
-// end-to-end. Unit-level proof that the HUD parser + crosswalk
-// produce the right anchor for 20811 lives in
-// api/internal/etl/us/{hud,crosswalk}_test.go (golden cases).
+// This test loads the real committed seed (which now includes HUD
+// backfill rows) and verifies 20811 resolves to washington-dc-metro
+// end-to-end. If an operator regenerates `postal_codes_us.csv`
+// without the HUD source file staged (silent-skip path in
+// internal/etl/us/us.go), 20811 disappears from the seed and this
+// test fails — turning the silent ETL skip into a loud test failure.
+// Unit-level proof that the HUD parser + crosswalk produce the right
+// anchor lives in api/internal/etl/us/{hud,crosswalk}_test.go.
 func TestPipeline_HUDBackfill_ZIP20811(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
@@ -811,29 +811,14 @@ func TestPipeline_HUDBackfill_ZIP20811(t *testing.T) {
 	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_us.csv"), atlas.CountryUS)
 	must(err)
 
-	// Pre-condition: 20811 must not currently be in the seed CSV.
-	// (If it ever is, this test loses its meaning — fail loudly so the
-	// fixture can be re-thought.)
-	var existing int
+	var loaded int
 	if err := store.Pool().QueryRow(ctx, `
 		SELECT COUNT(*) FROM postal_codes WHERE postal_code = '20811' AND country = 'US'
-	`).Scan(&existing); err != nil {
-		t.Fatalf("count 20811 pre-state: %v", err)
+	`).Scan(&loaded); err != nil {
+		t.Fatalf("count 20811 in loaded seed: %v", err)
 	}
-	if existing != 0 {
-		t.Fatalf("pre-condition violated: 20811 is already in the seed (count=%d); this test assumes the slice #7.5.5 code shipped but the operator hasn't yet landed the regenerated postal_codes_us.csv diff", existing)
-	}
-
-	// Synthetic HUD-style row: 20811 → washington-dc-metro. This
-	// mirrors what `etl regenerate` with real HUD data on disk
-	// would produce; we inject it directly via SQL so the test
-	// doesn't depend on an account-gated upstream.
-	if _, err := store.Pool().Exec(ctx, `
-		INSERT INTO postal_codes (postal_code, country, leaf_region_id)
-		SELECT '20811', 'US', id FROM regions WHERE slug = 'washington-dc-metro' AND country = 'US'
-		ON CONFLICT (postal_code, country) DO UPDATE SET leaf_region_id = EXCLUDED.leaf_region_id
-	`); err != nil {
-		t.Fatalf("inject synthetic HUD anchor for 20811: %v", err)
+	if loaded == 0 {
+		t.Fatal("20811 missing from postal_codes after seed load; HUD backfill dropped out of api/seed/postal_codes_us.csv (operator regenerated without etl/sources/us/hud_zip_county_*.csv staged?)")
 	}
 
 	res, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: "20811", Country: atlas.CountryUS})

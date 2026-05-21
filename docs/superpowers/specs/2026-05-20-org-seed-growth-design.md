@@ -27,12 +27,15 @@ The slice stays editorial — no engineering changes, no schema
 migrations, no loader changes. `seed.LoadFile` already upserts orgs
 keyed on `region_slugs`; this slice fills the table.
 
-## Two coverage gates
+## Coverage gates
 
 | Gate | Floor | Anchor |
 |---|---|---|
 | **State / province floor** | ≥1 org per US state + ≥1 per CA province | Org attached at the state/province region directly |
-| **Top-30 metro gate** | ≥1 org per metro in the 25 US + 5 CA canvas | Org at the metro/MSA/CMA level, or city leaf if municipal |
+| **Top-20 metro gate** | ≥3 orgs per metro in the top-20 canvas | Orgs at the metro/MSA/CMA level, or city leaf if municipal |
+| **Top-21–30 metro gate** | ≥1 org per metro in the 21–30 canvas | Org at the metro/MSA/CMA level, or city leaf if municipal |
+
+> Raised from ≥1 to ≥3 for the top 20 metros in slice 7.7 (2026-05-21).
 
 - **Per-metro depth:** 1–3 new orgs per metro is the typical target;
   no hard cap. Existing metros (NYC at 5, others at 1–2) keep their
@@ -48,8 +51,51 @@ keyed on `region_slugs`; this slice fills the table.
 ## Activity bar
 
 Any one of — site updated / blog or news post / social post / event —
-within the last 12 months as of the verification date. Maintainer
-spot-checks each candidate during the review pass.
+within the last 12 months as of the verification date. Acceptable
+surfaces: the org's own website (blog, news, statements, events,
+press), the org's owned social-media account, the org's mailing list
+or newsletter, or a known third-party platform the org owns its
+presence on (e.g., Action Network campaign page, Instagram). External
+press alone is NOT sufficient — chapters and grassroots groups whose
+own surfaces have stale content fail this bar even when external
+coverage exists. Maintainer spot-checks each candidate during the
+review pass.
+
+## Scope precedents (locked in slice 7.7)
+
+The slice 7.6 + 7.7 editorial passes admitted several org shapes that
+warrant explicit precedents for future passes:
+
+- **Public-agency oversight bodies.** Legislatively-created bodies
+  that publish independent oversight of a transit/streets operator
+  (e.g., MBTA Advisory Board, M.G.L. ch. 161A § 7) are admitted when
+  they maintain their own public-facing oversight work distinct from
+  the agency they oversee. City-internal advisory committees inside
+  the operating agency (e.g., Phoenix Vision Zero Community Advisory
+  Committee, PSTA TRAC) are NOT admitted — they sit inside an agency,
+  not outside it.
+- **Multi-issue 501(c)(3)s with named transit/safe-streets programs.**
+  Orgs whose primary mission is broader (disability rights, Center
+  for Independent Living, etc.) but which run a named, ongoing,
+  substantial transit/streets advocacy program are admitted (e.g.,
+  Detroit Disability Power; Paraquad's S.M.A.R.T. coalition). The
+  named-program test distinguishes these from generic civic groups
+  where transit is one of many incidental topics.
+- **Publication/advocacy hybrid 501(c)(3)s.** 501(c)(3) publications
+  whose programming extends beyond pure publishing — into events,
+  campaigns, or organized advocacy — are admitted (e.g., Streets.mn).
+  Pure publications without programming arms (NextSTL; Streetsblog
+  regional sub-sites that are publishing-only) are NOT admitted.
+- **Chapter / affiliate organizations.** Chapters of a parent 501(c)(3)
+  without independent incorporation (e.g., SAFE Inland Empire as a
+  chapter of SAFE LA; Sierra Club regional chapters) are NOT
+  separately admitted unless the chapter has its own 501(c)(3) status,
+  its own dated content on its own site, AND substantive editorial
+  independence. Otherwise the parent already covers the geography via
+  its primary anchor.
+
+These precedents do not relax the activity bar — each admitted org
+must still show dated 12-month activity on its own website.
 
 ## Empty-state policy
 
@@ -65,11 +111,16 @@ SD, MS, AK; CA territories YT, NT, NU; possibly PR.
 
 ## Metro fallback
 
-If a top-30 metro has no quality local org, the state-level org
-satisfies the gate via ancestor walk for ZIPs in that metro. If even
-state-level coverage would be empty, swap the metro for the
-next-ranked metro with organizers and note the swap in the spec
-under "Canvas adjustments."
+If a top-30 metro has no quality local org meeting the activity bar,
+the state-level org satisfies the gate via ancestor walk for ZIPs in
+that metro. If even state-level coverage would be empty, swap the
+metro for the next-ranked metro with organizers and note the swap in
+the spec under "Canvas adjustments."
+
+For the top-20 metros under slice 7.7's raised ≥3 floor, a documented
+gap (e.g., "third-org gap researched YYYY-MM-DD") in `orgs.toml` is
+the editorial answer when only 1–2 quality candidates exist; padding
+the slate with dormant or out-of-scope entries is explicitly rejected.
 
 ## Top-30 metro canvas
 
@@ -306,7 +357,14 @@ cover the loader + lookup paths; they fail at `pg-reset` time if any
   exists or gets added, its empty-state UI for gap states is its own
   slice.
 - **Tag taxonomy lockdown.** Open vocabulary preserved; controlled
-  taxonomy is a v1.1+ refinement.
+  taxonomy is a v1.1+ refinement. Slice #7.7 (incl. followup pass)
+  introduced new tag values: `oversight`, `rider-union`,
+  `accountability`, `media`, `land-use`, `accessibility`, `paratransit`,
+  `walkability`. Future lockdown should normalize these against
+  existing tags (e.g., `walkability` vs `walking`, `media` vs an
+  implicit "publication" facet) and decide whether org-shape facets
+  (`oversight`, `rider-union`) belong in the tag namespace or a
+  separate field.
 - **Per-org `verified_at` field on the schema.** Global header
   comment is enough for now.
 - **ES expansion** — slice 4.7 territory.
@@ -328,6 +386,46 @@ during the editorial pass.)
   Texas state-floor org (BikeTexas) through ancestor walk for SA ZIPs.
   Worth revisiting if a maintainer with local knowledge surfaces an
   active SA advocacy group.
+
+### Top-20 metro third-org gaps (slice 7.7, 2026-05-21)
+
+- **Miami (US #8)** — Transit Alliance Miami and Bike Walk Coral Gables
+  bring `miami`/`greater-miami` to 2 metro-level orgs. Healthy Little
+  Havana's transit work (Little Havana Moves) is partner-only with
+  Transit Alliance and has no independent active web presence; Bike
+  Miami (Friendship Circle) is a fundraising-events org, not advocacy.
+  Florida Bicycle Association (state-floor) covers the metro via the
+  ancestor walk for `fl`.
+- **Inland Empire (US #13)** — Inland Empire Biking Alliance and
+  Friends of CV Link bring `riverside-ca-metro` to 2 metro-level orgs.
+  SAFE Inland Empire (safe-ie.org) is the strongest borderline candidate
+  but operates as a chapter of SAFE LA's 501(c)(3) — not independently
+  incorporated — and its own website carries 2023-vintage statistics
+  with no 2026-dated content on the org's own site (external press
+  in The Breeze 2026-01-18 exists). Inland Empire Urbanists has no
+  dedicated website, only a Google Form. CCAEJ, PC4EJ, and El Sol
+  Neighborhood Educational Center are environmental-justice /
+  community-health orgs whose transit/streets work is adjacent rather
+  than central. Californians for Electric Rail and The Transit
+  Coalition are LA- or statewide-anchored groups that parachute into
+  IE campaigns rather than IE-anchored advocacy. Calbike (state-floor)
+  covers the metro via the ancestor walk for `ca-state`. Worth
+  revisiting if SAFE-IE incorporates independently or refreshes its
+  site, or if Inland Empire Urbanists stands up a real website.
+- **Tampa (US #18)** — Walk Bike Tampa remains the only metro-anchored
+  org meeting the activity bar. Tampa BayCycle has TLS errors;
+  TBARTA dissolved December 31 2023; Sierra Club Tampa Bay's transit
+  page is dormant; PSTA TRAC is an internal committee; onbikes /
+  Bikes For Christ are bike-redistribution not advocacy. Florida
+  Bicycle Association (state-floor) covers the metro via the ancestor
+  walk for `fl`.
+- **Denver (US #19)** — Denver Streets Partnership and Greater Denver
+  Transit are the two clear metro-level advocacy nonprofits. Mile High
+  Connects closed January 2022; Streetsblog Denver shut down at the
+  end of January 2022 (operated by DSP); Denver Bicycle Lobby's site
+  is 2023-vintage with no current meeting date; Community Cycles is
+  Boulder-anchored; Bikes Together is a community bike shop. Bicycle
+  Colorado (state-floor) covers the metro via the ancestor walk.
 
 ### State floor gaps (documented; ZIPs in these states will return empty)
 
