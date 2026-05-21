@@ -474,6 +474,22 @@ website_url = "https://www.friendsoftransit.org"
 tags = ["transit", "advocacy", "education", "rail"]
 region_slugs = ["phoenix-az-metro"]
 
+[[org]]
+slug = "urban-phoenix-project"
+name = "Urban Phoenix Project"
+short_desc = "All-volunteer Phoenix urbanism nonprofit campaigning for protected bike lanes, transit expansion, parking reform, and an end to reverse-lane arterials; hosts urbanist talks, street cleanups, and Park(ing) Day."
+website_url = "https://www.urbanphoenixproject.org"
+tags = ["transit", "cycling", "safe-streets", "walkability", "advocacy"]
+region_slugs = ["phoenix-az-metro"]
+
+[[org]]
+slug = "tempe-bicycle-action-group"
+name = "Tempe Bicycle Action Group"
+short_desc = "Tempe 501(c)(3) cycling-advocacy nonprofit (TBAG) working with the City of Tempe on Vision Zero, Baseline Road safety, and the Capital Improvements Program; runs Open Streets Tempe and the annual Bike Month programming."
+website_url = "https://www.biketempe.org"
+tags = ["cycling", "advocacy", "safe-streets", "vision-zero"]
+region_slugs = ["phoenix-az-metro"]
+
 # --- Riverside-San Bernardino (Inland Empire) ---
 
 [[org]]
