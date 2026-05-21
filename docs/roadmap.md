@@ -140,7 +140,7 @@ the plan is the *design* view.
   spec: `docs/superpowers/specs/2026-05-20-org-seed-growth-design.md`.
 - **Top-20 metro depth pass (slice #7.7):** Raised the metro gate to
   ≥3 orgs per top-20 metro (top-21–30 stays at ≥1). Boston gets the
-  showcase treatment at 4 metro orgs (TransitMatters, LivableStreets,
+  showcase treatment at 5 metro orgs (TransitMatters, LivableStreets,
   Boston Cyclists Union, A Better City, MBTA Advisory Board) plus
   WalkMassachusetts at the state floor. LA, Chicago, Dallas, Houston,
   Philadelphia, Atlanta, SF Bay, Seattle, and Minneapolis lift to ≥3
@@ -228,7 +228,7 @@ The rows remain in the tables below for traceability.
 | 7.5.4 | **CA CMAs + 1,643 FSA postal codes** *(shipped)* | New `internal/etl/ca` package parses the StatsCan FSA + CMA boundary file DBF tables (extracted from the boundary zips inside the ETL; shapefile geometry ignored). Generates `regions_ca_cmas.toml` (41 CMAs filtered to type='B', with overrides for toronto-cma/montreal-cma/metro-vancouver/ottawa-gatineau-cma) and `postal_codes_ca.csv` (1,643 rows). FSA→CMA mapping uses a coarse FSA-prefix table (M, L1/3/4/5/6 → Toronto; H → Montréal; V5-7 → Vancouver; K1-2 + J8-9 → Ottawa-Gatineau; T2-3 → Calgary; T5-6 → Edmonton; L8-9 → Hamilton) in lieu of the restricted-licence PCCF. Minimal stdlib-only DBF reader; Latin-1 → UTF-8 decoding for accented CMA names. Anchor distribution: 10 city-leaf, 522 CMA, 1111 province. Closes #7.5. |
 | 7.5.5 | **Non-ZCTA ZIP fallback** | Census ZCTA excludes P.O. Box-only ZIPs, single-building ZIPs, and APO/FPO ZIPs — so `/lookup?postal_code=20811` (Bethesda P.O. Box) returns `postal-code-not-found` today. Add HUD's quarterly USPS ZIP Code Crosswalk as a second US ETL source; emit fallback rows only for ZIPs absent from ZCTA. Preference order: HUD-supplied CBSA → curated county leaf if one exists → state floor. For 20811: HUD maps to Montgomery County MD inside CBSA 47900 → anchors at `washington-dc-metro`. Pin HUD vintage in `etl/SOURCES.md`; integration-test regression on 20811. CA likely needs no equivalent — FSA-prefix → province fallback in #7.5.4 already covers P.O. Box FSAs. Update [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md) §Out-of-coverage UX to describe the two-source pipeline. |
 | 7.6 | **Seed data growth** | Expand `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to the planned **~100–120** across the supported countries via two independent coverage gates: a **universal state/province floor** (every US state + every CA province has ≥1 org or a documented `# gap`) plus a **top-30 metro gate** (25 US CBSAs + 5 CA CMAs each get ≥1 org). Editorial work, not engineering. Design spec: [`docs/superpowers/specs/2026-05-20-org-seed-growth-design.md`](./superpowers/specs/2026-05-20-org-seed-growth-design.md). |
-| 7.7 | **Top-20 metro depth pass** | Brings Boston to 4–6 orgs (showcase) and lifts LA, Miami, Seattle, Tampa, Chicago, SF, Dallas, Houston, Philly, Denver, Minneapolis to ≥3 metro-level orgs each. Updates the 7.6 design-spec gate language. Editorial work, not engineering. |
+| 7.7 | **Top-20 metro depth pass** | Brings Boston to 4–6 orgs (showcase) and lifts each top-20 metro to ≥3 metro-level orgs or a documented third-org gap. Updates the 7.6 design-spec gate language. Editorial work, not engineering. |
 
 ## Frontend (React + Vite)
 
