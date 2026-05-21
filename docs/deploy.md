@@ -181,6 +181,16 @@ flyctl secrets set \
 it has closed, re-`export` it from your password manager before
 running this block.
 
+> **Paste hazard:** if you paste the `flyctl secrets set ...` block
+> from a wrapped terminal into fish/zsh, soft-wrap or a stray `\`
+> can land a literal newline inside the `DATABASE_URL` value. The
+> migration step then errors with
+> `parse db url: ... invalid control character in URL`. To avoid:
+> assemble `DATABASE_URL` into a shell variable first (`set DB_URL
+> "postgres://..."` in fish; `DB_URL="postgres://..."` in bash),
+> echo it to confirm it's a single line of the expected length,
+> then pass `"DATABASE_URL=$DB_URL"` as a single quoted argument.
+
 `URBANIST_ADMIN_TOKEN` is pre-staged for Phase 2 (no-op until admin
 endpoints land). `URBANIST_CLIENT_SECRET` is read by the slice-#23
 `X-Atlas-Client` middleware and must match the
