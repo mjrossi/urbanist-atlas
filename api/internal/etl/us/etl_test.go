@@ -195,21 +195,21 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 	// in that order. We seed one ZCTA per bucket plus one that should
 	// short-circuit to "unknown".
 	zctaPlace := map[string]ZCTAPlace{
-		"10001": {PlaceGEOID: "3651000"},     // NYC city — not in placeToLeaf, falls through
-		"02115": {PlaceGEOID: "2507000"},     // Boston city → city-leaf
-		"60601": {PlaceGEOID: "1714000"},     // Chicago city → city-leaf (also Cook County)
-		"60002": {PlaceGEOID: "1700000"},     // unknown place → fall through to county
-		"99999": {PlaceGEOID: "0000000"},     // unknown both → unknown bucket
-		"39580": {PlaceGEOID: "3754860"},     // Raleigh (not curated) → fall through to MSA
+		"10001": {PlaceGEOID: "3651000"}, // NYC city — not in placeToLeaf, falls through
+		"02115": {PlaceGEOID: "2507000"}, // Boston city → city-leaf
+		"60601": {PlaceGEOID: "1714000"}, // Chicago city → city-leaf (also Cook County)
+		"60002": {PlaceGEOID: "1700000"}, // unknown place → fall through to county
+		"99999": {PlaceGEOID: "0000000"}, // unknown both → unknown bucket
+		"39580": {PlaceGEOID: "3754860"}, // Raleigh (not curated) → fall through to MSA
 	}
 	zctaCounty := map[string]ZCTACounty{
-		"10001": {CountyGEOID: "36061"},      // Manhattan → nyc-borough
-		"02115": {CountyGEOID: "25025"},      // Suffolk County, MA
-		"60601": {CountyGEOID: "17031"},      // Cook County — but place-leaf wins
-		"60002": {CountyGEOID: "17031"},      // Cook County → county-leaf
-		"39580": {CountyGEOID: "37183"},      // Wake County, NC → MSA
+		"10001": {CountyGEOID: "36061"}, // Manhattan → nyc-borough
+		"02115": {CountyGEOID: "25025"}, // Suffolk County, MA
+		"60601": {CountyGEOID: "17031"}, // Cook County — but place-leaf wins
+		"60002": {CountyGEOID: "17031"}, // Cook County → county-leaf
+		"39580": {CountyGEOID: "37183"}, // Wake County, NC → MSA
 		// 99999 has no county row.
-		"82001": {CountyGEOID: "56021"},      // Cheyenne, WY → state fallback
+		"82001": {CountyGEOID: "56021"}, // Cheyenne, WY → state fallback
 	}
 	countyToMSA := map[string]string{
 		"25025": "14460", // Boston MSA

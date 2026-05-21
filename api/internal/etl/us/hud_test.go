@@ -66,6 +66,32 @@ func TestParseHUDZipCounty_MalformedNumericRejected(t *testing.T) {
 	}
 }
 
+func TestParseHUDZipCounty_LeftPadsLeadingZeros(t *testing.T) {
+	// Defends against an operator round-tripping the HUD CSV through
+	// Excel, which silently coerces ZIP / COUNTY strings to ints and
+	// drops leading zeros ("00601" → "601", "01001" → "1001"). The
+	// parser must restore them so downstream lookups don't mis-anchor
+	// Puerto Rico (state FIPS "72") and New England (state FIPS "01"
+	// through "09") ZIPs.
+	fixture := `"ZIP","COUNTY","RES_RATIO","BUS_RATIO","OTH_RATIO","TOT_RATIO"
+"601","72001","0.95","0.03","0.02","0.95"
+"1001","25013","1.00","1.00","1.00","1.00"
+`
+	got, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	if err != nil {
+		t.Fatalf("ParseHUDZipCounty: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0].ZIP != "00601" || got[0].County != "72001" {
+		t.Errorf("row 0 = (%q,%q), want (\"00601\",\"72001\")", got[0].ZIP, got[0].County)
+	}
+	if got[1].ZIP != "01001" || got[1].County != "25013" {
+		t.Errorf("row 1 = (%q,%q), want (\"01001\",\"25013\")", got[1].ZIP, got[1].County)
+	}
+}
+
 func TestParseHUDZipCounty_TrimsTrailingWhitespace(t *testing.T) {
 	fixture := "\"ZIP\",\"COUNTY\",\"RES_RATIO\",\"BUS_RATIO\",\"OTH_RATIO\",\"TOT_RATIO\"\n" +
 		"\"20811 \",\"24031 \",\"0.000\",\"0.999\",\"0.001\",\"0.999\"\n"

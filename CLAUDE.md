@@ -176,9 +176,15 @@ See the plan for the full schema, but at a glance:
   `postal_codes_<cc>.csv` by the ETL pipeline; the lookup SQL is
   unchanged across tiers (the recursive CTE in
   `api/internal/store/postgres/queries/lookup.sql` walks ancestors of
-  whatever region the postal code points at). See
+  whatever region the postal code points at). The **US pipeline runs
+  two sources**: Census ZCTA crosswalks (primary, ~33,700 ZIPs with
+  city-leaf precision where curated) and HUD's quarterly USPS
+  ZIP-County crosswalk (additive backfill for the ~9k operational
+  ZIPs Census omits — P.O. Box-only, single-building, APO/FPO).
+  See
   [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./docs/superpowers/specs/2026-05-19-postal-coverage-design.md)
-  for the smallest-anchor design rationale and editorial conventions.
+  for the smallest-anchor design rationale, two-source merge, and
+  editorial conventions.
 - `organizations` join many-to-many to `regions` via
   `organization_regions`; an org can attach to any node in the graph.
 - `submissions` for the public submission queue, with bearer-token-

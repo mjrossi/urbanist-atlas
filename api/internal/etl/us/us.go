@@ -1,6 +1,9 @@
 // Package us implements the United States ETL plan for the urbanist
-// atlas postal-coverage pipeline (slice #7.5.3). It reads three Census
-// Bureau reference files staged under etl/sources/us/:
+// atlas postal-coverage pipeline (slices #7.5.3 + #7.5.5). It reads
+// upstream reference files staged under etl/sources/us/ from two
+// complementary sources:
+//
+// Census Bureau (primary — slice #7.5.3):
 //
 //   - list1_2023.csv             — CBSA delineation (xlsx → CSV via
 //     etl/scripts/xlsx_to_csv.py;
@@ -8,11 +11,19 @@
 //   - tab20_zcta520_place20_natl.txt  — ZCTA-to-place crosswalk
 //   - tab20_zcta520_county20_natl.txt — ZCTA-to-county crosswalk
 //
-// and produces two deterministic seed files under api/seed/:
+// HUD (additive backfill — slice #7.5.5):
+//
+//   - hud_zip_county_<vintage>.csv — USPS ZIP-to-County crosswalk
+//     covering operational ZIPs Census ZCTA omits (P.O. Box-only,
+//     single-building, APO/FPO). Optional — the orchestrator
+//     gracefully degrades to ZCTA-only when the file is absent.
+//
+// It produces two deterministic seed files under api/seed/:
 //
 //   - regions_us_msas.toml       — one [[region]] per Metropolitan
 //     Statistical Area
-//   - postal_codes_us.csv        — ZIP → smallest-curated-anchor slug
+//   - postal_codes_us.csv        — ZIP → smallest-curated-anchor slug,
+//     merged from ZCTA + HUD passes
 //
 // Importing the package (or blank-importing it, as cmd/server/etl.go
 // does) registers the US plan with etl.Plans via init().
@@ -164,16 +175,14 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 			return err
 		}
 		logger.Info("etl us: parsed HUD ZIP-County", "rows", len(huds), "path", hudPath)
-		hudAnchors = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug)
-		for _, a := range hudAnchors {
-			hudReasons[a.Reason]++
-		}
+		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug)
 		logger.Info(fmt.Sprintf("etl us: hud backfill: added %d anchors across %+v", len(hudAnchors), hudReasons),
 			"added", len(hudAnchors),
 			"borough_count", hudReasons["hud:nyc-borough"],
 			"county_leaf_count", hudReasons["hud:county-leaf"],
 			"msa_count", hudReasons["hud:msa"],
 			"state_count", hudReasons["hud:state"],
+			"unknown_count", hudReasons["hud:unknown"],
 		)
 	}
 
