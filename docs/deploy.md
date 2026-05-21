@@ -599,6 +599,17 @@ root, which `initdb` refuses to write into. The fix is in
 the mount root). If you ever see this error after a config change,
 confirm `PGDATA` is still pointed at the subdir.
 
+**DB machine boot-loops with `mkdir: can't create directory '/var/lib/postgresql/data/pgdata': Permission denied`.**
+PGDATA is correctly pointed at a subdirectory, but Fly mounts volumes
+as `root:root mode 0755` and the upstream `postgres:17-alpine`
+entrypoint demotes to the `postgres` user before doing the mkdir.
+The fix is the thin wrapper at `infra/postgres/Dockerfile` +
+`infra/postgres/entrypoint-fly.sh`, which runs as root, pre-creates
+the PGDATA subdir + chowns the mount root to `postgres`, then exec's
+`docker-entrypoint.sh`. If you ever see this error, confirm
+`infra/postgres/fly.toml` has `[build] dockerfile = "Dockerfile"`
+(not `image = "postgres:17-alpine"` — that bypasses the wrapper).
+
 **Need to inspect production data.**
 `flyctl ssh console -a urbanist-atlas-db -C "psql -U urbanist
 urbanist_atlas"` opens a `psql` session against the DB.

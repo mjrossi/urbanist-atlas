@@ -7,7 +7,10 @@ app = 'urbanist-atlas-db'
 primary_region = 'iad'
 
 [build]
-  image = 'postgres:17-alpine'
+  # Builds infra/postgres/Dockerfile (a thin wrapper over
+  # postgres:17-alpine; see that file's header for why). The build
+  # context defaults to the directory containing this fly.toml.
+  dockerfile = 'Dockerfile'
 
 [env]
   POSTGRES_DB = 'urbanist_atlas'

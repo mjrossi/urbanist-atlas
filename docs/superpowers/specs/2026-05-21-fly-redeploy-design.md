@@ -203,7 +203,9 @@ app = "urbanist-atlas-db"
 primary_region = "iad"
 
 [build]
-  image = "postgres:17-alpine"
+  # See infra/postgres/Dockerfile + entrypoint-fly.sh for why we wrap
+  # postgres:17-alpine instead of using it directly.
+  dockerfile = "Dockerfile"
 
 [env]
   POSTGRES_DB = "urbanist_atlas"
