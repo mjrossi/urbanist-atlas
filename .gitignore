@@ -62,3 +62,8 @@ etl/sources/
 *.bak
 *.orig
 *.rej
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
