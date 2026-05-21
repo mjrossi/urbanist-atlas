@@ -1,0 +1,93 @@
+name: backup-postgres
+
+# Nightly logical backup of urbanist-atlas-db to Cloudflare R2.
+# Combined with Fly's daily volume snapshots (5-day retention), this
+# gives us off-Fly durability + a deterministic pg_restore path.
+#
+# Design doc: docs/superpowers/specs/2026-05-21-fly-deploy-design.md §Backups
+# On-demand local snapshots: `just db-backup` (no R2 upload).
+#
+# Required repo secrets:
+#   FLY_API_TOKEN          — `flyctl auth token` from a maintainer account
+#   CF_ACCOUNT_ID          — Cloudflare account id (the R2 endpoint hostname)
+#   R2_ACCESS_KEY_ID       — R2 access key with read/write on the bucket
+#   R2_SECRET_ACCESS_KEY   — paired secret
+#
+# R2 bucket: `urbanist-atlas-backups` with a 30-day lifecycle rule
+# configured in the Cloudflare dashboard. This workflow uploads only;
+# R2 handles expiration.
+
+on:
+  schedule:
+    # 02:00 America/New_York ≈ 07:00 UTC year-round (DST shifts by an
+    # hour but a logical backup at 06:00 or 07:00 ET is equally fine
+    # for a dogfood window).
+    - cron: "0 7 * * *"
+  # Manual trigger for first-run verification + on-demand snapshots
+  # from the Actions tab.
+  workflow_dispatch:
+
+concurrency:
+  group: backup-postgres
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: pg_dump → R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Resolve dump filename
+        id: filename
+        run: |
+          # Date-only key so a same-day re-run overwrites rather than
+          # accumulates. If we ever want hourly granularity, switch to
+          # `date -u +%Y-%m-%dT%H%M%SZ`.
+          echo "name=$(date -u +%Y-%m-%d).sql.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Capture pg_dump from Fly Postgres
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          # `flyctl ssh console -C` runs the command in the DB
+          # container and streams stdout back. pg_dump | gzip inside
+          # the container minimizes bytes over the SSH tunnel.
+          flyctl ssh console \
+            -a urbanist-atlas-db \
+            -C "sh -c 'pg_dump -U urbanist urbanist_atlas | gzip -c'" \
+            > "${{ steps.filename.outputs.name }}"
+          # Sanity: refuse to upload an empty file (a silent pg_dump
+          # failure would otherwise quietly clobber a real backup if
+          # the workflow re-ran later in the day).
+          test -s "${{ steps.filename.outputs.name }}"
+          ls -lh "${{ steps.filename.outputs.name }}"
+
+      - name: Upload to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: |
+          set -euo pipefail
+          # ubuntu-latest ships awscli v1; --endpoint-url is the
+          # standard R2 S3-API surface. CF_ACCOUNT_ID is the
+          # subdomain prefix on r2.cloudflarestorage.com.
+          aws s3 cp \
+            "${{ steps.filename.outputs.name }}" \
+            "s3://urbanist-atlas-backups/${{ steps.filename.outputs.name }}" \
+            --endpoint-url "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+
+      - name: Summary
+        run: |
+          echo "### Backup uploaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "- file: \`${{ steps.filename.outputs.name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- bucket: \`urbanist-atlas-backups\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- retention: 30 days (R2 bucket lifecycle rule)" >> "$GITHUB_STEP_SUMMARY"
