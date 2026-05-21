@@ -27,7 +27,7 @@ The slice stays editorial — no engineering changes, no schema
 migrations, no loader changes. `seed.LoadFile` already upserts orgs
 keyed on `region_slugs`; this slice fills the table.
 
-## Two coverage gates
+## Coverage gates
 
 | Gate | Floor | Anchor |
 |---|---|---|
