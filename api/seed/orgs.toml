@@ -518,6 +518,14 @@ website_url = "https://detroitgreenways.org"
 tags = ["cycling", "walking", "advocacy", "greenways", "safe-streets"]
 region_slugs = ["detroit-mi-metro"]
 
+[[org]]
+slug = "detroit-disability-power"
+name = "Detroit Disability Power"
+short_desc = "Detroit grassroots organization building political power for disabled Detroiters since 2018; transit and mobility is one of four primary policy agendas, with wins on DDOT funding, bus-stop shelters, and same-day paratransit."
+website_url = "https://www.detroitdisabilitypower.org"
+tags = ["transit", "accessibility", "advocacy", "safe-streets", "paratransit"]
+region_slugs = ["detroit-mi-metro"]
+
 # --- Minneapolis-St. Paul ---
 
 [[org]]
