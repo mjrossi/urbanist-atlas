@@ -123,7 +123,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 
 	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, cbsaToSlug)
 	csvPath := filepath.Join(outDir, "postal_codes_us.csv")
-	if err := writeCSV(csvPath, anchors); err != nil {
+	if err := writeCSV(csvPath, anchors, nil); err != nil {
 		return err
 	}
 	logger.Info("etl us: wrote postal codes", "path", csvPath, "count", len(anchors), "by_reason", fmt.Sprintf("%+v", reasons))
@@ -167,11 +167,11 @@ func writeMSAs(path string, msas []MSA, assignments map[string]MSAOverride) erro
 	return WriteMSAsTOML(f, msas, assignments)
 }
 
-func writeCSV(path string, anchors []PostalAnchor) error {
+func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("etl us: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WritePostalCodesCSV(f, anchors)
+	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors)
 }

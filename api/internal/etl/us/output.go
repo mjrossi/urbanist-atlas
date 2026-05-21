@@ -278,14 +278,38 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 
 // WritePostalCodesCSV emits the postal_codes_us.csv file
 // deterministically: rows sorted by postal_code ASC, LF line endings,
-// trailing newline.
-func WritePostalCodesCSV(w io.Writer, anchors []PostalAnchor) error {
-	sort.Slice(anchors, func(i, j int) bool { return anchors[i].ZCTA < anchors[j].ZCTA })
+// trailing newline. Accepts two anchor sources — the primary ZCTA
+// pass (slice #7.5.3) and the HUD non-ZCTA backfill (slice #7.5.5) —
+// and merges them with ZCTA winning any (country, postal_code) tie.
+// Pass nil or an empty slice for hudAnchors when running without HUD
+// data; the output reduces to ZCTA-only in that case, matching the
+// pre-#7.5.5 behavior.
+func WritePostalCodesCSV(w io.Writer, zctaAnchors, hudAnchors []PostalAnchor) error {
+	// Build a dedup map keyed by postal code; ZCTA inserted first so
+	// HUD rows with the same key are silently dropped at insertion.
+	merged := make(map[string]PostalAnchor, len(zctaAnchors)+len(hudAnchors))
+	for _, a := range zctaAnchors {
+		merged[a.ZCTA] = a
+	}
+	for _, a := range hudAnchors {
+		if _, ok := merged[a.ZCTA]; ok {
+			continue
+		}
+		merged[a.ZCTA] = a
+	}
+
+	zips := make([]string, 0, len(merged))
+	for z := range merged {
+		zips = append(zips, z)
+	}
+	sort.Strings(zips)
+
 	cw := csv.NewWriter(w)
 	if err := cw.Write([]string{"postal_code", "country", "leaf_region_slug"}); err != nil {
 		return err
 	}
-	for _, a := range anchors {
+	for _, z := range zips {
+		a := merged[z]
 		if err := cw.Write([]string{a.ZCTA, "US", a.AnchorSlug}); err != nil {
 			return err
 		}
