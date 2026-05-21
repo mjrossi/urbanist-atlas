@@ -555,6 +555,24 @@ tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["san-diego-ca-metro"]
 
 # --- Tampa ---
+# Tampa remains at 1 metro-level org (Walk Bike Tampa) after slice #7.7
+# research. Candidates considered and excluded 2026-05-21:
+#   - Tampa BayCycle (tampabaycycle.com) — TLS certificate broken;
+#     organization originally funded by FDOT through the Tampa Downtown
+#     Partnership; activity could not be verified.
+#   - TBARTA (Tampa Bay Area Regional Transit Authority) — dissolved
+#     December 31 2023 by unanimous board vote; no successor advocacy.
+#   - Tampa Bay Sierra Club (sierraclub.org/florida/tampa-bay) —
+#     mentions sustainable transit as an educational topic but events
+#     server non-responsive; no substantive 2025/2026 transit campaigns
+#     verifiable from the chapter page.
+#   - PSTA TRAC (Transit Rider Advocacy Committee) — internal PSTA
+#     committee, not an independent nonprofit.
+#   - onbikes / Bikes For Christ — bike-redistribution nonprofits, not
+#     safe-streets advocacy in scope.
+# Florida Bicycle Association (state-floor) covers the metro via the
+# ancestor walk. Revisit if a maintainer surfaces an active second
+# Tampa Bay advocacy nonprofit (Pinellas or Hillsborough side).
 
 [[org]]
 slug = "walk-bike-tampa"
