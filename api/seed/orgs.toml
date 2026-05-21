@@ -290,6 +290,15 @@ website_url = "https://dallasbicyclecoalition.org"
 tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
 region_slugs = ["dallas-tx-metro"]
 
+[[org]]
+slug = "dallas-area-transit-alliance"
+name = "Dallas Area Transit Alliance"
+short_desc = "Rider-run DART advocacy nonprofit (DATA) founded 2024 to preserve and expand North Texas public transit; testifies at DART board meetings, opposes member-city pullouts, and tracks Texas Legislature transit bills."
+website_url = "https://dallasareatransitalliance.org"
+contact_url = "https://ridewithdata.substack.com/contact"
+tags = ["transit", "advocacy", "grassroots", "regional"]
+region_slugs = ["dallas-tx-metro"]
+
 # --- Houston ---
 
 [[org]]
