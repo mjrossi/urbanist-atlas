@@ -412,11 +412,80 @@ func TestPipeline_WorkedCities(t *testing.T) {
 				t.Errorf("DC 20017 ancestry missing %q; got %v", expected, ancestrySlugs)
 			}
 		}
+		// Diamond dedup: `dc` is reachable both at depth 1 (direct
+		// parent of the washington-dc city leaf) and depth 2 (parent
+		// of washington-dc-metro, which is itself a depth-1 parent).
+		// The recursive CTE's UNION dedupes on the full tuple including
+		// depth, so without the outer DISTINCT ON (id) in
+		// queries/lookup.sql the same region surfaces twice. Lock that
+		// behavior in.
+		counts := map[string]int{}
+		for _, s := range ancestrySlugs {
+			counts[s]++
+		}
+		for slug, n := range counts {
+			if n > 1 {
+				t.Errorf("DC 20017 ancestry contains %q %d times; want exactly once (DAG-diamond dedup regression)", slug, n)
+			}
+		}
 		// Place label: "Washington — Washington Metro" (broad = the
 		// us:metro ancestor; inner is empty because dc is sort 60, at
 		// the state-tier exclusion line in placeLabel).
 		if want := "Washington — Washington Metro"; got.ResolvedPlaceLabel != want {
 			t.Errorf("DC 20017 place label = %q, want %q", got.ResolvedPlaceLabel, want)
+		}
+	})
+
+	t.Run("gap-state ZIPs return graceful empty (Local + Regional both empty, no error)", func(t *testing.T) {
+		// Slice #7.6 documented 9 US states + 4 CA province/territory
+		// blocks as state-floor gaps (no demonstrably-active statewide
+		// advocacy org as of 2026-05-20). The /lookup contract for ZIPs
+		// in these regions is: 200 OK with empty Local + empty Regional
+		// — graceful empty, not an error and not a fallback to a
+		// national umbrella. This test locks in that contract.
+		//
+		// 82001 (Cheyenne, WY) anchors at cheyenne-wy-metro, walks up
+		// to wy. Neither node has any anchored org.
+		// X0A (Iqaluit-area FSA, NU) anchors directly at nu (no CMA
+		// in scope for NU). NU is a documented territory gap.
+		//
+		// If a future seed edit attaches an org to wy / cheyenne-wy-
+		// metro / nu (closing a gap), this test will fail and the
+		// orgs.toml `# gap` comment for that region needs to be
+		// removed in the same change.
+		cases := []struct {
+			name                 string
+			postal               string
+			country              atlas.Country
+			wantAncestryContains string
+		}{
+			{"WY (state-floor gap, metro→state walk)", "82001", atlas.CountryUS, "wy"},
+			{"NU (CA territory gap, direct anchor)", "X0A", atlas.CountryCA, "nu"},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				got, err := atlas.Lookup(ctx, store, atlas.LookupQuery{PostalCode: c.postal, Country: c.country})
+				if err != nil {
+					t.Fatalf("Lookup %s: %v", c.postal, err)
+				}
+				if len(got.Local) != 0 {
+					t.Errorf("Lookup %s: Local must be empty for gap state; got %v", c.postal, orgSlugList(got.Local))
+				}
+				if len(got.Regional) != 0 {
+					t.Errorf("Lookup %s: Regional must be empty for gap state; got %v", c.postal, orgSlugList(got.Regional))
+				}
+				// Distinguish "graceful empty for gap state" from "no
+				// leaf found at all" — confirm the ancestor walk
+				// actually reached the gap region.
+				ancestrySlugs := make(map[string]bool, len(got.ResolvedAncestry))
+				for _, r := range got.ResolvedAncestry {
+					ancestrySlugs[r.Slug] = true
+				}
+				if !ancestrySlugs[c.wantAncestryContains] {
+					t.Errorf("Lookup %s: ancestry must include %q to confirm gap-region walk happened; got %v",
+						c.postal, c.wantAncestryContains, keysOf(ancestrySlugs))
+				}
+			})
 		}
 	})
 }
