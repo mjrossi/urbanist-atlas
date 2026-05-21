@@ -346,13 +346,22 @@ during the editorial pass.)
   Miami (Friendship Circle) is a fundraising-events org, not advocacy.
   Florida Bicycle Association (state-floor) covers the metro via the
   ancestor walk for `fl`.
-- **Denver (US #16)** — Denver Streets Partnership and Greater Denver
-  Transit are the two clear metro-level advocacy nonprofits. Mile High
-  Connects closed January 2022; Streetsblog Denver shut down at the
-  end of January 2022 (operated by DSP); Denver Bicycle Lobby's site
-  is 2023-vintage with no current meeting date; Community Cycles is
-  Boulder-anchored; Bikes Together is a community bike shop. Bicycle
-  Colorado (state-floor) covers the metro via the ancestor walk.
+- **Inland Empire (US #13)** — Inland Empire Biking Alliance and
+  Friends of CV Link bring `riverside-ca-metro` to 2 metro-level orgs.
+  SAFE Inland Empire (safe-ie.org) is the strongest borderline candidate
+  but operates as a chapter of SAFE LA's 501(c)(3) — not independently
+  incorporated — and its own website carries 2023-vintage statistics
+  with no 2026-dated content on the org's own site (external press
+  in The Breeze 2026-01-18 exists). Inland Empire Urbanists has no
+  dedicated website, only a Google Form. CCAEJ, PC4EJ, and El Sol
+  Neighborhood Educational Center are environmental-justice /
+  community-health orgs whose transit/streets work is adjacent rather
+  than central. Californians for Electric Rail and The Transit
+  Coalition are LA- or statewide-anchored groups that parachute into
+  IE campaigns rather than IE-anchored advocacy. Calbike (state-floor)
+  covers the metro via the ancestor walk for `ca-state`. Worth
+  revisiting if SAFE-IE incorporates independently or refreshes its
+  site, or if Inland Empire Urbanists stands up a real website.
 - **Tampa (US #18)** — Walk Bike Tampa remains the only metro-anchored
   org meeting the activity bar. Tampa BayCycle has TLS errors;
   TBARTA dissolved December 31 2023; Sierra Club Tampa Bay's transit
@@ -360,6 +369,13 @@ during the editorial pass.)
   Bikes For Christ are bike-redistribution not advocacy. Florida
   Bicycle Association (state-floor) covers the metro via the ancestor
   walk for `fl`.
+- **Denver (US #19)** — Denver Streets Partnership and Greater Denver
+  Transit are the two clear metro-level advocacy nonprofits. Mile High
+  Connects closed January 2022; Streetsblog Denver shut down at the
+  end of January 2022 (operated by DSP); Denver Bicycle Lobby's site
+  is 2023-vintage with no current meeting date; Community Cycles is
+  Boulder-anchored; Bikes Together is a community bike shop. Bicycle
+  Colorado (state-floor) covers the metro via the ancestor walk.
 
 ### State floor gaps (documented; ZIPs in these states will return empty)
 

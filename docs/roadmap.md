@@ -143,12 +143,13 @@ the plan is the *design* view.
   showcase treatment at 5 metro orgs (TransitMatters, LivableStreets,
   Boston Cyclists Union, A Better City, MBTA Advisory Board) plus
   WalkMassachusetts at the state floor. LA, Chicago, Dallas, Houston,
-  Philadelphia, Atlanta, SF Bay, Seattle, and Minneapolis lift to ≥3
-  metro orgs each. Three top-20 metros end the pass with documented
-  third-org gaps (Miami at 2, Denver at 2, Tampa at 1) rather than
-  padding with dormant candidates. Final tally: 18 net-new orgs
-  (orgs.toml grows from 111 → 129). Design spec gate language updated
-  in the same spec.
+  Philadelphia, Atlanta, SF Bay, Seattle, Minneapolis, Phoenix,
+  Detroit, and St. Louis lift to ≥3 metro orgs each. Four top-20
+  metros end the pass with documented third-org gaps (Miami at 2,
+  Inland Empire at 2, Tampa at 1, Denver at 2) rather than padding
+  with dormant or out-of-scope candidates. Final tally: 23 net-new
+  orgs (orgs.toml grows from 111 → 134). Design spec gate language
+  updated in the same spec.
 - **X-Atlas-Client shared-secret gate (slice #23):**
   `api/internal/httpapi/clientsecret.go` middleware checks
   `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via
