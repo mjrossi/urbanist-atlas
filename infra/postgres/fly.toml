@@ -33,7 +33,12 @@ primary_region = 'iad'
 # operations where any transient blip could take the DB offline
 # permanently. `always` keeps Fly restarting indefinitely; the data
 # lives on the `pgdata` volume so restarts are safe.
-[restart]
+#
+# Note: Fly's schema requires `restart` as an array of tables
+# (`[[restart]]`), not a single table (`[restart]`) — flyctl errors
+# with "cannot unmarshal object into Go struct field Config.restart
+# of type []appconfig.Restart" otherwise.
+[[restart]]
   policy = 'always'
 
 [[vm]]

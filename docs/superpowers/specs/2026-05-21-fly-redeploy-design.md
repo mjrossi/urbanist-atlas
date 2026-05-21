@@ -225,7 +225,8 @@ primary_region = "iad"
 # Default `on-failure max_retries=10` would let a transient blip
 # strand the DB stopped indefinitely. `always` keeps Fly restarting;
 # the data lives on the pgdata volume so restarts are safe.
-[restart]
+# Fly's schema requires `restart` as an array of tables, hence [[ ]].
+[[restart]]
   policy = "always"
 
 [[vm]]
