@@ -157,7 +157,7 @@ name = "Bike Walk Coral Gables"
 short_desc = "Coral Gables 501(c)(3) promoting cycling and walking as safe, healthy forms of transportation; runs monthly Gables Bike Tours, the annual Gables Bike Day ciclovia, Bike to Work Day, and PARK(ing) Day."
 website_url = "https://bikewalkcoralgables.org"
 tags = ["cycling", "walking", "safe-streets", "advocacy"]
-region_slugs = ["miami"]
+region_slugs = ["greater-miami"]
 
 # --- Seattle ---
 
