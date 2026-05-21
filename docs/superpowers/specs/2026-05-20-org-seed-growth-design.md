@@ -32,7 +32,10 @@ keyed on `region_slugs`; this slice fills the table.
 | Gate | Floor | Anchor |
 |---|---|---|
 | **State / province floor** | ≥1 org per US state + ≥1 per CA province | Org attached at the state/province region directly |
-| **Top-30 metro gate** | ≥1 org per metro in the 25 US + 5 CA canvas | Org at the metro/MSA/CMA level, or city leaf if municipal |
+| **Top-20 metro gate** | ≥3 orgs per metro in the top-20 canvas | Orgs at the metro/MSA/CMA level, or city leaf if municipal |
+| **Top-21–30 metro gate** | ≥1 org per metro in the 21–30 canvas | Org at the metro/MSA/CMA level, or city leaf if municipal |
+
+> Raised from ≥1 to ≥3 for the top 20 metros in slice 7.7 (2026-05-21).
 
 - **Per-metro depth:** 1–3 new orgs per metro is the typical target;
   no hard cap. Existing metros (NYC at 5, others at 1–2) keep their
@@ -65,11 +68,16 @@ SD, MS, AK; CA territories YT, NT, NU; possibly PR.
 
 ## Metro fallback
 
-If a top-30 metro has no quality local org, the state-level org
-satisfies the gate via ancestor walk for ZIPs in that metro. If even
-state-level coverage would be empty, swap the metro for the
-next-ranked metro with organizers and note the swap in the spec
-under "Canvas adjustments."
+If a top-30 metro has no quality local org meeting the activity bar,
+the state-level org satisfies the gate via ancestor walk for ZIPs in
+that metro. If even state-level coverage would be empty, swap the
+metro for the next-ranked metro with organizers and note the swap in
+the spec under "Canvas adjustments."
+
+For the top-20 metros under slice 7.7's raised ≥3 floor, a documented
+gap (e.g., "third-org gap researched YYYY-MM-DD") in `orgs.toml` is
+the editorial answer when only 1–2 quality candidates exist; padding
+the slate with dormant or out-of-scope entries is explicitly rejected.
 
 ## Top-30 metro canvas
 
@@ -328,6 +336,30 @@ during the editorial pass.)
   Texas state-floor org (BikeTexas) through ancestor walk for SA ZIPs.
   Worth revisiting if a maintainer with local knowledge surfaces an
   active SA advocacy group.
+
+### Top-20 metro third-org gaps (slice 7.7, 2026-05-21)
+
+- **Miami (US #8)** — Transit Alliance Miami and Bike Walk Coral Gables
+  bring `miami`/`greater-miami` to 2 metro-level orgs. Healthy Little
+  Havana's transit work (Little Havana Moves) is partner-only with
+  Transit Alliance and has no independent active web presence; Bike
+  Miami (Friendship Circle) is a fundraising-events org, not advocacy.
+  Florida Bicycle Association (state-floor) covers the metro via the
+  ancestor walk for `fl`.
+- **Denver (US #16)** — Denver Streets Partnership and Greater Denver
+  Transit are the two clear metro-level advocacy nonprofits. Mile High
+  Connects closed January 2022; Streetsblog Denver shut down at the
+  end of January 2022 (operated by DSP); Denver Bicycle Lobby's site
+  is 2023-vintage with no current meeting date; Community Cycles is
+  Boulder-anchored; Bikes Together is a community bike shop. Bicycle
+  Colorado (state-floor) covers the metro via the ancestor walk.
+- **Tampa (US #18)** — Walk Bike Tampa remains the only metro-anchored
+  org meeting the activity bar. Tampa BayCycle has TLS errors;
+  TBARTA dissolved December 31 2023; Sierra Club Tampa Bay's transit
+  page is dormant; PSTA TRAC is an internal committee; onbikes /
+  Bikes For Christ are bike-redistribution not advocacy. Florida
+  Bicycle Association (state-floor) covers the metro via the ancestor
+  walk for `fl`.
 
 ### State floor gaps (documented; ZIPs in these states will return empty)
 
