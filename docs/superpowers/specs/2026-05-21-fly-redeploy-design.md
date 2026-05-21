@@ -210,8 +210,11 @@ primary_region = "iad"
   POSTGRES_USER = "urbanist"
   # POSTGRES_PASSWORD is set via `flyctl secrets set` (write-only;
   # captured locally at provision time for DATABASE_URL construction).
-  # PGDATA hint: postgres:17-alpine defaults to /var/lib/postgresql/data,
-  # which matches the [mounts] destination below — no override needed.
+  # PGDATA points at a SUBDIRECTORY of the mount, not the mount root:
+  # Fly's ext4 volumes auto-include a `lost+found` directory which
+  # would otherwise trip initdb's "directory exists but is not empty"
+  # guard on first start.
+  PGDATA = "/var/lib/postgresql/data/pgdata"
 
 [mounts]
   source = "pgdata"
@@ -226,7 +229,7 @@ primary_region = "iad"
 No `[[services]]` block — the DB is internal-only via Fly 6PN.
 No `[http_service]` for the same reason. No `release_command` — the
 `postgres:17-alpine` image initializes the database from the
-`POSTGRES_*` env vars on first start.
+`POSTGRES_*` / `PGDATA` env vars on first start.
 
 The volume `pgdata` is created out-of-band: `flyctl volumes create
 pgdata -a urbanist-atlas-db -r iad -s 1`.

@@ -12,6 +12,12 @@ primary_region = 'iad'
 [env]
   POSTGRES_DB = 'urbanist_atlas'
   POSTGRES_USER = 'urbanist'
+  # Fly's ext4 volumes auto-include a `lost+found` directory at the
+  # mount root, which trips initdb's "directory exists but is not
+  # empty" guard. Point PGDATA at a subdirectory of the mount so
+  # initdb has a clean target — the upstream postgres image honors
+  # PGDATA over its built-in default of /var/lib/postgresql/data.
+  PGDATA = '/var/lib/postgresql/data/pgdata'
 
 [[mounts]]
   source = 'pgdata'

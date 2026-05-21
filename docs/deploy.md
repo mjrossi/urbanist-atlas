@@ -584,6 +584,14 @@ urbanist-atlas-db`), (b) the API's `DATABASE_URL` references
 component matches the DB app's `POSTGRES_PASSWORD` secret. A typo in
 the constructed `DATABASE_URL` is the most common failure here.
 
+**DB machine boot-loops with `initdb: error: directory ... exists but is not empty`.**
+Fly's ext4 volumes auto-include a `lost+found` directory at the mount
+root, which `initdb` refuses to write into. The fix is in
+`infra/postgres/fly.toml`'s `[env]`: `PGDATA =
+"/var/lib/postgresql/data/pgdata"` (subdirectory of the mount, not
+the mount root). If you ever see this error after a config change,
+confirm `PGDATA` is still pointed at the subdir.
+
 **Need to inspect production data.**
 `flyctl ssh console -a urbanist-atlas-db -C "psql -U urbanist
 urbanist_atlas"` opens a `psql` session against the DB.
