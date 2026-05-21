@@ -146,6 +146,22 @@ website_url = "https://www.streetsforall.org"
 tags = ["advocacy", "safe-streets", "transit", "cycling"]
 region_slugs = ["greater-la"]
 
+[[org]]
+slug = "streets-are-for-everyone"
+name = "Streets Are For Everyone"
+short_desc = "LA-based Vision Zero nonprofit (SAFE) founded after a Griffith Park crash; runs Finish the Ride/Run, Streets Art SAFE youth film competition, faith-based street safety, and traffic-violence victim support across Southern California."
+website_url = "https://www.streetsareforeveryone.org"
+tags = ["safe-streets", "vision-zero", "advocacy", "education"]
+region_slugs = ["greater-la"]
+
+[[org]]
+slug = "act-la"
+name = "Alliance for Community Transit — Los Angeles"
+short_desc = "LA transit-equity coalition (ACT-LA) advocating for fareless transit, care-based transit safety, and equitable Metro investments centered on low-income communities and communities of color."
+website_url = "https://www.act-la.org"
+tags = ["transit", "equity", "advocacy", "coalition"]
+region_slugs = ["greater-la"]
+
 # --- Chicago region ---
 
 [[org]]
