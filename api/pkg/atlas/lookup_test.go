@@ -11,13 +11,17 @@ import (
 func nycFixture(t *testing.T) *MemStore {
 	t.Helper()
 	s := NewMemStore()
+	// Post-#7.5.2 shape: `nyc` is a regional intermediate region (only
+	// parent is `nyc-metro`); the borough leaf carries the state edge
+	// (`ny`) directly. Citywide orgs (TransAlt) attach to `nyc` and
+	// surface as Regional results for borough lookups.
 	addRegions(s,
 		Region{ID: 1, Slug: "nyc-tristate", Kind: "us:multi-state", Name: "Tri-State Region", Country: "US", ScopeTier: ScopeRegional, SortPriority: 80},
 		Region{ID: 2, Slug: "ny", Kind: "us:state", Name: "New York", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60},
 		Region{ID: 3, Slug: "nj", Kind: "us:state", Name: "New Jersey", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60},
 		Region{ID: 4, Slug: "nyc-metro", Kind: "us:metro", Name: "New York Metro", Country: "US", ScopeTier: ScopeRegional, SortPriority: 40, ParentSlugs: []string{"nyc-tristate"}},
-		Region{ID: 5, Slug: "nyc", Kind: "us:city", Name: "New York City", Country: "US", ScopeTier: ScopeLocal, SortPriority: 15, ParentSlugs: []string{"nyc-metro", "ny"}},
-		Region{ID: 6, Slug: "brooklyn", Kind: "us:borough", Name: "Brooklyn", Country: "US", ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"nyc"}},
+		Region{ID: 5, Slug: "nyc", Kind: "us:city", Name: "New York City", Country: "US", ScopeTier: ScopeRegional, SortPriority: 15, ParentSlugs: []string{"nyc-metro"}},
+		Region{ID: 6, Slug: "brooklyn", Kind: "us:borough", Name: "Brooklyn", Country: "US", ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"nyc", "ny"}},
 		Region{ID: 7, Slug: "hoboken", Kind: "us:city", Name: "Hoboken", Country: "US", ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"nyc-metro", "nj"}},
 	)
 	s.AddPostalCode("US", "11217", 6)
@@ -50,8 +54,13 @@ func TestLookup_NYC_Brooklyn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
 	}
-	wantLocal := []string{"brooklyn-spoke", "transalt"}
-	wantRegional := []string{"transitcenter", "ny-lcv", "tri-state"}
+	// After the #7.5.2 borough split, citywide NYC orgs (TransAlt)
+	// attach to the regional `nyc` node and bucket as Regional.
+	// Borough-only orgs (Brooklyn Spoke) stay in Local. The Regional
+	// bucket is ordered by best-matched sort_priority asc:
+	// nyc(15) → nyc-metro(40) → ny(60) → nyc-tristate(80).
+	wantLocal := []string{"brooklyn-spoke"}
+	wantRegional := []string{"transalt", "transitcenter", "ny-lcv", "tri-state"}
 	if diff := cmp.Diff(wantLocal, slugs(got.Local)); diff != "" {
 		t.Errorf("Local (-want +got):\n%s", diff)
 	}
@@ -100,7 +109,11 @@ func TestLookup_ResolvedAncestry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
 	}
-	wantOrder := []string{"brooklyn", "nyc", "nyc-metro", "ny", "nyc-tristate"}
+	// BFS depth order: brooklyn (0) → {nyc, ny} (1) → nyc-metro (2,
+	// from nyc) → nyc-tristate (3, from nyc-metro). Within depth 1 the
+	// tiebreak is sort_priority asc: nyc(15) before ny(60). ny has no
+	// further parents and stops at depth 1.
+	wantOrder := []string{"brooklyn", "nyc", "ny", "nyc-metro", "nyc-tristate"}
 	gotOrder := make([]string, len(got.ResolvedAncestry))
 	for i, r := range got.ResolvedAncestry {
 		gotOrder[i] = r.Slug

@@ -19,12 +19,15 @@ func TestIsMetroKind(t *testing.T) {
 	}
 	out := []RegionKind{
 		"us:state",
+		"us:federal-district",
+		"us:territory",
 		"us:city",
 		"us:county",
 		"us:multi-state",
 		"us:borough",
 		"us:transit-federation",
 		"ca:province",
+		"ca:territory",
 		"ca:city",
 		"pt:distrito",
 		"pt:nuts-ii",

@@ -41,15 +41,15 @@ func TestDetectCycles_LongCycle(t *testing.T) {
 	}
 }
 
-func TestDetectCycles_UnknownParentSlug(t *testing.T) {
+func TestDetectCycles_CrossFileParentIsAllowed(t *testing.T) {
+	// A parent slug not defined in this file is allowed — it's
+	// assumed to be in the DB (loaded by an earlier file). Resolution
+	// happens at write time via RegionIDBySlug. DetectCycles must not
+	// reject it; otherwise the multi-file seed split breaks.
 	f := File{Regions: []Region{
 		{Slug: "a", ScopeTier: "local", Kind: "x", Name: "A", Parents: []string{"ghost"}},
 	}}
-	err := DetectCycles(f)
-	if err == nil {
-		t.Fatal("expected unknown-parent error")
-	}
-	if !strings.Contains(err.Error(), "ghost") {
-		t.Errorf("err should name the missing slug: %v", err)
+	if err := DetectCycles(f); err != nil {
+		t.Errorf("DetectCycles should allow cross-file parents: %v", err)
 	}
 }

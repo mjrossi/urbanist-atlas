@@ -28,3 +28,9 @@ INSERT INTO postal_codes (country, postal_code, leaf_region_id)
 VALUES ($1, $2, $3)
 ON CONFLICT (country, postal_code) DO UPDATE
 SET leaf_region_id = EXCLUDED.leaf_region_id;
+
+-- Bulk upsert (chunked multi-row INSERT via UNNEST of three parallel
+-- arrays) is issued by loadpostal as raw pgx.Exec, bypassing sqlc
+-- because sqlc 1.x can't type-check multi-arg UNNEST. See
+-- internal/loadpostal/batch.go for the statement text. Same ON CONFLICT
+-- semantics as UpsertPostalCode above.

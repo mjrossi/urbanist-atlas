@@ -113,33 +113,77 @@ func extractOrgs(b []bucketed) []Org {
 }
 
 // placeLabel returns a human-readable header derived from the ancestry.
-// Format: "<leaf>, <most-specific-local-ancestor-different-from-leaf> — <most-specific-regional-ancestor>".
+// Format: "<leaf>, <inner-ancestor> — <broad-ancestor>".
 // Segments without content are dropped; the SPA can roll its own from
 // ResolvedAncestry if it wants something different.
+//
+// Ancestor picks:
+//
+//   - broad: the most-specific IsMetroKind ancestor (us:metro, ca:cma,
+//     ca:regional-district, pt:area-metropolitana). If no metro-kind
+//     ancestor exists, falls back to the first regional ancestor —
+//     handles transit federations (Berlin's VBB) and other non-metro
+//     regional contexts.
+//   - inner: the first non-leaf ancestor that is *below* state tier
+//     (sort_priority < 60) and distinct from broad. Captures local
+//     civic context — NYC for borough leaves, Berlin for Mitte,
+//     Cook County for a Chicago neighborhood. State, multi-state,
+//     and the broad slot itself are excluded so the label doesn't
+//     repeat itself or pad with administrative geography.
+//
+// Both NYC (regional, kind us:city) and Berlin (local, kind de:land)
+// land in the inner slot via the sort_priority < 60 test — they're
+// sub-state-tier intermediate civic units regardless of scope_tier.
 func placeLabel(ancestry []Region) string {
 	if len(ancestry) == 0 {
 		return ""
 	}
 	leaf := ancestry[0]
-	var localAncestor, regionalAncestor *Region
+
+	var broad *Region
 	for i := 1; i < len(ancestry); i++ {
 		r := ancestry[i]
-		if r.ScopeTier == ScopeLocal && localAncestor == nil && r.Slug != leaf.Slug {
+		if IsMetroKind(r.Kind) {
 			cp := r
-			localAncestor = &cp
-		}
-		if r.ScopeTier == ScopeRegional && regionalAncestor == nil {
-			cp := r
-			regionalAncestor = &cp
+			broad = &cp
+			break
 		}
 	}
+	if broad == nil {
+		for i := 1; i < len(ancestry); i++ {
+			r := ancestry[i]
+			if r.ScopeTier == ScopeRegional {
+				cp := r
+				broad = &cp
+				break
+			}
+		}
+	}
+
+	var inner *Region
+	for i := 1; i < len(ancestry); i++ {
+		r := ancestry[i]
+		if r.Slug == leaf.Slug {
+			continue
+		}
+		if broad != nil && r.Slug == broad.Slug {
+			continue
+		}
+		if r.SortPriority >= 60 { // state-tier or higher: excludes state/multi-state.
+			continue
+		}
+		cp := r
+		inner = &cp
+		break
+	}
+
 	switch {
-	case localAncestor != nil && regionalAncestor != nil:
-		return leaf.Name + ", " + localAncestor.Name + " — " + regionalAncestor.Name
-	case regionalAncestor != nil:
-		return leaf.Name + " — " + regionalAncestor.Name
-	case localAncestor != nil:
-		return leaf.Name + ", " + localAncestor.Name
+	case inner != nil && broad != nil:
+		return leaf.Name + ", " + inner.Name + " — " + broad.Name
+	case broad != nil:
+		return leaf.Name + " — " + broad.Name
+	case inner != nil:
+		return leaf.Name + ", " + inner.Name
 	default:
 		return leaf.Name
 	}

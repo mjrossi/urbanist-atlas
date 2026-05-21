@@ -1,7 +1,13 @@
-# Region taxonomy for the United States.
+# Region taxonomy for the United States (leaves + intermediate
+# regions). The state tier lives in regions_us_states.toml and loads
+# first; entries here reference state slugs as parents via cross-file
+# resolution.
+#
 # Each [[region]] entry creates one row in `regions`; the `parents`
 # array creates rows in `region_parents`. A region may appear before
 # its parents in the file — loadregions resolves slugs after parsing.
+# Parents not defined in this file are resolved from the DB at write
+# time (see internal/loadregions/write.go's RegionIDBySlug fallback).
 #
 # See docs/region-graph.md for modeling conventions, including:
 #   - State edges live on the leaf (city), not on the metro.
@@ -10,180 +16,27 @@
 #   - Transit federations are siblings of states, parented under the
 #     leaves they serve.
 #
-# Recommended sort_priority ranges:
+# Recommended sort_priority ranges (see docs/region-graph.md §9):
 #   10  borough / neighborhood
 #   15  consolidated city
 #   20  county
 #   40  metro
 #   50  transit federation / RTA-style region
-#   60  state / province
+#   60  state / province  (defined in regions_us_states.toml)
 #   80  multi-state / multi-province
 
-# --- States (parents of nothing in v1; national tier excluded) ---
+# Multi-state and transit-federation regions live in
+# regions_us_multistate.toml (loaded between us_states and us_msas so
+# MSA overrides can parent under them). City/borough/county leaves
+# below cross-reference them via the loader's DB-lookup fallback.
 
-[[region]]
-slug = "ny"
-kind = "us:state"
-name = "New York"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "nj"
-kind = "us:state"
-name = "New Jersey"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "ct"
-kind = "us:state"
-name = "Connecticut"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "il"
-kind = "us:state"
-name = "Illinois"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "in"
-kind = "us:state"
-name = "Indiana"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "wi"
-kind = "us:state"
-name = "Wisconsin"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "ca-state"
-kind = "us:state"
-name = "California"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "ma"
-kind = "us:state"
-name = "Massachusetts"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "fl"
-kind = "us:state"
-name = "Florida"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "wa"
-kind = "us:state"
-name = "Washington"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-# --- Multi-state and federation regions ---
-
-[[region]]
-slug = "nyc-tristate"
-kind = "us:multi-state"
-name = "Tri-State Region (NY/NJ/CT)"
-scope_tier = "regional"
-sort_priority = 80
-parents = []
-
-[[region]]
-slug = "chicagoland-multistate"
-kind = "us:multi-state"
-name = "Chicagoland (IL/IN/WI)"
-scope_tier = "regional"
-sort_priority = 80
-parents = []
-
-[[region]]
-slug = "rta-service-area"
-kind = "us:transit-federation"
-name = "RTA Service Area (Cook + 5 collar)"
-scope_tier = "regional"
-sort_priority = 50
-parents = ["il"]
-
-# --- Metros (parented under multi-state where applicable) ---
-
-[[region]]
-slug = "nyc-metro"
-kind = "us:metro"
-name = "New York Metro"
-scope_tier = "regional"
-sort_priority = 40
-parents = ["nyc-tristate"]
-
-[[region]]
-slug = "chicago-metro"
-kind = "us:metro"
-name = "Chicago Metro"
-scope_tier = "regional"
-sort_priority = 40
-parents = ["chicagoland-multistate"]
-
-[[region]]
-slug = "sf-bay-area"
-kind = "us:metro"
-name = "San Francisco Bay Area"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "greater-boston"
-kind = "us:metro"
-name = "Greater Boston"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "greater-miami"
-kind = "us:metro"
-name = "Greater Miami"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "seattle-metro"
-kind = "us:metro"
-name = "Seattle Metro"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
-
-[[region]]
-slug = "greater-la"
-kind = "us:metro"
-name = "Greater Los Angeles"
-scope_tier = "regional"
-sort_priority = 40
-parents = []
+# --- Metros ---
+#
+# All US MSAs (Census CBSAs) live in regions_us_msas.toml, generated
+# by `urbanist-atlas-server etl regenerate --country=US`. Editorial
+# overrides for slug/name/parents are in regions_us_msa_overrides.toml.
+# Load order ensures the MSA file is upserted before this file so the
+# city leaves below can cross-reference MSA slugs as parents.
 
 # --- Counties (where they matter for advocacy reach) ---
 
@@ -203,17 +56,28 @@ scope_tier = "local"
 sort_priority = 20
 parents = ["chicago-metro", "in"]
 
-# --- Consolidated cities (NYC is the only weird one in v1) ---
+# --- NYC: borough split (slice #7.5.2) ---
+#
+# `nyc` is the only US city we model sub-municipally at v1 — its
+# boroughs are also counties (the Census ZCTA-to-county crosswalk
+# naturally distinguishes them) and each has a distinct civic
+# identity + advocacy ecosystem. See docs/region-graph.md §8.
+#
+# After the split:
+#   - `nyc` is a regional intermediate region (between borough leaves
+#     and `nyc-metro`); its only parent is `nyc-metro`. Citywide NYC
+#     orgs attach here (TransitCenter, Transportation Alternatives,
+#     Riders Alliance).
+#   - Boroughs are local leaves; they carry the state edge (`ny`)
+#     directly per rule §1.
 
 [[region]]
 slug = "nyc"
 kind = "us:city"
 name = "New York City"
-scope_tier = "local"
+scope_tier = "regional"
 sort_priority = 15
-parents = ["nyc-metro", "ny"]
-
-# --- Boroughs (NYC) and cities ---
+parents = ["nyc-metro"]
 
 [[region]]
 slug = "brooklyn"
@@ -221,7 +85,7 @@ kind = "us:borough"
 name = "Brooklyn"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "manhattan"
@@ -229,7 +93,7 @@ kind = "us:borough"
 name = "Manhattan"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "queens"
@@ -237,7 +101,7 @@ kind = "us:borough"
 name = "Queens"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "bronx"
@@ -245,7 +109,7 @@ kind = "us:borough"
 name = "The Bronx"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
 
 [[region]]
 slug = "staten-island"
@@ -253,7 +117,9 @@ kind = "us:borough"
 name = "Staten Island"
 scope_tier = "local"
 sort_priority = 10
-parents = ["nyc"]
+parents = ["nyc", "ny"]
+
+# --- Cities (non-NYC) ---
 
 [[region]]
 slug = "hoboken"
@@ -342,3 +208,18 @@ name = "Los Angeles"
 scope_tier = "local"
 sort_priority = 10
 parents = ["greater-la", "ca-state"]
+
+[[region]]
+slug = "washington-dc"
+kind = "us:city"
+name = "Washington"
+scope_tier = "local"
+sort_priority = 10
+parents = ["washington-dc-metro", "dc"]
+# DC is a federal district that is its own state-equivalent. Without
+# this leaf, every DC ZIP would anchor at washington-dc-metro and the
+# breadcrumb walk would surface the metro's other state parents (MD,
+# VA, WV) ahead of DC itself (tied at sort_priority=60, ordered by id
+# which reflects load order — see api/internal/store/postgres/queries
+# /lookup.sql). With the city leaf in place, DC ZIPs land here first
+# and the metro/state parents bridge in at depth 1.

@@ -22,28 +22,44 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// loadAllSeeds runs the same three-country region + postal + org
-// loaders pipeline_test.go uses. Caller must hold a Postgres pool
+// loadAllSeeds runs the same multi-file region + postal + org loaders
+// the `loaddata` orchestrator uses. State/province-tier files load
+// first (their slugs are referenced as parents by leaves in the main
+// file via cross-file resolution). Caller must hold a Postgres pool
 // fresh from startPostgres + applyMigrations.
 func loadAllSeeds(ctx context.Context, t *testing.T, store *Store) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	files := []struct {
-		regions string
-		postal  string
+	regionFiles := []struct {
+		path    string
+		country string
+	}{
+		{repoFile(t, "seed", "regions_us_states.toml"), "US"},
+		{repoFile(t, "seed", "regions_us_multistate.toml"), "US"},
+		{repoFile(t, "seed", "regions_us_msas.toml"), "US"},
+		{repoFile(t, "seed", "regions_us.toml"), "US"},
+		{repoFile(t, "seed", "regions_ca_provinces.toml"), "CA"},
+		{repoFile(t, "seed", "regions_ca_cmas.toml"), "CA"},
+		{repoFile(t, "seed", "regions_ca.toml"), "CA"},
+		{repoFile(t, "seed", "regions_pt.toml"), "PT"},
+	}
+	for _, rf := range regionFiles {
+		if _, err := loadregions.LoadFile(ctx, store.Pool(), logger, rf.path, rf.country); err != nil {
+			t.Fatalf("loadregions %s (%s): %v", rf.country, rf.path, err)
+		}
+	}
+	postalFiles := []struct {
+		path    string
 		country atlas.Country
 	}{
-		{repoFile(t, "seed", "regions_us.toml"), repoFile(t, "seed", "postal_codes_us.csv"), atlas.CountryUS},
-		{repoFile(t, "seed", "regions_ca.toml"), repoFile(t, "seed", "postal_codes_ca.csv"), atlas.CountryCA},
-		{repoFile(t, "seed", "regions_pt.toml"), repoFile(t, "seed", "postal_codes_pt.csv"), atlas.Country("PT")},
+		{repoFile(t, "seed", "postal_codes_us.csv"), atlas.CountryUS},
+		{repoFile(t, "seed", "postal_codes_ca.csv"), atlas.CountryCA},
+		{repoFile(t, "seed", "postal_codes_pt.csv"), atlas.Country("PT")},
 	}
-	for _, f := range files {
-		if _, err := loadregions.LoadFile(ctx, store.Pool(), logger, f.regions, string(f.country)); err != nil {
-			t.Fatalf("loadregions %s: %v", f.country, err)
-		}
-		if _, err := loadpostal.LoadFile(ctx, store.Pool(), logger, f.postal, f.country); err != nil {
-			t.Fatalf("loadpostal %s: %v", f.country, err)
+	for _, pf := range postalFiles {
+		if _, err := loadpostal.LoadFile(ctx, store.Pool(), logger, pf.path, pf.country); err != nil {
+			t.Fatalf("loadpostal %s: %v", pf.country, err)
 		}
 	}
 	if _, err := seed.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "orgs.toml")); err != nil {

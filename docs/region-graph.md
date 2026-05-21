@@ -189,7 +189,110 @@ a US user's would feel distant), not the default display rules.
 attached directly. The ancestor walk reaches them through their
 children. Orgs attached to abstract regions still surface correctly.
 
-### 7. Sort priority is a hint, not a contract
+### 7. Postal codes anchor at the smallest curated region
+
+`postal_codes.leaf_region_id` is a misnomer — the schema doesn't
+constrain that referenced row to be a leaf in the DAG sense. The
+recursive ancestor walk works from any region. So the convention is:
+**every postal code anchors at the smallest curated region for its
+area**, and granularity grows organically per-ZIP as we curate more
+leaves.
+
+Resolution priority, applied at seed-time:
+
+```
+if curated city leaf exists for ZCTA's place        → anchor = city leaf
+elif ZCTA is in an NYC borough county               → anchor = borough leaf
+elif ZCTA is in a curated MSA                       → anchor = MSA region
+else                                                → anchor = state/province
+```
+
+Worked examples:
+
+| Postal code | Anchor       | Why                                                |
+|---|---|---|
+| 10001 (NYC) | `manhattan`  | NYC borough county = New York County               |
+| 94110 (SF)  | `sf`         | SF is a curated city leaf                          |
+| 33401 (WPB) | `miami-msa`  | West Palm Beach is in the Miami MSA, no city leaf  |
+| 83702 (ID)  | `id` (state) | No leaf, not in a curated MSA; state fallback      |
+
+The lookup-side ancestor walk is unchanged: from whichever anchor the
+postal code points at, walk up via `region_parents`, gather ancestors,
+join orgs. No app-level fallback logic.
+
+The full design rationale is at
+[`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md).
+
+### 8. NYC is the only US city we model sub-municipally at v1
+
+NYC's five boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten
+Island) exist as separate leaves under a single `nyc` regional
+intermediate region. This is the **only sub-municipal split in the
+US seed at v1**.
+
+Three things converge to make NYC structurally splittable:
+
+1. **NYC boroughs are counties.** Manhattan = New York County,
+   Brooklyn = Kings County, Queens = Queens County, Bronx = Bronx
+   County, Staten Island = Richmond County. The Census ZCTA-to-county
+   crosswalk hands us borough resolution for free.
+2. **Each borough has distinct civic identity** — Borough President,
+   council districts, etc. Most other US "city subdivisions" (LA
+   neighborhoods, Chicago community areas, DC wards, Boston
+   neighborhoods) lack distinct civic governance.
+3. **Borough-specific advocacy ecosystems exist** (e.g., Brooklyn
+   Spoke is borough-only). The split gives them a natural
+   attachment point.
+
+The DAG shape:
+
+```mermaid
+graph BT
+  manhattan[Manhattan<br/>local · 10]
+  brooklyn[Brooklyn<br/>local · 10]
+  queens[Queens<br/>local · 10]
+  bronx[The Bronx<br/>local · 10]
+  staten[Staten Island<br/>local · 10]
+  nyc[NYC<br/>REGIONAL · 15]
+  nycmetro[NYC Metro<br/>regional · 40]
+  ny[New York<br/>regional · 60]
+
+  manhattan --> nyc
+  brooklyn --> nyc
+  queens --> nyc
+  bronx --> nyc
+  staten --> nyc
+  manhattan --> ny
+  brooklyn --> ny
+  queens --> ny
+  bronx --> ny
+  staten --> ny
+  nyc --> nycmetro
+```
+
+Note: `nyc.scope_tier = regional` even though `kind = us:city` —
+similar to Berlin's `kind = de:land` / `scope_tier = local`
+exception. The scope_tier-vs-kind decoupling earns its keep here.
+
+The state edge (`ny`) lives on each borough leaf, **not** on `nyc`
+itself, per [rule §1](#1-state-edges-live-on-the-leaf-not-on-the-metro).
+A Manhattan lookup walks `manhattan → {nyc, ny} → nyc-metro →
+nyc-tristate`; the orgs at each tier surface in the right bucket.
+
+**Citywide NYC orgs attach to `nyc`** (regional) — TransitCenter,
+Transportation Alternatives, Riders Alliance. **Borough-only orgs
+attach to the specific borough leaf** (Brooklyn Spoke → `brooklyn`).
+**Metro-wide orgs attach to `nyc-metro`** (Regional Plan
+Association).
+
+Other US cities (LA, Chicago, Boston, SF, Miami, etc.) stay as a
+single leaf at v1, even where neighborhood identity is strong. The
+ZCTA-to-county crosswalk would give them a single shared county, not
+neighborhood-level granularity. Promotion to multi-leaf would
+require additional editorial work + ZIP-to-neighborhood crosswalks
+with fuzzy boundaries. Deferred until org density warrants.
+
+### 9. Sort priority is a hint, not a contract
 
 `sort_priority` orders orgs within the Regional bucket. Lower = more
 specific = sorts earlier. Recommended ranges:
@@ -347,52 +450,75 @@ explicitly query for national-tier orgs.
 
 ## Adding a new country
 
-Worked example: Germany.
+Worked example: Germany. The region taxonomy now splits across
+multiple files per country, mirroring how slices #7.5.1–#7.5.4
+structured US + CA. Files at minimum:
 
-1. **Write `api/seed/regions_de.toml`.** Start with the Länder, then
-   add Bezirke/Kreise as needed, then cities. Set `scope_tier` per
-   region using the conventions above. For city-states (Berlin,
-   Hamburg, Bremen), use `scope_tier='local'`. Add transit federations
-   (VBB, VRR, MVV, …) as top-level regions with the leaves they serve
-   as children.
+| File | Purpose |
+|---|---|
+| `regions_de_lander.toml` (or `_states`) | Top-tier hand-defined Länder. `scope_tier=regional`. No parents. |
+| `regions_de_multistate.toml` *(optional)* | Multi-Länder advocacy regions or transit federations (e.g., VBB, MVV). |
+| `regions_de_msas.toml` *(generated, optional)* | Metro-equivalent regions from a Census-style upstream source via the ETL pipeline. Skip if you start hand-curated. |
+| `regions_de.toml` | Hand-curated city/Gemeinde leaves. Parents reference state/multi-state/MSA slugs from the files above (cross-file resolution handled by `internal/loadregions/write.go`'s `RegionIDBySlug` fallback). |
 
-2. **Generate `api/seed/postal_codes_de.csv`.** Take an upstream source
-   (OpenGeoDB, Geonames, official Bundespost data), reshape into the
-   3-column format `postal_code,country,leaf_region_slug`. Each German
-   postcode maps to its leaf city/Gemeinde.
+Per-country file lists live in `api/internal/loaddata/loaddata.go`'s
+`countries` table — add a `{code, regionFiles, postal}` entry there
+when adding a country, in the right load order.
 
-3. **Add DE orgs to `api/seed/orgs.toml`.** Use `region_slugs` to
-   attach them. For an org that works across the VBB area, attach to
-   `["vbb-region"]`. For a Berlin-wide org, attach to `["berlin"]`.
+### Step-by-step
 
-4. **Run `just loaddata` (after updating the recipe to include the new
-   files).** It runs:
+1. **Write `api/seed/regions_de_lander.toml`.** All 16 Länder.
+   `scope_tier=regional`, `kind=de:land`, no parents. Mirror the
+   structure of `regions_us_states.toml`.
 
-   ```sh
-   just loadregions seed/regions_de.toml DE
-   just loadpostal  seed/postal_codes_de.csv DE
-   just seed
-   ```
+2. **(Optional) Write `api/seed/regions_de_multistate.toml`.** Transit
+   federations (VBB, VRR, MVV, …) and any multi-Länder advocacy
+   regions. Parent under the Länder slugs from step 1 where
+   appropriate per rule §3.
 
-5. **Add a per-country postal normalizer if needed.** Edit
-   `api/pkg/atlas/postal.go`. The default normalizer (`uppercase +
-   strip whitespace`) works for DE/FR/MX (5-digit numeric). UK and CA
-   need special handling (outward code / FSA truncation); those are
-   already in place. Australia is 4-digit numeric.
+3. **(Optional) Build the ETL plan.** If Germany has a Census-style
+   reference for metros (e.g., the EU's NUTS-3 codes mapped to
+   FUAs / Stadtregionen), add `api/internal/etl/de/` with parsers +
+   plan registration. Otherwise skip — hand-curating one
+   `regions_de.toml` is fine for low cardinality.
 
-6. **Smoke-test:**
+4. **Write `api/seed/regions_de.toml`.** Cities. For city-states
+   (Berlin, Hamburg, Bremen), use `kind=de:land` + `scope_tier=local`
+   (the editorial override per rule §4). Other cities get
+   `kind=de:kreisfreie-stadt` or `de:gemeinde` + `scope_tier=local`.
 
-   ```sh
-   just lookup 10115 DE     # Berlin-Mitte
-   just lookup 14467 DE     # Potsdam
-   ```
+5. **Generate `api/seed/postal_codes_de.csv`.** Reshape an upstream
+   source (OpenGeoDB, Geonames, official Bundespost data) into the
+   3-column format `postal_code,country,leaf_region_slug` using the
+   smallest-anchor pattern: prefer city leaves, fall through to
+   Länder for un-curated postcodes. The ETL pipeline can do this if
+   you build the DE plan in step 3.
 
-   The first should return Berlin and VBB orgs in Local + Regional.
-   The second should return Brandenburg + VBB orgs in Regional, NOT
-   the Berlin-attached orgs.
+6. **Add DE orgs to `api/seed/orgs.toml`.** Use `region_slugs` to
+   attach them.
 
-That's the entire flow. No schema changes; no code changes for
-typical countries.
+7. **Update `api/internal/loaddata/loaddata.go`.** Add a
+   `{"DE", []string{"de_lander", "de_multistate", "de"}, "de"}`
+   entry so `just loaddata` picks up the new country.
+
+8. **Run `just loaddata` against a fresh dev DB.**
+
+9. **Add a per-country postal normalizer if needed.** Edit
+   `api/pkg/atlas/postal.go`. The default normalizer
+   (`uppercase + strip whitespace`) works for DE (5-digit numeric).
+   UK and CA need special handling (outward code / FSA truncation);
+   those are already in place.
+
+10. **Smoke-test:**
+
+    ```sh
+    just lookup 10115 DE     # Berlin-Mitte
+    just lookup 14467 DE     # Potsdam
+    ```
+
+That's the flow. No schema changes; no code changes beyond the
+single-line addition in `loaddata.go` (and the ETL plan if you
+choose to build one).
 
 ---
 
@@ -434,7 +560,7 @@ contributors don't need to re-decide them.
    country-prefix unless forced.
 2. **Kind**: always country-prefixed (`pt:municipio`, `us:state`,
    `ca:province`).
-3. **`sort_priority`**: use the bands documented in §7 above. New
+3. **`sort_priority`**: use the bands documented in §9 above. New
    country fits or documents a deviation in its design spec.
 4. **`scope_tier`**: editorial per rule §4 (local = city/neighborhood;
    regional = region/metro/state; national = country-wide umbrella per

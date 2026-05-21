@@ -1,57 +1,17 @@
-# Region taxonomy for Canada. No county tier (CA uses regional
-# districts instead); no country tier (per v1 scope).
+# Region taxonomy for Canada (leaves + intermediate regions). The
+# province/territory tier lives in regions_ca_provinces.toml and loads
+# first; entries here reference province slugs as parents via
+# cross-file resolution. No county tier (CA uses regional districts
+# instead); no country tier (per v1 scope).
 
-# --- Provinces ---
-
-[[region]]
-slug = "bc"
-kind = "ca:province"
-name = "British Columbia"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "on"
-kind = "ca:province"
-name = "Ontario"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-[[region]]
-slug = "qc"
-kind = "ca:province"
-name = "Québec"
-scope_tier = "regional"
-sort_priority = 60
-parents = []
-
-# --- Regional districts (BC) / CMAs (StatsCan) ---
-
-[[region]]
-slug = "metro-vancouver"
-kind = "ca:regional-district"
-name = "Metro Vancouver"
-scope_tier = "regional"
-sort_priority = 40
-parents = ["bc"]
-
-[[region]]
-slug = "toronto-cma"
-kind = "ca:cma"
-name = "Greater Toronto Area"
-scope_tier = "regional"
-sort_priority = 40
-parents = ["on"]
-
-[[region]]
-slug = "montreal-cma"
-kind = "ca:cma"
-name = "Greater Montréal"
-scope_tier = "regional"
-sort_priority = 40
-parents = ["qc"]
+# --- CMAs ---
+#
+# All Statistics Canada CMAs live in regions_ca_cmas.toml, generated
+# by `urbanist-atlas-server etl regenerate --country=CA`. Slug + kind
+# overrides for the well-known curated CMAs (toronto-cma,
+# montreal-cma, metro-vancouver) live in api/internal/etl/ca/mappings.go.
+# Load order ensures the CMA file is upserted before this file so the
+# city leaves below can cross-reference CMA slugs as parents.
 
 # --- Cities ---
 

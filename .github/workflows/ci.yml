@@ -53,6 +53,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # Cache the Go module download cache (~/go/pkg/mod) and the
+      # compiled-object build cache (~/.cache/go-build). Keyed on
+      # api/go.sum so the cache invalidates the moment any dep moves;
+      # the restore-key fallback means a go.sum change still hydrates
+      # most of the build cache from the previous run, avoiding a
+      # cold rebuild. On a cache hit this saves ~30-60s on every
+      # PR push (typical: ~100MB of modules + the cgo-free pgx/
+      # testcontainers/chi compile tree).
+      - name: Cache Go modules + build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('api/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       - uses: jdx/mise-action@v4
       - name: Show mise version
         # Surfaces the installed mise version in the job log so a
@@ -74,6 +91,16 @@ jobs:
       # Single source of truth for "what CI runs"; same recipe a
       # contributor runs locally before pushing.
       - run: just api-check
+      # Integration tests (build tag `integration`) spin a Postgres
+      # container per-test via testcontainers-go and exercise the
+      # loadregions → loadpostal → seed → /lookup pipeline end-to-end
+      # against real SQL. Catches FK-resolution, recursive-CTE, and
+      # seed-load regressions the unit suite can't see — e.g., the
+      # diamond-dedup bug (commit 47db5b7) and the suffixed-slug bug
+      # (commit 86a70a5) from slice #7.6 would both have failed this
+      # step immediately. ubuntu-latest runners have Docker installed
+      # and running, so testcontainers Just Works with no extra setup.
+      - run: just api-test-integration
 
   web:
     name: web (vite)

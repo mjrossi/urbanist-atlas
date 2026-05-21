@@ -1,0 +1,395 @@
+# Canadian Census Metropolitan Areas (CMAs), generated from the
+# Statistics Canada CMA boundary file by api/cmd/server etl
+# regenerate --country=CA.
+#
+# Edit policy: do NOT hand-edit this file. Editorial overrides for
+# slug/name/kind live in api/internal/etl/ca/mappings.go (cmaOverrides,
+# keyed by StatsCan CMA UID); change those and re-run etl regenerate.
+#
+# Filtering: only CMATYPE='B' rows from the StatsCan boundary file
+# (true Census Metropolitan Areas, population ≥100k) are emitted.
+# Census Agglomerations (CMATYPE='D') are dropped.
+#
+# Slug convention:
+#   - Override-supplied for the well-known CMAs (toronto-cma,
+#     montreal-cma, metro-vancouver). See ca/mappings.go.
+#   - Auto-generated otherwise as "<slugified-name>-cma".
+#
+# Parents:
+#   - Single-province CMAs parent under their province slug.
+#   - Multi-province CMAs (Ottawa-Gatineau) parent under all their
+#     constituent provinces so MSA-anchored FSAs surface
+#     province-tier orgs through the ancestor walk.
+#
+# Loaded by just loaddata BETWEEN regions_ca_provinces.toml (parents:
+# provinces) and regions_ca.toml (children: curated cities). Cross-file
+# parent resolution lives in internal/loadregions/write.go.
+
+[[region]]
+slug = "abbotsford-mission-cma"
+kind = "ca:cma"
+name = "Abbotsford - Mission"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 932 — Abbotsford - Mission
+
+[[region]]
+slug = "barrie-cma"
+kind = "ca:cma"
+name = "Barrie"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 568 — Barrie
+
+[[region]]
+slug = "belleville-quinte-west-cma"
+kind = "ca:cma"
+name = "Belleville - Quinte West"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 522 — Belleville - Quinte West
+
+[[region]]
+slug = "brantford-cma"
+kind = "ca:cma"
+name = "Brantford"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 543 — Brantford
+
+[[region]]
+slug = "calgary-cma"
+kind = "ca:cma"
+name = "Calgary"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ab"]
+# StatsCan CMA 825 — Calgary
+
+[[region]]
+slug = "chilliwack-cma"
+kind = "ca:cma"
+name = "Chilliwack"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 930 — Chilliwack
+
+[[region]]
+slug = "drummondville-cma"
+kind = "ca:cma"
+name = "Drummondville"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+# StatsCan CMA 447 — Drummondville
+
+[[region]]
+slug = "edmonton-cma"
+kind = "ca:cma"
+name = "Edmonton"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ab"]
+# StatsCan CMA 835 — Edmonton
+
+[[region]]
+slug = "fredericton-cma"
+kind = "ca:cma"
+name = "Fredericton"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nb"]
+# StatsCan CMA 320 — Fredericton
+
+[[region]]
+slug = "greater-sudbury-cma"
+kind = "ca:cma"
+name = "Greater Sudbury"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 580 — Greater Sudbury
+
+[[region]]
+slug = "guelph-cma"
+kind = "ca:cma"
+name = "Guelph"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 550 — Guelph
+
+[[region]]
+slug = "halifax-cma"
+kind = "ca:cma"
+name = "Halifax"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ns"]
+# StatsCan CMA 205 — Halifax
+
+[[region]]
+slug = "hamilton-cma"
+kind = "ca:cma"
+name = "Hamilton"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 537 — Hamilton
+
+[[region]]
+slug = "kamloops-cma"
+kind = "ca:cma"
+name = "Kamloops"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 925 — Kamloops
+
+[[region]]
+slug = "kelowna-cma"
+kind = "ca:cma"
+name = "Kelowna"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 915 — Kelowna
+
+[[region]]
+slug = "kingston-cma"
+kind = "ca:cma"
+name = "Kingston"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 521 — Kingston
+
+[[region]]
+slug = "kitchener-cambridge-waterloo-cma"
+kind = "ca:cma"
+name = "Kitchener - Cambridge - Waterloo"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 541 — Kitchener - Cambridge - Waterloo
+
+[[region]]
+slug = "lethbridge-cma"
+kind = "ca:cma"
+name = "Lethbridge"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ab"]
+# StatsCan CMA 810 — Lethbridge
+
+[[region]]
+slug = "london-cma"
+kind = "ca:cma"
+name = "London"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 555 — London
+
+[[region]]
+slug = "metro-vancouver"
+kind = "ca:regional-district"
+name = "Metro Vancouver"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 933 — Metro Vancouver
+
+[[region]]
+slug = "moncton-cma"
+kind = "ca:cma"
+name = "Moncton"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nb"]
+# StatsCan CMA 305 — Moncton
+
+[[region]]
+slug = "montreal-cma"
+kind = "ca:cma"
+name = "Greater Montréal"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+# StatsCan CMA 462 — Greater Montréal
+
+[[region]]
+slug = "nanaimo-cma"
+kind = "ca:cma"
+name = "Nanaimo"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 938 — Nanaimo
+
+[[region]]
+slug = "oshawa-cma"
+kind = "ca:cma"
+name = "Oshawa"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 532 — Oshawa
+
+[[region]]
+slug = "ottawa-gatineau-cma"
+kind = "ca:cma"
+name = "Ottawa-Gatineau"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc", "on"]
+# StatsCan CMA 505 — Ottawa-Gatineau
+
+[[region]]
+slug = "peterborough-cma"
+kind = "ca:cma"
+name = "Peterborough"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 529 — Peterborough
+
+[[region]]
+slug = "quebec-cma"
+kind = "ca:cma"
+name = "Québec"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+# StatsCan CMA 421 — Québec
+
+[[region]]
+slug = "red-deer-cma"
+kind = "ca:cma"
+name = "Red Deer"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ab"]
+# StatsCan CMA 830 — Red Deer
+
+[[region]]
+slug = "regina-cma"
+kind = "ca:cma"
+name = "Regina"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sk"]
+# StatsCan CMA 705 — Regina
+
+[[region]]
+slug = "saguenay-cma"
+kind = "ca:cma"
+name = "Saguenay"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+# StatsCan CMA 408 — Saguenay
+
+[[region]]
+slug = "saint-john-cma"
+kind = "ca:cma"
+name = "Saint John"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nb"]
+# StatsCan CMA 310 — Saint John
+
+[[region]]
+slug = "saskatoon-cma"
+kind = "ca:cma"
+name = "Saskatoon"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sk"]
+# StatsCan CMA 725 — Saskatoon
+
+[[region]]
+slug = "sherbrooke-cma"
+kind = "ca:cma"
+name = "Sherbrooke"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+# StatsCan CMA 433 — Sherbrooke
+
+[[region]]
+slug = "st-catharines-niagara-cma"
+kind = "ca:cma"
+name = "St. Catharines - Niagara"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 539 — St. Catharines - Niagara
+
+[[region]]
+slug = "st-johns-cma"
+kind = "ca:cma"
+name = "St. John's"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nl-province"]
+# StatsCan CMA 001 — St. John's
+
+[[region]]
+slug = "thunder-bay-cma"
+kind = "ca:cma"
+name = "Thunder Bay"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 595 — Thunder Bay
+
+[[region]]
+slug = "toronto-cma"
+kind = "ca:cma"
+name = "Greater Toronto Area"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 535 — Greater Toronto Area
+
+[[region]]
+slug = "trois-rivieres-cma"
+kind = "ca:cma"
+name = "Trois-Rivières"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+# StatsCan CMA 442 — Trois-Rivières
+
+[[region]]
+slug = "victoria-cma"
+kind = "ca:cma"
+name = "Victoria"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 935 — Victoria
+
+[[region]]
+slug = "windsor-cma"
+kind = "ca:cma"
+name = "Windsor"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 559 — Windsor
+
+[[region]]
+slug = "winnipeg-cma"
+kind = "ca:cma"
+name = "Winnipeg"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mb"]
+# StatsCan CMA 602 — Winnipeg
