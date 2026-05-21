@@ -195,21 +195,21 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 	// in that order. We seed one ZCTA per bucket plus one that should
 	// short-circuit to "unknown".
 	zctaPlace := map[string]ZCTAPlace{
-		"10001": {PlaceGEOID: "3651000"},     // NYC city — not in placeToLeaf, falls through
-		"02115": {PlaceGEOID: "2507000"},     // Boston city → city-leaf
-		"60601": {PlaceGEOID: "1714000"},     // Chicago city → city-leaf (also Cook County)
-		"60002": {PlaceGEOID: "1700000"},     // unknown place → fall through to county
-		"99999": {PlaceGEOID: "0000000"},     // unknown both → unknown bucket
-		"39580": {PlaceGEOID: "3754860"},     // Raleigh (not curated) → fall through to MSA
+		"10001": {PlaceGEOID: "3651000"}, // NYC city — not in placeToLeaf, falls through
+		"02115": {PlaceGEOID: "2507000"}, // Boston city → city-leaf
+		"60601": {PlaceGEOID: "1714000"}, // Chicago city → city-leaf (also Cook County)
+		"60002": {PlaceGEOID: "1700000"}, // unknown place → fall through to county
+		"99999": {PlaceGEOID: "0000000"}, // unknown both → unknown bucket
+		"39580": {PlaceGEOID: "3754860"}, // Raleigh (not curated) → fall through to MSA
 	}
 	zctaCounty := map[string]ZCTACounty{
-		"10001": {CountyGEOID: "36061"},      // Manhattan → nyc-borough
-		"02115": {CountyGEOID: "25025"},      // Suffolk County, MA
-		"60601": {CountyGEOID: "17031"},      // Cook County — but place-leaf wins
-		"60002": {CountyGEOID: "17031"},      // Cook County → county-leaf
-		"39580": {CountyGEOID: "37183"},      // Wake County, NC → MSA
+		"10001": {CountyGEOID: "36061"}, // Manhattan → nyc-borough
+		"02115": {CountyGEOID: "25025"}, // Suffolk County, MA
+		"60601": {CountyGEOID: "17031"}, // Cook County — but place-leaf wins
+		"60002": {CountyGEOID: "17031"}, // Cook County → county-leaf
+		"39580": {CountyGEOID: "37183"}, // Wake County, NC → MSA
 		// 99999 has no county row.
-		"82001": {CountyGEOID: "56021"},      // Cheyenne, WY → state fallback
+		"82001": {CountyGEOID: "56021"}, // Cheyenne, WY → state fallback
 	}
 	countyToMSA := map[string]string{
 		"25025": "14460", // Boston MSA
@@ -287,5 +287,55 @@ func TestSlugify_DoesNotPropagateInteriorWhitespace(t *testing.T) {
 	// hyphen (prevDash blocks the leading separator from emitting).
 	if strings.HasPrefix(slugify(in), "-") {
 		t.Errorf("slugify must not emit leading hyphen")
+	}
+}
+
+func TestWritePostalCodesCSV_MergesAndDedupsWithZCTAWinning(t *testing.T) {
+	// ZCTA pass produced two ZIPs (10001 → manhattan, 20002 →
+	// washington-dc); HUD pass produced one new ZIP (20811 →
+	// washington-dc-metro) and one duplicate of a ZCTA ZIP
+	// (10001 → nyc-metro). The merge must emit three rows sorted
+	// ASC by postal_code, with the ZCTA-source anchor for 10001
+	// winning the tie against the HUD entry.
+	zcta := []PostalAnchor{
+		{ZCTA: "10001", AnchorSlug: "manhattan", Reason: "nyc-borough"},
+		{ZCTA: "20002", AnchorSlug: "washington-dc", Reason: "city-leaf"},
+	}
+	hud := []PostalAnchor{
+		{ZCTA: "20811", AnchorSlug: "washington-dc-metro", Reason: "hud:msa"},
+		{ZCTA: "10001", AnchorSlug: "nyc-metro", Reason: "hud:msa"},
+	}
+	var buf strings.Builder
+	if err := WritePostalCodesCSV(&buf, zcta, hud); err != nil {
+		t.Fatalf("WritePostalCodesCSV: %v", err)
+	}
+	got := buf.String()
+	want := "postal_code,country,leaf_region_slug\n" +
+		"10001,US,manhattan\n" +
+		"20002,US,washington-dc\n" +
+		"20811,US,washington-dc-metro\n"
+	if got != want {
+		t.Errorf("CSV (-want +got):\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestWritePostalCodesCSV_NilHUDPreservesZCTAOnlyBehavior(t *testing.T) {
+	// Pre-#7.5.5 callers (none post-merge, but defensive) can still
+	// pass nil for the HUD slice and get ZCTA-only output sorted by
+	// postal code.
+	zcta := []PostalAnchor{
+		{ZCTA: "20002", AnchorSlug: "washington-dc"},
+		{ZCTA: "10001", AnchorSlug: "manhattan"},
+	}
+	var buf strings.Builder
+	if err := WritePostalCodesCSV(&buf, zcta, nil); err != nil {
+		t.Fatalf("WritePostalCodesCSV: %v", err)
+	}
+	got := buf.String()
+	want := "postal_code,country,leaf_region_slug\n" +
+		"10001,US,manhattan\n" +
+		"20002,US,washington-dc\n"
+	if got != want {
+		t.Errorf("CSV (-want +got):\nwant:\n%s\ngot:\n%s", want, got)
 	}
 }
