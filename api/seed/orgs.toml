@@ -520,6 +520,14 @@ website_url = "https://www.ourstreetsmn.org"
 tags = ["cycling", "walking", "safe-streets", "advocacy"]
 region_slugs = ["minneapolis-mn-metro"]
 
+[[org]]
+slug = "streets-mn"
+name = "Streets.mn"
+short_desc = "Twin Cities 501(c)(3) publication/advocacy nonprofit fostering conversation about transportation, land use, and urban planning across Minnesota; daily articles by community contributors on transit, bike corrals, and zoning."
+website_url = "https://streets.mn"
+tags = ["transit", "urbanism", "media", "advocacy", "land-use"]
+region_slugs = ["minneapolis-mn-metro"]
+
 # --- San Diego ---
 
 [[org]]
