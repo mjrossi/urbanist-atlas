@@ -500,6 +500,39 @@ website_url = "https://ieba.clubexpress.com"
 tags = ["cycling", "advocacy", "regional"]
 region_slugs = ["riverside-ca-metro"]
 
+[[org]]
+slug = "friends-of-cv-link"
+name = "Friends of CV Link"
+short_desc = "Palm Springs-based 501(c)(3) advocating for the CV Link — a 40-mile car-free walking and cycling corridor across the Coachella Valley — and the safer streets and accessible mobility it represents for Riverside County's eastern desert communities."
+website_url = "https://www.friendscvlink.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["riverside-ca-metro"]
+
+# Third-org gap researched 2026-05-21 per slice #7.7's top-20 metro
+# uplift: the Inland Empire reaches 2 metro-level orgs (Inland Empire
+# Biking Alliance + Friends of CV Link). Candidates considered and
+# excluded:
+#   - SAFE Inland Empire (safe-ie.org) — operates as the first chapter
+#     of SAFE LA's 501(c)(3), not independently incorporated; its own
+#     website carries 2023-vintage statistics and undated event entries
+#     with no 2026-dated content (2026 mentions exist in external press
+#     like The Breeze 2026-01-18, but the activity bar requires dated
+#     evidence on the org's own site). Strongest borderline case —
+#     revisit if SAFE-IE incorporates independently or refreshes its
+#     site with 2026 content.
+#   - Inland Empire Urbanists — active and in-scope per Streetsblog
+#     California coverage, but the org has no website, only a Google
+#     Form. Revisit if a real site stands up.
+#   - CCAEJ, PC4EJ, El Sol — environmental-justice / community-health
+#     orgs whose transit/streets work is adjacent rather than central.
+#   - Californians for Electric Rail, The Transit Coalition — LA- or
+#     statewide-anchored groups parachuting into IE campaigns; would
+#     count at a state or LA tier, not IE metro.
+# Calbike covers the metro via the state-floor ancestor walk for ca.
+# Per slice #7.7's quality-over-quantity principle, a documented gap
+# is preferable to admitting a candidate that fails the activity bar
+# or the independent-nonprofit criterion.
+
 # --- Detroit ---
 
 [[org]]
