@@ -583,6 +583,19 @@ website_url = "https://www.greaterdenvertransit.com"
 tags = ["transit", "grassroots", "advocacy", "regional"]
 region_slugs = ["denver-co-metro"]
 
+# Third-org gap researched 2026-05-21 per slice #7.7's top-20 metro
+# uplift: Denver Streets Partnership (above) and Greater Denver Transit
+# (above) are the two clear metro-level advocacy nonprofits. Other
+# candidates considered and excluded: Mile High Connects closed its
+# doors in 2022 after a 10-year run; Streetsblog Denver shut down at
+# the end of January 2022 (operated by DSP); Denver Bicycle Lobby's
+# website carries 2023-vintage content with no current meeting date;
+# Community Cycles is Boulder-anchored (separate metro footprint);
+# Bikes Together is a community bike shop, not an advocacy nonprofit.
+# Bicycle Colorado covers the metro via the state-floor ancestor walk.
+# Worth revisiting if a maintainer surfaces an active Denver-metro
+# advocacy entity.
+
 # --- St. Louis ---
 
 [[org]]
