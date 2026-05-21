@@ -90,3 +90,97 @@ func Crosswalk(
 	}
 	return out, reasonCounts
 }
+
+// CrosswalkHUDBackfill produces PostalAnchor rows for ZIPs that the
+// Census ZCTA crosswalk could not resolve. HUD's quarterly USPS
+// ZIP-to-County crosswalk covers P.O. Box-only ZIPs, single-building
+// ZIPs, APO/FPO ZIPs, and the long tail of ZIPs Census omits from
+// ZCTA (~5-10k US ZIPs depending on vintage).
+//
+// Algorithm, per ZIP not already in zctaAnchors:
+//
+//  1. Group huds by ZIP; pick the row with max(TOT_RATIO) as the
+//     primary-county row. TOT_RATIO (residential + business + other)
+//     keeps P.O. Box-only ZIPs anchoring correctly, where a
+//     RES_RATIO pick would be undefined (RES_RATIO == 0 across all
+//     rows of a P.O. Box-only ZIP).
+//  2. Walk the primary county FIPS through the existing fallback
+//     chain (same order as Crosswalk, minus the place-leaf tier
+//     since HUD doesn't carry a place GEOID):
+//     - NYC borough (county ∈ {36005, 36047, 36061, 36081, 36085})
+//     → "hud:nyc-borough"
+//     - countyToLeaf (Cook, Lake-IN) → "hud:county-leaf"
+//     - countyToMSA via msaSlugs → "hud:msa"
+//     - stateFIPSToSlug via county[:2] → "hud:state"
+//     - else: silently drop (no PostalAnchor emitted; the operator
+//     can compare the input HUD row count against the returned
+//     anchor count to see the drop count)
+//
+// Output is sorted by ZIP ASC so the merged CSV stays deterministic
+// regardless of HUD's source ordering.
+//
+// CrosswalkHUDBackfill does NOT mutate or shadow the existing
+// Crosswalk output — it is purely additive. ZCTA-resolved ZIPs always
+// win any tie at the writer layer (see WritePostalCodesCSV).
+func CrosswalkHUDBackfill(
+	huds []HUDZipCounty,
+	zctaAnchors []PostalAnchor,
+	countyToMSA map[string]string,
+	msaSlugs map[string]string, // CBSA code → slug
+) []PostalAnchor {
+	// Build set of ZIPs already resolved by ZCTA.
+	resolved := make(map[string]struct{}, len(zctaAnchors))
+	for _, a := range zctaAnchors {
+		resolved[a.ZCTA] = struct{}{}
+	}
+
+	// Group HUD rows by ZIP, keeping only the max-TOT_RATIO row per
+	// ZIP. Stable tiebreak on the first row we encountered keeps
+	// the choice deterministic when two rows match exactly.
+	type row struct {
+		county string
+		tot    float64
+	}
+	pick := make(map[string]row, len(huds))
+	for _, h := range huds {
+		if _, skip := resolved[h.ZIP]; skip {
+			continue
+		}
+		cur, seen := pick[h.ZIP]
+		if !seen || h.TotRatio > cur.tot {
+			pick[h.ZIP] = row{county: h.County, tot: h.TotRatio}
+		}
+	}
+
+	// Walk the fallback for each picked ZIP; collect placed anchors.
+	zips := make([]string, 0, len(pick))
+	for z := range pick {
+		zips = append(zips, z)
+	}
+	sort.Strings(zips)
+
+	out := make([]PostalAnchor, 0, len(zips))
+	for _, z := range zips {
+		county := pick[z].county
+		anchor := PostalAnchor{ZCTA: z}
+		switch {
+		case nycBoroughCounty[county] != "":
+			anchor.AnchorSlug = nycBoroughCounty[county]
+			anchor.Reason = "hud:nyc-borough"
+		case countyToLeaf[county] != "":
+			anchor.AnchorSlug = countyToLeaf[county]
+			anchor.Reason = "hud:county-leaf"
+		case msaSlugs[countyToMSA[county]] != "":
+			anchor.AnchorSlug = msaSlugs[countyToMSA[county]]
+			anchor.Reason = "hud:msa"
+		case len(county) >= 2 && stateFIPSToSlug[county[:2]] != "":
+			anchor.AnchorSlug = stateFIPSToSlug[county[:2]]
+			anchor.Reason = "hud:state"
+		}
+		if anchor.AnchorSlug == "" {
+			continue
+		}
+		out = append(out, anchor)
+	}
+	return out
+}
