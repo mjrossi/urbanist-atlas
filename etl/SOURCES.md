@@ -16,7 +16,7 @@ Design at
 
 ## US
 
-Sources pinned by slice #7.5.3. Files live under `etl/sources/us/`
+Sources pinned by slice #7.5.3 + #7.5.5. Files live under `etl/sources/us/`
 (gitignored).
 
 | File                                  | Vintage          | URL                                                                                                                            | sha256 |
@@ -25,6 +25,35 @@ Sources pinned by slice #7.5.3. Files live under `etl/sources/us/`
 | `list1_2023.csv`                      | (derived from xlsx)         | (run `etl/scripts/xlsx_to_csv.py list1_2023.xlsx list1_2023.csv`)                                                              | `6ad49da23ac95fe35f6e038e6ebc54b59b071d1503c1bde249d0a585f199b14a` |
 | `tab20_zcta520_place20_natl.txt`      | Census ZCTA-to-place, 2020  | https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_place20_natl.txt                                | `698a5dad71ed419411677d0ffd8ecd9331067f59c472cdd239b92c12f698285d` |
 | `tab20_zcta520_county20_natl.txt`     | Census ZCTA-to-county, 2020 | https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt                               | `3ed41278d637dc249e0323306f68be8a6c234e3090f4de88ef328dee71aeaaaf` |
+| `hud_zip_county_2026q1.csv`           | HUD USPS ZIP-to-County, 2026-Q1 | https://www.huduser.gov/portal/dataset/uspszip-api.html (download requires HUD account; pick the most-recent quarterly release) | `TBD — operator fills on first download (see HUD note below)` |
+
+### HUD download — operator note
+
+The HUD USPS ZIP Crosswalk requires a HUDUser account
+(<https://www.huduser.gov/portal/dataset/uspszip-api.html>). The
+direct download URL is account-scoped, so we can't pin a canonical
+public URL the way Census files allow. On the first download:
+
+1. Sign in to HUDUser, navigate to the *USPS ZIP Code Crosswalk
+   Files*, pick the most recent **ZIP-to-County** release (quarterly
+   cadence), and save the CSV to
+   `etl/sources/us/hud_zip_county_YYYYqN.csv` (replace `YYYYqN` with
+   the release label — e.g., `hud_zip_county_2026q1.csv`).
+2. Compute the sha256 of the saved file
+   (`shasum -a 256 etl/sources/us/hud_zip_county_*.csv`) and paste it
+   into the table above plus the `SHA256` field in
+   `api/internal/etl/us/us.go`. Commit both edits together.
+3. Re-run `urbanist-atlas-server etl regenerate --country=US` to
+   produce the updated `api/seed/postal_codes_us.csv` with HUD
+   backfill rows (~5–10k net-new rows; ZCTA-source rows unchanged).
+
+Subsequent vintage upgrades follow the same recipe — see *Vintage
+upgrade workflow* below.
+
+License: HUD USPS Crosswalk files are public-domain US-government
+data (HUD is a federal agency; works of the US government are not
+subject to copyright under 17 U.S.C. § 105). See `LICENSE-DATA` for
+attribution recommendation.
 
 ### Manual refresh workflow
 
@@ -42,6 +71,8 @@ mkdir -p etl/sources/us && cd etl/sources/us
 curl -O https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx
 curl -O https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_place20_natl.txt
 curl -O https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt
+# HUD ZIP-County CSV: download manually via HUDUser portal (account
+# required), save as hud_zip_county_YYYYqN.csv (e.g., hud_zip_county_2026q1.csv).
 
 # 3. Convert the xlsx to CSV.
 python3 ../../scripts/xlsx_to_csv.py list1_2023.xlsx list1_2023.csv
@@ -49,7 +80,7 @@ python3 ../../scripts/xlsx_to_csv.py list1_2023.xlsx list1_2023.csv
 # 4. Verify checksums against this file. Mismatch = upstream vintage
 #    changed; bump the entries above and re-review the generated
 #    seed diff.
-shasum -a 256 list1_2023.xlsx list1_2023.csv tab20_*.txt
+shasum -a 256 list1_2023.xlsx list1_2023.csv tab20_*.txt hud_zip_county_*.csv
 
 # 5. Run the ETL.
 cd ../../../api
