@@ -126,7 +126,7 @@ root** (Fly's standard) and uses a two-stage Alpine build:
   `api/seed/`.
 - `ENTRYPOINT ["urbanist-atlas-server"]`, `CMD ["serve"]`. The
   `fly.toml` overrides the CMD where needed (e.g.,
-  `release_command = "urbanist-atlas-server migrate up"`).
+  `release_command = "migrate up"`).
 
 The historical slice-#19 Dockerfile (commit `e37c12f`) is the
 reference for the structure; the only fix on restoration is dropping
@@ -153,7 +153,7 @@ primary_region = "iad"
   dockerfile = "Dockerfile"
 
 [deploy]
-  release_command = "urbanist-atlas-server migrate up"
+  release_command = "migrate up"
 
 [env]
   URBANIST_PORT = "8080"

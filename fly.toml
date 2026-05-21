@@ -1,59 +1,42 @@
-# fly.toml — urbanist-atlas API
+# fly.toml app configuration file generated for urbanist-atlas on 2026-05-21T16:30:06-04:00
 #
-# Single Fly app for the API; sibling app `urbanist-atlas-db` runs
-# postgres:17-alpine (see infra/postgres/fly.toml). The QA hostname
-# qa-api.urbanistatlas.com is attached via `flyctl certs add` once
-# DNS is in place; production hostname (api.urbanistatlas.com) is
-# added to this same app at prod launch — no re-architecture.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Design doc: docs/superpowers/specs/2026-05-21-fly-redeploy-design.md
-# Runbook:    docs/deploy.md
 
-app = "urbanist-atlas"
-primary_region = "iad"
+app = 'urbanist-atlas'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
-# Migrations run on every deploy via the same binary that serves
-# traffic — embedded migrations (api/migrations/embed.go) mean no
-# version skew is possible between code and schema. Failure here
-# blocks the deploy, which is intentional.
 [deploy]
-  release_command = "urbanist-atlas-server migrate up"
+  # release_command is APPENDED to the Dockerfile ENTRYPOINT
+  # (["urbanist-atlas-server"]), so don't repeat the binary name here.
+  release_command = 'migrate up'
 
-# Non-secret env vars. Secrets (DATABASE_URL, URBANIST_ADMIN_TOKEN,
-# URBANIST_CLIENT_SECRET) are set via `flyctl secrets set`. See the
-# runbook in docs/deploy.md §3.
 [env]
-  URBANIST_PORT = "8080"
-  URBANIST_LOG_FORMAT = "json"
-  URBANIST_STORE = "postgres"
-  URBANIST_SEED_DIR = "/app/seed"
-  # CORS allowlist for Phase 1. `*.pages.dev` covers automatic Pages
-  # PR previews. At prod launch this grows to include
-  # https://urbanistatlas.com; once QA retires, drop the qa.* entry.
-  URBANIST_CORS_ORIGINS = "https://qa.urbanistatlas.com,*.pages.dev"
+  URBANIST_CORS_ORIGINS = 'https://qa.urbanistatlas.com,*.pages.dev'
+  URBANIST_LOG_FORMAT = 'json'
+  URBANIST_PORT = '8080'
+  URBANIST_SEED_DIR = '/app/seed'
+  URBANIST_STORE = 'postgres'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  # Keep one machine warm so dogfooders never hit a cold start. Extra
-  # machines (Fly scales horizontally on concurrency) auto-suspend on
-  # idle — faster wake than "stop", still billing-efficient.
-  auto_stop_machines = "suspend"
+  auto_stop_machines = 'suspend'
   auto_start_machines = true
   min_machines_running = 1
-  processes = ["app"]
+  processes = ['app']
 
   [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    timeout = "5s"
-    path = "/healthz"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/healthz'
 
 [[vm]]
-  cpu_kind = "shared"
+  cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256

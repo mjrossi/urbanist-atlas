@@ -131,37 +131,41 @@ deploy.
 
 Non-secret config is already in `fly.toml`'s `[env]` block
 (`URBANIST_LOG_FORMAT`, `URBANIST_STORE`, `URBANIST_SEED_DIR`,
-`URBANIST_PORT`, `URBANIST_CORS_ORIGINS`). Secrets go via
-`flyctl secrets set`:
+`URBANIST_PORT`, `URBANIST_CORS_ORIGINS`). Three secrets go via
+`flyctl secrets set` — and one of them (`URBANIST_CLIENT_SECRET`)
+needs to be captured locally for the Cloudflare Pages dashboard in §
+Cloudflare Pages + DNS, because Fly secrets are write-only after set
+(`flyctl secrets list` only shows digests). So pre-generate the
+captured values, echo the one you'll paste later, then set everything
+in one call:
 
 ```sh
+ADMIN_TOKEN="$(openssl rand -hex 32)"
+CLIENT_SECRET="$(openssl rand -hex 32)"
+echo "CLIENT_SECRET=$CLIENT_SECRET"   # → paste into password manager / Pages dashboard NOW
+
 flyctl secrets set \
     DATABASE_URL="postgres://urbanist:${PG_PASSWORD}@urbanist-atlas-db.internal:5432/urbanist_atlas?sslmode=disable" \
-    URBANIST_ADMIN_TOKEN="$(openssl rand -hex 32)" \
-    URBANIST_CLIENT_SECRET="$(openssl rand -hex 32)" \
-    -a urbanist-atlas
-```
-
-(`URBANIST_ADMIN_TOKEN` is pre-staged for Phase 2;
-`URBANIST_CLIENT_SECRET` is read by the slice-#23 `X-Atlas-Client`
-middleware and must match the value in the Cloudflare Pages
-`VITE_API_CLIENT_SECRET` env.)
-
-Capture the `URBANIST_CLIENT_SECRET` value — you'll paste it into the
-Cloudflare Pages dashboard in § Cloudflare Pages + DNS. Re-read via
-`flyctl secrets list -a urbanist-atlas` (digests only — set values
-are write-only on Fly), so capture at set time:
-
-```sh
-CLIENT_SECRET="$(openssl rand -hex 32)"
-echo "CLIENT_SECRET=$CLIENT_SECRET"     # → paste into Pages dashboard
-flyctl secrets set \
+    URBANIST_ADMIN_TOKEN="$ADMIN_TOKEN" \
     URBANIST_CLIENT_SECRET="$CLIENT_SECRET" \
     -a urbanist-atlas
 ```
 
-(The two `flyctl secrets set` invocations above merge — Fly de-dupes
-on key name.)
+`${PG_PASSWORD}` is the value captured in § Fly step 1 when you set
+`POSTGRES_PASSWORD` on the DB app. If the shell session that captured
+it has closed, re-`export` it from your password manager before
+running this block.
+
+`URBANIST_ADMIN_TOKEN` is pre-staged for Phase 2 (no-op until admin
+endpoints land). `URBANIST_CLIENT_SECRET` is read by the slice-#23
+`X-Atlas-Client` middleware and must match the
+`VITE_API_CLIENT_SECRET` value you set in the Cloudflare Pages
+dashboard.
+
+> **Fish users:** translate `VAR=value` → `set VAR value` and
+> `"$(cmd)"` → `(cmd)` (fish doesn't do command substitution inside
+> double quotes); see the API smoke section's example for the
+> equivalent fish form.
 
 ### 4. First deploy
 
@@ -176,9 +180,10 @@ The deploy:
    the `urbanist-atlas-server` binary at `/usr/local/bin/` and the
    seed dir at `/app/seed`.
 2. Pushes the image to Fly's registry.
-3. Runs `release_command = "urbanist-atlas-server migrate up"` in a
-   one-off machine against the `DATABASE_URL` secret. Migration
-   failure blocks the deploy.
+3. Runs `release_command = "migrate up"` in a one-off machine against
+   the `DATABASE_URL` secret (the Dockerfile's
+   `ENTRYPOINT ["urbanist-atlas-server"]` is prepended automatically).
+   Migration failure blocks the deploy.
 4. Starts a new app machine; old machine drains after the health-check
    on the new one passes.
 
@@ -520,13 +525,19 @@ every commit hash are reused as-is.
 ## Troubleshooting
 
 **`flyctl deploy` fails during the release_command step.**
-The `release_command` runs `urbanist-atlas-server migrate up` in a
-one-off machine before the new app machine takes traffic. Check
+The `release_command = "migrate up"` runs in a one-off machine before
+the new app machine takes traffic; Fly prepends the Dockerfile
+`ENTRYPOINT ["urbanist-atlas-server"]` automatically. Check
 `flyctl logs -a urbanist-atlas` for the migration error (usually a
 Goose SQL syntax issue or a missing column from a hand-applied prior
 migration). Migrations are embedded in the binary
 (`api/migrations/embed.go`), so the deployed code and the migration
-set are always in lockstep — no version-skew failure mode.
+set are always in lockstep — no version-skew failure mode. **Gotcha:**
+if you ever rewrite the release_command, do **not** repeat the binary
+name (`urbanist-atlas-server migrate up`) — Fly appends to ENTRYPOINT,
+not replaces it, so a doubled name shows up as `urbanist-atlas-server
+urbanist-atlas-server ...` and the binary sees the second
+`urbanist-atlas-server` as a subcommand and exits non-zero.
 
 **`/healthz` returns 200 but `/api/v1/lookup` returns 401.**
 Expected when calling without the `X-Atlas-Client` header. Either

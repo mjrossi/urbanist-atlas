@@ -9,7 +9,7 @@
 # overrides on top of this.
 
 [tools]
-"aqua:concourse/concourse/fly" = "latest"
+"aqua:superfly/flyctl" = "latest"
 
 [env]
 # Human-friendly logs in dev; production stays JSON via mise.toml's default.
