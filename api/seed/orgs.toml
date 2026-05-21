@@ -72,6 +72,23 @@ contact_url = "https://walksf.org/contact-us/"
 tags = ["walking", "safe-streets", "vision-zero"]
 region_slugs = ["sf"]
 
+[[org]]
+slug = "sf-bicycle-coalition"
+name = "San Francisco Bicycle Coalition"
+short_desc = "501(c)(4) SF cycling advocacy nonprofit since 1971 with 6,000+ dues-paying members; organizes Bike to Work Day, Bike Buddies mentorship, Energizer Stations, and Board-of-Directors-led infrastructure campaigns."
+website_url = "https://sfbike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["sf"]
+
+[[org]]
+slug = "bike-east-bay"
+name = "Bike East Bay"
+short_desc = "Oakland-based East Bay (Alameda + Contra Costa counties) cycling advocacy nonprofit since 1972 with 4,000+ members; campaigns for the East Bay Greenway, San Pablo Ave multimodal corridor, and a protected Lake Merritt Loop."
+website_url = "https://bikeeastbay.org"
+contact_url = "https://bikeeastbay.org/contact/"
+tags = ["cycling", "advocacy", "safe-streets", "regional"]
+region_slugs = ["sf-bay-area"]
+
 # --- Boston region ---
 
 [[org]]
