@@ -244,7 +244,7 @@ are `application/json`; error responses are
 `application/problem+json` with stable `type` URIs under
 `https://urbanistatlas.com/problems/{slug}` and a `request_id`
 extension echoing the `X-Request-ID` header. CORS allows
-`urbanistatlas.com`, `*.pages.dev`, and `localhost:5173`. Admin
+`urbanistatlas.com`, `*.<account>.workers.dev`, and `localhost:5173`. Admin
 endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 
 ## Hosting
@@ -285,7 +285,7 @@ The API ships in two phases — see roadmap slices #22–#28 for the
 implementation slices.
 
 - **Phase 1 — locked-down dogfooding (launch state).** CORS allowlist
-  is restricted to `urbanistatlas.com` + `*.pages.dev`. A shared
+  is restricted to `urbanistatlas.com` + `*.<account>.workers.dev`. A shared
   `X-Atlas-Client` secret header (bundled into the frontend build via
   `VITE_API_CLIENT_SECRET`, checked by the backend against
   `URBANIST_CLIENT_SECRET`) keeps casual scrapers out. Only `/healthz`
