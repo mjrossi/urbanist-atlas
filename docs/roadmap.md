@@ -144,6 +144,27 @@ the plan is the *design* view.
   `etl/SOURCES.md` + `api/internal/etl/us/us.go` and re-runs
   `etl regenerate --country=US` to materialize the ~5–10k net-new
   rows in `api/seed/postal_codes_us.csv`.
+- **Org-seed growth (slice #7.6):** Expanded `api/seed/orgs.toml` from
+  23 curated entries (19 US/CA + 4 PT) to 111 via two independent
+  coverage gates — a universal state/province floor (every US state +
+  every CA province has ≥1 org or a documented `# gap`) and a top-30
+  metro gate (≥1 metro-anchored org per metro in the 25 US + 5 CA
+  canvas). Closing tally: 88 net-new orgs, 13 documented gaps (9 US:
+  WV, AR, OK, KS, ND, SD, NV, WY, PR; 4 CA: PE, SK, NB, plus YT/NT/NU
+  consolidated), and 1 multi-anchored org (The Street Trust). Design
+  spec: `docs/superpowers/specs/2026-05-20-org-seed-growth-design.md`.
+- **Top-20 metro depth pass (slice #7.7):** Raised the metro gate to
+  ≥3 orgs per top-20 metro (top-21–30 stays at ≥1). Boston gets the
+  showcase treatment at 5 metro orgs (TransitMatters, LivableStreets,
+  Boston Cyclists Union, A Better City, MBTA Advisory Board) plus
+  WalkMassachusetts at the state floor. LA, Chicago, Dallas, Houston,
+  Philadelphia, Atlanta, SF Bay, Seattle, Minneapolis, Phoenix,
+  Detroit, and St. Louis lift to ≥3 metro orgs each. Four top-20
+  metros end the pass with documented third-org gaps (Miami at 2,
+  Inland Empire at 2, Tampa at 1, Denver at 2) rather than padding
+  with dormant or out-of-scope candidates. Final tally: 23 net-new
+  orgs (orgs.toml grows from 111 → 134). Design spec gate language
+  updated in the same spec.
 - **X-Atlas-Client shared-secret gate (slice #23):**
   `api/internal/httpapi/clientsecret.go` middleware checks
   `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via
@@ -222,7 +243,8 @@ The rows remain in the tables below for traceability.
 | 7.5.3 | **US MSAs + ~34k ZCTA postal codes** *(shipped)* | New `internal/etl/us` package parses Census CBSA delineation (xlsx → CSV via `etl/scripts/xlsx_to_csv.py`) + ZCTA-to-place + ZCTA-to-county. Generates `regions_us_msas.toml` (393 entries) using `regions_us_msa_overrides.toml` for the 7 known metros (nyc-metro, chicago-metro, sf-bay-area, greater-boston, greater-miami, seattle-metro, greater-la). Generates `postal_codes_us.csv` (~33.7k rows) via smallest-anchor crosswalk. `loadpostal` switched to batched `unnest` upserts via raw `pgx.Exec` to avoid 33k per-row round-trips on Heroku. New `regions_us_multistate.toml` carved out of `regions_us.toml` to break the circular load order between MSAs and curated leaves. Integration tests passing in ~36s. |
 | 7.5.4 | **CA CMAs + 1,643 FSA postal codes** *(shipped)* | New `internal/etl/ca` package parses the StatsCan FSA + CMA boundary file DBF tables (extracted from the boundary zips inside the ETL; shapefile geometry ignored). Generates `regions_ca_cmas.toml` (41 CMAs filtered to type='B', with overrides for toronto-cma/montreal-cma/metro-vancouver/ottawa-gatineau-cma) and `postal_codes_ca.csv` (1,643 rows). FSA→CMA mapping uses a coarse FSA-prefix table (M, L1/3/4/5/6 → Toronto; H → Montréal; V5-7 → Vancouver; K1-2 + J8-9 → Ottawa-Gatineau; T2-3 → Calgary; T5-6 → Edmonton; L8-9 → Hamilton) in lieu of the restricted-licence PCCF. Minimal stdlib-only DBF reader; Latin-1 → UTF-8 decoding for accented CMA names. Anchor distribution: 10 city-leaf, 522 CMA, 1111 province. Closes #7.5. |
 | 7.5.5 | **Non-ZCTA ZIP fallback** *(shipped — code; data diff deferred to operator)* | Census ZCTA excludes P.O. Box-only ZIPs, single-building ZIPs, and APO/FPO ZIPs — so `/lookup?postal_code=20811` (Bethesda P.O. Box) returned `postal-code-not-found` pre-#7.5.5. Adds HUD's quarterly USPS ZIP-to-County crosswalk as a second US ETL source via `api/internal/etl/us/hud.go` + `CrosswalkHUDBackfill` (sibling to the existing untouched `Crosswalk`); emits fallback rows only for ZIPs absent from ZCTA, picking max-`TOT_RATIO` row (correct for P.O. Box-only ZIPs where `RES_RATIO=0`) and walking county FIPS through the existing `nyc-borough → county-leaf → msa → state` chain. Writer merges + dedups with ZCTA winning. CA needs no equivalent — FSA-prefix → province fallback in #7.5.4 already covers P.O. Box FSAs. HUD pin in `etl/SOURCES.md` (sha256 TBD by operator on first HUDUser download); integration-test regression on 20811 via synthetic anchor fixture. §Out-of-coverage UX of [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md) updated. Operator follow-up: run `etl regenerate --country=US` after pinning the HUD sha256 to materialize the ~5–10k net-new rows in `api/seed/postal_codes_us.csv`. |
-| 7.6 | **Seed data growth** | Expand `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to the planned **~100–120** across the supported countries via two independent coverage gates: a **universal state/province floor** (every US state + every CA province has ≥1 org or a documented `# gap`) plus a **top-30 metro gate** (25 US CBSAs + 5 CA CMAs each get ≥1 org). Editorial work, not engineering. Design spec: [`docs/superpowers/specs/2026-05-20-org-seed-growth-design.md`](./superpowers/specs/2026-05-20-org-seed-growth-design.md). |
+| 7.6 | **Seed data growth** *(shipped)* | Expanded `orgs.toml` from the curated 23 (19 US/CA + 4 PT) to **111** across the supported countries via two independent coverage gates: a **universal state/province floor** (every US state + every CA province has ≥1 org or a documented `# gap`) plus a **top-30 metro gate** (25 US CBSAs + 5 CA CMAs each get ≥1 org). Closing tally: 88 net-new orgs, 13 documented gaps (9 US: WV, AR, OK, KS, ND, SD, NV, WY, PR; 4 CA: PE, SK, NB, plus YT/NT/NU consolidated), 1 multi-anchored org (The Street Trust). Editorial work, not engineering. Design spec: [`docs/superpowers/specs/2026-05-20-org-seed-growth-design.md`](./superpowers/specs/2026-05-20-org-seed-growth-design.md). |
+| 7.7 | **Top-20 metro depth pass** *(shipped)* | Raised the metro gate to ≥3 orgs per top-20 metro (top-21–30 stays at ≥1). Boston gets the showcase treatment at 5 metro orgs plus WalkMassachusetts at the state floor; LA, Chicago, Dallas, Houston, Philadelphia, Atlanta, SF Bay, Seattle, Minneapolis, Phoenix, Detroit, and St. Louis lift to ≥3. Four top-20 metros end the pass with documented third-org gaps (Miami at 2, Inland Empire at 2, Tampa at 1, Denver at 2). Final tally: 23 net-new orgs (orgs.toml grows from 111 → 134). Updates the 7.6 design-spec gate language. Editorial work, not engineering. |
 
 ## Frontend (React + Vite)
 

@@ -4,10 +4,18 @@
 #
 # Inclusion criteria: transit and/or safe-streets advocacy in the US
 # or Canada. Housing-only / YIMBY-only orgs are out of scope per
-# CLAUDE.md. URLs are real and were last spot-checked on 2026-05-20
-# during the slice #7.6 editorial pass (see docs/superpowers/specs/
-# 2026-05-20-org-seed-growth-design.md for the two-gate coverage
-# design and the Canvas Adjustments log of documented gaps).
+# CLAUDE.md. URLs for orgs added or updated in a given slice are
+# spot-checked at that slice's verification date (see commit
+# messages). Slice #7.7 (2026-05-21) added 23 net-new orgs across
+# the top-20 US metros; older entries carry the verification dates
+# documented in their original slice commits.
+#
+# See docs/superpowers/specs/2026-05-20-org-seed-growth-design.md
+# for the coverage-gate design (raised to ≥3 orgs per top-20 metro
+# in slice 7.7), the Activity Bar + Scope Precedents (public-agency
+# oversight bodies, multi-issue 501c3s with named transit programs,
+# publication/advocacy hybrids, chapter-affiliate rules), and the
+# Canvas Adjustments log of documented gaps.
 
 # --- NYC region ---
 
@@ -71,6 +79,23 @@ contact_url = "https://walksf.org/contact-us/"
 tags = ["walking", "safe-streets", "vision-zero"]
 region_slugs = ["sf"]
 
+[[org]]
+slug = "sf-bicycle-coalition"
+name = "San Francisco Bicycle Coalition"
+short_desc = "501(c)(4) SF cycling advocacy nonprofit since 1971 with 6,000+ dues-paying members; organizes Bike to Work Day, Bike Buddies mentorship, Energizer Stations, and Board-of-Directors-led infrastructure campaigns."
+website_url = "https://sfbike.org"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["sf"]
+
+[[org]]
+slug = "bike-east-bay"
+name = "Bike East Bay"
+short_desc = "Oakland-based East Bay (Alameda + Contra Costa counties) cycling advocacy nonprofit since 1972 with 4,000+ members; campaigns for the East Bay Greenway, San Pablo Ave multimodal corridor, and a protected Lake Merritt Loop."
+website_url = "https://bikeeastbay.org"
+contact_url = "https://bikeeastbay.org/contact/"
+tags = ["cycling", "advocacy", "safe-streets", "regional"]
+region_slugs = ["sf-bay-area"]
+
 # --- Boston region ---
 
 [[org]]
@@ -90,7 +115,40 @@ website_url = "https://www.livablestreets.info"
 tags = ["safe-streets", "transit", "cycling", "walking"]
 region_slugs = ["cambridge-ma"]
 
+[[org]]
+slug = "boston-cyclists-union"
+name = "Boston Cyclists Union"
+short_desc = "Boston cycling advocacy nonprofit transforming Greater Boston streets into equitable, people-centered spaces through policy campaigns, bike-parking advocacy, and a free community bike repair program."
+website_url = "https://bostoncyclistsunion.org"
+contact_url = "https://bostoncyclistsunion.org/about_us/contact"
+tags = ["cycling", "safe-streets", "advocacy"]
+region_slugs = ["boston"]
+
+[[org]]
+slug = "a-better-city"
+name = "A Better City"
+short_desc = "Greater Boston business-aligned advocacy coalition pushing transit, climate, and land-use solutions; works on the I-90 Allston Multimodal Project, Bluebikes expansion, and Greening the Blue Line."
+website_url = "https://www.abettercity.org"
+tags = ["transit", "policy", "regional", "advocacy"]
+region_slugs = ["greater-boston"]
+
+[[org]]
+slug = "mbta-advisory-board"
+name = "MBTA Advisory Board"
+short_desc = "Independent Boston-region transit advisory board and watchdog for MBTA riders, taxpayers, and the public; monitors fare changes, capital and operating budgets, and service quality across rapid transit, buses, commuter rail, and ferry."
+website_url = "https://mbtaadvisoryboard.org"
+tags = ["transit", "advocacy", "oversight", "regional"]
+region_slugs = ["greater-boston"]
+
 # --- Miami ---
+# Greater-Miami coverage is at 2 metro-level orgs after slice #7.7.
+# Third-org gap researched 2026-05-21: Transit Alliance Miami is the
+# dominant metro org; Bike Walk Coral Gables added below as a city-leaf
+# anchor. Healthy Little Havana's transit/safe-streets work (Little
+# Havana Moves) is partner-only with Transit Alliance and no separately-
+# active web presence verified. Bike Miami (Friendship Circle) is a
+# fundraising-events org, not advocacy. Maintainer-side knowledge of
+# active Miami-Dade ped/bike/transit advocacy welcome.
 
 [[org]]
 slug = "transit-alliance-miami"
@@ -99,6 +157,14 @@ short_desc = "Grassroots advocacy organization working to make Miami a more walk
 website_url = "https://transitalliance.miami"
 tags = ["transit", "advocacy", "safe-streets"]
 region_slugs = ["miami"]
+
+[[org]]
+slug = "bike-walk-coral-gables"
+name = "Bike Walk Coral Gables"
+short_desc = "Coral Gables 501(c)(3) promoting cycling and walking as safe, healthy forms of transportation; runs monthly Gables Bike Tours, the annual Gables Bike Day ciclovia, Bike to Work Day, and PARK(ing) Day."
+website_url = "https://bikewalkcoralgables.org"
+tags = ["cycling", "walking", "safe-streets", "advocacy"]
+region_slugs = ["greater-miami"]
 
 # --- Seattle ---
 
@@ -110,6 +176,23 @@ website_url = "https://seattlesubway.org"
 tags = ["transit", "grassroots", "rail"]
 region_slugs = ["seattle-metro"]
 
+[[org]]
+slug = "seattle-streets-alliance"
+name = "Seattle Streets Alliance"
+short_desc = "Seattle safe-streets nonprofit (rebranded 2026 from Seattle Neighborhood Greenways after 15 years); organizes neighbors for safer speeds, better crossings, biking-network gap-fills, and equity-centered Vision Zero work."
+website_url = "https://www.streetsalliance.org"
+contact_url = "https://www.streetsalliance.org/who-we-are/contact-us/"
+tags = ["safe-streets", "vision-zero", "advocacy", "cycling", "walking", "equity"]
+region_slugs = ["seattle"]
+
+[[org]]
+slug = "transit-riders-union"
+name = "Transit Riders Union"
+short_desc = "Independent, member-run union of Seattle/King County transit riders; wins include the low-income ORCA LIFT fare and statewide minimum-wage initiatives; runs candidate endorsements and rider-experience campaigns."
+website_url = "https://www.transitriders.org"
+tags = ["transit", "grassroots", "advocacy", "rider-union", "equity"]
+region_slugs = ["seattle"]
+
 # --- LA ---
 
 [[org]]
@@ -118,6 +201,36 @@ name = "Streets For All"
 short_desc = "Los Angeles-based advocacy organization for safer, more sustainable streets and transit across the LA region."
 website_url = "https://www.streetsforall.org"
 tags = ["advocacy", "safe-streets", "transit", "cycling"]
+region_slugs = ["greater-la"]
+
+[[org]]
+slug = "streets-are-for-everyone"
+name = "Streets Are For Everyone"
+short_desc = "LA-based Vision Zero nonprofit (SAFE) founded after a Griffith Park crash; runs Finish the Ride/Run, Streets Art SAFE youth film competition, faith-based street safety, and traffic-violence victim support across Southern California."
+website_url = "https://www.streetsareforeveryone.org"
+tags = ["safe-streets", "vision-zero", "advocacy", "education"]
+region_slugs = ["greater-la"]
+
+# ACT-LA verification 2026-05-21 (soft, campaign-site format):
+#   - act-la.org is structured as a static campaign site with portfolio
+#     pages (Universal Fareless Transit, Metro TOC, Equity in Planning)
+#     rather than a dated blog feed.
+#   - 2024-2028 Strategic Plan page (https://www.act-la.org/24-28-strategic-plan/)
+#     documents an active strategic horizon through Dec 2028 with named
+#     campaigns covering 2026: universal fareless transit at Metro,
+#     SSLE budget reallocation to care-based safety, freeway-widening-
+#     budget reallocation to bus service, 20 new bus-only lanes.
+#   - Social presence active on Facebook (@ACTLosAngeles), Twitter
+#     (@all4transit), and LinkedIn.
+# Re-verify the org-site surface during the next editorial pass; if no
+# dated content surfaces by then, downgrade to gap-doc and let LA fall
+# back to 2 metro orgs.
+[[org]]
+slug = "act-la"
+name = "Alliance for Community Transit — Los Angeles"
+short_desc = "LA transit-equity coalition (ACT-LA) advocating for fareless transit, care-based transit safety, and equitable Metro investments centered on low-income communities and communities of color."
+website_url = "https://www.act-la.org"
+tags = ["transit", "equity", "advocacy", "coalition"]
 region_slugs = ["greater-la"]
 
 # --- Chicago region ---
@@ -136,6 +249,35 @@ name = "Better Streets Chicago"
 short_desc = "Volunteer-led group advocating for safer, more vibrant streets in the City of Chicago."
 website_url = "https://betterstreetschi.org"
 tags = ["safe-streets", "advocacy", "grassroots"]
+region_slugs = ["chicago"]
+
+# Commuters Take Action verification 2026-05-21:
+#   - Nov 24 2025 statement on Initial Bus Priority Corridor Study
+#     (Pulaski/Western/Cottage Grove/Fullerton/55th) at
+#     https://www.ctaction.org/contact-us/statements
+#   - Nov 4 2025 statement responding to Chicago Tribune op-ed on the
+#     transit reform & funding bill (same statements page)
+#   - Ongoing Streetsblog Chicago tag coverage:
+#     https://chi.streetsblog.org/tag/commuters-take-action
+# Most recent own-site statement is 6 months from verification — within
+# the 12-month activity-bar window. Social channels @ctaaction active
+# on Instagram/Threads/Twitter.
+[[org]]
+slug = "commuters-take-action"
+name = "Commuters Take Action"
+short_desc = "Chicago transit-rider collective monitoring CTA reliability; publishes data, collects rider testimonials, testifies at board meetings, and organizes protests against the 22% rail and 5% bus service cuts since 2020."
+website_url = "https://www.ctaction.org"
+contact_url = "https://www.ctaction.org/contact-us/contact-form"
+tags = ["transit", "grassroots", "advocacy", "accountability"]
+region_slugs = ["chicago"]
+
+[[org]]
+slug = "chicago-bike-grid-now"
+name = "Chicago, Bike Grid Now!"
+short_desc = "Chicago grassroots cycling advocacy group mobilizing for 450 miles of cyclist- and pedestrian-prioritized roads; fights to rectify inequitable infrastructure distribution to the South and West Sides via traffic calming and lower speed limits."
+website_url = "https://bikegridnow.org"
+contact_url = "https://bikegridnow.org/contact-us/"
+tags = ["cycling", "safe-streets", "advocacy", "grassroots", "equity"]
 region_slugs = ["chicago"]
 
 # --- Baltimore ---
@@ -230,6 +372,15 @@ website_url = "https://dallasbicyclecoalition.org"
 tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
 region_slugs = ["dallas-tx-metro"]
 
+[[org]]
+slug = "dallas-area-transit-alliance"
+name = "Dallas Area Transit Alliance"
+short_desc = "Rider-run DART advocacy nonprofit (DATA) founded 2024 to preserve and expand North Texas public transit; testifies at DART board meetings, opposes member-city pullouts, and tracks Texas Legislature transit bills."
+website_url = "https://dallasareatransitalliance.org"
+contact_url = "https://ridewithdata.substack.com/contact"
+tags = ["transit", "advocacy", "grassroots", "regional"]
+region_slugs = ["dallas-tx-metro"]
+
 # --- Houston ---
 
 [[org]]
@@ -247,6 +398,14 @@ name = "LINK Houston"
 short_desc = "Houston transportation-equity nonprofit advocating for robust, equitable transit, walking, and biking access; publishes the Equity in Transit report and METRO budget advocacy."
 website_url = "https://linkhouston.org"
 tags = ["transit", "equity", "advocacy", "policy", "research"]
+region_slugs = ["houston-tx-metro"]
+
+[[org]]
+slug = "a-tale-of-two-bridges"
+name = "A Tale of Two Bridges"
+short_desc = "Houston urbanism nonprofit (ATOTB) for walkable, equitable streets; publishes the Houston Urbanism Guide, organizes Heights traffic-calming campaigns, and tracks Houston City Council district transportation issues."
+website_url = "https://atotb.org"
+tags = ["walking", "cycling", "transit", "urbanism", "advocacy", "safe-streets"]
 region_slugs = ["houston-tx-metro"]
 
 # --- Washington DC ---
@@ -293,6 +452,15 @@ website_url = "https://www.5thsqadvocacy.org"
 tags = ["transit", "urbanism", "political", "advocacy", "policy"]
 region_slugs = ["philadelphia-pa-metro"]
 
+[[org]]
+slug = "clean-air-council"
+name = "Clean Air Council"
+short_desc = "Philadelphia-based environmental nonprofit running the city's biking/walking advocacy programs; sponsors Feet First Philly (pedestrian advocacy), operates GoPhillyGo trip planner, and works the High Injury Network corridors and Cobbs Creek Trail expansion."
+website_url = "https://cleanair.org"
+contact_url = "https://cleanair.org/contact-us/"
+tags = ["cycling", "walking", "transit", "safe-streets", "vision-zero", "advocacy", "policy"]
+region_slugs = ["philadelphia-pa-metro"]
+
 # --- Atlanta ---
 
 [[org]]
@@ -309,6 +477,14 @@ name = "MARTA Army"
 short_desc = "Atlanta grassroots transit-rider organization using tactical urbanism — bus timetables, trash cans, rider-experience improvements — to enhance MARTA from the bottom up."
 website_url = "https://www.martaarmy.org"
 tags = ["transit", "grassroots", "advocacy", "tactical-urbanism"]
+region_slugs = ["atlanta-ga-metro"]
+
+[[org]]
+slug = "beltline-rail-now"
+name = "BeltLine Rail Now"
+short_desc = "Atlanta grassroots nonprofit with 10,000+ supporters organizing for equitable, urgent delivery of light rail on the 22-mile Beltline corridor; partners with MARTA and Atlanta BeltLine Inc. on the citywide rail commitment."
+website_url = "https://beltlinerailnow.com"
+tags = ["transit", "rail", "advocacy", "grassroots"]
 region_slugs = ["atlanta-ga-metro"]
 
 # --- Phoenix ---
@@ -330,6 +506,22 @@ website_url = "https://www.friendsoftransit.org"
 tags = ["transit", "advocacy", "education", "rail"]
 region_slugs = ["phoenix-az-metro"]
 
+[[org]]
+slug = "urban-phoenix-project"
+name = "Urban Phoenix Project"
+short_desc = "All-volunteer Phoenix urbanism nonprofit campaigning for protected bike lanes, transit expansion, parking reform, and an end to reverse-lane arterials; hosts urbanist talks, street cleanups, and Park(ing) Day."
+website_url = "https://www.urbanphoenixproject.org"
+tags = ["transit", "cycling", "safe-streets", "walkability", "advocacy"]
+region_slugs = ["phoenix-az-metro"]
+
+[[org]]
+slug = "tempe-bicycle-action-group"
+name = "Tempe Bicycle Action Group"
+short_desc = "Tempe 501(c)(3) cycling-advocacy nonprofit (TBAG) working with the City of Tempe on Vision Zero, Baseline Road safety, and the Capital Improvements Program; runs Open Streets Tempe and the annual Bike Month programming."
+website_url = "https://www.biketempe.org"
+tags = ["cycling", "advocacy", "safe-streets", "vision-zero"]
+region_slugs = ["phoenix-az-metro"]
+
 # --- Riverside-San Bernardino (Inland Empire) ---
 
 [[org]]
@@ -339,6 +531,39 @@ short_desc = "Redlands-based cycling advocacy alliance unifying the Inland Empir
 website_url = "https://ieba.clubexpress.com"
 tags = ["cycling", "advocacy", "regional"]
 region_slugs = ["riverside-ca-metro"]
+
+[[org]]
+slug = "friends-of-cv-link"
+name = "Friends of CV Link"
+short_desc = "Palm Springs-based 501(c)(3) advocating for the CV Link — a 40-mile car-free walking and cycling corridor across the Coachella Valley — and the safer streets and accessible mobility it represents for Riverside County's eastern desert communities."
+website_url = "https://www.friendscvlink.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["riverside-ca-metro"]
+
+# Third-org gap researched 2026-05-21 per slice #7.7's top-20 metro
+# uplift: the Inland Empire reaches 2 metro-level orgs (Inland Empire
+# Biking Alliance + Friends of CV Link). Candidates considered and
+# excluded:
+#   - SAFE Inland Empire (safe-ie.org) — operates as the first chapter
+#     of SAFE LA's 501(c)(3), not independently incorporated; its own
+#     website carries 2023-vintage statistics and undated event entries
+#     with no 2026-dated content (2026 mentions exist in external press
+#     like The Breeze 2026-01-18, but the activity bar requires dated
+#     evidence on the org's own site). Strongest borderline case —
+#     revisit if SAFE-IE incorporates independently or refreshes its
+#     site with 2026 content.
+#   - Inland Empire Urbanists — active and in-scope per Streetsblog
+#     California coverage, but the org has no website, only a Google
+#     Form. Revisit if a real site stands up.
+#   - CCAEJ, PC4EJ, El Sol — environmental-justice / community-health
+#     orgs whose transit/streets work is adjacent rather than central.
+#   - Californians for Electric Rail, The Transit Coalition — LA- or
+#     statewide-anchored groups parachuting into IE campaigns; would
+#     count at a state or LA tier, not IE metro.
+# Calbike covers the metro via the state-floor ancestor walk for ca.
+# Per slice #7.7's quality-over-quantity principle, a documented gap
+# is preferable to admitting a candidate that fails the activity bar
+# or the independent-nonprofit criterion.
 
 # --- Detroit ---
 
@@ -358,6 +583,14 @@ website_url = "https://detroitgreenways.org"
 tags = ["cycling", "walking", "advocacy", "greenways", "safe-streets"]
 region_slugs = ["detroit-mi-metro"]
 
+[[org]]
+slug = "detroit-disability-power"
+name = "Detroit Disability Power"
+short_desc = "Detroit grassroots organization building political power for disabled Detroiters since 2018; transit and mobility is one of four primary policy agendas, with wins on DDOT funding, bus-stop shelters, and same-day paratransit."
+website_url = "https://www.detroitdisabilitypower.org"
+tags = ["transit", "accessibility", "advocacy", "safe-streets", "paratransit"]
+region_slugs = ["detroit-mi-metro"]
+
 # --- Minneapolis-St. Paul ---
 
 [[org]]
@@ -374,6 +607,14 @@ name = "Our Streets Minneapolis"
 short_desc = "Minneapolis nonprofit (formerly Minneapolis Bicycle Coalition) promoting safe biking, walking, and rolling; led April 2026 transportation reform hearing in the MN Senate."
 website_url = "https://www.ourstreetsmn.org"
 tags = ["cycling", "walking", "safe-streets", "advocacy"]
+region_slugs = ["minneapolis-mn-metro"]
+
+[[org]]
+slug = "streets-mn"
+name = "Streets.mn"
+short_desc = "Twin Cities 501(c)(3) publication/advocacy nonprofit fostering conversation about transportation, land use, and urban planning across Minnesota; daily articles by community contributors on transit, bike corrals, and zoning."
+website_url = "https://streets.mn"
+tags = ["transit", "urbanism", "media", "advocacy", "land-use"]
 region_slugs = ["minneapolis-mn-metro"]
 
 # --- San Diego ---
@@ -403,6 +644,24 @@ tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["san-diego-ca-metro"]
 
 # --- Tampa ---
+# Tampa remains at 1 metro-level org (Walk Bike Tampa) after slice #7.7
+# research. Candidates considered and excluded 2026-05-21:
+#   - Tampa BayCycle (tampabaycycle.com) — TLS certificate broken;
+#     organization originally funded by FDOT through the Tampa Downtown
+#     Partnership; activity could not be verified.
+#   - TBARTA (Tampa Bay Area Regional Transit Authority) — dissolved
+#     December 31 2023 by unanimous board vote; no successor advocacy.
+#   - Tampa Bay Sierra Club (sierraclub.org/florida/tampa-bay) —
+#     mentions sustainable transit as an educational topic but events
+#     server non-responsive; no substantive 2025/2026 transit campaigns
+#     verifiable from the chapter page.
+#   - PSTA TRAC (Transit Rider Advocacy Committee) — internal PSTA
+#     committee, not an independent nonprofit.
+#   - onbikes / Bikes For Christ — bike-redistribution nonprofits, not
+#     safe-streets advocacy in scope.
+# Florida Bicycle Association (state-floor) covers the metro via the
+# ancestor walk. Revisit if a maintainer surfaces an active second
+# Tampa Bay advocacy nonprofit (Pinellas or Hillsborough side).
 
 [[org]]
 slug = "walk-bike-tampa"
@@ -431,6 +690,19 @@ website_url = "https://www.greaterdenvertransit.com"
 tags = ["transit", "grassroots", "advocacy", "regional"]
 region_slugs = ["denver-co-metro"]
 
+# Third-org gap researched 2026-05-21 per slice #7.7's top-20 metro
+# uplift: Denver Streets Partnership (above) and Greater Denver Transit
+# (above) are the two clear metro-level advocacy nonprofits. Other
+# candidates considered and excluded: Mile High Connects closed its
+# doors in 2022 after a 10-year run; Streetsblog Denver shut down at
+# the end of January 2022 (operated by DSP); Denver Bicycle Lobby's
+# website carries 2023-vintage content with no current meeting date;
+# Community Cycles is Boulder-anchored (separate metro footprint);
+# Bikes Together is a community bike shop, not an advocacy nonprofit.
+# Bicycle Colorado covers the metro via the state-floor ancestor walk.
+# Worth revisiting if a maintainer surfaces an active Denver-metro
+# advocacy entity.
+
 # --- St. Louis ---
 
 [[org]]
@@ -447,6 +719,14 @@ name = "Citizens for Modern Transit"
 short_desc = "St. Louis-region transit advocacy leading the push to expand light rail and integrated affordable public transit; active on the 2026 Missouri legislative agenda."
 website_url = "https://cmt-stl.org"
 tags = ["transit", "rail", "advocacy", "regional", "policy"]
+region_slugs = ["st-louis-mo-metro"]
+
+[[org]]
+slug = "paraquad"
+name = "Paraquad"
+short_desc = "St. Louis-region Center for Independent Living (founded 1970) whose public-policy program convenes the S.M.A.R.T. coalition (St. Louis Metropolitan Alliance for Reliable Transit), advocating for safe, accessible, and affordable public transit including paratransit service; St. Louis was the first US city with lift-equipped public buses in 1977 through Paraquad's advocacy."
+website_url = "https://paraquad.org"
+tags = ["transit", "accessibility", "advocacy", "paratransit", "regional"]
 region_slugs = ["st-louis-mo-metro"]
 
 # --- US States (statewide) ---
@@ -485,6 +765,15 @@ name = "Massachusetts Bicycle Coalition"
 short_desc = "Massachusetts statewide bicycle advocacy group (MassBike) pushing the MassDOT Bike Plan, e-bike incentive program, and Ride Safe Act; runs the Council of Advocates."
 website_url = "https://www.massbike.org"
 tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["ma"]
+
+[[org]]
+slug = "walk-massachusetts"
+name = "WalkMassachusetts"
+short_desc = "Massachusetts statewide pedestrian advocacy nonprofit (formerly WalkBoston) since 1990; conducts community walk audits, advances pedestrian-safety legislation, and runs the WalkMA Network of municipal walk/bike committees."
+website_url = "https://walkmass.org"
+contact_url = "https://walkmass.org/contact-us/"
+tags = ["walking", "pedestrian", "safe-streets", "advocacy", "policy"]
 region_slugs = ["ma"]
 
 # --- New Hampshire ---
