@@ -4,11 +4,18 @@
 #
 # Inclusion criteria: transit and/or safe-streets advocacy in the US
 # or Canada. Housing-only / YIMBY-only orgs are out of scope per
-# CLAUDE.md. URLs are real and were last spot-checked on 2026-05-21
-# during the slice #7.7 editorial pass (top-20 metro depth uplift —
-# see docs/superpowers/specs/2026-05-20-org-seed-growth-design.md
-# for the coverage-gate design, raised to ≥3 orgs per top-20 metro
-# in slice 7.7, and the Canvas Adjustments log of documented gaps).
+# CLAUDE.md. URLs for orgs added or updated in a given slice are
+# spot-checked at that slice's verification date (see commit
+# messages). Slice #7.7 (2026-05-21) added 23 net-new orgs across
+# the top-20 US metros; older entries carry the verification dates
+# documented in their original slice commits.
+#
+# See docs/superpowers/specs/2026-05-20-org-seed-growth-design.md
+# for the coverage-gate design (raised to ≥3 orgs per top-20 metro
+# in slice 7.7), the Activity Bar + Scope Precedents (public-agency
+# oversight bodies, multi-issue 501c3s with named transit programs,
+# publication/advocacy hybrids, chapter-affiliate rules), and the
+# Canvas Adjustments log of documented gaps.
 
 # --- NYC region ---
 
@@ -204,6 +211,20 @@ website_url = "https://www.streetsareforeveryone.org"
 tags = ["safe-streets", "vision-zero", "advocacy", "education"]
 region_slugs = ["greater-la"]
 
+# ACT-LA verification 2026-05-21 (soft, campaign-site format):
+#   - act-la.org is structured as a static campaign site with portfolio
+#     pages (Universal Fareless Transit, Metro TOC, Equity in Planning)
+#     rather than a dated blog feed.
+#   - 2024-2028 Strategic Plan page (https://www.act-la.org/24-28-strategic-plan/)
+#     documents an active strategic horizon through Dec 2028 with named
+#     campaigns covering 2026: universal fareless transit at Metro,
+#     SSLE budget reallocation to care-based safety, freeway-widening-
+#     budget reallocation to bus service, 20 new bus-only lanes.
+#   - Social presence active on Facebook (@ACTLosAngeles), Twitter
+#     (@all4transit), and LinkedIn.
+# Re-verify the org-site surface during the next editorial pass; if no
+# dated content surfaces by then, downgrade to gap-doc and let LA fall
+# back to 2 metro orgs.
 [[org]]
 slug = "act-la"
 name = "Alliance for Community Transit — Los Angeles"
@@ -230,6 +251,17 @@ website_url = "https://betterstreetschi.org"
 tags = ["safe-streets", "advocacy", "grassroots"]
 region_slugs = ["chicago"]
 
+# Commuters Take Action verification 2026-05-21:
+#   - Nov 24 2025 statement on Initial Bus Priority Corridor Study
+#     (Pulaski/Western/Cottage Grove/Fullerton/55th) at
+#     https://www.ctaction.org/contact-us/statements
+#   - Nov 4 2025 statement responding to Chicago Tribune op-ed on the
+#     transit reform & funding bill (same statements page)
+#   - Ongoing Streetsblog Chicago tag coverage:
+#     https://chi.streetsblog.org/tag/commuters-take-action
+# Most recent own-site statement is 6 months from verification — within
+# the 12-month activity-bar window. Social channels @ctaaction active
+# on Instagram/Threads/Twitter.
 [[org]]
 slug = "commuters-take-action"
 name = "Commuters Take Action"
