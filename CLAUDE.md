@@ -249,21 +249,35 @@ endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 
 ## Hosting
 
-- **API:** Heroku Common Runtime (region `us`, Virginia). Heroku/go
-  buildpack compiles the binary from `api/cmd/server`; Heroku Postgres
-  Essential-0 add-on provides the database. `Procfile` declares the
-  `release` (migrations) and `web` (serve) processes. See
-  [`docs/superpowers/specs/2026-05-18-heroku-deploy-design.md`](./docs/superpowers/specs/2026-05-18-heroku-deploy-design.md)
-  for the design and
-  [`docs/deploy.md`](./docs/deploy.md) for the runbook.
+- **API:** Fly.io, region `iad` (Virginia, US East). A multi-stage
+  `Dockerfile` at the repo root builds the Go binary; the root
+  `fly.toml`'s `[deploy] release_command` runs `migrate up` on every
+  deploy.
+- **Database:** A sibling Fly app `urbanist-atlas-db` runs
+  `postgres:17-alpine` with a 1 GB volume mounted at
+  `/var/lib/postgresql/data` (config at `infra/postgres/fly.toml`).
+  The API reaches it over Fly's internal 6PN at
+  `urbanist-atlas-db.internal:5432`; no public exposure. Same image
+  as the testcontainers integration suite, so the wire is identical
+  from local CI to production.
+- **Backups:** Nightly GitHub Actions cron at
+  `.github/workflows/backup.yml` does `pg_dump | gzip` via
+  `flyctl ssh console`, uploads to Cloudflare R2 bucket
+  `urbanist-atlas-backups` with a 30-day retention policy
+  configured at the bucket level.
 - **Web:** Cloudflare Pages connected to `web/`. PR preview deploys per
   branch.
 
-The chunk that takes the project from localhost to live (slices
-#19/#20/#21/#23) is specced at
-[`docs/superpowers/specs/2026-05-18-qa-deploy-design.md`](./docs/superpowers/specs/2026-05-18-qa-deploy-design.md);
-operational runbook lives at
-[`docs/deploy.md`](./docs/deploy.md) (created in slice #20).
+See [`docs/superpowers/specs/2026-05-21-fly-redeploy-design.md`](./docs/superpowers/specs/2026-05-21-fly-redeploy-design.md)
+for the design (supersedes the prior Heroku pivot at
+[`2026-05-18-heroku-deploy-design.md`](./docs/superpowers/specs/2026-05-18-heroku-deploy-design.md))
+and [`docs/deploy.md`](./docs/deploy.md) for the runbook.
+
+The chunk that takes the project from localhost to live (slice #20.6,
+which absorbs #20/#21-DNS/#22/#25) is specced at
+[`docs/superpowers/specs/2026-05-18-qa-deploy-design.md`](./docs/superpowers/specs/2026-05-18-qa-deploy-design.md)
+(architecture overview) and the redeploy design doc above (concrete
+implementation).
 
 ## Launch strategy
 

@@ -8,7 +8,7 @@ back the local and regional groups working in your area.
 
 A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
-**Site:** Not yet deployed. Phase 1 dogfooding will attach to `qa.urbanistatlas.com` (SPA) and `qa-api.urbanistatlas.com` (API) when the [deploy runbook](./docs/deploy.md) is executed against a fresh Heroku + Cloudflare Pages account; the production `urbanistatlas.com` hostname attaches to the same Pages project once Phase 2 (API keys, rate limiting) ships.
+**Site:** Not yet deployed. Phase 1 dogfooding will attach to `qa.urbanistatlas.com` (SPA) and `qa-api.urbanistatlas.com` (API) when the [deploy runbook](./docs/deploy.md) is executed against a fresh Fly.io + Cloudflare Pages account; the production `urbanistatlas.com` hostname attaches to the same Pages project once Phase 2 (API keys, rate limiting) ships.
 
 ---
 
@@ -16,8 +16,9 @@ A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
 This is a monorepo with two halves:
 
-- **[`api/`](./api)** — Go service (chi + sqlc + goose + Heroku Postgres Essential-0),
-  deployed to Heroku. Hosts the public JSON API at `/api/v1`.
+- **[`api/`](./api)** — Go service (chi + sqlc + goose +
+  `postgres:17-alpine` on a sibling Fly app), deployed to Fly.io.
+  Hosts the public JSON API at `/api/v1`.
 - **[`web/`](./web)** — React + Vite SPA, deployed to Cloudflare Pages.
   Consumes the JSON API.
 
@@ -39,11 +40,10 @@ against the live API. Errors on both halves use
 [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 `application/problem+json`.
 
-Remaining work to v1.0 — executing the Heroku + Cloudflare Pages
-deploy runbook (the slice #20/#21 deliverables landed as code,
-config, and docs, but the runbook has not yet been run against
-live infrastructure), postal-code data expansion, seed-data
-growth, and the Phase 1 lockdown sequence — is tracked in
+Remaining work to v1.0 — executing the Fly + Cloudflare Pages
+deploy runbook (slice #20.6 deliverables landed as code, config,
+and docs, but the runbook has not yet been run against live
+infrastructure), and the Phase 1 lockdown sequence — is tracked in
 [`docs/roadmap.md`](./docs/roadmap.md). Public submissions are
 deferred to Phase 2 alongside the API-key + email-verified account
 system. The full architectural plan lives at
@@ -69,27 +69,33 @@ cd web && npm install && npm run dev    # SPA on :5173
 
 ### Deploy
 
-The API is configured to ship via the `heroku/go` buildpack to
-Heroku (region `us`, Virginia, Common Runtime) backed by Heroku
-Postgres Essential-0; `Procfile` at the repo root declares
-release-phase migrations + the web process. The web SPA is
-configured to deploy to Cloudflare Pages from `web/`, with
-`web/public/_redirects` providing the SPA fallback for direct
-navigation. **No deploy has been executed yet** — the initial
-provisioning runbook (creating the Heroku app, attaching the
-Postgres add-on, wiring DNS, setting secrets) lives at
-[`docs/deploy.md`](./docs/deploy.md); see slice #20 / #21 in the
-[roadmap](./docs/roadmap.md) for the split between "deliverables
-landed" and "runbook executed." Ongoing ops will use the
-`heroku-*` recipes (`just heroku-deploy`, `just heroku-logs`,
-`just heroku-config`, `just heroku-ssh`, `just heroku-loaddata`,
-`just db-backup`).
+The API is configured to ship to Fly.io (region `iad`, Virginia) via
+a multi-stage `Dockerfile` at the repo root; the API's `fly.toml`
+declares the build, runtime config, and `release_command` for
+migrations. The database runs on a sibling Fly app
+`urbanist-atlas-db` (config at `infra/postgres/fly.toml`) executing
+`postgres:17-alpine` with a 1 GB volume — same image as the
+integration test suite. The web SPA deploys to Cloudflare Pages from
+`web/`, with `web/public/_redirects` providing the SPA fallback for
+direct navigation. Nightly `pg_dump` backups land in Cloudflare R2
+via the GitHub Actions workflow at
+[`.github/workflows/backup.yml`](./.github/workflows/backup.yml).
+**No deploy has been executed yet** — the initial provisioning
+runbook (creating both Fly apps, attaching the volume, wiring DNS
+and certs, setting secrets, enabling backups) lives at
+[`docs/deploy.md`](./docs/deploy.md); see slice #20.6 in the
+[roadmap](./docs/roadmap.md). Ongoing ops will use the `fly-*` /
+`db-*` recipes (`just fly-deploy`, `just fly-logs`,
+`just fly-secrets`, `just fly-ssh`, `just fly-loaddata`,
+`just db-backup`, `just db-restore <file>`).
 
-The hosting decision behind the Heroku choice is documented at
+The hosting decision is documented at
 [`docs/superpowers/specs/2026-05-18-hosting-cost-spike.md`](./docs/superpowers/specs/2026-05-18-hosting-cost-spike.md)
 and
-[`docs/superpowers/specs/2026-05-18-heroku-deploy-design.md`](./docs/superpowers/specs/2026-05-18-heroku-deploy-design.md).
-The full chunk design (slices #19/#20/#21/#23) lives at
+[`docs/superpowers/specs/2026-05-21-fly-redeploy-design.md`](./docs/superpowers/specs/2026-05-21-fly-redeploy-design.md)
+(which supersedes the earlier
+[`2026-05-18-heroku-deploy-design.md`](./docs/superpowers/specs/2026-05-18-heroku-deploy-design.md)).
+The full chunk design lives at
 [`docs/superpowers/specs/2026-05-18-qa-deploy-design.md`](./docs/superpowers/specs/2026-05-18-qa-deploy-design.md).
 
 ## Contributing organizations

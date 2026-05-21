@@ -21,5 +21,5 @@ URBANIST_LOG_FORMAT = "text"
 DATABASE_URL = "postgres://urbanist:urbanist@localhost:55432/urbanist_atlas_dev?sslmode=disable"
 
 # Dev-only admin token. Do not deploy this value anywhere. The real
-# production token lives in Heroku app config, not in this repo.
+# production token lives in Fly app secrets, not in this repo.
 URBANIST_ADMIN_TOKEN = "dev-admin-token-not-secret"

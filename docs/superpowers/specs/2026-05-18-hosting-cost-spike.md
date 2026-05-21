@@ -244,6 +244,36 @@ on the new `docs/deploy.md` after the Heroku PR lands. The
 reversibility plan (migrate back to Fly if dogfood reveals a fit
 problem) is in the Heroku design doc's §Reversibility section.
 
+### Decision (2026-05-21 update — Heroku reversed)
+
+Slice #20.6 **reverses the Heroku decision** above before any Heroku
+resources were provisioned, and adopts the spike's original Finalist 1
+recommendation: **Fly app + sibling Fly app running
+`postgres:17-alpine`**, ~$5/mo total.
+
+Drivers of the reversal:
+
+- **Vendor risk on Heroku** — the maintainer has lost confidence in
+  Heroku's long-term direction (post-Salesforce ownership turbulence,
+  layoffs, free-tier removal history). The operator-familiarity
+  dividend that originally tipped the decision toward Heroku no
+  longer outweighs the vendor risk.
+- **The Fly platform itself is fine** — the maintainer used Fly
+  positively before; Fly's only fault was MPG pricing, and the
+  sibling Postgres path sidesteps MPG entirely. Postgres runs as
+  our own `postgres:17-alpine` container with a 1 GB volume; the
+  data dumps with vanilla `pg_dump`. If Fly itself ever becomes a
+  concern, only the API host needs replacing.
+- **Cost is half of Heroku's** — ~$5/mo vs. $12/mo, a meaningful
+  margin for a dogfood directory.
+
+The full implementation design and cascading file rewrites are
+specified in
+[`2026-05-21-fly-redeploy-design.md`](./2026-05-21-fly-redeploy-design.md).
+The Heroku design at
+[`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)
+is kept for history but flagged Superseded.
+
 ## Impact map (read once a decision lands)
 
 | Outcome | PR #11 disposition | PR #12 | Files to rewrite |

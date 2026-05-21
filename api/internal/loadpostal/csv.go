@@ -85,8 +85,8 @@ SET leaf_region_id = EXCLUDED.leaf_region_id`
 //  2. Chunk the resolved rows into batchSize-row groups and issue one
 //     multi-row INSERT … SELECT FROM unnest(...) per group via raw
 //     pgx.Exec. For 33k US ZCTAs that's ~66 batches instead of 33k
-//     per-row Exec round-trips — turns a multi-minute Heroku load into
-//     a few seconds.
+//     per-row Exec round-trips — turns a multi-minute production load
+//     into a few seconds.
 //
 // Idempotent: re-running with the same input produces the same row
 // set (ON CONFLICT … DO UPDATE keeps the leaf_region_id current).

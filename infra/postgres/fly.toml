@@ -1,0 +1,38 @@
+# infra/postgres/fly.toml — urbanist-atlas sibling Postgres
+#
+# A second Fly app named `urbanist-atlas-db` runs the upstream
+# postgres:17-alpine image with a 1 GB volume. Same image as the
+# testcontainers integration suite — wire identical from local CI to
+# production.
+#
+# No [[services]] / [http_service]: the database is reachable only
+# over Fly's internal 6PN at `urbanist-atlas-db.internal:5432`. The
+# API app connects via the DATABASE_URL secret constructed at provision
+# time (see docs/deploy.md §2).
+#
+# Design doc: docs/superpowers/specs/2026-05-21-fly-redeploy-design.md
+# Volume:     `flyctl volumes create pgdata -a urbanist-atlas-db -r iad -s 1`
+
+app = "urbanist-atlas-db"
+primary_region = "iad"
+
+[build]
+  image = "postgres:17-alpine"
+
+# postgres:17-alpine initializes the database from these env vars on
+# first start. POSTGRES_PASSWORD is set as a Fly secret separately
+# (write-only; capture locally for DATABASE_URL construction on the
+# API app). PGDATA defaults to /var/lib/postgresql/data, which matches
+# the [mounts] destination below — no override needed.
+[env]
+  POSTGRES_DB = "urbanist_atlas"
+  POSTGRES_USER = "urbanist"
+
+[mounts]
+  source = "pgdata"
+  destination = "/var/lib/postgresql/data"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024

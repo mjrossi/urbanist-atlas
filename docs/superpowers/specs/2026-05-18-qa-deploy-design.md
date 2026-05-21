@@ -1,28 +1,34 @@
 # QA-first deploy chunk (slices #19 + #20 + #21 + #23)
 
-**Status:** Deliverables shipped (slices #19/#23/#19.5/#20/#21 code,
-config, docs all landed on `main` by 2026-05-19); runbook execution
-against live Heroku + Cloudflare Pages still pending.
+**Status:** Deliverables shipped; runbook execution against live Fly
++ Cloudflare Pages still pending (now driven by slice #20.6).
 **Supersedes:** none.
 **Superseded-in-part-by:** [`2026-05-18-hosting-cost-spike.md`](./2026-05-18-hosting-cost-spike.md)
-+ [`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)
-— the pivot from Fly.io to Heroku Common Runtime + Heroku Postgres
-Essential-0 rewrites:
-- the **API row** of the architecture table (now Heroku app, not Fly app);
-- the **DB row** of the architecture table (now Heroku Postgres
-  Essential-0, not Fly Managed Postgres);
-- the **API row** of the URL / DNS plan table (now CNAME → Heroku
-  DNS target, not `urbanist-atlas.fly.dev`);
-- **Slice #19** in full (the `Dockerfile` + `fly.toml` + `[group('fly')]`
-  recipes are deleted; Heroku ships from `Procfile` + buildpack);
-- **Slice #20** in full (Heroku CLI + Postgres add-on, no `flyctl`);
-- the **Future migration** section (read against the Heroku design
-  doc's "Reversibility" section instead).
++ [`2026-05-21-fly-redeploy-design.md`](./2026-05-21-fly-redeploy-design.md)
+(the slice-#20.6 Heroku → Fly re-pivot). The intermediate Heroku design
+at [`2026-05-18-heroku-deploy-design.md`](./2026-05-18-heroku-deploy-design.md)
+is itself superseded.
 
-Slices #21 / #23 / #22 / #25 are unaffected in spirit, though any
-inline references to Fly within those sections (CORS origin location,
-TLS cert provisioning, etc.) should be read as their Heroku
-equivalents.
+The slice-#20.6 design rewrites:
+- the **API row** of the architecture table (Fly app
+  `urbanist-atlas`, region `iad`, multi-stage Dockerfile);
+- the **DB row** of the architecture table (Fly sibling app
+  `urbanist-atlas-db` running `postgres:17-alpine` on a 1 GB volume,
+  reachable over Fly internal 6PN — *not* Fly Managed Postgres, which
+  was ruled out on cost in the spike);
+- the **API row** of the URL / DNS plan table (CNAME →
+  `urbanist-atlas.fly.dev`, proxy OFF; Fly issues Let's Encrypt via
+  `flyctl certs add`);
+- **Slice #19** is restored (Dockerfile + fly.toml ship again);
+- **Slice #20** is fully replaced by **#20.6** (Fly CLI + sibling
+  Postgres + GHA cron backups to Cloudflare R2; no `heroku` CLI, no
+  `Procfile`);
+- the **Future migration** section is read against the new design
+  doc's "Future migration: QA → prod" section.
+
+Slices #21 / #23 / #22 / #25 are largely unaffected in spirit:
+#21's DNS retarget half is absorbed by #20.6 (Heroku CNAME → Fly
+CNAME); #22 and #25 are also absorbed by #20.6; #23 is host-agnostic.
 **Related:**
 - [`docs/roadmap.md`](../../roadmap.md) (slice rows #19, #20, #21, #23)
 - [`CLAUDE.md`](../../../CLAUDE.md) §Hosting + §Launch strategy

@@ -1,13 +1,15 @@
 # Heroku deploy design — Phase 1 dogfood host
 
-**Status:** Shipped (deliverables) / pending execution. Slice **#20**
-code, config, and runbook landed on `main` in PR
-[#14](https://github.com/mjrossi/urbanist-atlas/pull/14) (2026-05-19);
-slice **#21**'s `_redirects` + Pages runbook landed in PR
-[#12](https://github.com/mjrossi/urbanist-atlas/pull/12) (2026-05-19).
-The runbook at [`docs/deploy.md`](../../deploy.md) has **not yet been
-executed** against a live Heroku account; no Heroku app, Postgres
-add-on, Pages project, or DNS record exists yet.
+**Status:** **Superseded by [`2026-05-21-fly-redeploy-design.md`](./2026-05-21-fly-redeploy-design.md) (2026-05-21).**
+Slice #20's Heroku deliverables shipped on 2026-05-19 (PR #14) but the
+runbook was never executed. Slice #20.6 reverses the Heroku decision
+back to the spike's Finalist 1 (Fly app + sibling
+`postgres:17-alpine`); the Heroku-shaped artifacts (`Procfile`,
+`heroku-*` justfile recipes, the original Heroku-targeted
+`docs/deploy.md`) are deleted, while the Go-side portability wins
+(`DATABASE_URL` rename, `loaddata` subcommand) survive unchanged.
+This document is kept for history; do **not** treat it as the current
+deploy contract.
 **Supersedes:** the Fly Managed Postgres path documented in
 [`2026-05-18-qa-deploy-design.md`](./2026-05-18-qa-deploy-design.md)
 §Slice #20 (which targets `flyctl mpg`).
