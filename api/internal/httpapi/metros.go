@@ -68,48 +68,12 @@ func toOAPIMetroSummaries(in []atlas.MetroSummary) []oapi.MetroSummary {
 }
 
 // toOAPIMetroDetail converts a single domain metro to the wire shape.
-// Orgs are mapped via toOAPIOrgs (the same hydration used by /recent
-// and shared with the LookupOrg adapter where applicable).
+// Orgs are mapped via toOAPIOrgs (shared with /recent; the /lookup
+// endpoint uses toOAPILookupOrgs which extends the same base). See
+// oapi_adapters.go.
 func toOAPIMetroDetail(in atlas.MetroDetail) oapi.MetroDetail {
 	return oapi.MetroDetail{
 		Region: toOAPIRegion(in.Region),
 		Orgs:   toOAPIOrgs(in.Orgs),
 	}
-}
-
-// toOAPIOrgs adapts a slice of domain Orgs to the wire shape. The base
-// /lookup endpoint uses oapi.LookupOrg (with matched_region_slugs);
-// /metros/{slug} and /recent use the plain oapi.Org without that
-// extension.
-func toOAPIOrgs(in []atlas.Org) []oapi.Org {
-	out := make([]oapi.Org, 0, len(in))
-	for _, o := range in {
-		out = append(out, toOAPIOrg(o))
-	}
-	return out
-}
-
-func toOAPIOrg(o atlas.Org) oapi.Org {
-	tags := make([]string, len(o.Tags))
-	for i, t := range o.Tags {
-		tags[i] = string(t)
-	}
-	regions := make([]oapi.Region, 0, len(o.Regions))
-	for _, r := range o.Regions {
-		regions = append(regions, toOAPIRegion(r))
-	}
-	out := oapi.Org{
-		Id:         o.ID,
-		Slug:       o.Slug,
-		Name:       o.Name,
-		ShortDesc:  o.ShortDesc,
-		WebsiteUrl: o.WebsiteURL,
-		Tags:       tags,
-		Regions:    regions,
-	}
-	if o.ContactURL != "" {
-		cu := o.ContactURL
-		out.ContactUrl = &cu
-	}
-	return out
 }
