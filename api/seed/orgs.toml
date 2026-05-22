@@ -1303,6 +1303,22 @@ website_url = "https://nybc.net"
 tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["ny"]
 
+[[org]]
+slug = "reinvent-albany"
+name = "Reinvent Albany"
+short_desc = "New York State good-government 501(c)(3) running a named MTA transparency and transit-funding accountability program; convenes letters and advocacy with Riders Alliance, NYPIRG Straphangers, and TSTC on Open Data, lockbox protections, and member-item disclosure."
+website_url = "https://reinventalbany.org"
+tags = ["transit", "accountability", "advocacy", "policy", "transparency"]
+region_slugs = ["ny"]
+
+[[org]]
+slug = "nypirg"
+name = "NYPIRG"
+short_desc = "New York Public Interest Research Group, statewide multi-issue 501(c)(3) running the NYPIRG Straphangers Campaign (since 1979) as its named transit-rider program — a voice for NYC subway and bus riders advocating for affordable fares and continued system expansion."
+website_url = "https://www.nypirg.org"
+tags = ["transit", "advocacy", "rider-union", "research", "policy"]
+region_slugs = ["ny"]
+
 # --- Pennsylvania ---
 
 [[org]]
@@ -1489,6 +1505,22 @@ website_url = "https://www.biketexas.org"
 tags = ["cycling", "advocacy", "safe-streets", "education", "policy"]
 region_slugs = ["tx"]
 
+[[org]]
+slug = "texas-streets-coalition"
+name = "Texas Streets Coalition"
+short_desc = "Texas statewide 30+ nonprofit coalition working to put people first in transportation planning; informs, reforms, and transforms TxDOT projects, processes, and policies (89% of TxDOT's 10-year $100B+ budget is constitutionally dedicated to highways)."
+website_url = "https://texasstreetscoalition.org"
+tags = ["transit", "safe-streets", "advocacy", "policy", "equity"]
+region_slugs = ["tx"]
+
+[[org]]
+slug = "texas-pedestrian-safety-coalition"
+name = "Texas Pedestrian Safety Coalition"
+short_desc = "Texas statewide pedestrian-safety coalition meeting quarterly to advance pedestrian and vulnerable-road-user safety policy and education across the state."
+website_url = "https://www.texaspedsafety.org"
+tags = ["walking", "safe-streets", "advocacy", "vision-zero"]
+region_slugs = ["tx"]
+
 # --- Illinois ---
 
 [[org]]
@@ -1633,6 +1665,22 @@ name = "California Bicycle Coalition"
 short_desc = "California's statewide bicycle advocacy coalition (CalBike) since 1994; 2026 California Bicycle Summit in Sacramento (Apr 23-24), Lobby Day, and Active Transportation Program reforms."
 website_url = "https://www.calbike.org"
 tags = ["cycling", "advocacy", "safe-streets", "policy", "equity"]
+region_slugs = ["ca-state"]
+
+[[org]]
+slug = "california-walks"
+name = "California Walks"
+short_desc = "California's statewide pedestrian-safety advocacy 501(c)(3); partners with state agencies, organizations, and community networks to strengthen pedestrian-safety policy and walkable-community practice through equity, education, and collaboration."
+website_url = "https://calwalks.org"
+tags = ["walking", "safe-streets", "advocacy", "policy", "equity"]
+region_slugs = ["ca-state"]
+
+[[org]]
+slug = "transform-ca"
+name = "TransForm"
+short_desc = "California statewide 501(c)(3) advocating for transportation, housing, and climate policy alignment; central member of the January 2025 61-nonprofit coalition pressing state agencies on transportation, housing, and air quality."
+website_url = "https://transformca.org"
+tags = ["transit", "advocacy", "policy", "climate", "equity"]
 region_slugs = ["ca-state"]
 
 # --- Colorado ---
