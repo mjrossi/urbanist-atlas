@@ -1036,6 +1036,23 @@ region_slugs = ["providence-ri-metro"]
 # Worth revisiting once Bike Walk Jax is independently incorporated
 # with its own active web surface.
 
+# --- Milwaukee ---
+#
+# Wisconsin Bike Fed (state floor) runs named Milwaukee programs
+# (MilWALKee Walks pedestrian initiative, Milwaukee Complete Streets
+# for All) and covers the metro via the ancestor walk; not duplicated
+# here. Milwaukee Bicycle Collective is bike-redistribution-only
+# (excluded per the slice 7.7 Tampa rationale). Bublr Bikes is a
+# bikeshare operator, not advocacy.
+
+[[org]]
+slug = "better-streets-mke"
+name = "Better Streets MKE"
+short_desc = "Milwaukee safe-streets advocacy group; publishes a regular newsletter and runs project-specific advocacy on Vision Zero, Complete Streets, Fond du Lac Avenue reconstruction, and the city's 414 in Motion Transportation & Mobility Plan."
+website_url = "https://www.betterstreetsmke.com"
+tags = ["safe-streets", "advocacy", "vision-zero", "walking", "cycling"]
+region_slugs = ["milwaukee-wi-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
