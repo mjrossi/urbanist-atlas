@@ -941,6 +941,24 @@ website_url = "https://healthbydesignonline.org"
 tags = ["transit", "safe-streets", "vision-zero", "advocacy", "walking"]
 region_slugs = ["indianapolis-in-metro"]
 
+# --- Cleveland ---
+
+[[org]]
+slug = "bike-cleveland"
+name = "Bike Cleveland"
+short_desc = "Greater Cleveland's leading 501(c)(3) advocacy for cyclists and pedestrians; organizes Better Streets Committees, pushes city policy and infrastructure under the Cleveland Moves plan, and partners with CPT on multi-modal advocacy."
+website_url = "https://www.bikecleveland.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["cleveland-oh-metro"]
+
+[[org]]
+slug = "clevelanders-for-public-transit"
+name = "Clevelanders for Public Transit"
+short_desc = "Volunteer-driven Cleveland transit-rider organization building constituency for affordable and reliable GCRTA service in partnership with labor and community allies; pushed 25Connects BRT dedicated bus-lane campaign in 2025."
+website_url = "https://clefortransit.org"
+tags = ["transit", "rider-union", "grassroots", "advocacy"]
+region_slugs = ["cleveland-oh-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
