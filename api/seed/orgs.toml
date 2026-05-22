@@ -6,9 +6,12 @@
 # or Canada. Housing-only / YIMBY-only orgs are out of scope per
 # CLAUDE.md. URLs for orgs added or updated in a given slice are
 # spot-checked at that slice's verification date (see commit
-# messages). Slice #7.7 (2026-05-21) added 23 net-new orgs across
-# the top-20 US metros; older entries carry the verification dates
-# documented in their original slice commits.
+# messages). Slice #7.8 (in progress, 2026-05-22) is broadening the
+# geographic canvas — adding top-31–50 US metros, CA CMAs #6–10,
+# big-state depth for the largest US states, and city-leaf orgs for
+# prominent non-metro cities. Slice #7.7 (2026-05-21) added 23
+# net-new orgs across the top-20 US metros; older entries carry the
+# verification dates documented in their original slice commits.
 #
 # See docs/superpowers/specs/2026-05-20-org-seed-growth-design.md
 # for the coverage-gate design (raised to ≥3 orgs per top-20 metro
@@ -728,6 +731,41 @@ short_desc = "St. Louis-region Center for Independent Living (founded 1970) whos
 website_url = "https://paraquad.org"
 tags = ["transit", "accessibility", "advocacy", "paratransit", "regional"]
 region_slugs = ["st-louis-mo-metro"]
+
+# === Slice 7.8 — top-31–50 US metros + CA CMAs #6–10 ===
+#
+# Metro-anchored orgs for the next-tier metros beyond the slice 7.6
+# top-30 canvas. Floor is ≥1 per metro; ≥2 where research surfaces
+# multiple quality candidates. See
+# docs/superpowers/specs/2026-05-22-org-seed-broadening-design.md
+# for the canvas extension design.
+
+# --- Pittsburgh ---
+
+[[org]]
+slug = "bikepgh"
+name = "BikePGH"
+short_desc = "Pittsburgh's flagship cycling and complete-streets 501(c)(3); runs OpenStreets PGH, Vision Zero campaigns, and the MoveForwardPGH bike-plan implementation with the city's Department of Mobility & Infrastructure."
+website_url = "https://bikepgh.org"
+contact_url = "https://bikepgh.org/about-us/contact/"
+tags = ["cycling", "advocacy", "safe-streets", "vision-zero", "walking"]
+region_slugs = ["pittsburgh-pa-metro"]
+
+[[org]]
+slug = "pittsburghers-for-public-transit"
+name = "Pittsburghers for Public Transit"
+short_desc = "Rider- and worker-led transit-justice 501(c)(3) organizing against Pittsburgh Regional Transit service cuts and fare hikes; runs the statewide Transit for All PA! program."
+website_url = "https://www.pittsburghforpublictransit.org"
+tags = ["transit", "rider-union", "grassroots", "advocacy"]
+region_slugs = ["pittsburgh-pa-metro"]
+
+[[org]]
+slug = "pittsburgh-walks"
+name = "Pittsburgh Walks"
+short_desc = "Pedestrian advocacy coalition; trains volunteers as the Safe Sidewalks Crew to audit sidewalks with DOMI and Access Mob Pittsburgh and prioritize pedestrian infrastructure across the city."
+website_url = "https://www.pittsburghwalks.org"
+tags = ["walking", "safe-streets", "advocacy", "accessibility"]
+region_slugs = ["pittsburgh-pa-metro"]
 
 # --- US States (statewide) ---
 #
