@@ -1856,6 +1856,16 @@ contact_url = "mailto:info@bikeedmonton.ca"
 tags = ["cycling", "advocacy", "safe-streets", "grassroots", "education"]
 region_slugs = ["edmonton-cma"]
 
+# --- Québec City ---
+
+[[org]]
+slug = "acces-transports-viables"
+name = "Accès transports viables"
+short_desc = "Multi-modal users-rights nonprofit for the Capitale-Nationale and Chaudière-Appalaches regions; defends public-transit, carpooling, walking, and cycling users and runs the annual Mois du vélo campaign across Québec and Lévis."
+website_url = "https://transportsviables.org"
+tags = ["transit", "cycling", "walking", "advocacy", "rider-union"]
+region_slugs = ["quebec-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
