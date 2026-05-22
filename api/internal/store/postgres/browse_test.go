@@ -11,6 +11,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"sort"
@@ -296,7 +297,7 @@ func TestPostgresStore_GetOrgBySlug_UnknownSlug(t *testing.T) {
 	if err == nil {
 		t.Fatalf("err: want ErrOrgNotFound, got nil (result=%+v)", got)
 	}
-	if err != atlas.ErrOrgNotFound {
+	if !errors.Is(err, atlas.ErrOrgNotFound) {
 		t.Errorf("err: want ErrOrgNotFound, got %v", err)
 	}
 	if got != nil {

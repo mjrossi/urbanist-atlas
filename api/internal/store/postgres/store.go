@@ -288,7 +288,11 @@ func (s *Store) GetOrgBySlug(ctx context.Context, slug string) (*atlas.Org, erro
 		return nil, err
 	}
 	if len(orgs) == 0 {
-		return nil, atlas.ErrOrgNotFound
+		// hydrateOrgRows cannot drop rows for a single-row input today.
+		// If a future change ever does (e.g. region-tier filtering),
+		// surface the integrity violation as 500 rather than masking it
+		// as a 404 for an org that actually exists in the table.
+		return nil, fmt.Errorf("postgres: hydrateOrgRows dropped row for slug %q", slug)
 	}
 	return &orgs[0], nil
 }

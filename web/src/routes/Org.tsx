@@ -47,7 +47,12 @@ function OrgBody({
   }
   if (query.isError) {
     const err = query.error;
-    if (err.status === 404) {
+    // useQuery<_, ApiError> is a TS hint only — react-query passes
+    // whatever the queryFn rejected. Narrow with instanceof so a stray
+    // non-ApiError (network TypeError, AbortError) doesn't render
+    // `undefined` from missing fields.
+    const apiErr = err instanceof ApiError ? err : null;
+    if (apiErr?.status === 404) {
       return (
         <p className="results-state">
           This organization isn’t in the atlas yet — try{' '}
@@ -57,9 +62,9 @@ function OrgBody({
     }
     return (
       <p className="results-state error" role="alert">
-        {err.message}
-        {err.requestId ? (
-          <span className="results-state-detail">request id: {err.requestId}</span>
+        {apiErr?.message ?? 'Something went wrong loading this organization.'}
+        {apiErr?.requestId ? (
+          <span className="results-state-detail">request id: {apiErr.requestId}</span>
         ) : null}
       </p>
     );
@@ -72,6 +77,10 @@ function OrgBody({
       <header className="page-header">
         <h1>{org.name}</h1>
         <p>
+          {/* Org data is admin-curated, so we render the website as a
+              link even when domainOf can't extract a hostname (e.g. a
+              scheme-less URL slipped past validation). The link text
+              falls back to the raw URL, making bad data visible. */}
           <a href={org.website_url} target="_blank" rel="noopener noreferrer">
             {domain ?? org.website_url}
           </a>
@@ -120,19 +129,23 @@ function OrgBody({
 }
 
 /**
- * Region kinds that map to a `/m/:metroSlug` index page. Mirrors the
- * server-side MetroKindStrings set; keep them in lockstep when a new
- * metro-equivalent kind goes live in `api/pkg/atlas/metro_kinds.go`.
+ * Region kinds that map to a `/m/:metroSlug` index page. MUST stay in
+ * lockstep with the server-side metroKinds map in
+ * `api/pkg/atlas/metro_kinds.go` — the `/api/v1/metros/{slug}` endpoint
+ * only serves regions whose kind is in that map, so a drift here
+ * either dead-links (web has a kind the server rejects) or hides a
+ * valid pivot (server serves a kind we don't link).
  */
 const METRO_KINDS = new Set<string>([
   'us:metro',
-  'us:multi-state',
   'ca:cma',
+  'ca:regional-district',
+  'pt:area-metropolitana',
 ]);
 
 function regionLink(r: Region) {
   if (METRO_KINDS.has(r.kind)) {
-    return <Link to={`/m/${r.slug}`}>{r.name}</Link>;
+    return <Link to={`/m/${encodeURIComponent(r.slug)}`}>{r.name}</Link>;
   }
   return <span>{r.name}</span>;
 }

@@ -8,11 +8,10 @@ import { TagChip } from './TagChip.tsx';
  * as small pills, and a "via X" subtitle naming the matched region(s)
  * that caused this org to surface for the current lookup. The
  * `website_url` stays as a secondary affordance via the `.entry-domain`
- * external link next to the name.
- *
- * The domain is rendered next to the name as a visual hint that the
- * secondary link leaves the site; we derive it from `website_url`
- * defensively so a malformed URL doesn't blow up the page.
+ * external link next to the name — the link always renders when
+ * website_url is non-empty, falling back to the raw URL when domainOf
+ * can't extract a hostname (admin-curated data; a typo'd URL is more
+ * useful as a visible broken link than as a missing affordance).
  */
 function domainOf(url: string): string | null {
   try {
@@ -47,14 +46,14 @@ export function Entry({
         <h3 className="entry-name">
           <Link to={`/orgs/${encodeURIComponent(org.slug)}`}>{org.name}</Link>
         </h3>
-        {domain ? (
+        {org.website_url ? (
           <a
             className="entry-domain"
             href={org.website_url}
             target="_blank"
             rel="noopener noreferrer"
           >
-            {domain}
+            {domain ?? org.website_url}
           </a>
         ) : null}
       </div>

@@ -50,6 +50,7 @@ describe('Entry', () => {
     expect(link.getAttribute('href')).toBe('https://www.transalt.org');
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toContain('noopener');
+    expect(link.getAttribute('rel')).toContain('noreferrer');
   });
 
   it('strips the leading www. when displaying the domain', () => {
@@ -84,13 +85,19 @@ describe('Entry', () => {
     expect(container.querySelector('.entry-tags')).toBeNull();
   });
 
-  it('gracefully drops the domain hint when website_url is malformed', () => {
-    const { container } = renderEntry(
+  it('falls back to the raw URL as link text when website_url is malformed', () => {
+    // Admin-curated data: render the outbound affordance even if
+    // domainOf can't extract a hostname. A visibly-broken link is more
+    // useful to the user (and to us) than a silently-missing one.
+    renderEntry(
       <ul>
         <Entry org={makeOrg({ website_url: 'not a url' })} regionNameBySlug={emptyMap} />
       </ul>,
     );
-    expect(container.querySelector('.entry-domain')).toBeNull();
+    const link = screen.getByRole('link', { name: 'not a url' });
+    expect(link.getAttribute('href')).toBe('not a url');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
   });
 
   it('renders "via X" subtitle when matched_region_slugs is non-empty', () => {

@@ -31,6 +31,11 @@ func getOrgHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)
 			return
 		}
+		if org == nil {
+			logger.ErrorContext(r.Context(), "store contract violation: nil org with nil err", "slug", slug, "rid", rid)
+			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)
+			return
+		}
 		writeJSON(w, http.StatusOK, toOAPIOrg(*org))
 	}
 }

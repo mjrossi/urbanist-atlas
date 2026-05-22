@@ -28,7 +28,7 @@ const emptyMap = new Map<string, string>();
 
 describe('EntryList', () => {
   it('renders both Local and Regional section labels', () => {
-    render(<EntryList local={[]} regional={[]} regionNameBySlug={emptyMap} />);
+    renderList(<EntryList local={[]} regional={[]} regionNameBySlug={emptyMap} />);
     expect(screen.getByText('Local')).toBeDefined();
     expect(screen.getByText('Regional')).toBeDefined();
   });

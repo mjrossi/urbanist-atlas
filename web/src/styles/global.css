@@ -638,6 +638,17 @@ em {
   color: var(--muted);
   letter-spacing: 0.02em;
   white-space: nowrap;
+  /* Quiet secondary affordance — no underline by default so the
+     org-name link stays the visual primary. The global `a {}` rule
+     would add one otherwise. */
+  text-decoration: none;
+}
+
+.entry-domain:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .entry-via {

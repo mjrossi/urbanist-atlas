@@ -117,6 +117,57 @@ describe('Org', () => {
     expect(link.getAttribute('rel')).toContain('noopener');
   });
 
+  // METRO_KINDS in Org.tsx must stay in lockstep with the server's
+  // metroKinds map (api/pkg/atlas/metro_kinds.go). These tests pin the
+  // currently-known set so a one-sided edit fails CI loudly.
+  it('links ca:regional-district regions to /m/:slug', async () => {
+    getOrgMock.mockResolvedValueOnce(
+      makeOrg({
+        regions: [
+          {
+            id: 20,
+            kind: 'ca:regional-district',
+            name: 'Metro Vancouver',
+            slug: 'metro-vancouver',
+            country: 'CA',
+            scope_tier: 'regional',
+            parent_slugs: [],
+          },
+        ],
+      }),
+    );
+    renderAt('/orgs/transalt');
+
+    await waitFor(() => {
+      const link = screen.getByRole('link', { name: 'Metro Vancouver' });
+      expect(link.getAttribute('href')).toBe('/m/metro-vancouver');
+    });
+  });
+
+  it('does NOT link us:multi-state regions (server /metros does not serve them)', async () => {
+    getOrgMock.mockResolvedValueOnce(
+      makeOrg({
+        regions: [
+          {
+            id: 30,
+            kind: 'us:multi-state',
+            name: 'NYC Tri-State',
+            slug: 'nyc-tristate',
+            country: 'US',
+            scope_tier: 'regional',
+            parent_slugs: [],
+          },
+        ],
+      }),
+    );
+    renderAt('/orgs/transalt');
+
+    await waitFor(() => {
+      expect(screen.getByText('NYC Tri-State')).toBeDefined();
+    });
+    expect(screen.queryByRole('link', { name: 'NYC Tri-State' })).toBeNull();
+  });
+
   it('renders a contact link when contact_url is present', async () => {
     getOrgMock.mockResolvedValueOnce(
       makeOrg({ contact_url: 'https://www.transalt.org/contact' }),

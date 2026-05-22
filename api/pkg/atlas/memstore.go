@@ -177,6 +177,12 @@ func (s *MemStore) GetMetro(_ context.Context, slug string) (*MetroDetail, error
 // GetOrgBySlug implements Store. Scans the in-memory orgs by slug,
 // hydrates Regions like the wire contract expects, returns
 // ErrOrgNotFound when no row matches.
+//
+// Behavioral note: the Postgres impl additionally gates on
+// status='approved', but atlas.Org has no Status field so MemStore
+// can't replicate that filter. Dev/test callers are responsible for
+// only loading approved orgs into MemStore (LoadDevFixtures does;
+// hand-built fixtures should too).
 func (s *MemStore) GetOrgBySlug(_ context.Context, slug string) (*Org, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

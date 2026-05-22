@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -89,7 +90,7 @@ func TestMemStore_GetOrgBySlug_HappyPath(t *testing.T) {
 func TestMemStore_GetOrgBySlug_NotFound(t *testing.T) {
 	s := NewMemStore()
 	_, err := s.GetOrgBySlug(context.Background(), "nope")
-	if err != ErrOrgNotFound {
+	if !errors.Is(err, ErrOrgNotFound) {
 		t.Errorf("err = %v, want ErrOrgNotFound", err)
 	}
 }
