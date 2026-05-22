@@ -314,6 +314,13 @@ web-check: web-deps web-lint web-test web-build web-gen-check
 preview:
     @just pg-up
     @just migrate-up
+    @# Fail fast if the dev DB container isn't reachable, instead of
+    @# letting `|| echo 0` silently fall through to a confusing
+    @# `just loaddata` failure one indirection later.
+    @if ! docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -c "SELECT 1" >/dev/null 2>&1; then \
+        echo "preview: postgres container 'urbanist-atlas-pg' is not reachable. Check 'docker ps' and 'just pg-up'." >&2; \
+        exit 1; \
+    fi
     @count=$(docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -t -A -c "SELECT COUNT(*) FROM organizations" 2>/dev/null || echo 0); \
     if [ "$count" = "0" ]; then \
         echo "preview: empty DB — running loaddata"; \
