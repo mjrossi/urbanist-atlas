@@ -1179,6 +1179,23 @@ website_url = "https://utru.org"
 tags = ["transit", "rider-union", "advocacy", "grassroots"]
 region_slugs = ["salt-lake-city-ut-metro"]
 
+# --- Hartford ---
+#
+# Bike Walk Connecticut already covers the CT state floor; not
+# duplicated. Transport Hartford Academy (a program of Center for
+# Latino Progress) would qualify under the named-program precedent
+# but couldn't be verified to clear the activity bar in 2025-2026
+# from search alone — worth revisiting if a maintainer with local
+# knowledge confirms current programming.
+
+[[org]]
+slug = "bike-west-hartford"
+name = "Bike West Hartford"
+short_desc = "West Hartford 501(c)(3) advocating for bike-walk-transit improvements across the Hartford region; runs Center Streets festival, Tracey's Pride Ride, and monthly Thirsty Thursday community meetings."
+website_url = "https://bikewesthartford.org"
+tags = ["cycling", "walking", "transit", "advocacy", "safe-streets"]
+region_slugs = ["hartford-ct-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
