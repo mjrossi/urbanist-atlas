@@ -1,7 +1,19 @@
 # Seed data
 
 Hand-curated data for development and Phase 1 dogfooding. Three file
-formats:
+formats below describe the *shape*; the **operator workflow** for
+adding or correcting orgs / regions / MSA overrides is at
+[`docs/editorial.md`](../../docs/editorial.md).
+
+> ⚠️ **Seed data does not reload on deploy.** Merging a PR that edits
+> any file in this directory ships the *code* automatically (via the
+> `deploy-api` GHA job), but the database is reloaded only when a
+> maintainer runs `just fly-loaddata` after the merge. Loaders are
+> idempotent (upsert-by-stable-key) so re-running is safe. See
+> [`docs/deploy.md`](../../docs/deploy.md) § Deploys for the full
+> contract.
+
+
 
 | File                                | Format          | Cardinality                   | Source                                                                                |
 | ----------------------------------- | --------------- | ----------------------------- | ------------------------------------------------------------------------------------- |

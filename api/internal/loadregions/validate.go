@@ -43,7 +43,7 @@ func DetectCycles(f File) error {
 		case black:
 			return nil
 		case gray:
-			return fmt.Errorf("loadregions: cycle detected in parent graph:\n  %s\nfix the parents: field on one of these regions.", strings.Join(append(path, slug), " → "))
+			return fmt.Errorf("loadregions: cycle detected in parent graph:\n  %s\nfix the parents: field on one of these regions", strings.Join(append(path, slug), " → "))
 		}
 		color[slug] = gray
 		for _, p := range parents[slug] {

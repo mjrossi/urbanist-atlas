@@ -39,6 +39,53 @@ environment-flavored during QA. When prod launches, prod hostnames
 attach to the same apps/project and QA hostnames retire — no rebuilds,
 no data migration.
 
+## Deploys
+
+Day-to-day, deploys are automated. The table below is the operating
+contract; the rest of this file is the bring-up runbook + secrets +
+rotation + troubleshooting.
+
+| Component | Trigger | Mechanism |
+|---|---|---|
+| **API (Fly)** | push to `main` | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) → `deploy-api` job runs `flyctl deploy --remote-only`. Release-command (`migrate up`) runs in a one-off machine before traffic cuts over. |
+| **Web (Cloudflare Workers + Pages)** | push to `main` | Cloudflare dashboard git integration (`npx wrangler deploy` on `main`; `npx wrangler versions upload` for previews on other branches). Configured outside this repo. |
+| **DB (Fly sibling)** | manual | `just fly-deploy-db`. Rare — only on `postgres:17-alpine` image bumps. Auto-deploying Postgres is intentionally avoided. |
+| **Seed data** | manual | `just fly-loaddata` after a seed-file edit lands on `main`. Loaders are idempotent (upsert-by-stable-key), so re-runs converge. **A deploy does not reload seed data.** |
+| **Nightly backups** | scheduled | [`.github/workflows/backup.yml`](../.github/workflows/backup.yml) at 07:00 UTC. See [`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md). |
+| **Weekly vuln scan** | scheduled | [`.github/workflows/govulncheck.yml`](../.github/workflows/govulncheck.yml) on Mondays 12:00 UTC. Non-blocking; failures notify, don't gate merges. |
+
+### When to deploy manually
+
+- **API.** Default path is `git push → merge`. Fall back to
+  `just fly-deploy` when GitHub Actions is degraded, when you need to
+  deploy a non-`main` branch for a hot-fix, or when you want to watch
+  the build locally. For an Actions re-deploy of current `main` without
+  an empty commit: `gh workflow run ci.yml --ref main`.
+- **Web.** Cloudflare dashboard → Workers & Pages → `urbanist-atlas` →
+  Deployments → Retry latest. Or `cd web && npx wrangler deploy` from
+  a maintainer machine with `wrangler` authenticated.
+- **Seed data.** *Always* manual. After merging a PR that edits
+  `api/seed/**`, run `just fly-loaddata`. There is no auto-loader on
+  deploy by design — a malformed seed file should not be able to
+  block a code deploy.
+- **DB.** `just fly-deploy-db` for image bumps only. The sibling
+  Postgres app is internal-only and has no auto-redeploy path; see
+  the "STATE=stopped after first deploy" gotcha in § 1 below.
+
+### Rollback
+
+- **API.** `flyctl releases list -a urbanist-atlas` shows version
+  history; `flyctl deploy --image registry.fly.io/urbanist-atlas:<tag>`
+  rolls back to a prior image. Migrations are forward-only — if a
+  released migration is the cause, revert the offending Go change,
+  merge, and let auto-deploy ship the fix. Don't try to roll back
+  schema by hand.
+- **Web.** Cloudflare dashboard → Deployments → "Promote to
+  production" on a prior successful build.
+- **Seed data.** Git-revert the offending `api/seed/**` change,
+  merge, then `just fly-loaddata`. The loaders upsert by stable key,
+  so the reverted file's rows take over cleanly.
+
 ## Prerequisites
 
 - [flyctl](https://fly.io/docs/flyctl/install/) installed and
@@ -453,24 +500,28 @@ these preview URLs working.
 ## Ongoing operations
 
 Every recipe below has a `just fly-*` (or `just db-*`) wrapper at the
-repo root so the verbs are discoverable via `just --list`.
+repo root so the verbs are discoverable via `just --list`. For *who
+runs what when*, see § Deploys above; this table is the command
+reference.
 
-| Task | Command | Wrapper |
-|---|---|---|
-| Build + deploy current branch | `flyctl deploy -a urbanist-atlas` | `just fly-deploy` |
-| Deploy sibling Postgres (rare) | `flyctl deploy -a urbanist-atlas-db -c infra/postgres/fly.toml` | `just fly-deploy-db` |
-| Tail live API logs | `flyctl logs -a urbanist-atlas` | `just fly-logs` |
-| Tail live DB logs | `flyctl logs -a urbanist-atlas-db` | `just fly-logs-db` |
-| List config (names + digests) | `flyctl secrets list -a urbanist-atlas` | `just fly-secrets` |
-| Interactive shell on the API machine | `flyctl ssh console -a urbanist-atlas` | `just fly-ssh` |
-| Re-seed the database | `flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata"` | `just fly-loaddata` |
-| Ad-hoc local backup | `just db-backup` (writes `./urbanist-atlas-YYYY-MM-DD.sql.gz`) | `just db-backup` |
-| Restore a dump (DESTRUCTIVE) | `gunzip -c <file>.sql.gz \| flyctl ssh console -a urbanist-atlas-db -C "psql ..."` | `just db-restore <file>` |
-| psql against the DB | `flyctl ssh console -a urbanist-atlas-db -C "psql -U urbanist urbanist_atlas"` | — |
+| Task | Command | Wrapper | Path |
+|---|---|---|---|
+| Build + deploy API current branch | `flyctl deploy -a urbanist-atlas` | `just fly-deploy` | manual fallback (primary: GHA on merge to `main`) |
+| Re-deploy current `main` via Actions | `gh workflow run ci.yml --ref main` | — | manual fallback |
+| Deploy sibling Postgres (rare) | `flyctl deploy -a urbanist-atlas-db -c infra/postgres/fly.toml` | `just fly-deploy-db` | manual only |
+| Tail live API logs | `flyctl logs -a urbanist-atlas` | `just fly-logs` | as needed |
+| Tail live DB logs | `flyctl logs -a urbanist-atlas-db` | `just fly-logs-db` | as needed |
+| List config (names + digests) | `flyctl secrets list -a urbanist-atlas` | `just fly-secrets` | as needed |
+| Interactive shell on the API machine | `flyctl ssh console -a urbanist-atlas` | `just fly-ssh` | as needed |
+| Re-seed the database | `flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata"` | `just fly-loaddata` | manual only — required after every merge that edits `api/seed/**` |
+| Ad-hoc local backup | `just db-backup` (writes `./urbanist-atlas-YYYY-MM-DD.sql.gz`) | `just db-backup` | as needed |
+| Restore a dump (DESTRUCTIVE) | `gunzip -c <file>.sql.gz \| flyctl ssh console -a urbanist-atlas-db -C "psql ..."` | `just db-restore <file>` | manual only |
+| psql against the DB | `flyctl ssh console -a urbanist-atlas-db -C "psql -U urbanist urbanist_atlas"` | — | as needed |
 
-A redeploy after a code change is `flyctl deploy` (or
-`just fly-deploy`) from any branch; the `release_command` in
-`fly.toml` re-runs migrations.
+Auto-deploy ships every push to `main` through GHA; `release_command`
+in `fly.toml` re-runs migrations. Manual `flyctl deploy` from any
+branch still works and is the right move when Actions is degraded or
+a non-`main` hot-fix is needed.
 
 ## Secrets
 

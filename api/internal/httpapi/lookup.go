@@ -120,4 +120,3 @@ func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
 		MatchedRegionSlugs: matched,
 	}
 }
-
