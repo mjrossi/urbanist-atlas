@@ -52,6 +52,14 @@ updates:
     labels:
       - dependencies
       - javascript
+    ignore:
+      # openapi-typescript@7.x peer-depends on `typescript@^5.x`, so
+      # `npm ci` rejects a TS major-version bump until upstream ships
+      # TS 6+ support (tracked in openapi-ts/openapi-typescript#2774).
+      # Hold TS on 5.x; lift this once openapi-typescript widens its
+      # peer range, then we can take the TS major in a follow-up.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       # One PR per ecosystem for the SPA stack — React + Vite + RR +
       # React Query move in lockstep often enough that splitting them
