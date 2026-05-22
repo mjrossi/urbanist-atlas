@@ -840,6 +840,31 @@ website_url = "https://devougood.com"
 tags = ["transit", "cycling", "walking", "advocacy", "complete-streets"]
 region_slugs = ["cincinnati-oh-metro"]
 
+# --- Kansas City ---
+#
+# BikeWalkKC operates bi-state (KS + MO) but stays metro-anchored
+# per the slice 7.6 KS state-floor reasoning: BikeWalkKC is
+# "structurally a KC-metro org" and KS remains a documented
+# statewide gap. KCRTA is metro-anchored.
+
+[[org]]
+slug = "bikewalkkc"
+name = "BikeWalkKC"
+short_desc = "Bi-state Greater Kansas City advocacy 501(c)(3) for walking, biking, and transit; runs Safe Routes to School programming, operates the regional bike share, and convenes the Transportation for All Coalition."
+website_url = "https://bikewalkkc.org"
+contact_url = "https://bikewalkkc.org/about/contact/"
+tags = ["cycling", "walking", "transit", "advocacy", "safe-streets", "regional"]
+region_slugs = ["kansas-city-mo-metro"]
+
+[[org]]
+slug = "kc-regional-transit-alliance"
+name = "Kansas City Regional Transit Alliance"
+short_desc = "Bi-state Greater Kansas City transit advocacy 501(c)(3); educates the public on multi-modal transit access, surveys regional sentiment, and pushes local and county governments to commit funding for expanded transit service."
+website_url = "https://kcrta.org"
+contact_url = "mailto:chair@kcrta.org"
+tags = ["transit", "advocacy", "policy", "regional"]
+region_slugs = ["kansas-city-mo-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
