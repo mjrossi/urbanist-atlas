@@ -1329,6 +1329,14 @@ website_url = "https://www.pawalksandbikes.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
 region_slugs = ["pa"]
 
+[[org]]
+slug = "transit-for-all-pa"
+name = "Transit for All PA!"
+short_desc = "Pennsylvania statewide coalition of transit riders, workers, and supportive orgs/businesses; operates as a named program of Pittsburghers for Public Transit. 40,000+ supporters across all 253 PA legislative districts; 2025 legislative-package introduction; 2026 four-region paid fellowship program."
+website_url = "https://www.transitforallpa.org"
+tags = ["transit", "rider-union", "advocacy", "policy", "grassroots"]
+region_slugs = ["pa"]
+
 # --- Rhode Island ---
 
 [[org]]
@@ -1429,6 +1437,14 @@ name = "Florida Bicycle Association"
 short_desc = "Florida statewide 501(c)(3) bicycle advocacy and education coalition; represents the Sunshine State at the League of American Bicyclists National Bike Summit."
 website_url = "https://floridabicycle.org"
 tags = ["cycling", "advocacy", "safe-streets", "education", "policy"]
+region_slugs = ["fl"]
+
+[[org]]
+slug = "1000-friends-of-florida"
+name = "1000 Friends of Florida"
+short_desc = "Florida statewide smart-growth 501(c)(3) running a named transportation-options program; advocates in the legislature, serves on state and regional transportation boards, and conducts education to address Florida's pedestrian-safety crisis."
+website_url = "https://1000fof.org"
+tags = ["transit", "walking", "advocacy", "policy", "land-use"]
 region_slugs = ["fl"]
 
 # --- Kentucky ---
@@ -1549,6 +1565,14 @@ name = "League of Michigan Bicyclists"
 short_desc = "Michigan statewide cycling advocacy nonprofit (LMB) lobbying for bicycle-friendly policy at the State Capitol; hosts annual Advocacy Day and multi-day cycling tours."
 website_url = "https://lmb.org"
 tags = ["cycling", "advocacy", "safe-streets", "policy", "education"]
+region_slugs = ["mi"]
+
+[[org]]
+slug = "trans4m"
+name = "Transportation for Michigan"
+short_desc = "Michigan statewide transportation-policy coalition (Trans4M) of nonprofits, businesses, environmental groups, planners, and academic institutions; pushed for Public Act 16 of 2025 creating the Neighborhood Roads Fund and additional public-transportation funding."
+website_url = "https://www.t4michigan.org"
+tags = ["transit", "advocacy", "policy", "coalition"]
 region_slugs = ["mi"]
 
 # --- Ohio ---
