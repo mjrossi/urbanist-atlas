@@ -1053,6 +1053,17 @@ website_url = "https://www.betterstreetsmke.com"
 tags = ["safe-streets", "advocacy", "vision-zero", "walking", "cycling"]
 region_slugs = ["milwaukee-wi-metro"]
 
+# --- Oklahoma City (gap, 2026-05-22) ---
+#
+# OK is itself a documented state-floor gap (BikeOklahoma dissolved
+# per the slice 7.6 design). OKC has no independent advocacy
+# 501(c)(3) meeting the activity bar — bikewalkokc is the City's
+# plan name (not an org); Oklahoma Bicycle Society is a recreational
+# cycling club; Oklahoma Bicycle Society Foundation is a
+# fundraising arm. ZIPs in oklahoma-city-ok-metro return graceful
+# empty per the slice 7.6 empty-state policy. Worth revisiting if
+# the Oklahoma Bicycle Summit, Inc. successor takes off.
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
