@@ -1881,6 +1881,16 @@ website_url = "https://www.bikewinnipeg.ca"
 tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
 region_slugs = ["winnipeg-cma"]
 
+# --- Hamilton ---
+
+[[org]]
+slug = "cycle-hamilton"
+name = "Cycle Hamilton"
+short_desc = "Hamilton (Ontario) cycling-advocacy nonprofit working toward Hamilton becoming the best place to get around by bike; advocates for better infrastructure and develops partnerships, and runs the Tour d'Aldershot community ride."
+website_url = "https://cyclehamont.ca"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["hamilton-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
