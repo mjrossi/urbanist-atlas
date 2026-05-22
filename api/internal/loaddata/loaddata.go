@@ -46,7 +46,13 @@ var countries = []struct {
 }{
 	{"US", []string{"us_states", "us_multistate", "us_msas", "us"}, "us"},
 	{"CA", []string{"ca_provinces", "ca_cmas", "ca"}, "ca"},
-	{"PT", []string{"pt"}, "pt"},
+	// PT was loaded here through slice #4.6 as a region-graph
+	// validation fixture and removed from the user-facing pipeline by
+	// the slice #25 hygiene pass. The seed files (regions_pt.toml,
+	// postal_codes_pt.csv) stay in api/seed/ for the integration suite
+	// to load explicitly via loadregions.LoadFile + loadpostal.LoadFile
+	// (see pipeline_test.go), and a future v1.1+ slice can reintroduce
+	// PT to this list when the editorial coverage is ready to ship.
 }
 
 // Countries returns the country codes whose seed files LoadAll loads,

@@ -229,7 +229,14 @@ still pending operator action.
   *Urbanist Lexicon* in the Footer colophon, add a "Source on
   GitHub →" link in the Footer row, add Inter to the font credit,
   rewrite the About contact line to point at GitHub issues for
-  Phase 1, soften the 404 closing line.
+  Phase 1, soften the 404 closing line. Add a `/submit` Phase 2
+  placeholder route so the nav-linked URL stops falling through to
+  the 404 errorElement. Drop PT from the user-facing seed pipeline
+  (`loaddata.LoadAll`) and remove the four PT orgs from `orgs.toml`;
+  the PT seed files stay under `api/seed/` as a region-graph
+  validation fixture and migration
+  `0005_drop_pt_user_facing_seed.sql` cleans existing PT rows on
+  deploy.
 
 ## Deferred from this milestone
 

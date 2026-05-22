@@ -20,17 +20,25 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
 ## Scope (v1)
 
 - Transit + safe-streets organizations only. Housing/YIMBY is out of scope.
-- US + Canada are the primary shipping decision. Additional countries
-  (PT first, ES queued, MX/NL/UK over time) are added editorially as
-  the maintainer's interest and data availability allow — see
+- **US + Canada are the only shipping countries in v1.** Slice #4.6
+  loaded Portugal as a region-graph validation fixture to stress the
+  multi-parent DAG model; slice #25 dropped PT from the user-facing
+  seed pipeline (loaddata) once the validation had served its
+  purpose. The PT seed files (`api/seed/regions_pt.toml`,
+  `postal_codes_pt.csv`) stay in the repo as a reference and for the
+  integration suite (which loads them explicitly), and a future
+  v1.1+ slice can reintroduce PT — or ES, MX, NL, UK — when the
+  editorial coverage is ready to ship. See
   [`docs/region-graph.md`](./docs/region-graph.md) for the per-country
   conventions.
 - Results return **local** (city/county) + **regional** (metro/state/
   province/multi-state) orgs. The schema supports a third
   `scope_tier='national'` tier (slice #4.6) for country-wide umbrellas
-  like Portugal's MUBi; the default `/lookup` filters national-tier
-  orgs out so the surface stays local-first. US/CA editorial policy
-  forbids creating national regions in v1 seed data, preserving the
+  (e.g. Portugal's MUBi in the validation fixture, or future Living
+  Streets / MUBi-equivalent national orgs when other countries
+  reactivate); the default `/lookup` filters national-tier orgs out
+  so the surface stays local-first. US/CA editorial policy forbids
+  creating national regions in v1 seed data, preserving the
   no-national-orgs default behavior for those countries.
 
 ## Tooling: mise

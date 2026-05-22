@@ -1432,43 +1432,13 @@ region_slugs = ["nl-province"]
 # arrays at the territory-tier ancestor walk per the empty-state
 # policy in the design spec.
 
-# --- Portugal (slice #4.6 validation fixture) ---
+# --- Portugal ---
 #
-# Local chapters of national federations are modeled separately from
-# their national umbrella per the editorial policy in
-# docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md
-# (§2). The mubi-nacional row exists as the umbrella; default /lookup
-# filters scope_tier='national' out so it doesn't surface for postal
-# code queries.
-
-[[org]]
-slug = "mubi-lisboa"
-name = "MUBi Lisboa"
-short_desc = "Lisboa chapter of MUBi (Associação pela Mobilidade Urbana em Bicicleta), advocating for cycling infrastructure and urban mobility in the Lisboa area."
-website_url = "https://mubi.pt"
-tags = ["cycling", "advocacy", "local-chapter"]
-region_slugs = ["lisboa-municipio"]
-
-[[org]]
-slug = "mubi-porto"
-name = "MUBi Porto"
-short_desc = "Porto chapter of MUBi, working for safer cycling and active mobility across the Área Metropolitana do Porto."
-website_url = "https://mubi.pt"
-tags = ["cycling", "advocacy", "local-chapter"]
-region_slugs = ["porto-municipio"]
-
-[[org]]
-slug = "lisboa-para-pessoas"
-name = "Lisboa Para Pessoas"
-short_desc = "Lisboa-focused walkability and public-space advocacy; pedestrian-first journalism and campaigning."
-website_url = "https://lisboaparapessoas.pt"
-tags = ["pedestrian", "walkability", "safe-streets"]
-region_slugs = ["lisboa-municipio"]
-
-[[org]]
-slug = "mubi-nacional"
-name = "MUBi — Associação pela Mobilidade Urbana em Bicicleta"
-short_desc = "Portugal's national cycling federation; coordinates local chapters in Lisboa, Porto, Coimbra and beyond."
-website_url = "https://mubi.pt"
-tags = ["cycling", "national-federation"]
-region_slugs = ["pt-nacional"]
+# The four PT orgs (mubi-lisboa, mubi-porto, lisboa-para-pessoas,
+# mubi-nacional) were removed from this file by the slice #25
+# hygiene pass. PT was loaded as a region-graph validation fixture
+# in slice #4.6; the model held up and is now out of scope for v1
+# user-facing surfaces (US/CA only). The PT region + postal seed
+# files remain under api/seed/ for the integration suite to load
+# explicitly, and a future v1.1+ slice can reintroduce the orgs
+# here when the editorial coverage is ready to ship.

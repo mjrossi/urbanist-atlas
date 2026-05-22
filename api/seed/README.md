@@ -74,12 +74,23 @@ fixtures here. Modeling conventions:
 
 ## Validation fixtures
 
-`regions_pt.toml` + `postal_codes_pt.csv` (plus the PT entries in
-`orgs.toml`) are a deliberate validation fixture for the multi-parent
-DAG model, not a complete Portuguese directory. See
+`regions_pt.toml` + `postal_codes_pt.csv` are a deliberate
+validation fixture for the multi-parent DAG model, not a complete
+Portuguese directory. See
 [`docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md`](../../docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md)
 for what each region in the PT set is meant to prove about the model.
-The primary shipping decision remains US + CA.
+
+Slice #25 (hygiene) **dropped PT from the user-facing
+[`loaddata`](../internal/loaddata/loaddata.go) pipeline** once the
+validation had served its purpose. The PT seed files stay here as a
+reference and continue to be loaded explicitly by the integration
+suite (`api/internal/store/postgres/pipeline_test.go` uses
+`loadregions.LoadFile` + `loadpostal.LoadFile` against these files).
+The four PT orgs that used to live in `orgs.toml` were removed in
+the same slice; migration `0005_drop_pt_user_facing_seed.sql`
+cleans up existing PT rows on deploy. A future v1.1+ slice can
+re-add PT (or ES, MX, NL, UK) to `loaddata.countries` when the
+editorial coverage is ready to ship.
 
 ## Real-world data sources
 
