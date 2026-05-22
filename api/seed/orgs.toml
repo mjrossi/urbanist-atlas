@@ -959,6 +959,32 @@ website_url = "https://clefortransit.org"
 tags = ["transit", "rider-union", "grassroots", "advocacy"]
 region_slugs = ["cleveland-oh-metro"]
 
+# --- Nashville ---
+
+[[org]]
+slug = "walk-bike-nashville"
+name = "Walk Bike Nashville"
+short_desc = "Nashville's walking, biking, and livable-streets 501(c)(3) (founded 1998); 2025 State of Our Streets action plan, Walk Bike Bus Pass program, and ongoing campaigns for safer corridors like East Bank Boulevard."
+website_url = "https://www.walkbikenashville.org"
+tags = ["walking", "cycling", "advocacy", "safe-streets"]
+region_slugs = ["nashville-tn-metro"]
+
+[[org]]
+slug = "transit-now-nashville"
+name = "Transit Now Nashville"
+short_desc = "Grassroots Nashville transit-advocacy organization running advocacy and communications task forces to mobilize riders and supporters around WeGo service improvements and Choose How You Move implementation."
+website_url = "https://www.transitnownash.org"
+tags = ["transit", "advocacy", "grassroots", "rider-union"]
+region_slugs = ["nashville-tn-metro"]
+
+[[org]]
+slug = "transit-alliance-middle-tennessee"
+name = "The Transit Alliance of Middle Tennessee"
+short_desc = "Ten-county Middle Tennessee transit 501(c)(3) building public and private support for new transit investment; runs the Transit Citizen Leadership Academy."
+website_url = "https://www.thetransitalliance.org"
+tags = ["transit", "advocacy", "policy", "regional", "education"]
+region_slugs = ["nashville-tn-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
