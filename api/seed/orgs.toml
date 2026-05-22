@@ -1835,6 +1835,27 @@ website_url = "https://www.ottawatransitriders.ca"
 tags = ["transit", "grassroots", "advocacy"]
 region_slugs = ["ottawa-gatineau-cma"]
 
+# === Slice 7.8 — CA CMAs #6–10 ===
+
+# --- Edmonton ---
+
+[[org]]
+slug = "paths-for-people"
+name = "Paths for People"
+short_desc = "Edmonton multi-modal active-transportation advocacy nonprofit (10th anniversary 2025); pushes for safe, year-round walking, rolling, and cycling infrastructure across Edmonton and convenes letter-writing campaigns defending municipal autonomy in active-transportation planning."
+website_url = "https://pathsforpeople.org"
+tags = ["walking", "cycling", "advocacy", "safe-streets", "active-transportation"]
+region_slugs = ["edmonton-cma"]
+
+[[org]]
+slug = "bike-edmonton"
+name = "Bike Edmonton"
+short_desc = "Edmonton cycling nonprofit society (established 1980); operates a volunteer-run community bike workshop, education programs, and an Advocacy Committee that represents cyclists at City Hall."
+website_url = "https://bikeedmonton.ca"
+contact_url = "mailto:info@bikeedmonton.ca"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots", "education"]
+region_slugs = ["edmonton-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
