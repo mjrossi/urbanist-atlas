@@ -332,7 +332,7 @@ The rows remain in the tables below for traceability.
 | # | Slice | What lands |
 |---|-------|------------|
 | 13 | **Submit form** | `/submit` with `react-hook-form`, broadsheet-style fieldsets, optional Turnstile, POSTs to `/api/v1/submissions`. |
-| 16 | **Admin queue page** | `/admin/queue` — bearer token in `localStorage` for v1, approve/reject controls. Utilitarian, not for public eyes. |
+| 16 | **Admin triage — CLI subcommand** *(reshaped 2026-05-22 from `/admin/queue` web page)* | `urbanist-atlas-server submissions {list, approve <id>, reject <id> [--reason=...]}` subcommands. Faster to ship than a web page and fine for solo moderation. A `/admin/queue` web page becomes a v1.1+ candidate if submission volume warrants a second moderator. Tracked alongside the rest of Phase 2 in the launch umbrella issue. |
 | 17 | **Web CI tests (form-validation half)** | `lint` / `test` / `build` already run in CI and dedicated `lib/api.ts` tests shipped (see Done). Form-validation tests remain, deferred to land with slice #13. |
 
 ## Gatekeeping, licensing & ops
