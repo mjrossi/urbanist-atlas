@@ -15,13 +15,11 @@ the plan is the *design* view.
 `qa.urbanistatlas.com` (SPA on Cloudflare Workers + Pages) +
 `qa-api.urbanistatlas.com` (API on Fly.io, region `iad`, behind the
 `X-Atlas-Client` shared-secret gate). DB is a sibling Fly app
-running `postgres:17-alpine` on a 1 GB volume. 134 orgs and 35,424
-postal codes seeded. The R2 backup workflow has shipped + a
-step-by-step enablement runbook landed at
-[`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md); the
-operator dashboard work (R2 bucket + 30-day lifecycle + scoped
-token + four GitHub Secrets + first manual run) is the only
-remaining bring-up task.
+running `postgres:17-alpine` on a 1 GB volume. 130 orgs and 35,417
+postal codes seeded. Nightly R2 backups are live (workflow at
+`.github/workflows/backup.yml`, bucket `urbanist-atlas-backups`
+with a 30-day lifecycle), with the enablement steps documented at
+[`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md).
 
 **Done:**
 
@@ -256,19 +254,43 @@ remaining bring-up task.
   test plan / reviewer notes). README updated to retire the stale
   "visit /submit" line in favor of a Contributing section
   pointing at the new files.
-- **R2 backup runbook:** `docs/runbooks/r2-backups.md` —
-  step-by-step for enabling `.github/workflows/backup.yml` against
-  the QA Postgres + Cloudflare R2. Nine numbered steps from Fly
-  token generation through verifying the first manual run, plus a
-  restore path (`just db-restore`), a rotation + maintenance
-  cadence (6–12 month token rotation, quarterly retention audit,
-  half-yearly restore drill), and a troubleshooting section for
-  the common failure modes (SSH permission errors, R2 403s on
-  PutObject, endpoint URL typos, partial dumps, stragglers past
-  30 days). `docs/deploy.md` §7 collapses to a pointer at the
-  runbook so the deep content has one home. **Note:** the
-  backups themselves are still operator-pending (see Status
-  above) — this slice landed the runbook, not the bucket.
+- **Lookup-side handler tests (slice #7, lookup half):**
+  `httptest`-based handler coverage via the `newTestServer(t)`
+  helper in `api/internal/httpapi/lookup_test.go:19-31` (a
+  MemStore + `httptest` pattern reused across the package).
+  Sibling files: `api/internal/httpapi/metros_test.go` (detail
+  handler patterns at 78-143) and `recent_test.go` — including
+  `TestListRecent_ExcludesNationalTier` at lines 62-90, which
+  pins the slice-#4.6 national-tier filter. Submissions + admin
+  half of #7 stays deferred to Phase 2 alongside #5 / #13 / #16.
+- **`lib/api.ts` tests (slice #17, lib/api.ts half):**
+  `web/src/lib/api.test.ts` (~640 lines) covers `apiFetch`,
+  `ApiError`, and every typed wrapper, stubbing the network via
+  `vi.stubGlobal('fetch', ...)`. Form-validation tests stay
+  deferred and will land with slice #13.
+- **Web recipes in `justfile` (slice #18):** the
+  `[group('web')]` block in `justfile:248-294` provides
+  `web-dev`, `web-deps`, `web-lint`, `web-test`, `web-build`,
+  `web-oapi-gen`, `web-gen-check`, and the aggregate
+  `web-check`. Follow-up: ship a committed `web/.env.development`
+  for zero-step local dev ergonomics; the loop already works
+  without it because `web/.env.example` provides the keys,
+  `web/src/lib/api.ts` defaults `VITE_API_BASE` to
+  `http://localhost:8080`, and an empty `URBANIST_CLIENT_SECRET`
+  no-ops the `X-Atlas-Client` middleware on the API side.
+- **R2 backups (workflow + runbook + live bucket):**
+  `.github/workflows/backup.yml` runs nightly against QA Postgres
+  and uploads `pg_dump | gzip` to the `urbanist-atlas-backups` R2
+  bucket (30-day lifecycle). `docs/runbooks/r2-backups.md` covers
+  enablement (nine numbered steps from Fly token generation through
+  verifying the first manual run), the restore path
+  (`just db-restore`), rotation + maintenance cadence (6–12 month
+  token rotation, quarterly retention audit, half-yearly restore
+  drill), and troubleshooting for the common failure modes (SSH
+  permission errors, R2 403s on PutObject, endpoint URL typos,
+  partial dumps, stragglers past 30 days). `docs/deploy.md` §7
+  collapses to a pointer at the runbook so the deep content has
+  one home.
 
 ## Deferred from this milestone
 
@@ -295,7 +317,7 @@ The rows remain in the tables below for traceability.
 |---|-------|------------|
 | 4.7 | **Second EU country validation (Spain)** | Repeat the validation exercise for Spain. Adds `regions_es.toml`, `postal_codes_es.csv`, ~5 ES orgs. Specifically validates: autonomous communities (Catalonia, Basque Country with their own transit authorities), the comarca layer in some communities, and Ceuta/Melilla as the analogue of Açores/Madeira. Should be mostly mechanical given #4.6's conventions and loader changes. |
 | 5 | **Submissions + admin queue** | `POST /api/v1/submissions` (rate-limited, optional honeypot/Turnstile); `GET /admin/submissions`, `POST /admin/submissions/{id}/approve\|reject` (bearer-token auth via `URBANIST_ADMIN_TOKEN`); the approval transaction promotes a submission row into an `organizations` row. Region attachment uses the same `region_slugs` machinery as `orgs.toml`, so submitted orgs can target any region kind in any supported country. |
-| 7 | **Handler tests** | `httptest`-based integration tests for `/lookup`, `/submissions`, the admin endpoints. Lookup coverage should include: the national-tier filter (orgs attached to `scope_tier='national'` regions must NOT appear in default results) and the unknown-country fall-through (`country=ZZ` with an unknown postal code returns 404, not 400) — both shipped in slice #4.6 with light coverage in `pipeline_test.go`. |
+| 7 | **Handler tests (submissions + admin half)** | `httptest` coverage for `/submissions` and the admin endpoints, deferred to Phase 2 with those slices. The lookup half (including the national-tier filter and unknown-country fall-through) shipped — see the Done section. |
 | 7.5 | **Full-country postal data ingest** *(broken into sub-slices below)* | The smallest-anchor design has every US ZIP and CA FSA resolve to the smallest curated region (city leaf → NYC borough → MSA → state/province) — schema unchanged, no app-level fallback logic. Sub-slices below. Design spec: [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./superpowers/specs/2026-05-19-postal-coverage-design.md). |
 | 7.5.1 | **Foundation: ETL scaffolding + states/provinces** | Design spec; `etl download`/`etl regenerate` subcommand stubs on the `urbanist` binary; `api/internal/etl/` package skeleton; hand-defined `regions_us_states.toml` (52: 50 states + DC + PR) and `regions_ca_provinces.toml` (13: 10 provinces + 3 territories), with existing state/province entries moved out of `regions_us.toml` and `regions_ca.toml` for cleaner separation. No data-scale change. |
 | 7.5.2 | **NYC borough split** *(shipped)* | Migration `0004_split_nyc.sql` flips `nyc.scope_tier=regional`, drops the `nyc → ny` edge (boroughs carry the state edge per region-graph rule §1), keeps `nyc → nyc-metro`. Borough leaves keep their parents `[nyc, ny]`. Editorial decision: citywide NYC orgs (TransAlt, Riders Alliance, StreetsPAC) stay on `nyc` and bucket as Regional for borough lookups. Place-label heuristic in `pkg/atlas/lookup.go` updated to prefer `IsMetroKind` for the broad slot so labels like "Brooklyn, New York City — New York Metro" survive the regional-tier `nyc`. |
@@ -311,9 +333,7 @@ The rows remain in the tables below for traceability.
 |---|-------|------------|
 | 13 | **Submit form** | `/submit` with `react-hook-form`, broadsheet-style fieldsets, optional Turnstile, POSTs to `/api/v1/submissions`. |
 | 16 | **Admin queue page** | `/admin/queue` — bearer token in `localStorage` for v1, approve/reject controls. Utilitarian, not for public eyes. |
-| 17 | **Web CI tests (partial)** | `lint` / `test` / `build` already run in CI; pending pieces are dedicated `lib/api.ts` tests and the form-validation tests that land with slice #13. |
-| 18 | **Web recipes in justfile** | `web-dev`, `web-build`, `web-test`, `web-lint`. |
-| 18.5 | **Dev-loop env wiring** | Default `VITE_API_BASE` and `VITE_API_CLIENT_SECRET` for the local dev loop so `just web-dev` talks to `just api-run` out of the box. Preferred home is `mise.development.toml` (mirroring how `DATABASE_URL` is set for the server); alternative is a committed `web/.env.development`. Small ergonomic follow-up to slice #18 — `web-build`/`web-test` are affected too. |
+| 17 | **Web CI tests (form-validation half)** | `lint` / `test` / `build` already run in CI and dedicated `lib/api.ts` tests shipped (see Done). Form-validation tests remain, deferred to land with slice #13. |
 
 ## Gatekeeping, licensing & ops
 
@@ -328,7 +348,7 @@ execution against live infra; ⏳ = not yet started.
 
 | # | Slice | What lands | Status |
 |---|-------|------------|--------|
-| Bring-up | **Phase 1 deploy: Fly + sibling Postgres + Cloudflare Workers + Pages + DNS + CORS + smoke** *(merged + live 2026-05-21)* | **Shipped:** `Dockerfile` + `fly.toml` at the repo root (multi-stage Alpine Go build, `release_command = "migrate up"`); `infra/postgres/{Dockerfile, entrypoint-fly.sh, fly.toml}` for the sibling `urbanist-atlas-db` app — postgres:17-alpine wrapped with a root-stage `chown` so the postgres user can write the PGDATA subdir on Fly's root-owned mount, with `[[restart]] policy = "always"` for resilience; `[group('fly')]` justfile recipes (`fly-deploy`, `fly-deploy-db`, `fly-logs`, `fly-logs-db`, `fly-secrets`, `fly-ssh`, `fly-loaddata`, `db-backup`, `db-restore`); `just smoke` recipe in `[group('smoke')]` (curl checks against `/healthz`, `/api/v1/lookup` with + without `X-Atlas-Client`, ODbL headers, meta envelope, OpenAPI YAML); `wrangler.jsonc` at repo root for Cloudflare Workers + Pages (Static Assets) with SPA fallback via `not_found_handling = "single-page-application"`; `.github/workflows/backup.yml` nightly cron + workflow_dispatch (pg_dump → R2, 30-day retention); `docs/deploy.md` operator runbook; `docs/superpowers/specs/2026-05-21-fly-deploy-design.md` design doc. **Live:** `qa.urbanistatlas.com` (Workers + Pages) + `qa-api.urbanistatlas.com` (Fly app, region `iad`) behind the `X-Atlas-Client` gate; 134 orgs, 35,424 postal codes seeded; release_command, PGDATA, restart, Workers/Pages unified bring-up bugs all caught and fixed with docs/runbook patches. R2 backup workflow setup remains pending operator action. | ✅ |
+| Bring-up | **Phase 1 deploy: Fly + sibling Postgres + Cloudflare Workers + Pages + DNS + CORS + smoke** *(merged + live 2026-05-21)* | **Shipped:** `Dockerfile` + `fly.toml` at the repo root (multi-stage Alpine Go build, `release_command = "migrate up"`); `infra/postgres/{Dockerfile, entrypoint-fly.sh, fly.toml}` for the sibling `urbanist-atlas-db` app — postgres:17-alpine wrapped with a root-stage `chown` so the postgres user can write the PGDATA subdir on Fly's root-owned mount, with `[[restart]] policy = "always"` for resilience; `[group('fly')]` justfile recipes (`fly-deploy`, `fly-deploy-db`, `fly-logs`, `fly-logs-db`, `fly-secrets`, `fly-ssh`, `fly-loaddata`, `db-backup`, `db-restore`); `just smoke` recipe in `[group('smoke')]` (curl checks against `/healthz`, `/api/v1/lookup` with + without `X-Atlas-Client`, ODbL headers, meta envelope, OpenAPI YAML); `wrangler.jsonc` at repo root for Cloudflare Workers + Pages (Static Assets) with SPA fallback via `not_found_handling = "single-page-application"`; `.github/workflows/backup.yml` nightly cron + workflow_dispatch (pg_dump → R2, 30-day retention); `docs/deploy.md` operator runbook; `docs/superpowers/specs/2026-05-21-fly-deploy-design.md` design doc. **Live:** `qa.urbanistatlas.com` (Workers + Pages) + `qa-api.urbanistatlas.com` (Fly app, region `iad`) behind the `X-Atlas-Client` gate; 130 orgs, 35,417 postal codes seeded; release_command, PGDATA, restart, Workers/Pages unified bring-up bugs all caught and fixed with docs/runbook patches. R2 backups live (bucket + workflow + first run verified). | ✅ |
 | CORS | **Production CORS (Phase 1 lockdown)** | `URBANIST_CORS_ORIGINS` locked to `https://qa.urbanistatlas.com` + `*.<account>.workers.dev` in `fly.toml`'s `[env]` block; verified by `just smoke`. (On prod cutover, swap in `https://urbanistatlas.com`.) | ✅ |
 | Gate | **Shared-secret gate (Phase 1)** | Middleware checking `X-Atlas-Client` against `URBANIST_CLIENT_SECRET`; mismatch → 401 RFC 9457 `unauthorized`. Frontend bundles the secret via `VITE_API_CLIENT_SECRET`. Bypass list: `/healthz`, `/api/v1/openapi.yaml`. | ✅ |
 | Smoke | **End-to-end smoke (Phase 1)** | `just smoke` recipe hits the live QA endpoint: `/healthz` (200), `/api/v1/lookup?postal_code=10001&country=US` without secret (401), with secret (200 + `X-Data-License: ODbL-1.0` + `X-Data-Attribution` + `meta` envelope), `/api/v1/openapi.yaml` (200). Submissions + admin smoke deferred to Phase 2 with their slices. | ✅ |
