@@ -1331,6 +1331,44 @@ website_url = "https://albanybicyclecoalition.com"
 tags = ["cycling", "advocacy", "safe-streets", "complete-streets"]
 region_slugs = ["albany-ny-metro"]
 
+# --- Spokane WA ---
+
+[[org]]
+slug = "spokane-active-transportation"
+name = "Spokane Active Transportation"
+short_desc = "Spokane grassroots active-transportation 501(c)(3) (founded April 2019; SpokAT); builds a citywide neighborhood-greenway network and low-traffic-streets map and pushes for safe walking, biking, transit, and micro-mobility access."
+website_url = "https://activetransportationupdate.com"
+tags = ["walking", "cycling", "transit", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["spokane-wa-metro"]
+
+# --- Tallahassee FL ---
+
+[[org]]
+slug = "capital-city-cyclists"
+name = "Capital City Cyclists"
+short_desc = "Tallahassee-area cycling hybrid club / 501(c)(3) advocacy nonprofit (Tallahassee Cycling Inc.); promotes cycling for transportation, sport, and health through education, advocacy, and rider development."
+website_url = "https://cccyclists.org"
+tags = ["cycling", "advocacy", "education", "safe-streets"]
+region_slugs = ["tallahassee-fl-metro"]
+
+# --- Charleston SC ---
+
+[[org]]
+slug = "charleston-moves"
+name = "Charleston Moves"
+short_desc = "Charleston County (SC) urban-mobility 501(c)(3) (founded early 1990s as Charleston Bicycle Advocacy Group); runs annual Mobility Month, the Wappoo Cut Bridge safe-access campaign, and the 2026 Transportation Sales Tax referendum policy work."
+website_url = "https://charlestonmoves.org"
+tags = ["cycling", "walking", "transit", "advocacy", "safe-streets"]
+region_slugs = ["charleston-sc-metro"]
+
+# Note: Bike Walk Chattanooga and Bike Walk Knoxville were considered
+# but excluded per the slice 7.7 chapter/affiliate precedent — both
+# are regional sub-committees of Bike Walk Tennessee (the parent
+# 501(c)(3) serves as fiscal sponsor) without independent
+# incorporation. Bike Walk Tennessee already covers their metros via
+# the ancestor walk from chattanooga-tn-metro / knoxville-tn-metro
+# up to tn.
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
