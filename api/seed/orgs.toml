@@ -1129,6 +1129,16 @@ website_url = "https://www.sportsbackers.org/program/bike-walk-rva/"
 tags = ["cycling", "walking", "safe-streets", "advocacy"]
 region_slugs = ["richmond-va-metro"]
 
+# --- Louisville ---
+
+[[org]]
+slug = "streets-for-people-louisville"
+name = "Streets for People"
+short_desc = "Louisville-area 501(c)(3) (formerly Bicycling for Louisville) advocating for safer streets through speed-hump policy reform, automated traffic enforcement, multimodal scoring at the Kentucky Transportation Cabinet, and a proposed Louisville Metro Department of Transportation."
+website_url = "https://www.streetsforpeople.org"
+tags = ["safe-streets", "cycling", "walking", "transit", "advocacy", "policy"]
+region_slugs = ["louisville-jefferson-county-ky-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
