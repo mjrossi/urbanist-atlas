@@ -1196,6 +1196,24 @@ website_url = "https://bikewesthartford.org"
 tags = ["cycling", "walking", "transit", "advocacy", "safe-streets"]
 region_slugs = ["hartford-ct-metro"]
 
+# --- Buffalo ---
+
+[[org]]
+slug = "gobike-buffalo"
+name = "GObike Buffalo"
+short_desc = "Buffalo-region cycling advocacy 501(c)(3); runs the annual Bike Month Battle and pushes NFTA funding stability, Erie County transit-budget advocacy, and protected-bikeway implementation across the Niagara Frontier."
+website_url = "https://gobikebuffalo.org"
+tags = ["cycling", "advocacy", "safe-streets"]
+region_slugs = ["buffalo-ny-metro"]
+
+[[org]]
+slug = "citizens-for-regional-transit"
+name = "Citizens for Regional Transit"
+short_desc = "Buffalo-area transit advocacy 501(c)(3); files detailed comments on the NFTA budget (FY 2025-2026), advocates for Bailey Avenue BRT and rail expansion, and organizes paid members around quarterly governance."
+website_url = "https://citizenstransit.org"
+tags = ["transit", "advocacy", "policy", "rider-union"]
+region_slugs = ["buffalo-ny-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
