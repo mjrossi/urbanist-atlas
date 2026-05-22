@@ -1064,6 +1064,30 @@ region_slugs = ["milwaukee-wi-metro"]
 # empty per the slice 7.6 empty-state policy. Worth revisiting if
 # the Oklahoma Bicycle Summit, Inc. successor takes off.
 
+# --- Raleigh / Durham (Triangle) ---
+#
+# Raleigh-Cary (#42) and Durham-Chapel Hill (#80ish) are separate
+# MSAs. Oaks & Spokes anchors at the Raleigh metro; Bike Durham at
+# the Durham metro (bonus coverage beyond the strict slice 7.8
+# top-31-50 canvas — the Triangle has a strong advocacy ecosystem
+# worth representing).
+
+[[org]]
+slug = "oaks-and-spokes"
+name = "Oaks & Spokes"
+short_desc = "Raleigh-area cycling and walking advocacy 501(c)(3); transforms Raleigh into a city where biking and walking are safe and integral to everyday life, running free technical safety assessments and equity-focused bike-donation programs."
+website_url = "https://oaksandspokes.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["raleigh-nc-metro"]
+
+[[org]]
+slug = "bike-durham"
+name = "Bike Durham"
+short_desc = "Durham-area multi-modal advocacy 501(c)(3) for walking, biking, and transit; 2025 wins include continuation of fare-free GoDurham service and adoption of the city's first Vision Zero Action Plan."
+website_url = "https://bikedurham.org"
+tags = ["cycling", "walking", "transit", "advocacy", "safe-streets", "vision-zero"]
+region_slugs = ["durham-nc-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
