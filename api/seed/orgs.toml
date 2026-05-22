@@ -1866,6 +1866,21 @@ website_url = "https://transportsviables.org"
 tags = ["transit", "cycling", "walking", "advocacy", "rider-union"]
 region_slugs = ["quebec-cma"]
 
+# --- Winnipeg ---
+#
+# Functional Transit Winnipeg and Bike to the Future were considered
+# but couldn't be verified to clear the 12-month activity bar in
+# 2025-2026 (search surfaced primarily 2018-2022 activity). Worth
+# revisiting if either reactivates.
+
+[[org]]
+slug = "bike-winnipeg"
+name = "Bike Winnipeg"
+short_desc = "Winnipeg cycling-advocacy nonprofit; runs annual volunteer bike counts (multi-year data series), pushes for separated cycling on the Southwest Rapid Transit Corridor Phase 2, and advocates for cycling inclusion in Polo Park infrastructure work."
+website_url = "https://www.bikewinnipeg.ca"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["winnipeg-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
