@@ -1226,6 +1226,111 @@ region_slugs = ["buffalo-ny-metro"]
 # the ancestor walk. Worth revisiting if a Birmingham-area advocacy
 # group like a revived Pedestrian/Bicycle Coalition surfaces.
 
+# === Slice 7.8 — Non-top-50 US metro depth (city-leaf canvas) ===
+#
+# Adds orgs anchored at existing MSA slugs for prominent cities
+# outside the top-50 canvas — state capitals, college towns, and
+# mid-sized cities with active local advocacy. No new city-leaf
+# region entries needed since the MSAs already exist; orgs anchor
+# directly at the MSA level for these mostly mono-municipal areas
+# where the city dominates the MSA's population.
+
+# --- Madison WI ---
+
+[[org]]
+slug = "madison-bikes"
+name = "Madison Bikes"
+short_desc = "Madison (WI) all-volunteer cycling-advocacy 501(c)(3); organizes Madison Bike Week (89 events in 2025), engages on the city's 2025 Pedestrian and Bicycle Plan, and advocates with the Greater Madison MPO."
+website_url = "https://www.madisonbikes.org"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["madison-wi-metro"]
+
+# --- Boise ID ---
+
+[[org]]
+slug = "boise-bicycle-project"
+name = "Boise Bicycle Project"
+short_desc = "Boise community-oriented cycling 501(c)(3) running named programs: Boise's first permanent Traffic Garden, Open Streets Boise (7,000+ attendees 2025), and Shifting Gears (peer-led repair program for women in correctional facilities); admitted under the slice 7.7 multi-issue-with-named-programs precedent."
+website_url = "https://www.boisebicycleproject.org"
+tags = ["cycling", "advocacy", "safe-streets", "education", "equity"]
+region_slugs = ["boise-city-id-metro"]
+
+# --- Anchorage AK ---
+
+[[org]]
+slug = "bike-anchorage"
+name = "Bike Anchorage"
+short_desc = "Anchorage's largest cycling 501(c)(3); three program areas (encouragement, education, advocacy), Vision Zero implementation push, Winter Bike Fest, Winter Bike to Work Day, and Community Rides showcasing safe routes in the Anchorage Bowl."
+website_url = "https://www.bikeanchorage.org"
+tags = ["cycling", "advocacy", "safe-streets", "vision-zero", "education"]
+region_slugs = ["anchorage-ak-metro"]
+
+# --- Ann Arbor MI ---
+
+[[org]]
+slug = "walk-bike-washtenaw"
+name = "Walk Bike Washtenaw"
+short_desc = "Washtenaw County (Ann Arbor) walking and biking advocacy; coordinates regional Bike to Wherever Day, monthly community meetings, and advocates for facilities, policies, and community support to make Washtenaw a national leader in active transportation."
+website_url = "https://www.walkbikewashtenaw.org"
+tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["ann-arbor-mi-metro"]
+
+[[org]]
+slug = "bicycle-alliance-of-washtenaw"
+name = "Bicycle Alliance of Washtenaw"
+short_desc = "Washtenaw County cycling community-connector 501(c)(3); builds community through events, advocacy, and a 2026 Summit at a new larger venue; co-sponsors the Bicycle Film Festival with Walk Bike Washtenaw."
+website_url = "https://bikewashtenaw.org"
+tags = ["cycling", "advocacy", "grassroots", "events"]
+region_slugs = ["ann-arbor-mi-metro"]
+
+# --- Boulder CO ---
+
+[[org]]
+slug = "community-cycles"
+name = "Community Cycles"
+short_desc = "Boulder County cycling 501(c)(3) running named Advocacy Committee and Boulder for All campaign; championed Boulder's 30th Street multimodal completion in 2025 and lobbied City Council to make bike theft a 2026 priority."
+website_url = "https://communitycycles.org"
+tags = ["cycling", "advocacy", "safe-streets", "education", "equity"]
+region_slugs = ["boulder-co-metro"]
+
+# --- New Haven CT ---
+
+[[org]]
+slug = "new-haven-safe-streets-coalition"
+name = "Safe Streets Coalition of New Haven"
+short_desc = "New Haven citywide pedestrian, cycling, transit, and driver coalition (founded 2008); pushed the city's Safe Routes for All Citywide Active Transportation Plan and worked with state legislators on HB 5429's statewide Vision Zero council."
+website_url = "https://www.safestreetsnewhaven.org"
+tags = ["safe-streets", "walking", "cycling", "transit", "advocacy", "vision-zero"]
+region_slugs = ["new-haven-ct-metro"]
+
+[[org]]
+slug = "ncat-new-haven"
+name = "New Haven Coalition for Active Transportation"
+short_desc = "New Haven 501(c)(3) promoting healthy, active transportation through free bicycle safety classes for youth, teens, and adults."
+website_url = "https://www.ncat-ct.org"
+tags = ["cycling", "walking", "education", "advocacy", "safe-streets"]
+region_slugs = ["new-haven-ct-metro"]
+
+# --- Tucson AZ ---
+
+[[org]]
+slug = "living-streets-alliance"
+name = "Living Streets Alliance"
+short_desc = "Tucson sustainable-transportation 501(c)(3) (founded 2011); pushed RTA Next 2025 ballot measure for sidewalks/safe crossings/protected bikeways/transit and runs Cyclovia Tucson (24th edition) closing streets for car-free Downtown-Amphi events."
+website_url = "https://www.livingstreetsalliance.org"
+tags = ["walking", "cycling", "transit", "advocacy", "safe-streets"]
+region_slugs = ["tucson-az-metro"]
+
+# --- Albany NY ---
+
+[[org]]
+slug = "albany-bicycle-coalition"
+name = "Albany Bicycle Coalition"
+short_desc = "Capital Region (NY) cycling 501(c)(3) advocating for bike lanes, multi-use paths, Complete Streets, and pedestrian-safety legislation; works with NYS Safe Streets Coalition partners (Walkable Albany, Capital Streets, Families for Safe Streets, NYBC)."
+website_url = "https://albanybicyclecoalition.com"
+tags = ["cycling", "advocacy", "safe-streets", "complete-streets"]
+region_slugs = ["albany-ny-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
