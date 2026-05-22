@@ -1139,6 +1139,24 @@ website_url = "https://www.streetsforpeople.org"
 tags = ["safe-streets", "cycling", "walking", "transit", "advocacy", "policy"]
 region_slugs = ["louisville-jefferson-county-ky-metro"]
 
+# --- New Orleans ---
+
+[[org]]
+slug = "bike-easy"
+name = "Bike Easy"
+short_desc = "Greater New Orleans bicycle advocacy 501(c)(3); leads the two-year Moving New Orleans Bikes campaign for 600+ miles of low-stress bikeways across Orleans Parish in coalition with 30 partners, plus annual youth and adult Bike Safety Workshops."
+website_url = "https://bikeeasy.org"
+tags = ["cycling", "advocacy", "safe-streets", "education"]
+region_slugs = ["new-orleans-la-metro"]
+
+[[org]]
+slug = "ride-new-orleans"
+name = "Ride New Orleans"
+short_desc = "Independent New Orleans-region transit advocacy 501(c)(3); publishes the annual State of Transit report and pushes RTA service and downtown transit infrastructure improvements for world-class equitable transit."
+website_url = "https://rideneworleans.org"
+tags = ["transit", "advocacy", "equity", "rider-union"]
+region_slugs = ["new-orleans-la-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
