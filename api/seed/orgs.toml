@@ -1214,6 +1214,18 @@ website_url = "https://citizenstransit.org"
 tags = ["transit", "advocacy", "policy", "rider-union"]
 region_slugs = ["buffalo-ny-metro"]
 
+# --- Birmingham (gap, 2026-05-22) ---
+#
+# No demonstrably-active independent safe-streets advocacy 501(c)(3)
+# meeting the activity bar at the metro level. Redemptive Cycles is
+# transportation-access + equity programming (Earn-a-Bike, Kids' Bike
+# Rodeo) rather than safe-streets advocacy. Birmingham Urban Mountain
+# Pedalers is trails-focused (excluded by the slice 7.6 trails
+# precedent from the WV state-floor gap). Birmingham Bicycle Club is
+# recreational. AlaBike (state floor) covers birmingham-al-metro via
+# the ancestor walk. Worth revisiting if a Birmingham-area advocacy
+# group like a revived Pedestrian/Bicycle Coalition surfaces.
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
