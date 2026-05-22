@@ -1381,16 +1381,30 @@ website_url = "https://www.fresnobike.org"
 tags = ["cycling", "advocacy", "safe-streets", "education"]
 region_slugs = ["fresno-ca-metro"]
 
-# Note: Bike Walk Chattanooga and Bike Walk Knoxville were considered
-# but excluded per the slice 7.7 chapter/affiliate precedent — both
-# are regional sub-committees of Bike Walk Tennessee (the parent
-# 501(c)(3) serves as fiscal sponsor) without independent
-# incorporation. Bike Walk Tennessee already covers their metros via
-# the ancestor walk from chattanooga-tn-metro / knoxville-tn-metro
-# up to tn. Lexington KY and Reno NV also surveyed without clean
-# admits — Lexington's BikeLex couldn't be verified to clear the
-# 12-month activity bar, and Reno sits inside NV which is itself a
-# state-floor gap.
+# --- Albuquerque NM ---
+
+[[org]]
+slug = "bikeabq"
+name = "BikeABQ"
+short_desc = "Albuquerque volunteer cycling 501(c)(3) with an 11-member board; attends design reviews, writes advisory letters, runs Bike to Work Day, League Certified Instructor classes, and Safe Routes to Schools; pushed for Albuquerque's April 2026 traffic-law overhaul for pedestrian and cyclist safety."
+website_url = "https://www.bikeabq.org"
+tags = ["cycling", "advocacy", "safe-streets", "education"]
+region_slugs = ["albuquerque-nm-metro"]
+
+# Additional city-leaf candidates surveyed but not admitted:
+# - Lexington KY: BikeLex couldn't be verified for 12-month activity.
+# - Reno NV: sits inside NV which is itself a state-floor gap.
+# - Worcester MA: WalkBike Worcester was founded as a work group of
+#   the Worcester Food and Active Living Policy Council, not as an
+#   independent 501(c)(3); WalkMassachusetts (state floor) covers
+#   Worcester via the ancestor walk.
+# - Tulsa OK: Tulsa Hub is bike-redistribution-focused (excluded per
+#   slice 7.7 Tampa rationale); OK is itself a state-floor gap.
+# - Long Beach CA: Bike Long Beach is a chapter of BikeLA (no
+#   independent incorporation); BikeLA covers greater-la.
+# - Bike Walk Chattanooga + Bike Walk Knoxville: regional sub-
+#   committees of Bike Walk Tennessee (parent serves as fiscal
+#   sponsor); Bike Walk Tennessee already covers via ancestor walk.
 
 # --- US States (statewide) ---
 #
