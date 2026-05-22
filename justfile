@@ -5,8 +5,8 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, fly, smoke, ci. Each group
-# corresponds to a section comment below.
+# Groups: api, data, postgres, web, preview, fly, smoke, ci. Each
+# group corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -292,6 +292,40 @@ web-gen-check:
 [group('web')]
 [doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
+
+# ── preview: full-stack PR review against a local stack ─
+# Cloudflare Workers preview URLs target the *current* QA API at
+# qa-api.urbanistatlas.com — they don't see the API changes on a
+# PR's branch. For a PR that adds or changes an API endpoint, the
+# preview frontend will 404 against the not-yet-deployed backend.
+#
+# `just preview` is the local-stack alternative: brings up the dev
+# Postgres, applies any pending migrations, seeds the DB if empty,
+# and runs the API in the foreground. Reviewer is expected to be on
+# the PR branch already (e.g. via `gh pr checkout <PR#>`) and to run
+# `just web-dev` in a second terminal. See CONTRIBUTING.md
+# "Full-stack PR review" for the workflow.
+#
+# Idempotent: pg-up reuses an existing container, migrate-up is a
+# no-op when migrations are current, and loaddata is skipped when
+# the orgs table is already populated.
+[group('preview')]
+[doc('one-shot local stack for full-stack PR review (DB + migrate + seed-if-empty + api)')]
+preview:
+    @just pg-up
+    @just migrate-up
+    @count=$(docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -t -A -c "SELECT COUNT(*) FROM organizations" 2>/dev/null || echo 0); \
+    if [ "$count" = "0" ]; then \
+        echo "preview: empty DB — running loaddata"; \
+        just loaddata; \
+    else \
+        echo "preview: $count orgs already loaded — skipping loaddata"; \
+    fi
+    @echo ""
+    @echo "preview: API starting on http://localhost:8080"
+    @echo "preview: in another terminal, run \`just web-dev\` (http://localhost:5173)"
+    @echo ""
+    just api-run
 
 # ── fly: deploy + ops ─────────────────────────────────
 # Thin wrappers around `flyctl` so the deploy / logs / secrets /
