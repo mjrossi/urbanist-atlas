@@ -82,11 +82,23 @@ work). Nightly `pg_dump` backups land in Cloudflare R2 via the
 GitHub Actions workflow at
 [`.github/workflows/backup.yml`](./.github/workflows/backup.yml).
 
+Every push to `main` auto-deploys the API to Fly via the `deploy-api`
+job in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
+(release-command `migrate up` runs before traffic cuts over). The web
+SPA auto-deploys via Cloudflare's git integration. `just fly-deploy`
+remains as a manual fallback when Actions is degraded or a non-`main`
+branch needs a hot-fix. **Seed data does not reload on deploy** — run
+`just fly-loaddata` after merging a PR that edits `api/seed/**`. The
+operating contract (triggers, manual fallbacks, rollback) is the
+`## Deploys` section of [`docs/deploy.md`](./docs/deploy.md).
+
 The initial provisioning runbook (creating both Fly apps, attaching
 the volume, wiring DNS and certs, setting secrets, enabling backups,
 adding the Workers project custom domain) lives at
-[`docs/deploy.md`](./docs/deploy.md). Ongoing ops use the `fly-*` /
-`db-*` recipes (`just fly-deploy`, `just fly-logs`,
+[`docs/deploy.md`](./docs/deploy.md). Editorial workflows for adding
+or correcting orgs and regions are at
+[`docs/editorial.md`](./docs/editorial.md). Ongoing ops use the
+`fly-*` / `db-*` recipes (`just fly-deploy`, `just fly-logs`,
 `just fly-secrets`, `just fly-ssh`, `just fly-loaddata`,
 `just db-backup`, `just db-restore <file>`).
 

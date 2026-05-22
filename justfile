@@ -34,19 +34,41 @@ api-build:
 api-fmt:
     cd api && gofmt -w .
 
+# fail if any Go file would be rewritten by gofmt. `gofmt -l` prints
+# the offending paths and exits 0 even on drift, so the explicit
+# non-empty check turns that into a CI signal.
+[group('api')]
+[doc('fail if any Go file is not gofmt-clean')]
+api-fmt-check:
+    @cd api && \
+      drift="$(gofmt -l .)"; \
+      if [ -n "$drift" ]; then \
+        echo "gofmt drift in:"; echo "$drift"; \
+        echo "run \`just api-fmt\` and commit." >&2; \
+        exit 1; \
+      fi
+
 # go vet ./...
 [group('api')]
 api-vet:
     cd api && go vet ./...
+
+# staticcheck ./... — pinned in mise.toml. Catches bugs `go vet`
+# misses (unused fields, deprecated APIs, ineffective assignments).
+[group('api')]
+[doc('run staticcheck (mise-pinned) over the api module')]
+api-staticcheck:
+    cd api && mise exec -- staticcheck ./...
 
 # go test ./... with race detector, no cache (matches CI)
 [group('api')]
 api-test:
     cd api && go test ./... -race -count=1
 
-# vet + test + gen-no-diff — the CI gate for api/, run locally
+# fmt-check + vet + staticcheck + test + gen-no-diff — the CI gate for
+# api/, run locally before pushing.
 [group('api')]
-api-check: api-vet api-test api-gen-check
+api-check: api-fmt-check api-vet api-staticcheck api-test api-gen-check
 
 # go mod tidy
 [group('api')]
@@ -282,8 +304,16 @@ web-check: web-deps web-lint web-test web-build web-gen-check
 
 # deploy the API app from the current checkout. Release-command in
 # fly.toml runs `migrate up` before the new machine takes traffic.
+#
+# Manual fallback: every merge to main triggers a Fly deploy from the
+# `deploy-api` job in .github/workflows/ci.yml using
+# `flyctl deploy --remote-only`. Use this recipe when GitHub Actions
+# is degraded, when you need to deploy a non-main branch for a
+# hot-fix, or when you want to watch the build locally. For an
+# Actions-side re-deploy of current main without an empty commit,
+# `gh workflow run ci.yml --ref main`.
 [group('fly')]
-[doc('deploy the API to Fly (release_command runs migrations)')]
+[doc('deploy the API to Fly — manual fallback; primary path is GHA on merge to main')]
 fly-deploy:
     flyctl deploy -a urbanist-atlas
 

@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual trigger so a maintainer can re-deploy current `main` without
+  # an empty commit (e.g. after fixing a Fly-side config out-of-band).
+  # The `detect` → `api` → `web` → `deploy-api` chain runs the same way
+  # a push to main would.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -119,3 +124,61 @@ jobs:
       # api/openapi.yaml changes but src/lib/api.gen.ts wasn't
       # regenerated — silently shipping stale wire types.
       - run: just web-check
+
+  deploy-api:
+    name: deploy api → Fly
+    needs: [api, web]
+    # Only deploy on merges to main (and on the workflow_dispatch
+    # re-deploy escape hatch, also restricted to main). PR runs
+    # validate but never deploy. The ref check on the dispatch arm
+    # prevents a maintainer from accidentally shipping a feature
+    # branch to prod via `gh workflow run ci.yml --ref my-branch`.
+    if: |
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Override the workflow-level concurrency: never cancel an
+    # in-flight deploy. Two rapid merges queue rather than fight.
+    concurrency:
+      group: deploy-api-fly
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy
+        env:
+          # Repo secret FLY_API_TOKEN_DEPLOY is a deploy-scoped Fly
+          # token (`flyctl tokens create deploy -a urbanist-atlas`),
+          # narrower than the personal access token in FLY_API_TOKEN
+          # that backup.yml uses (which needs ssh console for pg_dump).
+          # flyctl itself reads the env var FLY_API_TOKEN, hence the
+          # rename at injection time.
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_DEPLOY }}
+        # --remote-only builds on Fly's builders, so the runner doesn't
+        # need a working Docker. release_command="migrate up" in fly.toml
+        # runs against the new image before traffic cuts over; a
+        # migration failure blocks the deploy.
+        run: flyctl deploy -a urbanist-atlas --remote-only
+      - name: Smoke-test /healthz
+        # /healthz is exempt from the X-Atlas-Client shared-secret
+        # middleware, so it works without provisioning a CI client
+        # secret. Retry because Fly traffic cutover (old machine drain
+        # + new machine warm) can briefly 502 even after `flyctl deploy`
+        # returns. Five 5s attempts ≈ 25s of grace, well under the job
+        # timeout and well over typical cutover latency.
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            if curl -fsS --max-time 10 https://qa-api.urbanistatlas.com/healthz; then
+              echo
+              echo "healthz OK on attempt $i"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "healthz did not respond OK after 5 attempts" >&2
+          exit 1

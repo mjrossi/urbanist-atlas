@@ -251,10 +251,10 @@ func TestDBFReader(t *testing.T) {
 
 	// File header (32 bytes).
 	header := make([]byte, 32)
-	header[0] = 0x03                                                        // dBASE III
-	binary.LittleEndian.PutUint32(header[4:8], 3)                           // 3 records
-	binary.LittleEndian.PutUint16(header[8:10], uint16(32+32+32+1))         // 32 file-header + 2×32 field-descriptors + 1 terminator
-	binary.LittleEndian.PutUint16(header[10:12], uint16(recordLen))         // record size
+	header[0] = 0x03                                                // dBASE III
+	binary.LittleEndian.PutUint32(header[4:8], 3)                   // 3 records
+	binary.LittleEndian.PutUint16(header[8:10], uint16(32+32+32+1)) // 32 file-header + 2×32 field-descriptors + 1 terminator
+	binary.LittleEndian.PutUint16(header[10:12], uint16(recordLen)) // record size
 	buf.Write(header)
 
 	// Field A descriptor.
