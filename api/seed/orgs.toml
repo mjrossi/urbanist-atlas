@@ -918,6 +918,29 @@ website_url = "https://transitcolumbus.org"
 tags = ["transit", "walking", "cycling", "advocacy", "rider-union"]
 region_slugs = ["columbus-oh-metro"]
 
+# --- Indianapolis ---
+#
+# ICAT (Indiana Citizens' Alliance for Transit) was considered but
+# excluded as a Health by Design initiative without independent
+# 501(c)(3) status — Health by Design already covers the metro via
+# its named Transit and Vision Zero programs.
+
+[[org]]
+slug = "central-indiana-cycling"
+name = "Central Indiana Cycling"
+short_desc = "Greater Indianapolis cycling 501(c)(3) (formed 2025 from the merger of Bike Indianapolis and the Central Indiana Bicycling Association); its Central Indiana Advocacy Committee meets monthly to push for connected bike routes, safer greenway crossings, and safer roads."
+website_url = "https://centralincycling.org"
+tags = ["cycling", "advocacy", "safe-streets"]
+region_slugs = ["indianapolis-in-metro"]
+
+[[org]]
+slug = "health-by-design"
+name = "Health by Design"
+short_desc = "Indianapolis-based multi-issue 501(c)(3) running named Vision Zero and Transit programs; convenes the Indiana Citizens' Alliance for Transit (ICAT) and facilitates the Road to Zero Academy across Central Indiana."
+website_url = "https://healthbydesignonline.org"
+tags = ["transit", "safe-streets", "vision-zero", "advocacy", "walking"]
+region_slugs = ["indianapolis-in-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
