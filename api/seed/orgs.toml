@@ -1361,13 +1361,36 @@ website_url = "https://charlestonmoves.org"
 tags = ["cycling", "walking", "transit", "advocacy", "safe-streets"]
 region_slugs = ["charleston-sc-metro"]
 
+# --- Grand Rapids MI ---
+
+[[org]]
+slug = "greater-grand-rapids-bicycle-coalition"
+name = "Greater Grand Rapids Bicycle Coalition"
+short_desc = "Grand Rapids grassroots cycling 501(c)(3); works for public-policy and urban-planning change, coordinates with The Rapid on transit-cycling integration, and supports the city's Vision Zero implementation (first MI municipality to adopt)."
+website_url = "https://www.bikegr.org"
+tags = ["cycling", "advocacy", "safe-streets", "vision-zero"]
+region_slugs = ["grand-rapids-mi-metro"]
+
+# --- Fresno CA ---
+
+[[org]]
+slug = "fresno-county-bicycle-coalition"
+name = "Fresno County Bicycle Coalition"
+short_desc = "Fresno County volunteer-operated cycling 501(c)(3) (founded 2001); advocates and educates for safer bicycling for everyday transportation across Fresno County and partners on CalBike's Central Valley Bikeways Project."
+website_url = "https://www.fresnobike.org"
+tags = ["cycling", "advocacy", "safe-streets", "education"]
+region_slugs = ["fresno-ca-metro"]
+
 # Note: Bike Walk Chattanooga and Bike Walk Knoxville were considered
 # but excluded per the slice 7.7 chapter/affiliate precedent — both
 # are regional sub-committees of Bike Walk Tennessee (the parent
 # 501(c)(3) serves as fiscal sponsor) without independent
 # incorporation. Bike Walk Tennessee already covers their metros via
 # the ancestor walk from chattanooga-tn-metro / knoxville-tn-metro
-# up to tn.
+# up to tn. Lexington KY and Reno NV also surveyed without clean
+# admits — Lexington's BikeLex couldn't be verified to clear the
+# 12-month activity bar, and Reno sits inside NV which is itself a
+# state-floor gap.
 
 # --- US States (statewide) ---
 #
