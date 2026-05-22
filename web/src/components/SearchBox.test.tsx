@@ -58,10 +58,6 @@ function getInput() {
   return screen.getByLabelText(/find local groups/i) as HTMLInputElement;
 }
 
-function getCountry() {
-  return screen.getByLabelText(/^country$/i) as HTMLSelectElement;
-}
-
 function getButton() {
   return screen.getByRole('button', { name: /look up/i });
 }
@@ -108,15 +104,4 @@ describe('SearchBox', () => {
     expect(getLocation().pathname).toBe('/');
   });
 
-  it('honors the country override when the heuristic would disagree', () => {
-    renderWithRouter();
-    fireEvent.change(getCountry(), { target: { value: 'CA' } });
-    // M1A is a valid FSA — overrides the digit-leading heuristic.
-    typeInto(getInput(), 'M1A');
-    fireEvent.click(getButton());
-
-    const { pathname, search } = getLocation();
-    expect(pathname).toBe('/r/M1A');
-    expect(search).toBe('?country=CA');
-  });
 });

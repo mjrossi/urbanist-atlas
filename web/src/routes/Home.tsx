@@ -1,8 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { SearchBox } from '../components/SearchBox.tsx';
 import { ApiError, listMetros, listRecent } from '../lib/api.ts';
 import type { MetroSummary, Org } from '../lib/api.ts';
+import { groupCountLabel } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 /** How many metros the home-page aside shows before linking to /browse. */
@@ -16,9 +19,10 @@ const RECENT_LIMIT = 5;
  * with two cards (browse-by-metro + recently-added) backed by
  * `/metros` and `/recent` respectively.
  *
- * Each aside card renders a "Coming soon" affordance on error so a
- * downed dependency degrades gracefully without breaking the rest of
- * the page.
+ * The aside cards degrade gracefully — a downed dependency surfaces
+ * "Temporarily unavailable" rather than breaking the rest of the
+ * page — so the homepage stays usable when only the data tier is
+ * troubled.
  */
 export function Home() {
   const metros = useQuery<MetroSummary[], ApiError>({
@@ -52,72 +56,109 @@ export function Home() {
       </section>
       <div className="broadsheet-gutter" aria-hidden="true" />
       <aside className="col-aside" aria-label="Other ways in">
-        <MetrosCard query={metros} />
-        <RecentCard query={recent} />
+        <AsideCard
+          label="Browse by metro"
+          query={metros}
+          loadingText="Loading metros…"
+          fallbackCopy={
+            <p>
+              A directory of metropolitan regions with the number of groups
+              indexed in each. Useful when you want to wander rather than
+              search.
+            </p>
+          }
+          renderList={(data) => <MetrosList items={data.slice(0, METROS_LIMIT)} />}
+        />
+        <AsideCard
+          label="Recently added"
+          query={recent}
+          loadingText="Loading recent…"
+          fallbackCopy={
+            <p>
+              The newest organizations to clear the submission queue. A
+              standing invitation to discover an effort you haven’t heard of
+              yet.
+            </p>
+          }
+          renderList={(data) => <RecentList items={data.slice(0, RECENT_LIMIT)} />}
+        />
       </aside>
     </div>
   );
 }
 
-function MetrosCard({
+/**
+ * A homepage aside card with the same loading / error / empty /
+ * success state ladder. Renders the section label, then one of:
+ *
+ *   - loadingText alone (no status pill — the spinner copy is enough)
+ *   - fallbackCopy + "Temporarily unavailable" pill on query error
+ *   - fallbackCopy + "Nothing indexed yet" pill when the response is empty
+ *   - renderList(data) on success
+ *
+ * Two card variants share this shape — extracting the helper keeps
+ * the two paths honest about which states they show.
+ */
+function AsideCard<T>({
+  label,
   query,
+  loadingText,
+  fallbackCopy,
+  renderList,
 }: {
-  query: ReturnType<typeof useQuery<MetroSummary[], ApiError>>;
+  label: string;
+  query: UseQueryResult<T[], ApiError>;
+  loadingText: string;
+  fallbackCopy: ReactNode;
+  renderList: (data: T[]) => ReactNode;
 }) {
   return (
     <div className="aside-card">
-      <span className="section-label">Browse by metro</span>
-      {renderMetrosBody(query)}
+      <span className="section-label">{label}</span>
+      {renderAsideBody(query, loadingText, fallbackCopy, renderList)}
     </div>
   );
 }
 
-function renderMetrosBody(
-  query: ReturnType<typeof useQuery<MetroSummary[], ApiError>>,
-) {
+function renderAsideBody<T>(
+  query: UseQueryResult<T[], ApiError>,
+  loadingText: string,
+  fallbackCopy: ReactNode,
+  renderList: (data: T[]) => ReactNode,
+): ReactNode {
   if (query.isPending) {
-    return (
-      <>
-        <p>Loading metros…</p>
-        <span className="aside-card-status">Coming soon</span>
-      </>
-    );
+    return <p>{loadingText}</p>;
   }
   if (query.isError) {
     return (
       <>
-        <p>
-          A directory of metropolitan regions with the number of groups
-          indexed in each. Useful when you want to wander rather than search.
-        </p>
-        <span className="aside-card-status">Coming soon</span>
+        {fallbackCopy}
+        <span className="aside-card-status">Temporarily unavailable</span>
       </>
     );
   }
-  const list = query.data.slice(0, METROS_LIMIT);
-  if (list.length === 0) {
+  if (query.data.length === 0) {
     return (
       <>
-        <p>
-          A directory of metropolitan regions with the number of groups
-          indexed in each. Useful when you want to wander rather than search.
-        </p>
-        <span className="aside-card-status">Coming soon</span>
+        {fallbackCopy}
+        <span className="aside-card-status">Nothing indexed yet</span>
       </>
     );
   }
+  return renderList(query.data);
+}
+
+function MetrosList({ items }: { items: MetroSummary[] }) {
   return (
     <>
       <ul className="entry-list" aria-label="Top metros">
-        {list.map((m) => (
+        {items.map((m) => (
           <li key={m.region.slug} className="entry">
             <div className="entry-header">
               <h3 className="entry-name">
                 <Link to={`/m/${m.region.slug}`}>{m.region.name}</Link>
               </h3>
-              <span className="entry-domain">
-                {m.org_count === 1 ? '1 group' : `${m.org_count} groups`}
-              </span>
+              <span className="entry-domain">{groupCountLabel(m.org_count)}</span>
             </div>
           </li>
         ))}
@@ -129,54 +170,10 @@ function renderMetrosBody(
   );
 }
 
-function RecentCard({
-  query,
-}: {
-  query: ReturnType<typeof useQuery<Org[], ApiError>>;
-}) {
-  return (
-    <div className="aside-card">
-      <span className="section-label">Recently added</span>
-      {renderRecentBody(query)}
-    </div>
-  );
-}
-
-function renderRecentBody(query: ReturnType<typeof useQuery<Org[], ApiError>>) {
-  if (query.isPending) {
-    return (
-      <>
-        <p>Loading recent…</p>
-        <span className="aside-card-status">Coming soon</span>
-      </>
-    );
-  }
-  if (query.isError) {
-    return (
-      <>
-        <p>
-          The newest organizations to clear the submission queue. A standing
-          invitation to discover an effort you haven’t heard of yet.
-        </p>
-        <span className="aside-card-status">Coming soon</span>
-      </>
-    );
-  }
-  const list = query.data.slice(0, RECENT_LIMIT);
-  if (list.length === 0) {
-    return (
-      <>
-        <p>
-          The newest organizations to clear the submission queue. A standing
-          invitation to discover an effort you haven’t heard of yet.
-        </p>
-        <span className="aside-card-status">Coming soon</span>
-      </>
-    );
-  }
+function RecentList({ items }: { items: Org[] }) {
   return (
     <ul className="entry-list" aria-label="Recently added">
-      {list.map((org) => (
+      {items.map((org) => (
         <li key={org.id} className="entry">
           <div className="entry-header">
             <h3 className="entry-name">

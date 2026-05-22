@@ -146,7 +146,7 @@ describe('Home', () => {
     expect(loading.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('falls back to "Coming soon" in the metros aside on error', async () => {
+  it('shows "Temporarily unavailable" in the metros aside on error', async () => {
     listMetrosMock.mockRejectedValueOnce(
       new ApiError(
         500,
@@ -159,15 +159,15 @@ describe('Home', () => {
     renderHome();
 
     await waitFor(() => {
-      // The card still says "Browse by metro" and now shows "Coming soon"
-      // again. The exact retry affordance is impl-detail; the contract
-      // is the graceful fallback copy.
-      const status = screen.getAllByText(/coming soon/i);
+      // Card still says "Browse by metro" + the descriptive fallback
+      // copy, plus an honest status pill. The contract is the graceful
+      // degradation, not the exact wording.
+      const status = screen.getAllByText(/temporarily unavailable/i);
       expect(status.length).toBeGreaterThanOrEqual(1);
     });
   });
 
-  it('falls back to "Coming soon" in the recent aside on error', async () => {
+  it('shows "Temporarily unavailable" in the recent aside on error', async () => {
     listMetrosMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockRejectedValueOnce(
       new ApiError(
@@ -180,7 +180,7 @@ describe('Home', () => {
     renderHome();
 
     await waitFor(() => {
-      const status = screen.getAllByText(/coming soon/i);
+      const status = screen.getAllByText(/temporarily unavailable/i);
       expect(status.length).toBeGreaterThanOrEqual(1);
     });
   });

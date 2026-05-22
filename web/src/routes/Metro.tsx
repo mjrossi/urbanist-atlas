@@ -78,11 +78,7 @@ function MetroBody({
         ) : (
           <ul className="entry-list">
             {orgs.map((org) => (
-              <Entry
-                key={org.id}
-                org={asLookupOrg(org)}
-                regionNameBySlug={emptyRegionMap}
-              />
+              <Entry key={org.id} org={asLookupOrg(org)} />
             ))}
           </ul>
         )}
@@ -107,14 +103,9 @@ function MetroHeader({ region }: { region: MetroDetail['region'] }) {
  * Project a base {@link Org} (returned by `/api/v1/metros/{slug}`)
  * onto the {@link LookupOrg} shape that {@link Entry} consumes. The
  * `matched_region_slugs` field is empty because this view isn't a
- * postal-code lookup — `Entry` already handles that case by omitting
- * the "via" subtitle (see `Entry.test.tsx`).
- *
- * Keeps `Entry`'s public signature untouched, per the slice's
- * non-goal of "no Entry/EntryList refactor".
+ * postal-code lookup — `Entry` omits the "via" subtitle when the list
+ * is empty (see `Entry.test.tsx`).
  */
 function asLookupOrg(org: Org): LookupOrg {
   return { ...org, matched_region_slugs: [] };
 }
-
-const emptyRegionMap = new Map<string, string>();

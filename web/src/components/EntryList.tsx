@@ -17,7 +17,7 @@ export function EntryList({
   regionNameBySlug: Map<string, string>;
 }) {
   return (
-    <div className="entry-list-wrap">
+    <>
       <Section
         label="Local"
         orgs={local}
@@ -30,7 +30,7 @@ export function EntryList({
         emptyHint="No regional groups indexed yet."
         regionNameBySlug={regionNameBySlug}
       />
-    </div>
+    </>
   );
 }
 

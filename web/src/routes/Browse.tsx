@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { ApiError, listMetros } from '../lib/api.ts';
 import type { MetroSummary } from '../lib/api.ts';
+import { groupCountLabel } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 /**
@@ -94,10 +95,6 @@ function MetroRow({ metro }: { metro: MetroSummary }) {
       <p className="entry-desc">{datelineFor(region)}</p>
     </li>
   );
-}
-
-function groupCountLabel(n: number): string {
-  return n === 1 ? '1 group' : `${n} groups`;
 }
 
 function datelineFor(region: MetroSummary['region']): string {

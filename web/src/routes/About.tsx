@@ -50,8 +50,12 @@ export function About() {
             Open Database License (ODbL) 1.0
           </a>{' '}
           and will be available for download once the API opens to the public.
-          Public submissions are coming with the API-key program; until then,
-          suggestions are welcome by email.
+          A public submission flow arrives with the Phase 2 API-key program;
+          until then, suggestions and corrections are welcome as issues on the{' '}
+          <a href="https://github.com/mjrossi/urbanist-atlas">
+            public repository
+          </a>
+          .
         </p>
       </section>
 
