@@ -1152,14 +1152,12 @@ tags = ["safe-streets", "cycling", "walking", "transit", "advocacy", "policy"]
 region_slugs = ["louisville-jefferson-county-ky-metro"]
 
 # --- New Orleans ---
-
-[[org]]
-slug = "bike-easy"
-name = "Bike Easy"
-short_desc = "Greater New Orleans bicycle advocacy 501(c)(3); leads the two-year Moving New Orleans Bikes campaign for 600+ miles of low-stress bikeways across Orleans Parish in coalition with 30 partners, plus annual youth and adult Bike Safety Workshops."
-website_url = "https://bikeeasy.org"
-tags = ["cycling", "advocacy", "safe-streets", "education"]
-region_slugs = ["new-orleans-la-metro"]
+#
+# Bike Easy is multi-anchored at [new-orleans-la-metro, la-state]
+# at its existing state-floor entry below (slice 7.6 Louisiana
+# section) — same precedent as The Street Trust at
+# [portland-or-metro, or]. New Orleans metro coverage thus comes
+# from the state-floor org + Ride New Orleans (added in slice 7.8).
 
 [[org]]
 slug = "ride-new-orleans"
@@ -1691,10 +1689,10 @@ region_slugs = ["ms"]
 [[org]]
 slug = "bike-easy"
 name = "Bike Easy"
-short_desc = "Greater New Orleans bicycle education and advocacy nonprofit; serves as Louisiana's de facto statewide voice at the National Bike Summit and on state policy."
+short_desc = "Greater New Orleans bicycle education and advocacy 501(c)(3); leads the two-year Moving New Orleans Bikes campaign for 600+ miles of low-stress bikeways across Orleans Parish in coalition with 30 partners. Multi-anchored at the New Orleans metro and the LA state floor — Bike Easy serves as Louisiana's de facto statewide voice."
 website_url = "https://bikeeasy.org"
 tags = ["cycling", "advocacy", "safe-streets", "education"]
-region_slugs = ["la-state"]
+region_slugs = ["new-orleans-la-metro", "la-state"]
 
 # --- Oklahoma ---
 # gap: BikeOklahoma (Oklahoma Bicycling Coalition) is in the process of
@@ -2132,18 +2130,12 @@ region_slugs = ["quebec-cma"]
 
 # --- Winnipeg ---
 #
+# Bike Winnipeg is multi-anchored at [winnipeg-cma, mb] at its
+# existing province-floor entry below (Manitoba section). Same
+# precedent as The Street Trust at [portland-or-metro, or].
 # Functional Transit Winnipeg and Bike to the Future were considered
 # but couldn't be verified to clear the 12-month activity bar in
-# 2025-2026 (search surfaced primarily 2018-2022 activity). Worth
-# revisiting if either reactivates.
-
-[[org]]
-slug = "bike-winnipeg"
-name = "Bike Winnipeg"
-short_desc = "Winnipeg cycling-advocacy nonprofit; runs annual volunteer bike counts (multi-year data series), pushes for separated cycling on the Southwest Rapid Transit Corridor Phase 2, and advocates for cycling inclusion in Polo Park infrastructure work."
-website_url = "https://www.bikewinnipeg.ca"
-tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
-region_slugs = ["winnipeg-cma"]
+# 2025-2026 (search surfaced primarily 2018-2022 activity).
 
 # --- Hamilton ---
 
@@ -2238,10 +2230,10 @@ region_slugs = ["ab"]
 [[org]]
 slug = "bike-winnipeg"
 name = "Bike Winnipeg"
-short_desc = "Winnipeg-based cycling advocacy nonprofit presenting recommendations to municipal and provincial governments; serves as Manitoba's de facto provincial cycling-advocacy voice."
+short_desc = "Winnipeg cycling-advocacy nonprofit; runs annual volunteer bike counts (multi-year data series), pushes for separated cycling on the Southwest Rapid Transit Corridor Phase 2, and advocates for cycling inclusion in Polo Park infrastructure work. Multi-anchored at the Winnipeg CMA and the MB province floor — serves as Manitoba's de facto provincial cycling-advocacy voice."
 website_url = "https://www.bikewinnipeg.ca"
-tags = ["cycling", "advocacy", "safe-streets"]
-region_slugs = ["mb"]
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["winnipeg-cma", "mb"]
 
 # --- Saskatchewan (provincial) ---
 # gap: Saskatchewan Cycling Association is the provincial branch of
