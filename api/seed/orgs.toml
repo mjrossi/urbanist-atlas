@@ -814,6 +814,32 @@ website_url = "https://www.snvbc.org"
 tags = ["cycling", "advocacy", "safe-streets", "vision-zero"]
 region_slugs = ["las-vegas-nv-metro"]
 
+# --- Cincinnati ---
+
+[[org]]
+slug = "better-bus-coalition"
+name = "Better Bus Coalition"
+short_desc = "Cincinnati-area transit advocacy organization working to improve Metro bus service across Hamilton County; current focus on BRT corridor infrastructure and transit-only lanes for the rollout of bus rapid transit."
+website_url = "https://betterbuscoalition.org"
+tags = ["transit", "advocacy", "bus", "rider-union"]
+region_slugs = ["cincinnati-oh-metro"]
+
+[[org]]
+slug = "queen-city-bike"
+name = "Queen City Bike"
+short_desc = "Greater Cincinnati and Northern Kentucky's only member-based cycling advocacy nonprofit; volunteer-led education and infrastructure advocacy supporting the City's Master Bike Plan."
+website_url = "https://queencitybike.org"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["cincinnati-oh-metro"]
+
+[[org]]
+slug = "devou-good-foundation"
+name = "Devou Good Foundation"
+short_desc = "Northern Kentucky / Greater Cincinnati private operating 501(c)(3) running a named Active Transportation program; combines grantmaking with direct advocacy for combining Cincinnati Metro and TANK and for Complete Streets across Hamilton, Kenton, Boone, and Campbell counties."
+website_url = "https://devougood.com"
+tags = ["transit", "cycling", "walking", "advocacy", "complete-streets"]
+region_slugs = ["cincinnati-oh-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
