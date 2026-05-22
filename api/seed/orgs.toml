@@ -1891,6 +1891,24 @@ website_url = "https://cyclehamont.ca"
 tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
 region_slugs = ["hamilton-cma"]
 
+# --- Kitchener-Cambridge-Waterloo ---
+
+[[org]]
+slug = "cyclewr"
+name = "CycleWR"
+short_desc = "Waterloo Region cycling-advocacy coalition; pushes for safe, convenient cycling as an everyday mode for all ages and abilities, with active campaigns on Kitchener-Fairway connections, Elmira active-transportation upgrades, and the I Bike, I Vote pledge."
+website_url = "https://cyclewr.ca"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["kitchener-cambridge-waterloo-cma"]
+
+[[org]]
+slug = "tritag"
+name = "Tri-Cities Transport Action Group"
+short_desc = "Waterloo Region multi-modal advocacy nonprofit (TriTAG) for walking, biking, and transit across Cambridge, Kitchener, and Waterloo; runs the IONize Waterloo Region campaign for a complete rapid-transit network linking the tri-cities."
+website_url = "https://www.tritag.ca"
+tags = ["transit", "cycling", "walking", "advocacy", "rail"]
+region_slugs = ["kitchener-cambridge-waterloo-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
