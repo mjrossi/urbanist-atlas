@@ -767,6 +767,33 @@ website_url = "https://www.pittsburghwalks.org"
 tags = ["walking", "safe-streets", "advocacy", "accessibility"]
 region_slugs = ["pittsburgh-pa-metro"]
 
+# --- Sacramento ---
+
+[[org]]
+slug = "sacramento-area-bicycle-advocates"
+name = "Sacramento Area Bicycle Advocates"
+short_desc = "Greater Sacramento's regional cycling 501(c)(3) (founded 1991, incorporated 2002); coordinates May Is Bike Month across seven counties and advocates for safer streets and e-bike incentives."
+website_url = "https://sacbike.org"
+contact_url = "mailto:saba@sacbike.org"
+tags = ["cycling", "advocacy", "safe-streets", "regional"]
+region_slugs = ["sacramento-ca-metro"]
+
+[[org]]
+slug = "civic-thread"
+name = "Civic Thread"
+short_desc = "Sacramento-region active-transportation and complete-streets 501(c)(3) (rebranded from WALKSacramento in 2023; founded 1998); convenes the Complete Streets Coalition and works on the Sacramento Regional Transit Bus Stop Improvement Plan."
+website_url = "https://civicthread.org"
+tags = ["walking", "safe-streets", "advocacy", "regional", "land-use"]
+region_slugs = ["sacramento-ca-metro"]
+
+[[org]]
+slug = "sacramento-transit-advocates-and-riders"
+name = "Sacramento Transit Advocates and Riders"
+short_desc = "All-volunteer rider-advocacy group covering SacRT, e-tran, Yolobus, Roseville Transit, and Folsom Stage Line; promotes ridership growth, accountability, and intermodal connectivity in the Sacramento region."
+website_url = "https://star-transit.org"
+tags = ["transit", "rider-union", "grassroots", "advocacy", "accountability"]
+region_slugs = ["sacramento-ca-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
