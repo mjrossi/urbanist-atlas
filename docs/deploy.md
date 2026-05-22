@@ -86,6 +86,25 @@ rotation + troubleshooting.
   merge, then `just fly-loaddata`. The loaders upsert by stable key,
   so the reverted file's rows take over cleanly.
 
+### GitHub Actions secrets
+
+Two Fly tokens, scoped narrowly:
+
+| Secret | Scope | Used by | How to issue |
+|---|---|---|---|
+| `FLY_API_TOKEN_DEPLOY` | deploy-only on `urbanist-atlas` | `ci.yml` → `deploy-api` | `flyctl tokens create deploy -a urbanist-atlas --expiry 8760h` |
+| `FLY_API_TOKEN` | personal access (broad) | `backup.yml` (needs `ssh console` for `pg_dump`) | `flyctl auth token` |
+
+Splitting them keeps the auto-deploy path on the principle of least
+privilege — a compromised CI run can ship code but can't shell into
+the DB or read app secrets. Rotate by re-issuing the token and
+`gh secret set <NAME>` with the new value; flyctl picks up the new
+token on the next workflow run with no machine restart needed.
+
+The R2 backup workflow also needs `CF_ACCOUNT_ID`,
+`R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` — issued + provisioned
+per [`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md).
+
 ## Prerequisites
 
 - [flyctl](https://fly.io/docs/flyctl/install/) installed and
