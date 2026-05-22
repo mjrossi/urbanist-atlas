@@ -398,7 +398,22 @@ smoke secret='' host='qa-api.urbanistatlas.com':
     if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
     if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
     if ! grep -qi '^X-Data-Attribution: ' "$headers"; then echo "  FAIL: missing X-Data-Attribution header"; fail=1; else echo "  OK X-Data-Attribution"; fi
+    rm -f "$headers" "$body"
+
+    # /lookup is a single-resource endpoint; the {meta, data} envelope
+    # only wraps collection responses (per the slice #24 ODbL design,
+    # see docs/api-architecture.md § Response envelope). Check meta on
+    # /metros, which is a collection endpoint.
+    echo "→ GET $BASE/api/v1/metros (collection meta envelope)"
+    headers=$(mktemp)
+    body=$(mktemp)
+    code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
+        -H "X-Atlas-Client: $SECRET" \
+        "$BASE/api/v1/metros")
+    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
+    if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
     if ! jq -e '.meta.license and .meta.attribution_url and .meta.generated_at' "$body" >/dev/null; then echo "  FAIL: meta envelope missing license/attribution_url/generated_at"; fail=1; else echo "  OK meta envelope"; fi
+    if ! jq -e '.data | type == "array"' "$body" >/dev/null; then echo "  FAIL: data is not an array"; fail=1; else echo "  OK data array"; fi
     rm -f "$headers" "$body"
 
     echo "→ GET $BASE/api/v1/openapi.yaml"
