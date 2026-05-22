@@ -9,7 +9,7 @@
 #   - well-known metros whose curated slug should be short (e.g.,
 #     "nyc-metro" rather than "new-york-ny-metro")
 #   - multi-state metros that should parent under an intermediate
-#     multi-state region (nyc-tristate, chicagoland-multistate) rather
+#     multi-state region (nyc-tristate, chicagoland) rather
 #     than under each constituent state directly
 #   - any future editorial cleanup of auto-generated names
 #
@@ -26,7 +26,7 @@ parents = ["nyc-tristate"]
 cbsa_code = "16980"
 slug = "chicago-metro"
 name = "Chicago Metro"
-parents = ["chicagoland-multistate"]
+parents = ["chicagoland"]
 
 # Single-state metros with curated leaves below carry no state parent
 # per region-graph.md §1 ("state edges live on the leaf, not on the

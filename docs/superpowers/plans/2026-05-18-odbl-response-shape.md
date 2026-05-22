@@ -53,7 +53,7 @@
 - [ ] **Step 0.1: Confirm worktree state**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 git rev-parse --abbrev-ref HEAD
 git status --short
 ```
@@ -65,7 +65,7 @@ Expected:
 - [ ] **Step 0.2: Confirm baseline `just ci` is green**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just ci
 ```
 
@@ -74,7 +74,7 @@ Expected: all green. If anything fails, STOP and report — the baseline is brok
 - [ ] **Step 0.3: Confirm generated files are clean**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just api-oapi-gen
 git diff --stat
 ```
@@ -336,7 +336,7 @@ Add a NEW bullet immediately after it:
 - [ ] **Step 1.9: Regenerate Go types and refresh embedded copy**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just api-oapi-gen
 ```
 
@@ -347,7 +347,7 @@ Expected:
 Quick sanity check:
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 grep -c "type Meta " api/internal/httpapi/oapi/types.gen.go
 grep -c "type MetroSummariesEnvelope " api/internal/httpapi/oapi/types.gen.go
 grep -c "type RecentEnvelope " api/internal/httpapi/oapi/types.gen.go
@@ -358,7 +358,7 @@ Expected: each grep returns `1`.
 - [ ] **Step 1.10: Regenerate TS types**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 npm --prefix web run generate:api
 ```
 
@@ -369,7 +369,7 @@ Expected:
 Quick sanity check:
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 grep -c "MetroSummariesEnvelope" web/src/lib/api.gen.ts
 grep -c "RecentEnvelope" web/src/lib/api.gen.ts
 grep -c "Meta:" web/src/lib/api.gen.ts
@@ -380,7 +380,7 @@ Expected: each grep returns at least `1`.
 - [ ] **Step 1.11: Run `just ci` — must stay green**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just ci
 ```
 
@@ -391,7 +391,7 @@ If `just ci` fails, STOP and inspect — most likely cause is a typo in the YAML
 - [ ] **Step 1.12: Commit**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 git add api/openapi.yaml \
         api/internal/httpapi/oapi/types.gen.go \
         api/internal/httpapi/openapi.yaml \
@@ -612,7 +612,7 @@ var _ = slog.LevelInfo
 - [ ] **Step 2.2: Run tests to verify they fail with the expected "undefined" errors**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 cd api && go test ./internal/httpapi/... -run "TestODbL|TestRespondCollection|TestNewMeta" -count=1 2>&1 | head -40
 ```
 
@@ -759,7 +759,7 @@ with:
 - [ ] **Step 2.7: Run the new odbl_test.go tests to GREEN**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 cd api && go test ./internal/httpapi/... -run "TestODbL|TestRespondCollection|TestNewMeta" -count=1 -v 2>&1 | tail -30
 ```
 
@@ -768,7 +768,7 @@ Expected: all six new tests PASS. If any fail, fix before continuing — don't u
 - [ ] **Step 2.8: Run the FULL existing test suite to see what breaks**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 cd api && go test ./internal/httpapi/... -count=1 2>&1 | tail -30
 ```
 
@@ -953,7 +953,7 @@ with:
 - [ ] **Step 2.12: Run the full httpapi test suite — must be all green**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 cd api && go test ./internal/httpapi/... -race -count=1
 ```
 
@@ -962,7 +962,7 @@ Expected: PASS. If anything fails, fix before continuing.
 - [ ] **Step 2.13: Run `just api-check` — must stay green**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just api-check
 ```
 
@@ -971,7 +971,7 @@ Expected: green. Note that this also runs the gen-check (regenerates types and e
 - [ ] **Step 2.14: Commit**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 git add api/internal/httpapi/odbl.go \
         api/internal/httpapi/odbl_test.go \
         api/internal/httpapi/router.go \
@@ -1160,7 +1160,7 @@ with:
 - [ ] **Step 3.2: Run the frontend tests — should fail on listMetros/listRecent**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 cd web && npm test -- --run 2>&1 | tail -40
 ```
 
@@ -1280,7 +1280,7 @@ to:
 - [ ] **Step 3.4: Run the frontend tests — must be all green**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 cd web && npm test -- --run 2>&1 | tail -20
 ```
 
@@ -1289,7 +1289,7 @@ Expected: all tests pass.
 - [ ] **Step 3.5: Run `just web-check` — must be green**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just web-check
 ```
 
@@ -1298,7 +1298,7 @@ Expected: green (covers npm ci, lint, test, build, gen-check).
 - [ ] **Step 3.6: Commit**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 git add web/src/lib/api.ts web/src/lib/api.test.ts
 git status
 git commit -m "$(cat <<'EOF'
@@ -1332,7 +1332,7 @@ Expected: commit succeeds.
 - [ ] **Step 4.1: Run the full `just ci`**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just ci
 ```
 
@@ -1343,7 +1343,7 @@ Expected: green.
 Start the dev Postgres and load the dev fixtures (skip if already loaded), then run the server in background and curl the new shape.
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just pg-up
 just migrate-up
 just loaddata
@@ -1352,7 +1352,7 @@ just loaddata
 In one terminal:
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just api-run
 ```
 
@@ -1378,7 +1378,7 @@ Stop the server (Ctrl-C in the first terminal).
 - [ ] **Step 4.3: Manual SPA smoke**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 just api-run &  # restart if you stopped it
 cd web && npm run dev
 ```
@@ -1394,7 +1394,7 @@ Stop both processes.
 - [ ] **Step 4.4: Inspect git log**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 git log main..HEAD --oneline
 ```
 
@@ -1406,7 +1406,7 @@ Expected: three commits, in order:
 - [ ] **Step 4.5: Push and open PR**
 
 ```bash
-cd /Users/mrossi/dev/urbanist-atlas/.worktrees/odbl-backend
+cd .worktrees/odbl-backend
 git push -u origin slice-24-odbl-response-shape
 gh pr create --title "feat: ODbL attribution headers + collection envelope (slice #24)" \
   --body "$(cat <<'EOF'

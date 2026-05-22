@@ -16,8 +16,12 @@ the plan is the *design* view.
 `qa-api.urbanistatlas.com` (API on Fly.io, region `iad`, behind the
 `X-Atlas-Client` shared-secret gate). DB is a sibling Fly app
 running `postgres:17-alpine` on a 1 GB volume. 134 orgs and 35,424
-postal codes seeded. R2 backup workflow is the only bring-up task
-still pending operator action.
+postal codes seeded. The R2 backup workflow has shipped + a
+step-by-step enablement runbook landed at
+[`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md); the
+operator dashboard work (R2 bucket + 30-day lifecycle + scoped
+token + four GitHub Secrets + first manual run) is the only
+remaining bring-up task.
 
 **Done:**
 
@@ -200,6 +204,71 @@ still pending operator action.
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
   `loaddata`, `ci`.
+- **Hygiene pass between Phase 1 and Phase 2 (slice #25):** evergreen
+  architecture docs to dig into when extending the API or adding a
+  country — `docs/api-architecture.md` (library-first split, Store
+  abstraction, wire-contract codegen, RFC 9457 problem+json, ODbL
+  response envelope, Phase 1 gate), `docs/etl-architecture.md`
+  (per-country ETL flow, US 2-source merge, source pinning +
+  determinism, add-a-country checklist), and
+  `docs/testing-strategy.md` (when to write unit vs. handler vs.
+  integration vs. frontend tests). API-side dedup of `toOAPIOrg` /
+  `toOAPILookupOrg` adapters into `oapi_adapters.go`; consistent
+  `fmt.Errorf`-wrapping in `pkg/atlas.Lookup`; new
+  `middleware_test.go` covers requestID + recoverer + logging +
+  statusRecorder (the four middlewares that had zero direct
+  coverage). Seed rename `chicagoland-multistate` →
+  `chicagoland` (locals don't say "multi-state"). Web cleanups:
+  add the missing `.visually-hidden` CSS rule, drop the unused
+  `.entry-list-wrap` wrapper, extract a generic `<AsideCard>`
+  component out of `Home.tsx`'s parallel renderer pair, replace
+  misleading "Coming soon" status pills with honest per-state
+  labels ("Temporarily unavailable" / "Nothing indexed yet"),
+  drop the empty `emptyRegionMap` placeholder in `Metro.tsx`, and
+  extract `groupCountLabel(n)` into a new `web/src/lib/format.ts`
+  shared by Home + Browse. Drop the auto/US/CA country override
+  `<select>` from `SearchBox` (the digit/letter heuristic is
+  unambiguous for v1) and change the input placeholder away from
+  the NYC-centric `11217` example. Copy refinements: link
+  *Urbanist Lexicon* in the Footer colophon, add a "Source on
+  GitHub →" link in the Footer row, add Inter to the font credit,
+  rewrite the About contact line to point at GitHub issues for
+  Phase 1, soften the 404 closing line. Add a `/submit` Phase 2
+  placeholder route so the nav-linked URL stops falling through to
+  the 404 errorElement. Drop PT from the user-facing seed pipeline
+  (`loaddata.LoadAll`) and remove the four PT orgs from `orgs.toml`;
+  the PT seed files stay under `api/seed/` as a region-graph
+  validation fixture and migration
+  `0005_drop_pt_user_facing_seed.sql` cleans existing PT rows on
+  deploy.
+- **Open-source readiness:** the standard community files so the
+  repo can flip to public. `CONTRIBUTING.md` (scope guardrails,
+  dev-loop quick start, PR conventions, three contribution paths
+  with no separate CLA), `SECURITY.md` (routes vulnerability
+  reports through GitHub Private Vulnerability Reporting; honest
+  one-maintainer SLA), `CODE_OF_CONDUCT.md` (Contributor Covenant
+  2.1 with enforcement via the same PVR channel),
+  `.github/ISSUE_TEMPLATE/` (bug report + feature request + the
+  high-volume org-correction-or-addition template with a
+  disclosure field, plus a `config.yml` that disables blank issues
+  and surfaces security / conventions / roadmap as contact links),
+  and `.github/PULL_REQUEST_TEMPLATE.md` (summary / related /
+  test plan / reviewer notes). README updated to retire the stale
+  "visit /submit" line in favor of a Contributing section
+  pointing at the new files.
+- **R2 backup runbook:** `docs/runbooks/r2-backups.md` —
+  step-by-step for enabling `.github/workflows/backup.yml` against
+  the QA Postgres + Cloudflare R2. Nine numbered steps from Fly
+  token generation through verifying the first manual run, plus a
+  restore path (`just db-restore`), a rotation + maintenance
+  cadence (6–12 month token rotation, quarterly retention audit,
+  half-yearly restore drill), and a troubleshooting section for
+  the common failure modes (SSH permission errors, R2 403s on
+  PutObject, endpoint URL typos, partial dumps, stragglers past
+  30 days). `docs/deploy.md` §7 collapses to a pointer at the
+  runbook so the deep content has one home. **Note:** the
+  backups themselves are still operator-pending (see Status
+  above) — this slice landed the runbook, not the bucket.
 
 ## Deferred from this milestone
 

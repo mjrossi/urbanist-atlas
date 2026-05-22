@@ -558,7 +558,12 @@ func TestPipeline_PT_ValidationFixture(t *testing.T) {
 	must(err)
 	_, err = loadpostal.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "postal_codes_pt.csv"), atlas.Country("PT"))
 	must(err)
+	// Main org seed (US + CA). PT orgs were moved to orgs_pt.toml in
+	// slice #25 so the production loaddata stays US/CA-only; the PT
+	// fixture below loads them explicitly for this validation test.
 	_, err = seed.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "orgs.toml"))
+	must(err)
+	_, err = seed.LoadFile(ctx, store.Pool(), logger, repoFile(t, "seed", "orgs_pt.toml"))
 	must(err)
 
 	t.Run("national tier filtered from default lookup", func(t *testing.T) {

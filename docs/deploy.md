@@ -286,31 +286,16 @@ curl -sS -H "X-Atlas-Client: $CLIENT_SECRET" \
 ### 7. Set up the backup workflow
 
 The nightly backup runs in GitHub Actions at
-`.github/workflows/backup.yml`. Add the required secrets to the repo
-(**Settings → Secrets and variables → Actions**):
+`.github/workflows/backup.yml`. Step-by-step setup —
+generating the Fly token, finding the Cloudflare account ID,
+creating the R2 bucket + lifecycle rule, issuing a scoped R2
+API token, adding the four GitHub Secrets, the first manual
+run, verification, and restore — lives in the dedicated
+runbook at
+[`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md).
 
-| Secret | Value |
-|---|---|
-| `FLY_API_TOKEN` | `flyctl auth token` — Fly personal access token |
-| `CF_ACCOUNT_ID` | Cloudflare account id (from any zone overview page in the dashboard) |
-| `R2_ACCESS_KEY_ID` | R2 access key (from R2 dashboard → Manage API tokens) |
-| `R2_SECRET_ACCESS_KEY` | Paired secret |
-
-Create the R2 bucket and the 30-day retention rule:
-
-1. Cloudflare dashboard → **R2 → Create bucket** → name
-   `urbanist-atlas-backups`, location automatic.
-2. Bucket → **Settings → Object lifecycle rules → Add rule**:
-   name `expire-30d`, scope `Apply to all objects`, action
-   `Delete objects` after `30 days`.
-
-Then trigger the workflow manually to verify end-to-end (**Actions →
-backup-postgres → Run workflow**). It should succeed in <60 s and
-the R2 bucket should contain a single dated `.sql.gz`. Download it,
-`gunzip -t` to verify integrity, optionally `pg_restore --list` to
-inspect.
-
-The cron runs nightly at 02:00 America/New_York from then on.
+The runbook also covers rotation cadence and the common failure
+modes (SSH permission errors, R2 403s, partial dumps).
 
 ## Cloudflare Workers + Pages + DNS
 

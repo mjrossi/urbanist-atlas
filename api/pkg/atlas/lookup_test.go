@@ -2,6 +2,7 @@ package atlas
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -87,8 +88,10 @@ func TestLookup_NYC_Hoboken_NoCrossStateLocalLeak(t *testing.T) {
 
 func TestLookup_NotFound(t *testing.T) {
 	_, err := Lookup(context.Background(), nycFixture(t), LookupQuery{PostalCode: "00000", Country: "US"})
-	if err != ErrPostalCodeNotFound {
-		t.Errorf("err = %v, want ErrPostalCodeNotFound", err)
+	// Lookup wraps ResolveLeafRegion's error with context; the sentinel
+	// is reachable via errors.Is. The HTTP handler does the same check.
+	if !errors.Is(err, ErrPostalCodeNotFound) {
+		t.Errorf("err = %v, want errors.Is(err, ErrPostalCodeNotFound)", err)
 	}
 }
 

@@ -1,0 +1,49 @@
+# Portugal orgs — slice #4.6 validation fixture.
+#
+# These four entries used to live in orgs.toml. Slice #25 (hygiene)
+# moved them out so the production seed pipeline (loaddata.LoadAll)
+# loads only US + CA orgs while the PT region-graph validation
+# work the slice-#4.6 spec describes stays exercisable by the
+# integration suite, which loads this file explicitly via
+# `seed.LoadFile` after the main `orgs.toml` (see
+# api/internal/store/postgres/pipeline_test.go's PT block).
+#
+# Local chapters of national federations are modeled separately
+# from their national umbrella per the editorial policy in
+# docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md
+# (§2). The mubi-nacional row exists as the umbrella; the default
+# /lookup filters scope_tier='national' out so it doesn't surface
+# for postal-code queries — that filter is one of the things the
+# integration suite verifies against this fixture.
+
+[[org]]
+slug = "mubi-lisboa"
+name = "MUBi Lisboa"
+short_desc = "Lisboa chapter of MUBi (Associação pela Mobilidade Urbana em Bicicleta), advocating for cycling infrastructure and urban mobility in the Lisboa area."
+website_url = "https://mubi.pt"
+tags = ["cycling", "advocacy", "local-chapter"]
+region_slugs = ["lisboa-municipio"]
+
+[[org]]
+slug = "mubi-porto"
+name = "MUBi Porto"
+short_desc = "Porto chapter of MUBi, working for safer cycling and active mobility across the Área Metropolitana do Porto."
+website_url = "https://mubi.pt"
+tags = ["cycling", "advocacy", "local-chapter"]
+region_slugs = ["porto-municipio"]
+
+[[org]]
+slug = "lisboa-para-pessoas"
+name = "Lisboa Para Pessoas"
+short_desc = "Lisboa-focused walkability and public-space advocacy; pedestrian-first journalism and campaigning."
+website_url = "https://lisboaparapessoas.pt"
+tags = ["pedestrian", "walkability", "safe-streets"]
+region_slugs = ["lisboa-municipio"]
+
+[[org]]
+slug = "mubi-nacional"
+name = "MUBi — Associação pela Mobilidade Urbana em Bicicleta"
+short_desc = "Portugal's national cycling federation; coordinates local chapters in Lisboa, Porto, Coimbra and beyond."
+website_url = "https://mubi.pt"
+tags = ["cycling", "national-federation"]
+region_slugs = ["pt-nacional"]

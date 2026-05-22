@@ -1,0 +1,61 @@
+# Dependabot keeps the three dependency surfaces in this monorepo
+# patched on a weekly cadence:
+#
+#   - github-actions  →  the actions used in .github/workflows/*.yml
+#   - gomod           →  api/go.mod + api/go.sum
+#   - npm             →  web/package.json + web/package-lock.json
+#
+# The allowlist under "Actions permissions" (Settings → Actions → General)
+# is publisher-scoped (`actions/*`, `jdx/mise-action@*`,
+# `superfly/flyctl-actions/*`), so Dependabot version bumps within those
+# publishers land without an allowlist edit. Bumping to a NEW publisher
+# requires adding the publisher to the allowlist first; Dependabot would
+# otherwise open a PR whose CI can't actually use the new action.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - github-actions
+
+  - package-ecosystem: gomod
+    directory: /api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "api"
+    labels:
+      - dependencies
+      - go
+    groups:
+      # Group the standard-library-adjacent stack into a single PR so
+      # related bumps (chi + pgx + sqlc-generated code) land together.
+      go-deps:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "web"
+    labels:
+      - dependencies
+      - javascript
+    groups:
+      # One PR per ecosystem for the SPA stack — React + Vite + RR +
+      # React Query move in lockstep often enough that splitting them
+      # into ~10 PRs/week is just noise.
+      web-deps:
+        patterns:
+          - "*"

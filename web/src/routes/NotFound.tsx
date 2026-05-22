@@ -28,9 +28,8 @@ export function NotFound() {
       </header>
       <section>
         <p>
-          We retract the link, with apologies. The page you tried to reach
-          either never went to press or has since been pulled from the
-          directory.
+          We’ve pulled this page from the edition, with apologies. The link
+          you followed either never went to press, or has since been retired.
         </p>
         <p>
           <Link to="/" className="not-found-return">

@@ -22,7 +22,11 @@ import (
 func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, error) {
 	leaf, err := store.ResolveLeafRegion(ctx, query.Country, query.PostalCode)
 	if err != nil {
-		return LookupResult{}, err
+		// Wrap so log lines (and any outer errors.Wrap chain) show the
+		// resolve step alongside the underlying message. errors.Is still
+		// finds atlas.ErrPostalCodeNotFound through the wrap, so the
+		// HTTP layer's 404 mapping is preserved.
+		return LookupResult{}, fmt.Errorf("atlas: resolve postal code: %w", err)
 	}
 
 	ancestry, err := store.AncestorRegions(ctx, leaf.ID)

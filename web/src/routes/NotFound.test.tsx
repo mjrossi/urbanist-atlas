@@ -25,7 +25,7 @@ describe('NotFound', () => {
 
   it('renders a retraction body paragraph', () => {
     renderNotFound();
-    expect(screen.getByText(/retract the link/i)).toBeDefined();
+    expect(screen.getByText(/pulled this page from the edition/i)).toBeDefined();
   });
 
   it('provides a return-to-homepage link pointing to /', () => {
