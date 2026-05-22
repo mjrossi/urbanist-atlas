@@ -1024,6 +1024,18 @@ contact_url = "mailto:info@growsmartri.org"
 tags = ["transit", "advocacy", "policy", "land-use"]
 region_slugs = ["providence-ri-metro"]
 
+# --- Jacksonville (gap, 2026-05-22) ---
+#
+# Jacksonville's BPAC voted in 2025 to seek 501(c)(3) status and
+# operate as an NGO named "Bike Walk Jax"; the transition is in
+# progress but the 501(c)(3) is not yet granted and the group still
+# meets at city facilities. Per the slice 7.7 agency-internal
+# committee precedent and the pending-incorporation status, Bike
+# Walk Jax doesn't yet clear the bar. The Florida Bicycle Association
+# (state floor) covers jacksonville-fl-metro via the ancestor walk.
+# Worth revisiting once Bike Walk Jax is independently incorporated
+# with its own active web surface.
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
