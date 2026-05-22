@@ -865,6 +865,41 @@ contact_url = "mailto:chair@kcrta.org"
 tags = ["transit", "advocacy", "policy", "regional"]
 region_slugs = ["kansas-city-mo-metro"]
 
+# --- Austin ---
+#
+# Farm & City was considered but excluded — their 2025-12-31 post
+# ("A Note on Farm&City's Future") confirms operations are currently
+# paused, failing the activity bar. Worth revisiting if/when Crossley
+# restarts the org. AURA is admitted under the slice 7.7 multi-issue-
+# with-named-programs precedent: AURA's broader urbanism mission
+# includes the named "Transit City" campaign and Bicycle Master Plan
+# advocacy alongside its housing work.
+
+[[org]]
+slug = "safe-streets-austin"
+name = "Safe Streets Austin"
+short_desc = "Austin's unified safe-streets 501(c)(3) (formed 2022 from the merger of Bike Austin, Walk Austin, and Vision Zero ATX); advocates for safer streets, bikeways, and trails across the city."
+website_url = "https://www.safestreetsaustin.org"
+tags = ["safe-streets", "cycling", "walking", "vision-zero", "advocacy"]
+region_slugs = ["austin-tx-metro"]
+
+[[org]]
+slug = "transit-forward"
+name = "Transit Forward"
+short_desc = "Independent Austin-region transit 501(c)(3) providing accountability and community engagement for Project Connect's $7.1B light-rail and bus expansion build-out."
+website_url = "https://transitforward.org"
+contact_url = "mailto:info@transitforward.org"
+tags = ["transit", "advocacy", "accountability", "rail"]
+region_slugs = ["austin-tx-metro"]
+
+[[org]]
+slug = "aura-austin"
+name = "AURA"
+short_desc = "Grassroots Austin urbanist group (founded 2013 as Austinites for Urban Rail Action); runs the Transit City campaign, advocates full funding of the Bicycle Master Plan and missing-sidewalk construction, and defends Project Connect at the legislature."
+website_url = "https://aura-atx.org"
+tags = ["transit", "cycling", "walking", "advocacy", "land-use"]
+region_slugs = ["austin-tx-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
