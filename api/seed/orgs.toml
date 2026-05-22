@@ -1111,6 +1111,24 @@ website_url = "https://www.micahmemphis.org"
 tags = ["transit", "advocacy", "equity", "grassroots"]
 region_slugs = ["memphis-tn-metro"]
 
+# --- Richmond ---
+
+[[org]]
+slug = "rva-rapid-transit"
+name = "RVA Rapid Transit"
+short_desc = "Richmond-region transit advocacy 501(c)(3) (founded 2014) independent of GRTC; runs Transit Talks public programs and the multi-week Mobility University training course for bus riders, and publishes annual State of Transit reports."
+website_url = "https://www.rvarapidtransit.org"
+tags = ["transit", "advocacy", "rider-union", "education"]
+region_slugs = ["richmond-va-metro"]
+
+[[org]]
+slug = "bike-walk-rva"
+name = "Bike Walk RVA"
+short_desc = "Richmond's named bike-walk safe-streets program operated by Sports Backers; advocates for safe, connected biking and walking infrastructure and trains local leaders. Admitted under the slice 7.7 named-program precedent."
+website_url = "https://www.sportsbackers.org/program/bike-walk-rva/"
+tags = ["cycling", "walking", "safe-streets", "advocacy"]
+region_slugs = ["richmond-va-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
