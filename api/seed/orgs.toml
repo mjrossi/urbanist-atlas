@@ -2161,6 +2161,26 @@ website_url = "https://www.tritag.ca"
 tags = ["transit", "cycling", "walking", "advocacy", "rail"]
 region_slugs = ["kitchener-cambridge-waterloo-cma"]
 
+# --- Halifax (CA CMA #14, bonus coverage beyond slice 7.8 canvas) ---
+
+[[org]]
+slug = "halifax-cycling-coalition"
+name = "Halifax Cycling Coalition"
+short_desc = "Halifax Regional Municipality cycling-advocacy nonprofit; pushed HRM Council to maintain the safe bike-lane construction budget in 2026-27 and tracks the All-Ages-and-Abilities bikeway network (31km / 59% complete as of October 2025)."
+website_url = "https://cyclehalifax.ca"
+tags = ["cycling", "advocacy", "safe-streets", "policy"]
+region_slugs = ["halifax-cma"]
+
+# --- Mississauga (sub-Toronto, bonus coverage) ---
+
+[[org]]
+slug = "mississauga-cycling-now"
+name = "Mississauga Cycling Now!"
+short_desc = "Mississauga (GTA) cycling-advocacy group commenting on regional planning and the Pedal Poll initiative; organizing the May 2026 webinar on the new Pedal Poll micromobility count to support Canada-wide cycling advocacy."
+website_url = "https://misscyclingnow.ca"
+tags = ["cycling", "advocacy", "grassroots"]
+region_slugs = ["toronto-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
