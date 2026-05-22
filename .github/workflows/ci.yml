@@ -129,10 +129,13 @@ jobs:
     name: deploy api → Fly
     needs: [api, web]
     # Only deploy on merges to main (and on the workflow_dispatch
-    # re-deploy escape hatch). PR runs validate but never deploy.
+    # re-deploy escape hatch, also restricted to main). PR runs
+    # validate but never deploy. The ref check on the dispatch arm
+    # prevents a maintainer from accidentally shipping a feature
+    # branch to prod via `gh workflow run ci.yml --ref my-branch`.
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-      || github.event_name == 'workflow_dispatch'
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Override the workflow-level concurrency: never cancel an

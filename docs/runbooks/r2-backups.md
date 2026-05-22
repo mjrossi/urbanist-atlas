@@ -140,6 +140,23 @@ GitHub repo → **Settings** → **Secrets and variables** → **Actions**
 Spelling matters — `backup.yml` references these exact names. After
 all four are saved, the Actions tab will show them as masked.
 
+> ⚠️ **Strip trailing newlines if you set secrets via `gh secret set`.**
+> The gh CLI stores stdin verbatim and does **not** trim the newline
+> that `flyctl auth token` (and most CLI output) emits. A token with
+> a stray `\n` causes flyctl to fail with
+> `net/http: invalid header field value for "Authorization"` — the
+> token looks correct in the dashboard but the workflow can't use
+> it. Use `tr -d '\n'` or `printf '%s'` to strip:
+>
+> ```sh
+> flyctl auth token | tr -d '\n' | gh secret set FLY_API_TOKEN
+> printf '%s' '<paste-account-id>' | gh secret set CF_ACCOUNT_ID
+> ```
+>
+> Setting secrets via the web UI is paste-safe — the form strips the
+> newline at submit time. Only `gh secret set` (and other stdin-piped
+> tools) carry this hazard.
+
 ## Step 7 — Trigger the workflow manually
 
 1. GitHub repo → **Actions** tab.
