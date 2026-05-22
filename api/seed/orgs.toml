@@ -794,6 +794,26 @@ website_url = "https://star-transit.org"
 tags = ["transit", "rider-union", "grassroots", "advocacy", "accountability"]
 region_slugs = ["sacramento-ca-metro"]
 
+# --- Las Vegas ---
+#
+# Thin advocacy ecosystem: NV is a documented state-floor gap (see
+# slice 7.6 canvas adjustments) and Las Vegas has no transit rider
+# union. PedSafe Vegas was considered but excluded — it operates as
+# a program inside UNLV's Transportation Research Center rather
+# than as an independently-incorporated nonprofit. The slice 7.7
+# chapter/affiliate precedent ("chapters without independent
+# incorporation are NOT admitted") extends naturally to university-
+# housed programs; the parent academic unit already covers the
+# work. Worth revisiting if PedSafe spins out into its own 501(c)(3).
+
+[[org]]
+slug = "southern-nevada-bicycle-coalition"
+name = "Southern Nevada Bicycle Coalition"
+short_desc = "Las Vegas-area cycling 501(c)(3) advocating for safer roads, three-foot passing law enforcement, and Vision Zero outcomes; runs the Change Lanes for Bikes, Let's Get There Together, and Ride Safe public-education campaigns."
+website_url = "https://www.snvbc.org"
+tags = ["cycling", "advocacy", "safe-streets", "vision-zero"]
+region_slugs = ["las-vegas-nv-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
