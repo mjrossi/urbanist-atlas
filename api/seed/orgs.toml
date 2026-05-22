@@ -985,6 +985,21 @@ website_url = "https://www.thetransitalliance.org"
 tags = ["transit", "advocacy", "policy", "regional", "education"]
 region_slugs = ["nashville-tn-metro"]
 
+# --- Virginia Beach / Norfolk / Hampton Roads ---
+#
+# Hampton Roads Public Transportation Alliance (HRPTA) appears in
+# nonprofit databases but couldn't be verified to clear the 12-month
+# activity bar on its own web surface; worth revisiting if the org
+# refreshes its public site.
+
+[[org]]
+slug = "bike-norfolk"
+name = "Bike Norfolk"
+short_desc = "All-volunteer Norfolk-area cycling 501(c)(3) advocating for bicycle-friendly infrastructure across Hampton Roads; runs Norfolk Bike Month (15th edition in 2026), volunteer-distributed bike lights, and on-site bike maintenance at local soup kitchens."
+website_url = "https://bikenorfolk.org"
+tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
+region_slugs = ["virginia-beach-va-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
