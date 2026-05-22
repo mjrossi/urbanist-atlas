@@ -1088,6 +1088,29 @@ website_url = "https://bikedurham.org"
 tags = ["cycling", "walking", "transit", "advocacy", "safe-streets", "vision-zero"]
 region_slugs = ["durham-nc-metro"]
 
+# --- Memphis ---
+#
+# Better Transit for a Better Memphis (BTBM) is a coalition
+# organized by MICAH + Sierra Club Chickasaw Group in 2024;
+# excluded as a coalition without independent 501(c)(3) status —
+# MICAH already covers the work via its named Transit Equity pillar.
+
+[[org]]
+slug = "innovate-memphis"
+name = "Innovate Memphis"
+short_desc = "Memphis civic-innovation 501(c)(3) running a named transportation-and-mobility program; co-developed the Transit Vision plan with MATA and launched a 2025 street-safety advocacy initiative with Hyde Family Foundation backing."
+website_url = "https://innovatememphis.com"
+tags = ["transit", "safe-streets", "advocacy", "mobility"]
+region_slugs = ["memphis-tn-metro"]
+
+[[org]]
+slug = "micah-memphis"
+name = "MICAH"
+short_desc = "Memphis Interfaith Coalition for Action and Hope, a 70+ congregation/organization 501(c)(3) (formed 2018) advocating across three pillars including a named Transit Equity program; convened Better Transit for a Better Memphis in 2024 to hold MATA accountable."
+website_url = "https://www.micahmemphis.org"
+tags = ["transit", "advocacy", "equity", "grassroots"]
+region_slugs = ["memphis-tn-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
