@@ -360,7 +360,6 @@ execution against live infra; ⏳ = not yet started.
 
 Not blocking launch:
 
-- Org detail pages (`/orgs/{slug}`)
 - Email/Slack notifications on new submissions
 - Multi-moderator auth (replaces the v1 shared bearer token)
 - Map view
