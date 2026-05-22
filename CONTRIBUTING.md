@@ -110,6 +110,39 @@ Common verbs (run `just` with no args for the full list):
   (needs Docker; not in CI)
 - `just ci` — what CI runs (`api-check` + `web-check`)
 
+## Full-stack PR review
+
+Cloudflare Workers preview URLs target the *current* QA API at
+`qa-api.urbanistatlas.com`, **not** the API as it stands on the
+PR's branch. For PRs that add or change an API endpoint, the
+preview frontend will 404 (or otherwise misbehave) against the
+not-yet-deployed backend. Two workflows handle this:
+
+1. **Local stack** — check out the PR branch and run the whole
+   stack locally:
+
+   ```sh
+   gh pr checkout <PR#>
+   just preview         # one terminal: DB + migrate + seed-if-empty + api
+   just web-dev         # another terminal: SPA on http://localhost:5173
+   ```
+
+   `just preview` is idempotent: it reuses the existing dev Postgres
+   container, no-ops if migrations are current, and skips `loaddata`
+   if the DB is already seeded.
+
+2. **Merge backend first** — if the work can be split, land + deploy
+   the API change first; then open the frontend PR. The Cloudflare
+   preview will then hit a QA API that has the new endpoint and Just
+   Work.
+
+This asymmetry exists because Workers previews are stateless and
+near-free, while a per-branch API preview would need its own
+database. A shared "preview" Fly app (one extra ~$5/mo machine
+that takes the latest push from any non-main branch) is a queued
+ergonomics upgrade in [`docs/roadmap.md`](./docs/roadmap.md) for
+when full-stack PR volume justifies it.
+
 ## Pull request guidelines
 
 - **One topic per PR.** Refactors, behavior changes, and doc

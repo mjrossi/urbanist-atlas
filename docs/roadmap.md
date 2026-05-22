@@ -367,3 +367,12 @@ Not blocking launch:
 - Org self-service editing
 - Housing / YIMBY scope expansion (deliberately deferred per scope)
 - i18n beyond US/CA English
+- **Shared "preview" Fly app for full-stack PR review** — one
+  extra `urbanist-atlas-preview` machine (~$5/mo) that auto-deploys
+  the API from any non-main branch on push, paired with Cloudflare
+  preview URLs reading a `VITE_API_BASE` env that points at it. The
+  Workers ↔ Fly asymmetry today means Cloudflare previews only
+  fully work for frontend-only PRs; `just preview` covers full-stack
+  review locally in the meantime (see
+  [`CONTRIBUTING.md`](../CONTRIBUTING.md#full-stack-pr-review)).
+  Promote when full-stack PR volume justifies the extra machine.
