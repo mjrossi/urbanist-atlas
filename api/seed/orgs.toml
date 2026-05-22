@@ -1000,6 +1000,30 @@ website_url = "https://bikenorfolk.org"
 tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
 region_slugs = ["virginia-beach-va-metro"]
 
+# --- Providence ---
+#
+# RI state floor is already covered by Rhode Island Bicycle Coalition;
+# additional entries here anchor at the providence-ri-metro level
+# (which covers roughly 95% of RI's population plus parts of southern
+# MA) rather than re-stacking RI's statewide slot.
+
+[[org]]
+slug = "providence-streets-coalition"
+name = "Providence Streets Coalition"
+short_desc = "Providence-area 501(c)(3) and alliance of 42 organizations advocating for human-centered streets across RI; runs the Save RIPTA campaign and a 2026 legislative package to reverse RIPTA service cuts and reform its governing board."
+website_url = "https://pvdstreets.org"
+tags = ["transit", "safe-streets", "walking", "cycling", "advocacy"]
+region_slugs = ["providence-ri-metro"]
+
+[[org]]
+slug = "grow-smart-ri"
+name = "Grow Smart RI"
+short_desc = "Rhode Island 501(c)(3) advocating sustainable smart-growth; runs named Better Transit Now and Rhodies in Transit programs and the Coalition for Transportation Choices alongside its broader land-use and zoning work."
+website_url = "https://growsmartri.org"
+contact_url = "mailto:info@growsmartri.org"
+tags = ["transit", "advocacy", "policy", "land-use"]
+region_slugs = ["providence-ri-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
