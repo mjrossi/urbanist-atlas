@@ -175,6 +175,22 @@ with a 30-day lifecycle), with the enablement steps documented at
   with dormant or out-of-scope candidates. Final tally: 23 net-new
   orgs (orgs.toml grows from 111 → 134). Design spec gate language
   updated in the same spec.
+- **Org-seed broadening / geographic reach (slice #7.8):** Extended
+  the canvas beyond v1 launch floors. New gates: **top-31–50 US
+  metro gate** (≥1), **CA CMA #6–10 gate** (≥1), **big-state depth**
+  (CA/NY/TX to ≥3, FL/PA/MI to ≥2 where genuinely-distinct
+  candidates exist), and a **city-leaf canvas** (Madison, Boise,
+  Anchorage, Ann Arbor, Boulder, New Haven, Tucson, Albany NY,
+  Spokane, Tallahassee, Charleston SC, Grand Rapids, Fresno,
+  Albuquerque, plus Halifax + Mississauga as CA bonuses). City-leaf
+  orgs anchor at existing MSA slugs (city dominates MSA) — no
+  region-tree changes. Final tally: +72 net-new orgs (orgs.toml
+  grows from 134 → 206) plus 3 top-31–50 metro gaps (Jacksonville,
+  Oklahoma City, Birmingham) and 8 city-leaf gaps documented inline.
+  New precedents: university-housed advocacy programs and state-
+  org sub-committees are not separately admitted (extends the slice
+  7.7 chapter/affiliate rule). Design spec:
+  [`docs/superpowers/specs/2026-05-22-org-seed-broadening-design.md`](./superpowers/specs/2026-05-22-org-seed-broadening-design.md).
 - **X-Atlas-Client shared-secret gate (slice #23):**
   `api/internal/httpapi/clientsecret.go` middleware checks
   `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via

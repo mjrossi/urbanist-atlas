@@ -6,19 +6,31 @@
 # or Canada. Housing-only / YIMBY-only orgs are out of scope per
 # CLAUDE.md. URLs for orgs added or updated in a given slice are
 # spot-checked at that slice's verification date (see commit
-# messages). Slice #7.8 (in progress, 2026-05-22) is broadening the
-# geographic canvas — adding top-31–50 US metros, CA CMAs #6–10,
-# big-state depth for the largest US states, and city-leaf orgs for
-# prominent non-metro cities. Slice #7.7 (2026-05-21) added 23
-# net-new orgs across the top-20 US metros; older entries carry the
-# verification dates documented in their original slice commits.
+# messages).
+#
+# Slice #7.8 (2026-05-22) broadened the geographic canvas: added
+# top-31–50 US metros, CA CMAs #6–10, big-state depth for the
+# largest US states (CA/NY/TX to ≥3; FL/PA/MI to ≥2), and city-
+# leaf orgs for prominent non-top-50 metros (Madison, Boise,
+# Anchorage, Ann Arbor, Boulder, New Haven, Tucson, Albany, Spokane,
+# Tallahassee, Charleston SC, Grand Rapids, Fresno, Albuquerque,
+# Halifax, Mississauga). +76 net-new orgs, growing the dataset
+# from 134 to 206. Gaps documented inline at the relevant section
+# headers (Jacksonville, Oklahoma City, Birmingham, Lexington, Reno,
+# Worcester, Tulsa, Long Beach, Chattanooga, Knoxville, etc.).
+#
+# Slice #7.7 (2026-05-21) added 23 net-new orgs across the top-20
+# US metros; older entries carry the verification dates documented
+# in their original slice commits.
 #
 # See docs/superpowers/specs/2026-05-20-org-seed-growth-design.md
-# for the coverage-gate design (raised to ≥3 orgs per top-20 metro
-# in slice 7.7), the Activity Bar + Scope Precedents (public-agency
-# oversight bodies, multi-issue 501c3s with named transit programs,
-# publication/advocacy hybrids, chapter-affiliate rules), and the
-# Canvas Adjustments log of documented gaps.
+# for the original coverage-gate design (raised to ≥3 orgs per
+# top-20 metro in slice 7.7), the Activity Bar + Scope Precedents
+# (public-agency oversight bodies, multi-issue 501c3s with named
+# transit programs, publication/advocacy hybrids, chapter-affiliate
+# rules), and the Canvas Adjustments log of documented gaps. Slice
+# 7.8 extends those gates without changing the activity bar or scope
+# precedents.
 
 # --- NYC region ---
 
