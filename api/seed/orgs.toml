@@ -1157,6 +1157,28 @@ website_url = "https://rideneworleans.org"
 tags = ["transit", "advocacy", "equity", "rider-union"]
 region_slugs = ["new-orleans-la-metro"]
 
+# --- Salt Lake City ---
+#
+# Bike Utah covers the UT state floor; not duplicated at the metro.
+# UTRU is statewide-scope but anchored at the metro for editorial
+# discipline (avoid re-stacking the state floor).
+
+[[org]]
+slug = "sweet-streets"
+name = "Sweet Streets"
+short_desc = "Salt Lake City public-transit and car-free-mobility advocacy organization; co-hosts the annual Active & Public Transportation Lobby Day with Bike Utah at the Utah Legislature and tracks transportation bills affecting SLC street design."
+website_url = "https://www.sweetstreetsslc.com"
+tags = ["transit", "safe-streets", "advocacy", "walking", "cycling"]
+region_slugs = ["salt-lake-city-ut-metro"]
+
+[[org]]
+slug = "utah-transit-riders-union"
+name = "Utah Transit Riders Union"
+short_desc = "Statewide Utah transit-rider advocacy organization centered on UTA service in the Wasatch Front; advocates for reliable, accessible, comfortable, efficient, and affordable transit for all riders."
+website_url = "https://utru.org"
+tags = ["transit", "rider-union", "advocacy", "grassroots"]
+region_slugs = ["salt-lake-city-ut-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
