@@ -93,10 +93,23 @@ adding the Workers project custom domain) lives at
 The Fly + sibling Postgres design lives at
 [`docs/superpowers/specs/2026-05-21-fly-deploy-design.md`](./docs/superpowers/specs/2026-05-21-fly-deploy-design.md).
 
-## Contributing organizations
+## Contributing
 
-Once the site is live: visit `/submit` to propose an organization. All
-submissions are reviewed by a human before going live.
+Pull requests, bug reports, and organization suggestions are all
+welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) — it
+covers the scope guardrails (what's in, what's deliberately out),
+the dev-loop setup, and the PR / commit conventions.
+
+For organizations to add or correct: use the
+[org-correction issue template](./.github/ISSUE_TEMPLATE/org_correction_or_addition.md)
+until the public submission flow ships with Phase 2 (slices
+#5 + #13 in [`docs/roadmap.md`](./docs/roadmap.md)).
+
+This project follows the
+[Contributor Covenant](./CODE_OF_CONDUCT.md). Security issues go
+through GitHub's private vulnerability reporting per
+[`SECURITY.md`](./SECURITY.md) — please don't open a public issue
+for those.
 
 ## License
 

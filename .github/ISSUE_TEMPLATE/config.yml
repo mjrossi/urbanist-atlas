@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report (private)
+    url: https://github.com/mjrossi/urbanist-atlas/security/advisories/new
+    about: Use GitHub's private vulnerability reporting for security issues. Do not open a public issue.
+  - name: Project conventions
+    url: https://github.com/mjrossi/urbanist-atlas/blob/main/CLAUDE.md
+    about: Read the project conventions (approved libraries, code shape, scope) before opening a feature request.
+  - name: Roadmap
+    url: https://github.com/mjrossi/urbanist-atlas/blob/main/docs/roadmap.md
+    about: Check if your idea is already queued before opening a feature request.
