@@ -200,6 +200,36 @@ still pending operator action.
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
   `loaddata`, `ci`.
+- **Hygiene pass between Phase 1 and Phase 2 (slice #25):** evergreen
+  architecture docs to dig into when extending the API or adding a
+  country — `docs/api-architecture.md` (library-first split, Store
+  abstraction, wire-contract codegen, RFC 9457 problem+json, ODbL
+  response envelope, Phase 1 gate), `docs/etl-architecture.md`
+  (per-country ETL flow, US 2-source merge, source pinning +
+  determinism, add-a-country checklist), and
+  `docs/testing-strategy.md` (when to write unit vs. handler vs.
+  integration vs. frontend tests). API-side dedup of `toOAPIOrg` /
+  `toOAPILookupOrg` adapters into `oapi_adapters.go`; consistent
+  `fmt.Errorf`-wrapping in `pkg/atlas.Lookup`; new
+  `middleware_test.go` covers requestID + recoverer + logging +
+  statusRecorder (the four middlewares that had zero direct
+  coverage). Seed rename `chicagoland-multistate` →
+  `chicagoland` (locals don't say "multi-state"). Web cleanups:
+  add the missing `.visually-hidden` CSS rule, drop the unused
+  `.entry-list-wrap` wrapper, extract a generic `<AsideCard>`
+  component out of `Home.tsx`'s parallel renderer pair, replace
+  misleading "Coming soon" status pills with honest per-state
+  labels ("Temporarily unavailable" / "Nothing indexed yet"),
+  drop the empty `emptyRegionMap` placeholder in `Metro.tsx`, and
+  extract `groupCountLabel(n)` into a new `web/src/lib/format.ts`
+  shared by Home + Browse. Drop the auto/US/CA country override
+  `<select>` from `SearchBox` (the digit/letter heuristic is
+  unambiguous for v1) and change the input placeholder away from
+  the NYC-centric `11217` example. Copy refinements: link
+  *Urbanist Lexicon* in the Footer colophon, add a "Source on
+  GitHub →" link in the Footer row, add Inter to the font credit,
+  rewrite the About contact line to point at GitHub issues for
+  Phase 1, soften the 404 closing line.
 
 ## Deferred from this milestone
 
