@@ -20,6 +20,59 @@ func (q *Queries) DeleteOrganizationRegions(ctx context.Context, organizationID 
 	return err
 }
 
+const getOrgBySlug = `-- name: GetOrgBySlug :one
+SELECT
+    o.id, o.slug, o.name, o.short_desc, o.website_url, o.contact_url, o.tags,
+    o.created_at,
+    ARRAY(
+        SELECT orx.region_id
+        FROM organization_regions orx
+        WHERE orx.organization_id = o.id
+        ORDER BY orx.region_id
+    )::bigint[] AS region_ids
+FROM organizations o
+WHERE o.slug = $1
+  AND o.status = 'approved'
+`
+
+type GetOrgBySlugRow struct {
+	ID         int64
+	Slug       string
+	Name       string
+	ShortDesc  string
+	WebsiteUrl string
+	ContactUrl pgtype.Text
+	Tags       []string
+	CreatedAt  pgtype.Timestamptz
+	RegionIds  []int64
+}
+
+// Returns the approved organization identified by slug, with every
+// region it serves array_agg'd onto the row so the adapter can hydrate
+// Org.Regions in one round-trip. Mirrors the shape used by OrgsForMetro
+// (browse.sql:73-113) so the Postgres-side adapter (hydrateOrgRows) can
+// be reused without a new mapper.
+//
+// Returns no row when the slug is unknown OR names an org whose status
+// is not 'approved' (e.g. pending or rejected submissions); the adapter
+// maps the empty result to ErrOrgNotFound → 404.
+func (q *Queries) GetOrgBySlug(ctx context.Context, slug string) (GetOrgBySlugRow, error) {
+	row := q.db.QueryRow(ctx, getOrgBySlug, slug)
+	var i GetOrgBySlugRow
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.ShortDesc,
+		&i.WebsiteUrl,
+		&i.ContactUrl,
+		&i.Tags,
+		&i.CreatedAt,
+		&i.RegionIds,
+	)
+	return i, err
+}
+
 const insertOrganizationRegion = `-- name: InsertOrganizationRegion :exec
 INSERT INTO organization_regions (organization_id, region_id)
 VALUES ($1, $2)

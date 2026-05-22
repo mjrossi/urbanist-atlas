@@ -255,6 +255,55 @@ func TestPostgresStore_ListRecent_ExcludesNationalTier(t *testing.T) {
 	}
 }
 
+func TestPostgresStore_GetOrgBySlug_HappyPath(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	// transportation-alternatives is a known org in api/seed/orgs.toml
+	// attached to nyc-metro + brooklyn descendants.
+	got, err := store.GetOrgBySlug(ctx, "transportation-alternatives")
+	if err != nil {
+		t.Fatalf("GetOrgBySlug: %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for known seed slug")
+	}
+	if got.Slug != "transportation-alternatives" {
+		t.Errorf("slug: want transportation-alternatives, got %s", got.Slug)
+	}
+	if got.Name == "" {
+		t.Error("name: want non-empty")
+	}
+	if len(got.Regions) == 0 {
+		t.Errorf("regions: want >= 1 (denormalized), got 0")
+	}
+	for _, r := range got.Regions {
+		if r.Slug == "" {
+			t.Error("region with empty slug — hydration failed")
+		}
+	}
+}
+
+func TestPostgresStore_GetOrgBySlug_UnknownSlug(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.GetOrgBySlug(ctx, "totally-fake-org")
+	if err == nil {
+		t.Fatalf("err: want ErrOrgNotFound, got nil (result=%+v)", got)
+	}
+	if err != atlas.ErrOrgNotFound {
+		t.Errorf("err: want ErrOrgNotFound, got %v", err)
+	}
+	if got != nil {
+		t.Errorf("result: want nil, got %+v", got)
+	}
+}
+
 func sortedKeys(m map[string]bool) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

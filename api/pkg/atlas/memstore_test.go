@@ -51,6 +51,49 @@ func TestMemStore_ResolveLeafRegion_NotFound(t *testing.T) {
 	}
 }
 
+func TestMemStore_GetOrgBySlug_HappyPath(t *testing.T) {
+	s := NewMemStore()
+	s.AddRegion(Region{ID: 1, Kind: "us:metro", Name: "NYC Metro", Slug: "nyc-metro", Country: "US", ScopeTier: ScopeRegional, SortPriority: 40})
+	s.AddRegion(Region{ID: 2, Kind: "us:borough", Name: "Brooklyn", Slug: "brooklyn", Country: "US", ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"nyc-metro"}})
+	s.AddOrg(Org{
+		ID: 1, Slug: "transalt",
+		Name:       "Transportation Alternatives",
+		ShortDesc:  "NYC-wide advocacy for walking, biking, and public transit.",
+		WebsiteURL: "https://www.transalt.org",
+		Tags:       []Tag{"transit", "safe-streets"},
+	}, []int64{1, 2})
+
+	got, err := s.GetOrgBySlug(context.Background(), "transalt")
+	if err != nil {
+		t.Fatalf("GetOrgBySlug: %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for known slug")
+	}
+	if got.Slug != "transalt" || got.Name != "Transportation Alternatives" {
+		t.Errorf("got %+v", got)
+	}
+	if len(got.Regions) != 2 {
+		t.Errorf("regions: want 2, got %d", len(got.Regions))
+	}
+	gotSlugs := []string{}
+	for _, r := range got.Regions {
+		gotSlugs = append(gotSlugs, r.Slug)
+	}
+	want := []string{"nyc-metro", "brooklyn"}
+	if diff := cmp.Diff(want, gotSlugs); diff != "" {
+		t.Errorf("region slugs (-want +got):\n%s", diff)
+	}
+}
+
+func TestMemStore_GetOrgBySlug_NotFound(t *testing.T) {
+	s := NewMemStore()
+	_, err := s.GetOrgBySlug(context.Background(), "nope")
+	if err != ErrOrgNotFound {
+		t.Errorf("err = %v, want ErrOrgNotFound", err)
+	}
+}
+
 func TestMemStore_AncestorRegions_TopOfTree(t *testing.T) {
 	s := NewMemStore()
 	s.AddRegion(Region{ID: 1, Slug: "ny", Kind: "us:state", Name: "New York", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60})

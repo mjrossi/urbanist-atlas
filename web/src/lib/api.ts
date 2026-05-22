@@ -168,6 +168,18 @@ export function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail>
 }
 
 /**
+ * `GET /api/v1/orgs/{slug}` — one organization, with every region it
+ * serves denormalized at `regions`. Throws {@link ApiError} with status
+ * 404 when the slug isn't in the atlas (or names a non-approved org).
+ *
+ * Single-object response — no `{meta, data}` envelope. ODbL travels via
+ * the `X-Data-License` + `X-Data-Attribution` response headers.
+ */
+export function getOrg(slug: string, init?: RequestInit): Promise<Org> {
+  return apiFetch<Org>(`/api/v1/orgs/${encodeURIComponent(slug)}`, init);
+}
+
+/**
  * `GET /api/v1/recent` — recently approved organizations, newest
  * first. Feeds the homepage "Recently added" aside.
  *

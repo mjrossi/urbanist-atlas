@@ -8,6 +8,7 @@ import {
   ApiError,
   apiFetch,
   getMetro,
+  getOrg,
   isSupportedCountry,
   listMetros,
   listRecent,
@@ -179,6 +180,79 @@ describe('listMetros / getMetro / listRecent', () => {
     const result = await listRecent();
     expect(result).toHaveLength(1);
     expect(result[0]!.slug).toBe('transalt');
+  });
+
+  it('getOrg calls GET /api/v1/orgs/{slug} and returns the bare Org', async () => {
+    // Single-object response — no `{meta, data}` envelope. ODbL
+    // attribution rides on response headers, not on the body.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: 1,
+        slug: 'transalt',
+        name: 'Transportation Alternatives',
+        short_desc: 'NYC advocacy',
+        website_url: 'https://transalt.org',
+        tags: ['transit', 'safe-streets'],
+        regions: [
+          {
+            id: 1,
+            kind: 'us:metro',
+            name: 'New York Metro',
+            slug: 'nyc-metro',
+            country: 'US',
+            scope_tier: 'regional',
+            parent_slugs: [],
+          },
+        ],
+      }),
+    );
+    const result = await getOrg('transalt');
+    expect(result.slug).toBe('transalt');
+    expect(result.regions).toHaveLength(1);
+    expect(result.regions[0]!.slug).toBe('nyc-metro');
+    const [url] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toMatch(/\/api\/v1\/orgs\/transalt($|\?)/);
+  });
+
+  it('getOrg throws ApiError with status 404 and the not-found problem type', async () => {
+    fetchMock.mockResolvedValueOnce(
+      problemResponse(404, {
+        type: 'https://urbanistatlas.com/problems/not-found',
+        title: 'Not Found',
+        status: 404,
+        detail: 'no organization with that slug',
+      }),
+    );
+    let caught: unknown;
+    try {
+      await getOrg('totally-fake');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    const apiErr = caught as ApiError;
+    expect(apiErr.status).toBe(404);
+    expect(apiErr.problem?.type).toBe(
+      'https://urbanistatlas.com/problems/not-found',
+    );
+  });
+
+  it('getOrg percent-encodes the slug', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: 1,
+        slug: 'weird slug',
+        name: 'Test',
+        short_desc: 'x',
+        website_url: 'https://example.com',
+        tags: [],
+        regions: [],
+      }),
+    );
+    await getOrg('weird slug');
+    const [url] = fetchMock.mock.calls[0]!;
+    expect(String(url)).not.toContain('weird slug');
+    expect(String(url)).toMatch(/weird(%20|\+)slug/);
   });
 
   it('getMetro percent-encodes the slug', async () => {

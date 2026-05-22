@@ -201,6 +201,41 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/orgs/{slug}:
+    get:
+      tags: [browse]
+      summary: Get a single organization by slug.
+      description: |
+        Returns the addressable detail view for one approved organization.
+        The body is a bare `Org` — no `{meta, data}` envelope, since
+        this is a single-object response; ODbL attribution travels via
+        the `X-Data-License` and `X-Data-Attribution` response headers.
+      operationId: getOrg
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+          example: transportation-alternatives
+      responses:
+        '200':
+          description: The organization, with every region it serves denormalized at `regions`.
+          headers:
+            X-Data-License:
+              $ref: '#/components/headers/XDataLicense'
+            X-Data-Attribution:
+              $ref: '#/components/headers/XDataAttribution'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Org'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/v1/recent:
     get:
       tags: [browse]

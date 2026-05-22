@@ -11,6 +11,10 @@ import (
 // a nearby code or a submission.
 var ErrPostalCodeNotFound = errors.New("atlas: postal code not found")
 
+// ErrOrgNotFound is returned by Store.GetOrgBySlug when no approved org
+// matches the slug. The HTTP layer maps this to a 404 problem document.
+var ErrOrgNotFound = errors.New("atlas: organization not found")
+
 // Store is the persistence seam between pkg/atlas and the rest of the
 // system. Three operations compose to satisfy Lookup; Postgres-backed
 // implementations can optimize internally (e.g. fold AncestorRegions
@@ -48,6 +52,12 @@ type Store interface {
 	// Returns (nil, nil) when the slug is unknown or names a non-metro
 	// region — the handler maps the nil pointer to 404.
 	GetMetro(ctx context.Context, slug string) (*MetroDetail, error)
+
+	// GetOrgBySlug returns the approved organization identified by slug,
+	// with every region it serves denormalized at Org.Regions. Returns
+	// ErrOrgNotFound when no row matches — the handler maps that to a
+	// 404 problem document.
+	GetOrgBySlug(ctx context.Context, slug string) (*Org, error)
 
 	// ListRecent returns the 10 most-recently-approved organizations
 	// across the whole atlas, ordered newest-first. Organizations

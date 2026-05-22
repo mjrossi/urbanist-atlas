@@ -1,14 +1,17 @@
+import { Link } from 'react-router';
 import type { LookupOrg } from '../lib/api.ts';
 import { TagChip } from './TagChip.tsx';
 
 /**
- * One row in the classified-section list: org name (linked out to
- * `website_url`), short description, the org's tags as small pills,
- * and a "via X" subtitle naming the matched region(s) that caused
- * this org to surface for the current lookup.
+ * One row in the classified-section list: org name (linked internally
+ * to the `/orgs/:slug` detail page), short description, the org's tags
+ * as small pills, and a "via X" subtitle naming the matched region(s)
+ * that caused this org to surface for the current lookup. The
+ * `website_url` stays as a secondary affordance via the `.entry-domain`
+ * external link next to the name.
  *
  * The domain is rendered next to the name as a visual hint that the
- * primary link leaves the site; we derive it from `website_url`
+ * secondary link leaves the site; we derive it from `website_url`
  * defensively so a malformed URL doesn't blow up the page.
  */
 function domainOf(url: string): string | null {
@@ -42,11 +45,18 @@ export function Entry({
     <li className="entry">
       <div className="entry-header">
         <h3 className="entry-name">
-          <a href={org.website_url} target="_blank" rel="noopener noreferrer">
-            {org.name}
-          </a>
+          <Link to={`/orgs/${encodeURIComponent(org.slug)}`}>{org.name}</Link>
         </h3>
-        {domain ? <span className="entry-domain">{domain}</span> : null}
+        {domain ? (
+          <a
+            className="entry-domain"
+            href={org.website_url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {domain}
+          </a>
+        ) : null}
       </div>
       {viaNames ? <p className="entry-via">via {viaNames}</p> : null}
       <p className="entry-desc">{org.short_desc}</p>
