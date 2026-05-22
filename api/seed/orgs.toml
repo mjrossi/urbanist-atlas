@@ -900,6 +900,24 @@ website_url = "https://aura-atx.org"
 tags = ["transit", "cycling", "walking", "advocacy", "land-use"]
 region_slugs = ["austin-tx-metro"]
 
+# --- Columbus OH ---
+
+[[org]]
+slug = "yay-bikes"
+name = "Yay Bikes!"
+short_desc = "Central Ohio bicycle advocacy and education 501(c)(3); runs free community bike rides, hosts the annual Mobility Justice Advocacy Summit with Transit Columbus, and partnered on the city's 2025 Complete Streets policy adoption."
+website_url = "https://www.yaybikes.com"
+tags = ["cycling", "advocacy", "safe-streets", "education"]
+region_slugs = ["columbus-oh-metro"]
+
+[[org]]
+slug = "transit-columbus"
+name = "Transit Columbus"
+short_desc = "Central Ohio 501(c)(3) (founded 2011) board-led by people whose primary travel is by bus, bike, wheelchair, or foot; advocates for transit, walking, and biking infrastructure and led the 2025 Complete Streets policy adoption."
+website_url = "https://transitcolumbus.org"
+tags = ["transit", "walking", "cycling", "advocacy", "rider-union"]
+region_slugs = ["columbus-oh-metro"]
+
 # --- US States (statewide) ---
 #
 # State-tier orgs satisfy the universal coverage floor — every US ZIP
