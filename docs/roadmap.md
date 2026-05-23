@@ -394,3 +394,19 @@ Not blocking launch:
   review locally in the meantime (see
   [`CONTRIBUTING.md`](../CONTRIBUTING.md#full-stack-pr-review)).
   Promote when full-stack PR volume justifies the extra machine.
+- **`loaddata --prune` flag** — `seed.LoadFile` is upsert-only:
+  removing an `[[org]]` block from `orgs.toml` does NOT delete the
+  corresponding row in production (the slug just stops being touched).
+  Surfaced 2026-05-23 during the pre-launch URL audit when STAR
+  (`sacramento-transit-advocates-and-riders`) had to be dropped after
+  its domain got hijacked — required a manual `DELETE FROM
+  organizations WHERE slug=...` against the prod DB on top of
+  `just fly-loaddata`. The slice: add an opt-in `--prune` flag to
+  the `loaddata` subcommand that deletes any org whose slug isn't in
+  the loaded file, inside the same transaction; default off so a
+  malformed file can't wipe prod data. FK cascades
+  (`organization_regions ON DELETE CASCADE`,
+  `submissions.promoted_org_id ON DELETE SET NULL`) make the DELETE
+  safe. Forward the flag through `just fly-loaddata` and document the
+  workflow in `docs/deploy.md`. Small, single-package change
+  (`api/internal/loaddata/`).
