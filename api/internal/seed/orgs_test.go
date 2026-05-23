@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -93,5 +94,27 @@ region_slugs = []
 	_, err := Parse(strings.NewReader(src))
 	if err == nil {
 		t.Fatal("expected empty region_slugs error")
+	}
+}
+
+// TestParse_LiveSeedFile parses api/seed/orgs.toml itself and runs the
+// same structural validation the loader runs. Catches duplicate slugs,
+// missing required fields, and empty region_slugs in the live seed
+// without requiring a Postgres testcontainer — so this class of bug
+// surfaces in `just api-test` (sub-second) instead of in
+// api-test-integration (~1m30s + Docker).
+func TestParse_LiveSeedFile(t *testing.T) {
+	const path = "../../seed/orgs.toml"
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open %s: %v", path, err)
+	}
+	defer f.Close()
+	parsed, err := Parse(f)
+	if err != nil {
+		t.Fatalf("Parse %s: %v", path, err)
+	}
+	if len(parsed.Orgs) == 0 {
+		t.Fatalf("Parse %s: expected at least one org", path)
 	}
 }

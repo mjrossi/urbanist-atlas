@@ -1,6 +1,8 @@
 package loadregions
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -94,5 +96,50 @@ parents = []
 	}
 	if len(f.Regions) != 1 || f.Regions[0].ScopeTier != "national" {
 		t.Errorf("national scope_tier not parsed: %+v", f.Regions)
+	}
+}
+
+// TestParse_LiveSeedFiles parses every api/seed/regions_*.toml file
+// loadregions consumes and runs the same structural validation the
+// loader runs. Catches duplicate slugs, missing required fields, and
+// bad scope_tier values in the live seed without requiring a Postgres
+// testcontainer — so this class of bug surfaces in `just api-test`
+// (sub-second) instead of in api-test-integration (~1m30s + Docker).
+//
+// Cross-file slug resolution (e.g. that every `parents = [...]` entry
+// resolves to a region defined in some file) is still deferred to the
+// integration suite; this guard is just the per-file structural pass.
+//
+// `regions_us_msa_overrides.toml` is intentionally skipped: it lives
+// in api/seed/ alongside the taxonomy files but is consumed by
+// api/internal/etl/us, not by loadregions, and uses a different
+// schema (CBSA-keyed editorial pins).
+func TestParse_LiveSeedFiles(t *testing.T) {
+	matches, err := filepath.Glob("../../seed/regions_*.toml")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+	if len(matches) == 0 {
+		t.Fatal("no regions_*.toml files found under ../../seed/")
+	}
+	for _, path := range matches {
+		name := filepath.Base(path)
+		if strings.HasSuffix(name, "_overrides.toml") {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			f, err := os.Open(path)
+			if err != nil {
+				t.Fatalf("open %s: %v", path, err)
+			}
+			defer f.Close()
+			parsed, err := Parse(f)
+			if err != nil {
+				t.Fatalf("Parse %s: %v", path, err)
+			}
+			if len(parsed.Regions) == 0 {
+				t.Fatalf("Parse %s: expected at least one region", path)
+			}
+		})
 	}
 }
