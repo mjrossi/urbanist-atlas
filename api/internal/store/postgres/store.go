@@ -267,6 +267,36 @@ func (s *Store) GetMetro(ctx context.Context, slug string) (*atlas.MetroDetail, 
 	return &atlas.MetroDetail{Region: region, Orgs: orgs}, nil
 }
 
+// GetOrgBySlug implements atlas.Store. Returns atlas.ErrOrgNotFound for
+// unknown slugs and for slugs that name a non-approved org (the SQL
+// gates on status='approved'). The row shape matches OrgsForMetro /
+// ListRecent, so hydration goes through the shared hydrateOrgRows path.
+func (s *Store) GetOrgBySlug(ctx context.Context, slug string) (*atlas.Org, error) {
+	row, err := s.q.GetOrgBySlug(ctx, slug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, atlas.ErrOrgNotFound
+		}
+		return nil, fmt.Errorf("postgres: get org by slug: %w", err)
+	}
+	orgs, err := s.hydrateOrgRows(ctx, []orgRow{{
+		ID: row.ID, Slug: row.Slug, Name: row.Name, ShortDesc: row.ShortDesc,
+		WebsiteUrl: row.WebsiteUrl, ContactUrl: row.ContactUrl, Tags: row.Tags,
+		CreatedAt: row.CreatedAt, RegionIds: row.RegionIds,
+	}})
+	if err != nil {
+		return nil, err
+	}
+	if len(orgs) == 0 {
+		// hydrateOrgRows cannot drop rows for a single-row input today.
+		// If a future change ever does (e.g. region-tier filtering),
+		// surface the integrity violation as 500 rather than masking it
+		// as a 404 for an org that actually exists in the table.
+		return nil, fmt.Errorf("postgres: hydrateOrgRows dropped row for slug %q", slug)
+	}
+	return &orgs[0], nil
+}
+
 // ListRecent implements atlas.Store. The SQL handles the national-tier
 // filter, ordering, and 10-row cap; this adapter only maps rows and
 // hydrates Org.Regions.

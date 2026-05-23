@@ -117,6 +117,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a single organization by slug.
+         * @description Returns the addressable detail view for one approved organization.
+         *     The body is a bare `Org` — no `{meta, data}` envelope, since
+         *     this is a single-object response; ODbL attribution travels via
+         *     the `X-Data-License` and `X-Data-Attribution` response headers.
+         */
+        get: operations["getOrg"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/recent": {
         parameters: {
             query?: never;
@@ -793,6 +816,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetroDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example transportation-alternatives */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The organization, with every region it serves denormalized at `regions`. */
+            200: {
+                headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Org"];
                 };
             };
             401: components["responses"]["Unauthorized"];

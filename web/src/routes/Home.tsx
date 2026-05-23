@@ -173,18 +173,38 @@ function MetrosList({ items }: { items: MetroSummary[] }) {
 function RecentList({ items }: { items: Org[] }) {
   return (
     <ul className="entry-list" aria-label="Recently added">
-      {items.map((org) => (
-        <li key={org.id} className="entry">
-          <div className="entry-header">
-            <h3 className="entry-name">
-              <a href={org.website_url} target="_blank" rel="noopener noreferrer">
-                {org.name}
-              </a>
-            </h3>
-          </div>
-          <p className="entry-desc">{org.short_desc}</p>
-        </li>
-      ))}
+      {items.map((org) => {
+        const domain = domainOf(org.website_url);
+        return (
+          <li key={org.id} className="entry">
+            <div className="entry-header">
+              <h3 className="entry-name">
+                <Link to={`/orgs/${encodeURIComponent(org.slug)}`}>{org.name}</Link>
+              </h3>
+              {org.website_url ? (
+                <a
+                  className="entry-domain"
+                  href={org.website_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {domain ?? org.website_url}
+                </a>
+              ) : null}
+            </div>
+            <p className="entry-desc">{org.short_desc}</p>
+          </li>
+        );
+      })}
     </ul>
   );
+}
+
+/** Same defensive URL→hostname helper as `Entry.tsx` and `Org.tsx`. */
+function domainOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
 }

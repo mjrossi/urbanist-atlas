@@ -5,6 +5,7 @@ import { Browse } from './routes/Browse.tsx';
 import { Home } from './routes/Home.tsx';
 import { Metro } from './routes/Metro.tsx';
 import { NotFoundWithLayout } from './routes/NotFound.tsx';
+import { Org } from './routes/Org.tsx';
 import { Results } from './routes/Results.tsx';
 import { Submit } from './routes/Submit.tsx';
 
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
       { path: 'r/:postalCode', Component: Results },
       { path: 'browse', Component: Browse },
       { path: 'm/:metroSlug', Component: Metro },
+      { path: 'orgs/:slug', Component: Org },
       { path: 'submit', Component: Submit },
       { path: 'about', Component: About },
     ],

@@ -137,6 +137,26 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'Org E' })).toBeDefined();
   });
 
+  it('links each recent org name to its /orgs/:slug detail page', async () => {
+    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRecentMock.mockResolvedValueOnce([makeOrg(1, 'transalt', 'Transportation Alternatives')]);
+    renderHome();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: 'Transportation Alternatives' }),
+      ).toBeDefined();
+    });
+    const orgLink = screen.getByRole('link', { name: 'Transportation Alternatives' });
+    expect(orgLink.getAttribute('href')).toBe('/orgs/transalt');
+    // Secondary external link to the website renders the domain.
+    const domainLink = screen.getByRole('link', { name: 'transalt.example.org' });
+    expect(domainLink.getAttribute('href')).toBe('https://transalt.example.org');
+    expect(domainLink.getAttribute('target')).toBe('_blank');
+    expect(domainLink.getAttribute('rel')).toContain('noopener');
+    expect(domainLink.getAttribute('rel')).toContain('noreferrer');
+  });
+
   it('renders subdued loading copy in both asides while the queries pend', () => {
     listMetrosMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockReturnValue(new Promise(() => {}));
