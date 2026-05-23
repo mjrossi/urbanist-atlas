@@ -50,7 +50,7 @@ region_slugs = ["nyc"]
 slug = "riders-alliance"
 name = "Riders Alliance"
 short_desc = "Grassroots membership organization of New York City subway and bus riders. Organizes campaigns for more reliable, affordable, and accessible service, and turns out riders to elected officials and the MTA board."
-website_url = "https://www.ridersny.org"
+website_url = "https://www.ridersalliance.org"
 tags = ["transit", "rider-union", "grassroots", "advocacy"]
 region_slugs = ["nyc"]
 
@@ -395,7 +395,7 @@ slug = "dallas-area-transit-alliance"
 name = "Dallas Area Transit Alliance"
 short_desc = "Rider-run DART advocacy nonprofit (DATA), founded 2024 to preserve and expand public transit across North Texas. Testifies at DART board meetings, opposes member-city pullouts, and tracks Texas Legislature transit bills."
 website_url = "https://dallasareatransitalliance.org"
-contact_url = "https://ridewithdata.substack.com/contact"
+contact_url = "https://dallasareatransitalliance.org/contact"
 tags = ["transit", "rider-union", "advocacy", "grassroots", "regional"]
 region_slugs = ["dallas-tx-metro"]
 
@@ -802,12 +802,23 @@ tags = ["walking", "safe-streets", "advocacy", "regional", "land-use"]
 region_slugs = ["sacramento-ca-metro"]
 
 [[org]]
-slug = "sacramento-transit-advocates-and-riders"
-name = "Sacramento Transit Advocates and Riders"
-short_desc = "All-volunteer Sacramento-region rider-advocacy group covering SacRT, e-tran, Yolobus, Roseville Transit, and Folsom Stage Line. Promotes ridership growth, agency accountability, and intermodal connectivity across the metro."
-website_url = "https://star-transit.org"
-tags = ["transit", "rider-union", "grassroots", "advocacy", "accountability"]
+slug = "sacramento-advocates-for-rail-and-transit"
+name = "Sacramento Advocates for Rail and Transit"
+short_desc = "Sacramento-region transit advocacy nonprofit (SMART), founded 2019 and incorporated 2024. A broad coalition of business, labor, environmental, faith, and neighborhood leaders pushing for expanded rail and bus service, transit operator funding, and equity-centered access — with named focus on Bus Rapid Transit, light-rail expansion, and passenger-rail connections to the Bay Area."
+website_url = "https://www.sactosmart.org"
+tags = ["transit", "rail", "advocacy", "coalition", "equity", "regional"]
 region_slugs = ["sacramento-ca-metro"]
+
+# Sacramento Transit Advocates and Riders (STAR) removed 2026-05-23
+# during a pre-launch URL audit: their primary domain star-transit.org
+# is currently compromised — apex and all pages 301-redirect to a
+# squatted gambling site (obsfuneralandcremation.com cloaked as a
+# funeral home) for non-Googlebot traffic. The org itself is still
+# operationally active per SacMoves Coalition member listings and
+# Facebook posts, but with no working public website we can't link
+# users to them in good conscience at launch. SMART (added above) now
+# provides the metro's transit-side advocacy coverage. Re-add STAR
+# when their website is restored or migrated to a clean domain.
 
 # --- Las Vegas ---
 #
@@ -867,7 +878,7 @@ slug = "bikewalkkc"
 name = "BikeWalkKC"
 short_desc = "Greater Kansas City advocacy nonprofit for walking, biking, and transit, working across the Missouri–Kansas state line. Runs Safe Routes to School programming, operates the regional bike-share system, and convenes the Transportation for All Coalition."
 website_url = "https://bikewalkkc.org"
-contact_url = "https://bikewalkkc.org/about/contact/"
+contact_url = "https://bikewalkkc.org/about/contact-us/"
 tags = ["cycling", "walking", "transit", "advocacy", "safe-streets", "regional"]
 region_slugs = ["kansas-city-mo-metro"]
 
@@ -2019,7 +2030,7 @@ region_slugs = ["toronto"]
 slug = "hub-cycling"
 name = "HUB Cycling"
 short_desc = "Metro Vancouver's cycling advocacy organization, founded 1998 (originally as the Vancouver Area Cycling Coalition). Works across the regional district to make cycling better for everyone through advocacy, education, and events."
-website_url = "https://bikehub.ca"
+website_url = "https://hubcycling.ca"
 tags = ["cycling", "advocacy", "safe-streets", "regional"]
 region_slugs = ["metro-vancouver"]
 
@@ -2088,11 +2099,20 @@ contact_url = "https://bikeottawa.ca/contact-us/"
 tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
 region_slugs = ["ottawa-gatineau-cma"]
 
+# Ottawa Transit Riders URL note (2026-05-23): the org's primary site
+# ottawatransitriders.ca has been unreachable since at least January 2026
+# — its authoritative nameservers return REFUSED, so the domain doesn't
+# resolve at all for end users (verified against 1.1.1.1, 8.8.8.8, and
+# Cloudflare DoH; most recent Wayback capture is 2026-01-21). The
+# organization itself is still active across Bluesky, Facebook, and
+# Instagram, so we link to their Bluesky profile (public-web viewable,
+# no login wall) in the interim. Restore the ottawatransitriders.ca
+# URL once DNS is back.
 [[org]]
 slug = "ottawa-transit-riders"
 name = "Ottawa Transit Riders"
 short_desc = "Grassroots Ottawa transit-rider advocacy group, founded 2019. Organizes around O-Train LRT reliability, OC Transpo fares, and accessible transit for the National Capital Region."
-website_url = "https://www.ottawatransitriders.ca"
+website_url = "https://bsky.app/profile/otttransitriders.bsky.social"
 tags = ["transit", "rider-union", "grassroots", "advocacy"]
 region_slugs = ["ottawa-gatineau-cma"]
 
@@ -2244,9 +2264,9 @@ region_slugs = ["winnipeg-cma", "mb"]
 
 [[org]]
 slug = "bicycle-nova-scotia"
-name = "Bicycle Nova Scotia"
-short_desc = "Nova Scotia's provincial nonprofit representing and rallying for cycling across the province. Partners with provincial and municipal governments to expand cycling capacity for riders of all types."
-website_url = "https://bicycle.ns.ca"
+name = "Cycling Nova Scotia"
+short_desc = "Nova Scotia's provincial nonprofit representing and rallying for cyclists across the province (CNS, formerly Bicycle Nova Scotia). Partners with provincial and municipal governments to expand cycling capacity for riders of all types."
+website_url = "https://cyclingns.ca"
 tags = ["cycling", "advocacy", "safe-streets"]
 region_slugs = ["ns"]
 
