@@ -14,9 +14,12 @@
 # leaf orgs for prominent non-top-50 metros (Madison, Boise,
 # Anchorage, Ann Arbor, Boulder, New Haven, Tucson, Albany, Spokane,
 # Tallahassee, Charleston SC, Grand Rapids, Fresno, Albuquerque,
-# Halifax, Mississauga). +76 net-new orgs, growing the dataset
-# from 134 to 206. Gaps documented inline at the relevant section
-# headers (Jacksonville, Oklahoma City, Birmingham, Lexington, Reno,
+# Halifax, Mississauga). +73 net-new orgs, growing the dataset
+# from 130 to 203. Albuquerque is covered by multi-anchoring the
+# pre-existing BikeABQ entry at [albuquerque-nm-metro, nm] per the
+# Street Trust precedent, rather than adding a new city-leaf row.
+# Gaps documented inline at the relevant section headers
+# (Jacksonville, Oklahoma City, Birmingham, Lexington, Reno,
 # Worcester, Tulsa, Long Beach, Chattanooga, Knoxville, etc.).
 #
 # Slice #7.7 (2026-05-21) added 23 net-new orgs across the top-20
@@ -1392,14 +1395,10 @@ tags = ["cycling", "advocacy", "safe-streets", "education"]
 region_slugs = ["fresno-ca-metro"]
 
 # --- Albuquerque NM ---
-
-[[org]]
-slug = "bikeabq"
-name = "BikeABQ"
-short_desc = "Albuquerque volunteer cycling 501(c)(3) with an 11-member board; attends design reviews, writes advisory letters, runs Bike to Work Day, League Certified Instructor classes, and Safe Routes to Schools; pushed for Albuquerque's April 2026 traffic-law overhaul for pedestrian and cyclist safety."
-website_url = "https://www.bikeabq.org"
-tags = ["cycling", "advocacy", "safe-streets", "education"]
-region_slugs = ["albuquerque-nm-metro"]
+# Covered by the pre-existing BikeABQ entry under "New Mexico" below,
+# multi-anchored at [albuquerque-nm-metro, nm] per the Street Trust
+# precedent. BikeABQ plays both the city-leaf role for ABQ-metro ZIPs
+# and the de-facto NM-statewide role; one row, two anchors.
 
 # Additional city-leaf candidates surveyed but not admitted:
 # - Lexington KY: BikeLex couldn't be verified for 12-month activity.
@@ -1948,10 +1947,10 @@ region_slugs = ["mt"]
 [[org]]
 slug = "bike-abq"
 name = "BikeABQ"
-short_desc = "Albuquerque cycling advocacy nonprofit since 1999; carries forward founder Gail Ryba's vision (also founded Bicycle Coalition of New Mexico) and serves as the de facto NM-statewide cycling voice."
+short_desc = "Albuquerque cycling 501(c)(3) since 1999, founded by Gail Ryba (also founded the Bicycle Coalition of New Mexico) and the de facto NM-statewide cycling voice. 11-member board attends design reviews, writes advisory letters, runs Bike to Work Day and League Certified Instructor classes, and pushed for Albuquerque's April 2026 traffic-law overhaul."
 website_url = "https://www.bikeabq.org"
 tags = ["cycling", "advocacy", "safe-streets", "education"]
-region_slugs = ["nm"]
+region_slugs = ["albuquerque-nm-metro", "nm"]
 
 # --- Oregon ---
 # Coverage satisfied by The Street Trust (see Portland OR section

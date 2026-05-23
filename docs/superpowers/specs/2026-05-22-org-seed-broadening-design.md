@@ -18,7 +18,7 @@ geography under-seeded:
   college towns, and isolated mid-sized cities had no local-tier
   entry; ZIPs there fell through to the state floor.
 
-This slice broadens geographic reach to **206 orgs (+76 net-new)**
+This slice broadens geographic reach to **203 orgs (+73 net-new)**
 without changing what counts as an admissible org. The scope
 precedents (public-agency oversight bodies, multi-issue 501(c)(3)s
 with named programs, publication/advocacy hybrids, chapters-must-be-
@@ -56,7 +56,7 @@ region-tree changes were needed.
 |---|---|---|---|
 | 26 | Pittsburgh | 3 | BikePGH, Pittsburghers for Public Transit, Pittsburgh Walks |
 | 27 | Sacramento | 3 | SABA, Civic Thread (formerly WALKSacramento), STAR |
-| 28 | Las Vegas | 1 | SNVBC; PedSafe Vegas excluded (UNLV-housed program) |
+| 28 | Las Vegas | 1 | Southern Nevada Bicycle Coalition; PedSafe Vegas excluded (UNLV-housed program) |
 | 29 | Cincinnati | 3 | Better Bus Coalition, Queen City Bike, Devou Good Foundation |
 | 30 | Kansas City | 2 | BikeWalkKC, KC Regional Transit Alliance |
 | 31 | Austin | 3 | Safe Streets Austin, Transit Forward, AURA |
@@ -101,7 +101,7 @@ region-tree changes were needed.
 |---|---|---|---|---|
 | CA | 1 (CalBike) | +2 (California Walks, TransForm) | 3 | ≥3 ✓ |
 | NY | 1 (NYBC) | +2 (Reinvent Albany, NYPIRG) | 3 | ≥3 ✓ |
-| TX | 1 (BikeTexas) | +2 (Texas Streets Coalition, Texas Pedsafe) | 3 | ≥3 ✓ |
+| TX | 1 (BikeTexas) | +2 (Texas Streets Coalition, Texas Pedestrian Safety Coalition) | 3 | ≥3 ✓ |
 | FL | 1 (FL Bicycle Assn) | +1 (1000 Friends of FL) | 2 | ≥2 ✓ |
 | PA | 1 (PA Walks and Bikes) | +1 (Transit for All PA!) | 2 | ≥2 ✓ |
 | OH | 2 (All Aboard OH, OH Bicycle Fed) | 0 | 2 | ≥2 ✓ |
@@ -149,25 +149,39 @@ incorporation).
 ## Final tally
 
 ```
-Existing orgs (after slice 7.7):          134
-+ Top-31-50 US metro canvas:              +40 (with 3 gaps documented)
+Existing orgs (after slice 7.7):          130
++ Top-31-50 US metro canvas:              ~+40 (with 3 gaps documented)
 + CA CMAs #6-10:                          +7
 + Big-state depth (CA/NY/TX/FL/PA/MI):    +8
-+ Non-top-50 metro depth (city-leaf):     +17 (with ~8 cities documented as gaps)
++ Non-top-50 metro depth (city-leaf):     +16 net-new + 1 multi-anchor
+                                          (BikeABQ pre-existed at nm state;
+                                          slice 7.8 added albuquerque-nm-metro
+                                          as a second anchor — see Per-org data
+                                          shape below)
 ─────────────────────────────────────────────
-Net-new total:                            ~+72
-Dataset after slice 7.8:                  ~206 orgs
+Net-new total:                            +73
+Dataset after slice 7.8:                  203 orgs
 ```
+
+The per-category subtotals are approximate (e.g., the city-leaf line
+counts Bike Durham as a metro-canvas Raleigh-bonus rather than a
+city-leaf entry, and Halifax/Mississauga are CMA bonuses); the
+dataset total is authoritative.
 
 ## Per-org data shape
 
 Unchanged from slice 7.6. Multi-anchoring used sparingly per the
-Street Trust precedent (`[portland-or-metro, or]`). No new
-multi-anchor entries in slice 7.8.
+Street Trust precedent (`[portland-or-metro, or]`). One new
+multi-anchor entry in slice 7.8: BikeABQ at `[albuquerque-nm-metro,
+nm]`. BikeABQ pre-existed on the slice-7.8 baseline at `nm` state
+only; slice 7.8 added the metro anchor so ABQ-metro ZIPs see BikeABQ
+as a local-tier org while the rest of New Mexico continues to see it
+via the state-floor anchor. One row, two anchors — the same role
+the Street Trust plays for Portland + Oregon.
 
 ## Critical files edited
 
-- `api/seed/orgs.toml` — editorial expansion (~+76 entries). Header
+- `api/seed/orgs.toml` — editorial expansion (+73 entries). Header
   updated to reflect slice 7.8 work and the new total.
 - `docs/roadmap.md` — slice 7.8 entry added under Done.
 - `docs/superpowers/specs/2026-05-22-org-seed-broadening-design.md`

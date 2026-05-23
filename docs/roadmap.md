@@ -184,9 +184,12 @@ with a 30-day lifecycle), with the enablement steps documented at
   Spokane, Tallahassee, Charleston SC, Grand Rapids, Fresno,
   Albuquerque, plus Halifax + Mississauga as CA bonuses). City-leaf
   orgs anchor at existing MSA slugs (city dominates MSA) — no
-  region-tree changes. Final tally: +72 net-new orgs (orgs.toml
-  grows from 134 → 206) plus 3 top-31–50 metro gaps (Jacksonville,
-  Oklahoma City, Birmingham) and 8 city-leaf gaps documented inline.
+  region-tree changes. Albuquerque is covered by multi-anchoring the
+  pre-existing BikeABQ entry at [albuquerque-nm-metro, nm] per the
+  Street Trust precedent, rather than adding a new city-leaf row.
+  Final tally: +73 net-new orgs (orgs.toml grows from 130 → 203)
+  plus 3 top-31–50 metro gaps (Jacksonville, Oklahoma City,
+  Birmingham) and 8 city-leaf gaps documented inline.
   New precedents: university-housed advocacy programs and state-
   org sub-committees are not separately admitted (extends the slice
   7.7 chapter/affiliate rule). Design spec:
