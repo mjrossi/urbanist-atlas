@@ -5,8 +5,8 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, preview, fly, smoke, ci. Each
-# group corresponds to a section comment below.
+# Groups: api, data, verify, postgres, web, preview, fly, smoke, ci.
+# Each group corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -176,6 +176,30 @@ etl-download country:
 [doc('etl: regenerate seed files from staged sources (e.g. `just etl-regenerate US`)')]
 etl-regenerate country:
     cd api && go run ./cmd/server etl regenerate --country {{country}} --src ../etl/sources --out seed
+
+# ── verify: out-of-band data hygiene checks ───────────
+# These probe third-party URLs from the seed data. Because a handful
+# of advocacy-org domains have lapsed and now resolve to parked
+# domains that log requester IPs, the recipes egress via a gluetun
+# container speaking Proton WireGuard. Set WIREGUARD_PRIVATE_KEY in
+# mise.local.toml [env] before first run (see mise.local.toml.example).
+
+# probe every website_url in api/seed/orgs.toml through the VPN;
+# writes tmp/org-url-report.{md,tsv}. Leaves gluetun running so
+# re-runs are fast — `just verify-org-urls-down` when you're done.
+[group('verify')]
+[doc('probe every seed org website_url via VPN; writes tmp/org-url-report.{md,tsv}')]
+verify-org-urls:
+    @mkdir -p tmp
+    docker compose -f scripts/verify-org-urls.compose.yml --profile verify run --rm --build verify
+
+# stop the gluetun VPN container brought up by `verify-org-urls`.
+# The verify container itself is removed by --rm each run; gluetun
+# is what lingers.
+[group('verify')]
+[doc('stop the gluetun VPN container used by verify-org-urls')]
+verify-org-urls-down:
+    docker compose -f scripts/verify-org-urls.compose.yml down
 
 # ── postgres: dev container lifecycle ─────────────────
 # Local dev Postgres runs in a named docker container with a

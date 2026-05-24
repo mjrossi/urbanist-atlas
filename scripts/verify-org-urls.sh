@@ -4,14 +4,41 @@
 # off-domain redirects, and parked-page signatures. Writes a Markdown
 # report grouped by severity plus a TSV with raw probe data.
 #
-# Network-bound — run from a host with open outbound HTTPS. The
-# managed remote-execution env this repo ships in blocks most external
-# hosts; use your laptop.
+# Network-bound — hits ~200 third-party advocacy-org URLs. A handful
+# resolve to parked/squatted domains that log requester IPs, so this is
+# a script you want to think about *where* you run from. Recommended:
+# a hardened Docker container behind a VPN.
 #
 # Usage:
+#
+#   # Bare metal (your laptop, your IP, your problem):
 #   scripts/verify-org-urls.sh                 # writes tmp/org-url-report.{md,tsv}
 #   REPORT=foo.md scripts/verify-org-urls.sh
 #   CONCURRENCY=4 TIMEOUT=30 scripts/verify-org-urls.sh
+#
+#   # Hardened Docker + Proton WireGuard via gluetun (recommended):
+#   #   1. Put WIREGUARD_PRIVATE_KEY in mise.local.toml [env]
+#   #      (see mise.local.toml.example).
+#   #   2. just verify-org-urls           # writes tmp/org-url-report.{md,tsv}
+#   #      just verify-org-urls-down      # stops gluetun when finished
+#   # The compose stack at scripts/verify-org-urls.compose.yml ties
+#   # this script's container to gluetun's network namespace, so all
+#   # egress goes through the VPN tunnel.
+#
+#   # If the VPN runs on the host (Tailscale, host-level WireGuard),
+#   # the bare-metal invocation above is fine — host routing handles
+#   # egress.
+#
+#   # Hardened Docker without compose, attached to your own VPN container:
+#   docker build -t atlas-url-verify -f scripts/verify-org-urls.Dockerfile .
+#   docker run --rm \
+#     --read-only --tmpfs /tmp \
+#     --cap-drop=ALL --security-opt no-new-privileges \
+#     --user "$(id -u):$(id -g)" \
+#     --network=container:<your-vpn-container> \
+#     -v "$PWD/api/seed:/work/api/seed:ro" \
+#     -v "$PWD/tmp:/work/tmp" \
+#     atlas-url-verify
 #
 # Why curl, not httpie: `curl -w` gives us status + final URL + body
 # size in one shot; matching that with httpie would need --print=h plus
@@ -55,7 +82,14 @@ probe() {
   body="$(mktemp)"
   trap 'rm -f "$body"' RETURN
 
+  # Hardening:
+  #   --max-filesize  cap body size so a 10 GB response can't fill the disk
+  #   --max-redirs    cap redirect chains; some parkers bounce through trackers
+  #   --proto-redir   refuse non-http(s) redirect targets (no file://, dict://, …)
   metrics="$(curl -sSL --max-time "$TIMEOUT" \
+    --max-filesize 5242880 \
+    --max-redirs 5 \
+    --proto-redir =https,http \
     -A "$UA" \
     -o "$body" \
     -w '%{http_code}\t%{url_effective}\t%{size_download}' \

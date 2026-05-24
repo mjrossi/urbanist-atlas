@@ -18,3 +18,8 @@
 # [env]
 # DATABASE_URL         = "postgres://urbanist@localhost:5432/atlas?sslmode=disable"
 # URBANIST_ADMIN_TOKEN = "my-personal-dev-token"
+#
+# Secret for scripts/verify-org-urls.compose.yml (gluetun + Proton VPN).
+# Generate at https://account.protonvpn.com/downloads → WireGuard.
+# WIREGUARD_PRIVATE_KEY = "…"
+# SERVER_COUNTRIES      = "United States"
