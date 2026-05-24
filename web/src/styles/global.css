@@ -762,6 +762,15 @@ em {
   color: var(--accent-rule);
 }
 
+.broadsheet-disclaimer {
+  text-align: center;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
 .broadsheet-footer-row {
   display: flex;
   justify-content: space-between;
