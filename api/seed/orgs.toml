@@ -1770,8 +1770,8 @@ region_slugs = ["mi"]
 [[org]]
 slug = "trans4m"
 name = "Transportation for Michigan"
-short_desc = "Michigan's statewide transportation-policy coalition (Trans4M). Brings together nonprofits, businesses, environmental groups, planners, and academic institutions; pushed for Public Act 16 of 2025, which created the Neighborhood Roads Fund and added public-transportation funding."
-website_url = "https://www.trans4m.org"
+short_desc = "Michigan's statewide transportation-policy coalition (Trans4M), hosted by the Michigan Municipal League. Brings together nonprofits, businesses, environmental groups, planners, and academic institutions; pushed for Public Act 16 of 2025, which created the Neighborhood Roads Fund and added public-transportation funding."
+website_url = "https://mml.org/advocacy/transportation/"
 tags = ["transit", "advocacy", "policy", "coalition"]
 region_slugs = ["mi"]
 
