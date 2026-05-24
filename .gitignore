@@ -56,6 +56,9 @@ api/.fly/
 # ── ETL: upstream source files (regenerated outputs live in api/seed/) ──
 etl/sources/
 
+# ── Scratch / one-off script output (scripts/verify-org-urls.sh, etc.) ──
+tmp/
+
 # ── Misc build / edit artifacts ─────────────────────
 *.log
 *.bak
