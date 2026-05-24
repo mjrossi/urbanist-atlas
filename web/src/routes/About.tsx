@@ -60,6 +60,27 @@ export function About() {
       </section>
 
       <section>
+        <h2>Independence and corrections</h2>
+        <p>
+          The Atlas is an independent reference work. It is not affiliated
+          with, endorsed by, or representing any of the organizations listed
+          here. Listings are based on publicly available information and
+          editorial judgment, and they can go stale — a website lapses, a
+          coalition reorganizes, a chapter folds.
+        </p>
+        <p>
+          If you spot a broken link, an outdated description, an organization
+          that no longer exists, or a listing that misrepresents the work of
+          the people it indexes, please{' '}
+          <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
+            open an issue on GitHub
+          </a>
+          . Corrections are read and applied by the same editor who maintains
+          the directory.
+        </p>
+      </section>
+
+      <section>
         <h2>Criteria for inclusion</h2>
         <p>
           The Atlas indexes organizations whose primary work is{' '}

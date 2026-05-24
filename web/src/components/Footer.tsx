@@ -2,8 +2,9 @@
  * Page-bottom footer. Mirrors the portfolio's `.broadsheet-footer`
  * shape — a centered italic colophon flanked by smaller meta rows —
  * but with Atlas wording. The colophon links the companion publication;
- * the bottom row carries the brand domain and a link to the source
- * repository so contributors have a one-click path to the code.
+ * the disclaimer below it frames the Atlas as an independent
+ * informational directory; the bottom row carries the brand domain and
+ * outbound links for reporting issues or browsing the source.
  */
 export function Footer() {
   return (
@@ -16,9 +17,17 @@ export function Footer() {
           </a>{' '}
           &middot; Set in Fraunces, Source Serif &amp; Inter
         </span>
+        <span className="broadsheet-disclaimer">
+          An independent informational directory. Not affiliated with the
+          organizations listed.
+        </span>
         <div className="broadsheet-footer-row">
           <span className="footer-left">urbanistatlas.com</span>
           <span className="footer-right">
+            <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
+              Report an issue →
+            </a>
+            {' · '}
             <a href="https://github.com/mjrossi/urbanist-atlas">
               Source on GitHub →
             </a>
