@@ -241,23 +241,23 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
     <>
       <section className="section-break" style={{ marginTop: 56 }}>
         <span className="num">IV.</span>
-        <h2 className="title">Or wander by what they fight for.</h2>
-        <span className="aside">Topic index</span>
+        <h2 className="title">The topics the Atlas covers.</h2>
+        <span className="aside">Editorial scope</span>
       </section>
       <div className="spread lede-first" style={{ marginTop: 12 }}>
         <div>
           <ul className="tag-list" style={{ gap: 12 }}>
             {tags.map((label) => (
               <li key={label}>
-                <Link to="/browse" className="tag">
-                  {label}
-                </Link>
+                <span className="tag">{label}</span>
               </li>
             ))}
           </ul>
           <p className="fineprint" style={{ marginTop: 22 }}>
             Tags are editorial labels, applied by hand. An organization can
-            carry up to five.
+            carry up to five. Per-topic filtering ships with Phase 2; until
+            then, <Link to="/browse">browse by metro</Link> is the
+            wander-mode entry point.
           </p>
         </div>
         <aside className="rail">

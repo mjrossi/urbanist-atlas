@@ -828,12 +828,21 @@ a.read-on:hover .arrow {
 }
 
 .tag:hover {
+  /* No-op on non-interactive `<span class="tag">` — anchor variants
+     below opt into the hover affordance. */
+}
+
+a.tag {
+  cursor: pointer;
+}
+
+a.tag:hover {
   background: var(--amber);
   border-color: var(--amber);
   color: var(--paper);
 }
 
-.tag:hover::before {
+a.tag:hover::before {
   color: var(--paper);
 }
 
