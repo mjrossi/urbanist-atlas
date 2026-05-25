@@ -3,6 +3,17 @@ import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 export function About() {
   useDocumentTitle('About — Urbanist Atlas');
+  const atAGlance = (
+    <div className="rail-block amber">
+      <div className="rail-kicker">At a glance</div>
+      <ul>
+        <li>Transit + safe-streets advocacy only</li>
+        <li>United States &amp; Canada (v1)</li>
+        <li>Curated by hand, one entry at a time</li>
+        <li>ODbL 1.0 — open data with attribution</li>
+      </ul>
+    </div>
+  );
   return (
     <>
       <div className="kicker">
@@ -31,6 +42,7 @@ export function About() {
 
       <div className="spread">
         <main className="prose">
+          <div className="glance-mobile">{atAGlance}</div>
           <div className="section-kicker" id="mission">§ I — Mission</div>
           <h2>Why this exists.</h2>
           <div className="h2-rule" />
@@ -209,15 +221,7 @@ export function About() {
               </li>
             </ul>
           </div>
-          <div className="rail-block amber">
-            <div className="rail-kicker">At a glance</div>
-            <ul>
-              <li>Transit + safe-streets advocacy only</li>
-              <li>United States &amp; Canada (v1)</li>
-              <li>Curated by hand, one entry at a time</li>
-              <li>ODbL 1.0 — open data with attribution</li>
-            </ul>
-          </div>
+          <div className="glance-desktop">{atAGlance}</div>
           <div className="rail-block">
             <div className="rail-kicker">Get in touch</div>
             <p>

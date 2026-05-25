@@ -96,6 +96,33 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
   const primaryMetro = org.regions.find((r) => METRO_KINDS.has(r.kind));
   const tagsTopline = org.tags.slice(0, 3).map(prettyTag).join(' · ');
 
+  const atAGlance = (
+    <div className="rail-block amber">
+      <div className="rail-kicker">At a glance</div>
+      <ul>
+        <li>
+          <strong>{org.regions.length}</strong>{' '}
+          {org.regions.length === 1 ? 'region' : 'regions'} served
+        </li>
+        <li>
+          <strong>{org.tags.length}</strong> editorial{' '}
+          {org.tags.length === 1 ? 'tag' : 'tags'}
+        </li>
+        <li>
+          <strong>
+            <code>{org.slug}</code>
+          </strong>{' '}
+          directory slug
+        </li>
+        {primaryMetro ? (
+          <li>
+            Primary metro · <strong>{primaryMetro.name}</strong>
+          </li>
+        ) : null}
+      </ul>
+    </div>
+  );
+
   return (
     <>
       <header className="org-feature">
@@ -185,6 +212,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 
       <div className="spread" style={{ marginTop: 0 }}>
         <main className="prose">
+          <div className="glance-mobile">{atAGlance}</div>
           <div className="section-kicker">§ I — The entry</div>
           <h2>The directory record.</h2>
           <div className="h2-rule" />
@@ -273,30 +301,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
         </main>
 
         <aside className="rail">
-          <div className="rail-block amber">
-            <div className="rail-kicker">At a glance</div>
-            <ul>
-              <li>
-                <strong>{org.regions.length}</strong>{' '}
-                {org.regions.length === 1 ? 'region' : 'regions'} served
-              </li>
-              <li>
-                <strong>{org.tags.length}</strong> editorial{' '}
-                {org.tags.length === 1 ? 'tag' : 'tags'}
-              </li>
-              <li>
-                <strong>
-                  <code>{org.slug}</code>
-                </strong>{' '}
-                directory slug
-              </li>
-              {primaryMetro ? (
-                <li>
-                  Primary metro · <strong>{primaryMetro.name}</strong>
-                </li>
-              ) : null}
-            </ul>
-          </div>
+          <div className="glance-desktop">{atAGlance}</div>
           <div className="rail-block">
             <div className="rail-kicker">Filed by</div>
             <p>

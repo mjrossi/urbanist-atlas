@@ -1115,6 +1115,27 @@ a.tag:hover::before {
   }
 }
 
+/* Dual-rendered "At a glance" blocks. The content shows at the top
+   of main on mobile (where it serves as a quick orientation) and in
+   the rail on desktop (where the sticky sidebar carries it). The
+   visibility flips at the same 900px breakpoint where .spread
+   becomes a two-column layout. */
+.glance-mobile {
+  margin-bottom: 28px;
+}
+
+@media (min-width: 900px) {
+  .glance-mobile {
+    display: none;
+  }
+}
+
+@media (max-width: 899px) {
+  .glance-desktop {
+    display: none;
+  }
+}
+
 .rail-kicker {
   font-family: var(--sans);
   font-size: 10.5px;
