@@ -171,7 +171,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
             </span>
           </div>
           {org.contact_url ? (
-            <div className="item" style={{ marginLeft: 'auto' }}>
+            <div className="item">
               <div>Contact</div>
               <span className="val amber">
                 <a href={org.contact_url} target="_blank" rel="noopener noreferrer">
