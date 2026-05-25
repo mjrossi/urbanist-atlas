@@ -31,7 +31,7 @@ export function About() {
 
       <div className="spread">
         <main className="prose">
-          <div className="section-kicker">§ I — Mission</div>
+          <div className="section-kicker" id="mission">§ I — Mission</div>
           <h2>Why this exists.</h2>
           <div className="h2-rule" />
           <p className="lead drop">
@@ -167,7 +167,9 @@ export function About() {
             and we&rsquo;ll set one up by hand.
           </p>
 
-          <div className="section-kicker">§ V — Acknowledgments</div>
+          <div className="section-kicker" id="acknowledgments">
+            § V — Acknowledgments
+          </div>
           <h2>Who the directory rests on.</h2>
           <div className="h2-rule" />
           <p>
@@ -191,7 +193,7 @@ export function About() {
             <div className="rail-kicker">On this page</div>
             <ul className="plain">
               <li>
-                <a href="#methodology">I &middot; Mission</a>
+                <a href="#mission">I &middot; Mission</a>
               </li>
               <li>
                 <a href="#methodology">II &middot; Methodology</a>
@@ -201,6 +203,9 @@ export function About() {
               </li>
               <li>
                 <a href="#for-developers">IV &middot; For developers</a>
+              </li>
+              <li>
+                <a href="#acknowledgments">V &middot; Acknowledgments</a>
               </li>
             </ul>
           </div>

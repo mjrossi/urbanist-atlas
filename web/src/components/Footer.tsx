@@ -35,22 +35,22 @@ export function Footer() {
             <li>
               <Link to="/about">About the Atlas</Link>
             </li>
-            <li>
-              <Link to="/colophon">Colophon</Link>
-            </li>
           </ul>
         </div>
         <div>
           <h4>Methodology</h4>
           <ul>
             <li>
-              <Link to="/about">Inclusion criteria</Link>
+              <Link to="/about#methodology">Inclusion criteria</Link>
             </li>
             <li>
-              <Link to="/about">Sources &amp; verification</Link>
+              <Link to="/about#corrections">Independence &amp; corrections</Link>
             </li>
             <li>
               <Link to="/about#for-developers">For developers</Link>
+            </li>
+            <li>
+              <Link to="/colophon">Colophon &amp; sources</Link>
             </li>
             <li>
               <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">

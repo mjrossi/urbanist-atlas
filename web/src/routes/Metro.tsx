@@ -160,13 +160,13 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
           <div className="rail-block">
             <div className="rail-kicker">About this metro</div>
             <p>
-              The Atlas treats {region.name} as the canonical{' '}
-              {region.country === 'US' ? 'MSA / metro region' : 'CMA / metro region'}
+              The Atlas indexes {region.name} as a{' '}
+              {region.country === 'US' ? 'US metro' : 'Canadian metro'}
               {region.parent_slugs.length > 0
-                ? `, nested under ${region.parent_slugs.join(' · ')}.`
+                ? `, sitting under ${region.parent_slugs.join(' · ')}.`
                 : '.'}{' '}
-              Sub-regions inside this metro are surfaced on each org&rsquo;s
-              detail page.
+              Sub-regions inside it — boroughs, counties, sibling cities —
+              show up on each org&rsquo;s detail page.
             </p>
             <p style={{ marginBottom: 0 }}>
               Looking up by postal code?{' '}

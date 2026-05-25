@@ -185,22 +185,19 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 
       <div className="spread" style={{ marginTop: 0 }}>
         <main className="prose">
-          <div className="section-kicker">§ I — What they do</div>
-          <h2>{org.name} in brief.</h2>
+          <div className="section-kicker">§ I — The entry</div>
+          <h2>The directory record.</h2>
           <div className="h2-rule" />
           <p className="lead drop">{org.short_desc}</p>
           <p>
-            The Atlas indexes {org.name}{' '}
-            {primaryMetro
-              ? `as a group working in ${primaryMetro.name}`
-              : 'in the directory'}
-            . Open their site at{' '}
+            For current campaigns and ways to plug in, open{' '}
             <a href={org.website_url} target="_blank" rel="noopener noreferrer">
               {domain ?? org.website_url}
-            </a>{' '}
-            for current campaigns and ways to plug in directly. The list of
-            regions they serve, below, is the editorial record we maintain
-            here.
+            </a>
+            .{' '}
+            {org.regions.length > 0
+              ? `Below: the regions the Atlas files ${org.name} under.`
+              : `${org.name} doesn’t have a region attached yet — file a tip if you can place them.`}
           </p>
 
           {org.regions.length > 0 ? (
@@ -303,10 +300,10 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
           <div className="rail-block">
             <div className="rail-kicker">Filed by</div>
             <p>
-              An entry in the Urbanist Atlas. Curated by hand against the{' '}
-              <Link to="/about#methodology">inclusion criteria</Link>; verified
-              against public sources. If you spot a problem with this entry,{' '}
-              <Link to="/submit">file a correction</Link>.
+              An entry in the Urbanist Atlas — curated by hand against the{' '}
+              <Link to="/about#methodology">inclusion criteria</Link>, verified
+              against public sources. Spot something off?{' '}
+              <Link to="/submit">File a correction</Link>.
             </p>
           </div>
           <div className="rail-block muted">

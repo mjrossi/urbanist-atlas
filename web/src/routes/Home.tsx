@@ -41,7 +41,7 @@ export function Home() {
           The front page<span className="crumb-sep">·</span>
           <span className="crumb-here">Index by postal code</span>
         </div>
-        <div>An independent directory</div>
+        <div>Vol. I · 2026 Edition</div>
       </div>
 
       <div className="spread lede-first" style={{ marginTop: 40 }}>
@@ -65,9 +65,10 @@ export function Home() {
             <div className="editors-note">
               <div className="label">Editor&rsquo;s note · Vol. I</div>
               <p>
-                This is Volume I. The directory is curated by hand, one
-                organization at a time, against a published set of criteria. If
-                your region is missing or an entry needs work,{' '}
+                Curated by hand, one organization at a time, against a
+                published set of criteria. There is no algorithmic
+                ingestion. If your region is missing or an entry needs
+                work,{' '}
                 <Link to="/submit">file a tip at the submissions desk</Link>.
               </p>
             </div>
@@ -138,8 +139,8 @@ function RecentlyFiled({ query }: { query: UseQueryResult<Org[], ApiError> }) {
     <>
       <section className="section-break">
         <span className="num">II.</span>
-        <h2 className="title">Recently filed in the Atlas.</h2>
-        <span className="aside">From the curation desk</span>
+        <h2 className="title">Recently filed.</h2>
+        <span className="aside">From the editor&rsquo;s desk</span>
       </section>
       <RecentBody query={query} />
     </>
@@ -159,20 +160,21 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
   }
   return (
     <div className="org-strip">
-      {items.map((org) => (
-        <Link
-          key={org.id}
-          className="org-card"
-          to={`/orgs/${encodeURIComponent(org.slug)}`}
-        >
-          <div className="added">+ Recently added</div>
-          <h3 className="org-name">{org.name}</h3>
-          <div className="org-where">
-            {primaryRegionLabel(org) ?? 'See the entry'}
-          </div>
-          <p className="org-desc">{truncate(org.short_desc, 180)}</p>
-        </Link>
-      ))}
+      {items.map((org) => {
+        const where = primaryRegionLabel(org);
+        return (
+          <Link
+            key={org.id}
+            className="org-card"
+            to={`/orgs/${encodeURIComponent(org.slug)}`}
+          >
+            <div className="added">+ Newly indexed</div>
+            <h3 className="org-name">{org.name}</h3>
+            {where ? <div className="org-where">{where}</div> : null}
+            <p className="org-desc">{truncate(org.short_desc, 180)}</p>
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -198,19 +200,19 @@ function ByTheNumbers({
       <section className="section-break" style={{ marginTop: 56 }}>
         <span className="num">III.</span>
         <h2 className="title">The Atlas, by the numbers.</h2>
-        <span className="aside">Updated nightly</span>
+        <span className="aside">From the live directory</span>
       </section>
       <div className="stats">
         <div className="stat">
           <div className="n">
             <span className="em">{formatNumber(totalOrgCount)}</span>
           </div>
-          <div className="label">Org entries indexed</div>
+          <div className="label">Org entries on file</div>
           <div className="sub">Across the US and Canada</div>
         </div>
         <div className="stat">
           <div className="n">{formatNumber(metroCount)}</div>
-          <div className="label">Metros covered</div>
+          <div className="label">Metros indexed</div>
           <div className="sub">
             {usCount !== null && caCount !== null
               ? `${usCount} US · ${caCount} Canada`
@@ -219,16 +221,16 @@ function ByTheNumbers({
         </div>
         <div className="stat">
           <div className="n">{formatNumber(recentCount)}</div>
-          <div className="label">In the recent file</div>
+          <div className="label">Recently filed</div>
           <div className="sub">Latest editorial additions</div>
         </div>
         <div className="stat">
           <div className="n">
             <span className="em">{topMetro ? topMetro.org_count : '—'}</span>
           </div>
-          <div className="label">Top metro org count</div>
+          <div className="label">Deepest coverage</div>
           <div className="sub">
-            {topMetro ? topMetro.region.name : 'Loading…'}
+            {topMetro ? `${topMetro.region.name}, today` : 'Loading…'}
           </div>
         </div>
       </div>
@@ -256,17 +258,17 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
           <p className="fineprint" style={{ marginTop: 22 }}>
             Tags are editorial labels, applied by hand. An organization can
             carry up to five. Per-topic filtering ships with Phase 2; until
-            then, <Link to="/browse">browse by metro</Link> is the
-            wander-mode entry point.
+            then, <Link to="/browse">the metro index</Link> is the wander
+            view.
           </p>
         </div>
         <aside className="rail">
           <div className="rail-block">
             <div className="rail-kicker">For developers</div>
             <p>
-              The full dataset is published under the Open Database License
-              (ODbL 1.0). Phase 2 opens self-serve free API keys; ahead of that,
-              we&rsquo;ll hand-issue an early key on request.
+              The dataset is published under the Open Database License (ODbL
+              1.0). Phase 2 opens self-serve free API keys; until then, an
+              editor will hand-issue one on request.
             </p>
             <Link to="/about#for-developers" className="read-on">
               Developer preview <span className="arrow">→</span>

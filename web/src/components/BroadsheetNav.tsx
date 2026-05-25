@@ -37,6 +37,9 @@ export function BroadsheetNav() {
     queryFn: ({ signal }) => listMetros({ signal }),
   });
   const metroCount = metros.data?.length ?? null;
+  const orgCount = metros.data
+    ? metros.data.reduce((sum, m) => sum + m.org_count, 0)
+    : null;
 
   return (
     <nav className="nav" aria-label="Primary">
@@ -62,9 +65,13 @@ export function BroadsheetNav() {
       </ul>
       <div className="nav-right">
         <span className="live">
-          <strong>Reader edition</strong>
+          <strong>Indexed &amp; current</strong>
         </span>
-        {metroCount !== null ? <span>{metroCount} metros indexed</span> : null}
+        {metroCount !== null && orgCount !== null ? (
+          <span>
+            {orgCount} orgs · {metroCount} metros
+          </span>
+        ) : null}
       </div>
     </nav>
   );
