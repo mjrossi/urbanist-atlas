@@ -60,7 +60,7 @@ describe('Submit', () => {
 
   it('submit button is disabled when required fields are empty', () => {
     renderSubmit();
-    const button = screen.getByRole('button', { name: /open as a github issue/i });
+    const button = screen.getByRole('button', { name: /open as github issue/i });
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -70,7 +70,7 @@ describe('Submit', () => {
     await fillRequired(user);
     // mode:'onBlur' — tab off the last field to trigger validation.
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as a github issue/i });
+    const button = screen.getByRole('button', { name: /open as github issue/i });
     await waitFor(() => {
       expect((button as HTMLButtonElement).disabled).toBe(false);
     });
@@ -81,7 +81,7 @@ describe('Submit', () => {
     renderSubmit();
     await fillRequired(user, { name: 'Sample Riders Alliance' });
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as a github issue/i });
+    const button = screen.getByRole('button', { name: /open as github issue/i });
     await waitFor(() => {
       expect((button as HTMLButtonElement).disabled).toBe(false);
     });
@@ -104,7 +104,7 @@ describe('Submit', () => {
     await user.click(screen.getByLabelText(/correction to an existing entry/i));
     await fillRequired(user);
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as a github issue/i });
+    const button = screen.getByRole('button', { name: /open as github issue/i });
     await waitFor(() => {
       expect((button as HTMLButtonElement).disabled).toBe(false);
     });
@@ -120,7 +120,7 @@ describe('Submit', () => {
     await user.click(screen.getByLabelText(/removal request/i));
     await fillRequired(user);
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as a github issue/i });
+    const button = screen.getByRole('button', { name: /open as github issue/i });
     await waitFor(() => {
       expect((button as HTMLButtonElement).disabled).toBe(false);
     });
@@ -137,10 +137,11 @@ describe('Submit', () => {
     });
   });
 
-  it('intro paragraph mentions GitHub and Phase 2', () => {
+  it('intro paragraph mentions GitHub and a pre-filled issue', () => {
     renderSubmit();
     const header = screen.getByRole('heading', { level: 1 }).parentElement;
     expect(header?.textContent).toMatch(/github/i);
-    expect(header?.textContent).toMatch(/phase 2/i);
+    expect(header?.textContent).toMatch(/pre-filled/i);
+    expect(header?.textContent).toMatch(/issue/i);
   });
 });

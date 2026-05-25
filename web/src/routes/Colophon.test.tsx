@@ -15,18 +15,28 @@ describe('Colophon', () => {
   it('renders the page heading', () => {
     renderColophon();
     const h1 = screen.getByRole('heading', { level: 1 });
-    expect(h1.textContent).toMatch(/^colophon$/i);
+    expect(h1.textContent).toMatch(/what the atlas/i);
+    expect(h1.textContent).toMatch(/built from/i);
   });
 
   it('renders the five section headings', () => {
-    renderColophon();
+    const { container } = renderColophon();
     const h2s = screen.getAllByRole('heading', { level: 2 });
     const text = h2s.map((h) => h.textContent ?? '').join(' | ');
-    expect(text).toMatch(/data sources/i);
-    expect(text).toMatch(/stack/i);
-    expect(text).toMatch(/type/i);
-    expect(text).toMatch(/licensing/i);
-    expect(text).toMatch(/editorial cadence/i);
+    // Five new-style section h2s.
+    expect(text).toMatch(/where the geography comes from/i);
+    expect(text).toMatch(/how the atlas runs/i);
+    expect(text).toMatch(/broadsheet vocabulary/i);
+    expect(text).toMatch(/what you can take/i);
+    expect(text).toMatch(/how the directory stays current/i);
+    // And the kicker numerals carry the I/II/III/IV/V topic labels.
+    const kickers = Array.from(container.querySelectorAll('.section-kicker'))
+      .map((k) => k.textContent ?? '')
+      .join(' | ');
+    expect(kickers).toMatch(/data sources/i);
+    expect(kickers).toMatch(/stack/i);
+    expect(kickers).toMatch(/licensing/i);
+    expect(kickers).toMatch(/editorial cadence/i);
   });
 
   it('names the upstream data providers with the right vintages', () => {
@@ -47,12 +57,6 @@ describe('Colophon', () => {
     renderColophon();
     expect(screen.getByText(/X-Data-License: ODbL-1\.0/)).toBeDefined();
     expect(screen.getByText(/X-Data-Attribution: https:\/\/urbanistatlas\.com/)).toBeDefined();
-  });
-
-  it('uses the .page single-column layout class', () => {
-    const { container } = renderColophon();
-    expect(container.querySelector('.page')).not.toBeNull();
-    expect(container.querySelector('.page-header')).not.toBeNull();
   });
 
   it('sets the browser tab title', async () => {

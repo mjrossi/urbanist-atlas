@@ -89,10 +89,11 @@ describe('Metro', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'TransitCenter' })).toBeDefined();
     });
-    expect(screen.getByText('New York Metro')).toBeDefined();
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.textContent).toMatch(/new york metro/i);
     expect(screen.getByRole('link', { name: 'Riders Alliance' })).toBeDefined();
     // Section heading present, mirroring the classified layout.
-    expect(screen.getByText(/organizations serving new york metro/i)).toBeDefined();
+    expect(screen.getByText(/groups working in new york metro/i)).toBeDefined();
   });
 
   it('passes the URL slug through to getMetro', async () => {
@@ -118,10 +119,12 @@ describe('Metro', () => {
     await waitFor(() => {
       expect(screen.getByText(/isn.t in the atlas yet/i)).toBeDefined();
     });
-    // Browse link is the suggested next step.
-    expect(
-      screen.getByRole('link', { name: /browse/i }).getAttribute('href'),
-    ).toBe('/browse');
+    // Browse link is the suggested next step (one in breadcrumb, one in
+    // the empty-state copy — at least one points at /browse).
+    const browseLinks = screen
+      .getAllByRole('link', { name: /browse/i })
+      .filter((a) => a.getAttribute('href') === '/browse');
+    expect(browseLinks.length).toBeGreaterThan(0);
   });
 
   it('renders a friendly empty state when orgs is an empty array', async () => {

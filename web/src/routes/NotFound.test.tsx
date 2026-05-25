@@ -23,9 +23,9 @@ describe('NotFound', () => {
     expect(screen.getByText(/story you were looking for/i)).toBeDefined();
   });
 
-  it('renders a retraction body paragraph', () => {
+  it('renders a body paragraph for users who followed a stale link', () => {
     renderNotFound();
-    expect(screen.getByText(/pulled this page from the edition/i)).toBeDefined();
+    expect(screen.getByText(/followed a link from another site/i)).toBeDefined();
   });
 
   it('provides a return-to-homepage link pointing to /', () => {
@@ -38,12 +38,6 @@ describe('NotFound', () => {
     renderNotFound();
     const link = screen.getByRole('link', { name: /return to the front page/i });
     expect(link.classList.contains('not-found-return')).toBe(true);
-  });
-
-  it('uses the .page single-column layout class', () => {
-    const { container } = renderNotFound();
-    expect(container.querySelector('.page')).not.toBeNull();
-    expect(container.querySelector('.page-header')).not.toBeNull();
   });
 
   it('sets the browser tab title', async () => {

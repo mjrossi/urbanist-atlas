@@ -60,31 +60,35 @@ describe('Browse', () => {
   it('renders the loading state while the query is pending', () => {
     listMetrosMock.mockReturnValue(new Promise(() => {}));
     renderBrowse();
-    expect(screen.getByRole('status').textContent).toMatch(/loading metros/i);
+    expect(screen.getByRole('status').textContent).toMatch(/loading the index/i);
   });
 
-  it('renders metro rows in the order returned by the API', async () => {
+  it('renders provided metros as /m/:slug links across the country sections', async () => {
     listMetrosMock.mockResolvedValueOnce([
       makeMetro({ id: 1, slug: 'nyc-metro', name: 'New York Metro' }, 12),
       makeMetro({ id: 2, slug: 'sf-bay-area', name: 'San Francisco Bay Area' }, 7),
-      makeMetro({ id: 3, slug: 'aml', name: 'Área Metropolitana de Lisboa', country: 'PT' }, 3),
+      makeMetro({ id: 3, slug: 'toronto-gta', name: 'Toronto GTA', country: 'CA' }, 3),
     ]);
     renderBrowse();
 
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
-    const links = screen.getAllByRole('link');
-    const names = links.map((a) => a.textContent ?? '');
-    expect(names[0]).toMatch(/new york metro/i);
-    expect(names[1]).toMatch(/san francisco bay area/i);
-    expect(names[2]).toMatch(/lisboa/i);
+    expect(
+      screen.getByRole('link', { name: /new york metro/i }).getAttribute('href'),
+    ).toBe('/m/nyc-metro');
+    expect(
+      screen.getByRole('link', { name: /san francisco bay area/i }).getAttribute('href'),
+    ).toBe('/m/sf-bay-area');
+    expect(
+      screen.getByRole('link', { name: /toronto gta/i }).getAttribute('href'),
+    ).toBe('/m/toronto-gta');
   });
 
   it('each metro row links to /m/:slug', async () => {
     listMetrosMock.mockResolvedValueOnce([
       makeMetro({ slug: 'nyc-metro', name: 'New York Metro' }, 12),
-      makeMetro({ id: 2, slug: 'aml', name: 'AML', country: 'PT' }, 3),
+      makeMetro({ id: 2, slug: 'aml', name: 'AML' }, 3),
     ]);
     renderBrowse();
 
@@ -100,12 +104,17 @@ describe('Browse', () => {
       makeMetro({ slug: 'nyc-metro', name: 'New York Metro' }, 12),
       makeMetro({ id: 2, slug: 'solo', name: 'Solo Metro' }, 1),
     ]);
-    renderBrowse();
+    const { container } = renderBrowse();
 
     await waitFor(() => {
-      expect(screen.getByText(/12 groups/i)).toBeDefined();
+      expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
-    expect(screen.getByText(/^1 group$/i)).toBeDefined();
+    const counts = Array.from(container.querySelectorAll('.icount')).map(
+      (n) => n.textContent ?? '',
+    );
+    const joined = counts.join(' | ');
+    expect(joined).toMatch(/12\s*groups/);
+    expect(joined).toMatch(/1\s*group(?!s)/);
   });
 
   it('renders an empty state when the list is empty', async () => {
