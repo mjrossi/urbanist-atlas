@@ -89,14 +89,20 @@ describe('Org', () => {
       ).toBeDefined();
     });
     expect(
-      screen.getByText(/NYC-wide advocacy for walking, biking, and public transit/i),
-    ).toBeDefined();
-    // Tags rendered as chips.
-    expect(screen.getByText('transit')).toBeDefined();
-    expect(screen.getByText('safe-streets')).toBeDefined();
-    // Region with a metro kind links to /m/:slug.
-    const metroLink = screen.getByRole('link', { name: 'New York Metro' });
-    expect(metroLink.getAttribute('href')).toBe('/m/nyc-metro');
+      screen.getAllByText(/NYC-wide advocacy for walking, biking, and public transit/i)
+        .length,
+    ).toBeGreaterThan(0);
+    // Tags rendered as chips, prettified (hyphens → spaces). Both the
+    // dateline ("§ transit · safe streets") and the tag-list spans show
+    // the prettified label.
+    expect(screen.getAllByText('transit').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/safe streets/i).length).toBeGreaterThan(0);
+    // Region with a metro kind links to /m/:slug (multiple links share
+    // the name — meta-strip + regions list + companion rail).
+    const metroLinks = screen
+      .getAllByRole('link', { name: 'New York Metro' })
+      .filter((a) => a.getAttribute('href') === '/m/nyc-metro');
+    expect(metroLinks.length).toBeGreaterThan(0);
     // Non-metro region (borough) renders as plain text, not a link.
     expect(screen.queryByRole('link', { name: 'Brooklyn' })).toBeNull();
     expect(screen.getByText('Brooklyn')).toBeDefined();
@@ -111,10 +117,16 @@ describe('Org', () => {
         screen.getByRole('heading', { level: 1, name: 'Transportation Alternatives' }),
       ).toBeDefined();
     });
-    const link = screen.getByRole('link', { name: 'transalt.org' });
-    expect(link.getAttribute('href')).toBe('https://www.transalt.org');
-    expect(link.getAttribute('target')).toBe('_blank');
-    expect(link.getAttribute('rel')).toContain('noopener');
+    // The website domain appears as a link in the org-feature header
+    // and again in the prose paragraph that points to the same URL.
+    const links = screen
+      .getAllByRole('link', { name: 'transalt.org' })
+      .filter((a) => a.getAttribute('href') === 'https://www.transalt.org');
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toContain('noopener');
+    }
   });
 
   // METRO_KINDS in Org.tsx must stay in lockstep with the server's
@@ -139,8 +151,10 @@ describe('Org', () => {
     renderAt('/orgs/transalt');
 
     await waitFor(() => {
-      const link = screen.getByRole('link', { name: 'Metro Vancouver' });
-      expect(link.getAttribute('href')).toBe('/m/metro-vancouver');
+      const links = screen
+        .getAllByRole('link', { name: 'Metro Vancouver' })
+        .filter((a) => a.getAttribute('href') === '/m/metro-vancouver');
+      expect(links.length).toBeGreaterThan(0);
     });
   });
 
@@ -175,8 +189,13 @@ describe('Org', () => {
     renderAt('/orgs/transalt');
 
     await waitFor(() => {
-      const link = screen.getByRole('link', { name: /contact/i });
-      expect(link.getAttribute('href')).toBe('https://www.transalt.org/contact');
+      // Contact URL lives in the meta-strip as an "open form →" link.
+      // Find it by href since the visible label is generic.
+      const contactLink = screen
+        .getAllByRole('link')
+        .find((a) => a.getAttribute('href') === 'https://www.transalt.org/contact');
+      expect(contactLink).toBeDefined();
+      expect(contactLink?.getAttribute('target')).toBe('_blank');
     });
   });
 
@@ -207,9 +226,19 @@ describe('Org', () => {
     await waitFor(() => {
       expect(screen.getByText(/isn.t in the atlas yet/i)).toBeDefined();
     });
-    expect(
-      screen.getByRole('link', { name: /browse/i }).getAttribute('href'),
-    ).toBe('/browse');
+    const browseLinks = screen
+      .getAllByRole('link', { name: /browse/i })
+      .filter((a) => a.getAttribute('href') === '/browse');
+    expect(browseLinks.length).toBeGreaterThan(0);
+  });
+
+  it('sets the browser tab title to the org name on success', async () => {
+    getOrgMock.mockResolvedValueOnce(makeOrg());
+    renderAt('/orgs/transalt');
+
+    await waitFor(() => {
+      expect(document.title).toMatch(/transportation alternatives.*urbanist atlas/i);
+    });
   });
 
   it('renders a non-404 ApiError as an error state', async () => {

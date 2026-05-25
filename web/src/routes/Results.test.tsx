@@ -90,19 +90,29 @@ describe('Results', () => {
         screen.getByRole('link', { name: 'Transportation Alternatives' }),
       ).toBeDefined();
     });
-    expect(screen.getByText('Brooklyn, NY')).toBeDefined();
-    expect(screen.getByText('11217')).toBeDefined();
+    // Place label appears in the deck copy.
+    expect(screen.getByText(/Brooklyn, NY/)).toBeDefined();
+    // Postal code is the h1.
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.textContent).toMatch(/11217/);
     expect(screen.getByRole('link', { name: 'Riders Alliance' })).toBeDefined();
-    expect(screen.getByText('Local')).toBeDefined();
-    expect(screen.getByText('Regional')).toBeDefined();
+    // Local + Regional section h2s.
+    const h2s = screen.getAllByRole('heading', { level: 2 });
+    const h2Text = h2s.map((h) => h.textContent ?? '').join(' | ');
+    expect(h2Text).toMatch(/local/i);
+    expect(h2Text).toMatch(/regional/i);
   });
 
   it('renders the empty prose when both tiers come back empty', async () => {
-    lookupMock.mockResolvedValueOnce(makeResult({ local: [], regional: [] }));
+    lookupMock.mockResolvedValueOnce(
+      makeResult({ local: [], regional: [] }),
+    );
     renderAt('/r/99999?country=US');
 
     await waitFor(() => {
-      expect(screen.getByText(/no groups indexed yet for 99999/i)).toBeDefined();
+      // Empty deck mentions the resolved place label and the
+      // editorial-cadence framing.
+      expect(screen.getByText(/nothing indexed yet for brooklyn, ny/i)).toBeDefined();
     });
   });
 
@@ -148,5 +158,24 @@ describe('Results', () => {
     const alert = screen.getByRole('alert');
     expect(alert.textContent).toMatch(/country.*DE.*isn.t supported/i);
     expect(lookupMock).not.toHaveBeenCalled();
+  });
+
+  it('sets the browser tab title to the postal code', async () => {
+    lookupMock.mockReturnValue(new Promise(() => {}));
+    renderAt('/r/11217?country=US');
+    await waitFor(() => {
+      expect(document.title).toMatch(/11217.*urbanist atlas/i);
+    });
+  });
+
+  it('adds a noindex,follow robots meta tag while mounted', async () => {
+    lookupMock.mockReturnValue(new Promise(() => {}));
+    const { unmount } = renderAt('/r/11217?country=US');
+    await waitFor(() => {
+      const meta = document.head.querySelector('meta[name="robots"]');
+      expect(meta?.getAttribute('content')).toBe('noindex,follow');
+    });
+    unmount();
+    expect(document.head.querySelector('meta[name="robots"]')).toBeNull();
   });
 });

@@ -1,19 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { Country } from '../lib/api.ts';
 import { normalizePostal } from '../lib/postal.ts';
-
-/**
- * Postal-code search input. Accepts a US 5-digit ZIP or a Canadian
- * postal code (3-char FSA or full 6-char). On submit it normalizes
- * the input (uppercase + strip whitespace) and navigates to
- * `/r/:postalCode?country=US|CA`.
- *
- * Country is detected heuristically from the first character (digit
- * → US, letter → CA). The override <select> was dropped — for US/CA
- * the heuristic is unambiguous, and the dropdown was visual noise.
- */
 
 type DetectedCountry = Country | null;
 
@@ -31,11 +20,6 @@ function detectCountry(raw: string): DetectedCountry {
   return null;
 }
 
-/**
- * Client-side sanity check. The API does authoritative validation;
- * this just prevents the obviously-junk submissions from making a
- * round trip and gives the user immediate feedback.
- */
 function validate(normalized: string, country: Country): string | null {
   if (normalized.length === 0) return 'Enter a ZIP or postal code.';
   if (country === 'US') {
@@ -50,12 +34,19 @@ function validate(normalized: string, country: Country): string | null {
   return null;
 }
 
+const SUGGESTIONS: ReadonlyArray<{ label: string; postal: string; country: Country }> = [
+  { label: '10027', postal: '10027', country: 'US' },
+  { label: '94110', postal: '94110', country: 'US' },
+  { label: 'M5V 1J1', postal: 'M5V1J1', country: 'CA' },
+  { label: '02139', postal: '02139', country: 'US' },
+  { label: '60607', postal: '60607', country: 'US' },
+];
+
 export function SearchBox() {
   const navigate = useNavigate();
   const [raw, setRaw] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const inputId = useId();
-
   const effectiveCountry: Country = detectCountry(raw) ?? 'US';
   const normalized = useMemo(() => normalizePostal(raw), [raw]);
 
@@ -72,19 +63,20 @@ export function SearchBox() {
   }
 
   return (
-    <form className="search-box" onSubmit={handleSubmit} noValidate>
-      <label htmlFor={inputId} className="section-label">
-        Find local groups
-      </label>
-      <div className="search-box-row">
+    <div className="lookup">
+      <div className="lookup-eyebrow">§ Look it up in the Atlas</div>
+      <h2 className="lookup-title">Find local advocates by postal code.</h2>
+      <form className="lookup-row" onSubmit={handleSubmit} noValidate>
+        <label htmlFor={inputId} className="sr-only">
+          Postal code
+        </label>
         <input
           id={inputId}
           type="text"
           name="postalCode"
-          className="search-box-input"
-          placeholder="94110 or M5V 1J1"
+          className="lookup-input"
+          placeholder="94110 · M5V 1J1 · 10027"
           autoComplete="postal-code"
-          inputMode="text"
           spellCheck={false}
           value={raw}
           onChange={(event) => {
@@ -94,19 +86,28 @@ export function SearchBox() {
           aria-invalid={submitError !== null}
           aria-describedby={submitError ? `${inputId}-error` : `${inputId}-hint`}
         />
-        <button type="submit" className="search-box-submit">
-          Look up
+        <button type="submit" className="btn-primary">
+          Look up <span className="arrow">→</span>
         </button>
-      </div>
+      </form>
       {submitError ? (
-        <p id={`${inputId}-error`} className="search-box-error" role="alert">
+        <p id={`${inputId}-error`} className="lookup-hint" role="alert" style={{ color: 'var(--amber)' }}>
           {submitError}
         </p>
       ) : (
-        <p id={`${inputId}-hint`} className="search-box-hint">
-          US ZIP (5 digits) or Canadian postal code (FSA or full).
+        <p id={`${inputId}-hint`} className="lookup-hint">
+          US ZIP (5 digits) or Canadian postal code (FSA or full). We&rsquo;ll name
+          the metro and surface the groups working there.
         </p>
       )}
-    </form>
+      <div className="lookup-suggestions">
+        <span className="label">Try one</span>
+        {SUGGESTIONS.map((s) => (
+          <Link key={s.postal} to={`/r/${s.postal}?country=${s.country}`}>
+            {s.label}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }

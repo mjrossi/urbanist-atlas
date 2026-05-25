@@ -72,16 +72,19 @@ describe('Home', () => {
     listRecentMock.mockReset();
   });
 
-  it('renders the lede column unchanged with the search box', () => {
+  it('renders the lede column unchanged with the search box', async () => {
     listMetrosMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
-    // The lede column heading is the existing slice's responsibility;
-    // assert it's still there so the aside wiring didn't disturb it.
-    expect(screen.getByText(/start with a postal code/i)).toBeDefined();
+    // The lede column still hosts the lookup card.
+    expect(screen.getByLabelText(/postal code/i)).toBeDefined();
+    expect(screen.getByText(/look it up in the atlas/i)).toBeDefined();
+    await waitFor(() => {
+      expect(document.title).toMatch(/urbanist atlas/i);
+    });
   });
 
-  it('renders the top 6 metros in the metros aside', async () => {
+  it('renders the top 7 metros in the metros rail', async () => {
     const metros = [
       makeMetro('nyc-metro', 'New York Metro', 12),
       makeMetro('sf-bay-area', 'San Francisco Bay Area', 7),
@@ -90,6 +93,7 @@ describe('Home', () => {
       makeMetro('m5', 'Metro 5', 3),
       makeMetro('m6', 'Metro 6', 2),
       makeMetro('m7', 'Metro 7', 1),
+      makeMetro('m8', 'Metro 8', 1),
     ];
     listMetrosMock.mockResolvedValueOnce(metros);
     listRecentMock.mockReturnValue(new Promise(() => {}));
@@ -98,12 +102,12 @@ describe('Home', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
-    // 7 metros provided, 6 should render; metro 7 should not appear.
-    expect(screen.queryByRole('link', { name: /metro 7/i })).toBeNull();
-    expect(screen.getByRole('link', { name: /metro 6/i })).toBeDefined();
+    // 8 metros provided, 7 should render; metro 8 should not appear.
+    expect(screen.queryByRole('link', { name: /metro 8/i })).toBeNull();
+    expect(screen.getByRole('link', { name: /metro 7/i })).toBeDefined();
   });
 
-  it('includes a "Browse all metros" link to /browse', async () => {
+  it('includes an "All metros" link to /browse', async () => {
     listMetrosMock.mockResolvedValueOnce([
       makeMetro('nyc-metro', 'New York Metro', 12),
     ]);
@@ -113,11 +117,11 @@ describe('Home', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
-    const browseLink = screen.getByRole('link', { name: /browse all metros/i });
+    const browseLink = screen.getByRole('link', { name: /all metros/i });
     expect(browseLink.getAttribute('href')).toBe('/browse');
   });
 
-  it('renders the top 5 recent orgs in the recent aside', async () => {
+  it('renders the top 4 recent orgs in the recent strip', async () => {
     listMetrosMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockResolvedValueOnce([
       makeOrg(1, 'a', 'Org A'),
@@ -125,16 +129,15 @@ describe('Home', () => {
       makeOrg(3, 'c', 'Org C'),
       makeOrg(4, 'd', 'Org D'),
       makeOrg(5, 'e', 'Org E'),
-      makeOrg(6, 'f', 'Org F'),
     ]);
     renderHome();
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Org A' })).toBeDefined();
+      expect(screen.getByRole('link', { name: /Org A/ })).toBeDefined();
     });
-    // 6 provided, 5 should render; Org F should not appear.
-    expect(screen.queryByRole('link', { name: 'Org F' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Org E' })).toBeDefined();
+    // 5 provided, 4 should render; Org E should not appear.
+    expect(screen.queryByRole('link', { name: /Org E/ })).toBeNull();
+    expect(screen.getByRole('link', { name: /Org D/ })).toBeDefined();
   });
 
   it('links each recent org name to its /orgs/:slug detail page', async () => {
@@ -144,17 +147,11 @@ describe('Home', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('link', { name: 'Transportation Alternatives' }),
+        screen.getByRole('link', { name: /Transportation Alternatives/ }),
       ).toBeDefined();
     });
-    const orgLink = screen.getByRole('link', { name: 'Transportation Alternatives' });
+    const orgLink = screen.getByRole('link', { name: /Transportation Alternatives/ });
     expect(orgLink.getAttribute('href')).toBe('/orgs/transalt');
-    // Secondary external link to the website renders the domain.
-    const domainLink = screen.getByRole('link', { name: 'transalt.example.org' });
-    expect(domainLink.getAttribute('href')).toBe('https://transalt.example.org');
-    expect(domainLink.getAttribute('target')).toBe('_blank');
-    expect(domainLink.getAttribute('rel')).toContain('noopener');
-    expect(domainLink.getAttribute('rel')).toContain('noreferrer');
   });
 
   it('renders subdued loading copy in both asides while the queries pend', () => {
@@ -166,7 +163,7 @@ describe('Home', () => {
     expect(loading.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows "Temporarily unavailable" in the metros aside on error', async () => {
+  it('shows the metro-list temporarily-unavailable message on metros error', async () => {
     listMetrosMock.mockRejectedValueOnce(
       new ApiError(
         500,
@@ -179,15 +176,13 @@ describe('Home', () => {
     renderHome();
 
     await waitFor(() => {
-      // Card still says "Browse by metro" + the descriptive fallback
-      // copy, plus an honest status pill. The contract is the graceful
-      // degradation, not the exact wording.
-      const status = screen.getAllByText(/temporarily unavailable/i);
-      expect(status.length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getByText(/metro list is temporarily unavailable/i),
+      ).toBeDefined();
     });
   });
 
-  it('shows "Temporarily unavailable" in the recent aside on error', async () => {
+  it('shows the recent-entries temporarily-unavailable message on recent error', async () => {
     listMetrosMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockRejectedValueOnce(
       new ApiError(
@@ -200,8 +195,9 @@ describe('Home', () => {
     renderHome();
 
     await waitFor(() => {
-      const status = screen.getAllByText(/temporarily unavailable/i);
-      expect(status.length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getByText(/recent entries are temporarily unavailable/i),
+      ).toBeDefined();
     });
   });
 
@@ -213,6 +209,15 @@ describe('Home', () => {
     await waitFor(() => {
       const nyc = screen.getByRole('link', { name: /new york metro/i });
       expect(nyc.getAttribute('href')).toBe('/m/nyc-metro');
+    });
+  });
+
+  it('sets the browser tab title', async () => {
+    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRecentMock.mockReturnValue(new Promise(() => {}));
+    renderHome();
+    await waitFor(() => {
+      expect(document.title).toMatch(/urbanist atlas/i);
     });
   });
 });

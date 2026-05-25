@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router';
 import { App } from './App.tsx';
 import { About } from './routes/About.tsx';
 import { Browse } from './routes/Browse.tsx';
+import { Colophon } from './routes/Colophon.tsx';
 import { Home } from './routes/Home.tsx';
 import { Metro } from './routes/Metro.tsx';
 import { NotFoundWithLayout } from './routes/NotFound.tsx';
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: 'orgs/:slug', Component: Org },
       { path: 'submit', Component: Submit },
       { path: 'about', Component: About },
+      { path: 'colophon', Component: Colophon },
     ],
   },
 ]);

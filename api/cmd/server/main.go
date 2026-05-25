@@ -51,6 +51,7 @@ func newRootCommand() *cli.Command {
 			migrateCommand(),
 			loadregionsCommand(),
 			loadpostalCommand(),
+			linkcheckCommand(),
 			seedCommand(),
 			loaddataCommand(),
 			etlCommand(),

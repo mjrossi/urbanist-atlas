@@ -1,7 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#0f0f0f"/>
-  <text x="50%" y="50%" dy="0.35em" text-anchor="middle"
-        font-family="-apple-system, system-ui, 'Segoe UI', sans-serif"
-        font-size="28" font-weight="600" letter-spacing="-1"
-        fill="#e2e2e2">MR</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  
+  <rect width="32" height="32" rx="3" ry="3" fill="#fdf6ec"></rect>
+  
+  <path fill="#8f5520" fill-rule="evenodd" d="&#xA;    M 15.4 4&#xA;    L 16.6 4&#xA;    L 28.4 27&#xA;    L 30 27&#xA;    L 30 28.6&#xA;    L 19.4 28.6&#xA;    L 19.4 27&#xA;    L 20.9 27&#xA;    L 18.7 22.4&#xA;    L 13.3 22.4&#xA;    L 11.1 27&#xA;    L 12.6 27&#xA;    L 12.6 28.6&#xA;    L 2 28.6&#xA;    L 2 27&#xA;    L 3.6 27&#xA;    Z&#xA;    M 16 10.6&#xA;    L 18 20.8&#xA;    L 14 20.8&#xA;    Z&#xA;  "></path>
 </svg>

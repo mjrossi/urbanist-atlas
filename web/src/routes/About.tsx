@@ -1,121 +1,255 @@
-/**
- * `/about` — mission / methodology / criteria / acknowledgments for
- * the Urbanist Atlas. Pure content; no data fetching.
- *
- * Uses the existing `.page` single-column treatment from global.css
- * (originally introduced in slice #14 for the Browse/Metro pages).
- * The four `<section>` blocks pick up the section-divider border
- * and the small-caps `<h2>` styling automatically.
- */
+import { Link } from 'react-router';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+
 export function About() {
-  return (
-    <div className="page">
-      <header className="page-header">
-        <h1>About the Urbanist Atlas</h1>
-        <p>
-          A directory of transit and safe-streets advocacy organizations,
-          searchable by US ZIP or Canadian postal code. A companion volume to{' '}
-          <a href="https://mjrossi.com/blog">Urbanist Lexicon</a>.
-        </p>
-      </header>
-
-      <section>
-        <h2>Mission</h2>
-        <p>
-          The Urbanist Atlas exists for a narrow reason: when someone moves to a
-          new city — or wakes up one morning angry about a dangerous
-          intersection three blocks from home — they should be able to find the
-          people already organizing for better streets and better transit
-          nearby, in under a minute.
-        </p>
-        <p>
-          National advocacy outfits do plenty of good work, but they are easy
-          to find on their own. The harder search is for the neighbourhood
-          committee, the metro-area rider alliance, the county-level Vision
-          Zero coalition. The Atlas indexes those.
-        </p>
-      </section>
-
-      <section>
-        <h2>Methodology</h2>
-        <p>
-          Entries are curated by hand. Each organization in the Atlas was
-          reviewed by an editor against the criteria below before being added.
-          There is no algorithmic ingestion and no automated scraping; the
-          directory grows one editorial decision at a time.
-        </p>
-        <p>
-          The underlying dataset is licensed under the{' '}
-          <a href="https://opendatacommons.org/licenses/odbl/">
-            Open Database License (ODbL) 1.0
-          </a>{' '}
-          and will be available for download once the API opens to the public.
-          A public submission flow arrives with the Phase 2 API-key program;
-          until then, suggestions and corrections are welcome as issues on the{' '}
-          <a href="https://github.com/mjrossi/urbanist-atlas">
-            public repository
-          </a>
-          .
-        </p>
-      </section>
-
-      <section>
-        <h2>Independence and corrections</h2>
-        <p>
-          The Atlas is an independent reference work. It is not affiliated
-          with, endorsed by, or representing any of the organizations listed
-          here. Listings are based on publicly available information and
-          editorial judgment, and they can go stale — a website lapses, a
-          coalition reorganizes, a chapter folds.
-        </p>
-        <p>
-          If you spot a broken link, an outdated description, an organization
-          that no longer exists, or a listing that misrepresents the work of
-          the people it indexes, please{' '}
-          <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
-            open an issue on GitHub
-          </a>
-          . Corrections are read and applied by the same editor who maintains
-          the directory.
-        </p>
-      </section>
-
-      <section>
-        <h2>Criteria for inclusion</h2>
-        <p>
-          The Atlas indexes organizations whose primary work is{' '}
-          <strong>transit advocacy</strong> (riders’ alliances, bus and rail
-          coalitions, transit committees) or{' '}
-          <strong>safe-streets advocacy</strong> (Vision Zero groups,
-          neighbourhood traffic-calming coalitions, pedestrian and cycling
-          alliances).
-        </p>
-        <p>
-          Out of scope, deliberately: housing and YIMBY organizations, even
-          when their priorities overlap. The directory’s job is to be useful,
-          not exhaustive, and a tighter scope makes the local-search
-          experience cleaner. Consultancies, think tanks, and academic centres
-          are also out of scope unless they double as a membership advocacy
-          organization.
-        </p>
-      </section>
-
-      <section>
-        <h2>Acknowledgments</h2>
-        <p>
-          Postal-code geography in the United States comes from the{' '}
-          <a href="https://www.census.gov">U.S. Census Bureau</a>’s ZIP Code
-          Tabulation Areas (ZCTAs); Canadian postal-code geography comes from{' '}
-          <a href="https://www.statcan.gc.ca">Statistics Canada</a>’s Postal
-          Code Conversion File. Both are public-domain or open-licensed.
-        </p>
-        <p>
-          Above all, this directory is built on the work of the organizations
-          it indexes — the volunteers, organizers, and staff who show up to
-          their city’s transportation meetings, week after week, and patiently
-          argue for better.
-        </p>
-      </section>
+  useDocumentTitle('About — Urbanist Atlas');
+  const atAGlance = (
+    <div className="rail-block amber">
+      <div className="rail-kicker">At a glance</div>
+      <ul>
+        <li>Transit + safe-streets advocacy only</li>
+        <li>United States &amp; Canada (v1)</li>
+        <li>Curated by hand, one entry at a time</li>
+        <li>ODbL 1.0 — open data with attribution</li>
+      </ul>
     </div>
+  );
+  return (
+    <>
+      <div className="kicker">
+        <div>
+          <Link to="/">Atlas</Link>
+          <span className="crumb-sep">/</span>
+          <span className="crumb-here">About</span>
+        </div>
+        <div>Volume I · 2026 Edition</div>
+      </div>
+
+      <div className="lede" style={{ marginTop: 48 }}>
+        <div className="eyebrow">
+          § About the Atlas<span className="eyebrow-rule" />
+        </div>
+        <h1>
+          A directory of <span className="accent">the people</span> doing the
+          work.
+        </h1>
+        <p className="deck">
+          The Urbanist Atlas indexes local and regional advocacy organizations
+          working on transit and safe streets across the United States and
+          Canada. Searchable by postal code. Curated by hand.
+        </p>
+      </div>
+
+      <div className="spread">
+        <main className="prose">
+          <div className="glance-mobile">{atAGlance}</div>
+          <div className="section-kicker" id="mission">§ I — Mission</div>
+          <h2>Why this exists.</h2>
+          <div className="h2-rule" />
+          <p className="lead drop">
+            The Urbanist Atlas exists for a narrow reason: when someone moves to
+            a new city — or wakes up one morning angry about a dangerous
+            intersection three blocks from home — they should be able to find
+            the people already organizing for better streets and better transit
+            nearby, in under a minute.
+          </p>
+          <p>
+            National advocacy outfits do plenty of good work, but they are easy
+            to find on their own. The harder search is for the neighbourhood
+            committee, the metro-area rider alliance, the county-level Vision
+            Zero coalition. The Atlas indexes those.
+          </p>
+          <p className="pullquote">
+            The harder search is for the neighbourhood committee, the metro-area
+            rider alliance, the county-level Vision Zero coalition.
+          </p>
+
+          <div className="section-kicker" id="methodology">
+            § II — Methodology
+          </div>
+          <h2>How we curate.</h2>
+          <div className="h2-rule" />
+          <p>
+            Entries are curated by hand. Each organization in the Atlas was
+            reviewed by an editor against the criteria below before being added.
+            There is no algorithmic ingestion and no automated scraping; the
+            directory grows one editorial decision at a time.
+          </p>
+          <h3>What gets in.</h3>
+          <div className="criteria">
+            <div className="row">
+              <p className="term">Geographic focus</p>
+              <p className="def">
+                A defined region — city, county, metro, state, or province.
+                National-only outfits are filtered from local search.
+              </p>
+              <span className="verdict yes">Required</span>
+            </div>
+            <div className="row">
+              <p className="term">Active advocacy</p>
+              <p className="def">
+                Visible public-facing work: campaigns, hearings, testimony,
+                organizing. Not just a mailing list or a 990 on file.
+              </p>
+              <span className="verdict yes">Required</span>
+            </div>
+            <div className="row">
+              <p className="term">On-topic</p>
+              <p className="def">
+                Transit advocacy or safe-streets advocacy. The two scopes the
+                Atlas exists to index.
+              </p>
+              <span className="verdict yes">Required</span>
+            </div>
+            <div className="row">
+              <p className="term">Government agencies</p>
+              <p className="def">
+                DOTs, transit boards, and their subsidiaries are out of scope —
+                even when staffers are doing the right thing.
+              </p>
+              <span className="verdict no">Excluded</span>
+            </div>
+            <div className="row">
+              <p className="term">Consultancies</p>
+              <p className="def">
+                Even pro-bono and B-Corp consultancies. The Atlas is for
+                organizations whose primary product is advocacy, not consulting.
+              </p>
+              <span className="verdict no">Excluded</span>
+            </div>
+            <div className="row">
+              <p className="term">Housing &amp; YIMBY</p>
+              <p className="def">
+                A neighbouring movement with overlapping priorities, but a
+                tighter scope keeps local search useful here.
+              </p>
+              <span className="verdict no">Excluded</span>
+            </div>
+          </div>
+
+          <div className="section-kicker" id="corrections">
+            § III — Independence and corrections
+          </div>
+          <h2>How we keep ourselves honest.</h2>
+          <div className="h2-rule" />
+          <p>
+            The Atlas is an independent reference work. It is not affiliated
+            with, endorsed by, or representing any of the organizations listed
+            here. Listings are based on publicly available information and
+            editorial judgment, and they can go stale — a website lapses, a
+            coalition reorganizes, a chapter folds.
+          </p>
+          <p>
+            If you spot a broken link, an outdated description, an organization
+            that no longer exists, or a listing that misrepresents the work of
+            the people it indexes,{' '}
+            <Link to="/submit">file a correction at the submissions desk</Link>.
+            Corrections are read and applied by the same editor who maintains
+            the directory.
+          </p>
+
+          <div className="section-kicker" id="for-developers">
+            § IV — For developers
+          </div>
+          <h2>The dataset is open.</h2>
+          <div className="h2-rule" />
+          <p>
+            The Atlas runs on a small Go service whose entire surface is
+            described by the OpenAPI document at{' '}
+            <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">
+              <code>/api/v1/openapi.yaml</code>
+            </a>
+            . The dataset is licensed under the{' '}
+            <a href="https://opendatacommons.org/licenses/odbl/">
+              Open Database License (ODbL) 1.0
+            </a>{' '}
+            for downstream reuse with attribution and share-alike. See the{' '}
+            <Link to="/colophon">colophon</Link> for the data-source and
+            licensing picture.
+          </p>
+          <p>
+            During the Phase 1 dogfood window the API sits behind a
+            shared-secret gate while we shake out schema and query bugs. The
+            Phase 2 program will open self-serve free keys. If you&rsquo;d like
+            an early key before Phase 2 — to build a directory widget, a
+            regional dashboard, anything — write to{' '}
+            <a href="mailto:hello@urbanistatlas.com?subject=Atlas%20API%20early%20access">
+              hello@urbanistatlas.com
+            </a>{' '}
+            and we&rsquo;ll set one up by hand.
+          </p>
+
+          <div className="section-kicker" id="acknowledgments">
+            § V — Acknowledgments
+          </div>
+          <h2>Who the directory rests on.</h2>
+          <div className="h2-rule" />
+          <p>
+            Postal-code geography in the United States comes from the{' '}
+            <a href="https://www.census.gov">U.S. Census Bureau</a>&rsquo;s ZIP
+            Code Tabulation Areas (ZCTAs) and the HUD USPS ZIP-to-County
+            crosswalk; Canadian postal-code geography comes from{' '}
+            <a href="https://www.statcan.gc.ca">Statistics Canada</a>&rsquo;s
+            boundary files. Both are public-domain or open-licensed.
+          </p>
+          <p>
+            Above all, this directory is built on the work of the organizations
+            it indexes — the volunteers, organizers, and staff who show up to
+            their city&rsquo;s transportation meetings, week after week, and
+            patiently argue for better.
+          </p>
+        </main>
+
+        <aside className="rail">
+          <div className="rail-block rail-toc">
+            <div className="rail-kicker">On this page</div>
+            <ul className="plain">
+              <li>
+                <a href="#mission">I &middot; Mission</a>
+              </li>
+              <li>
+                <a href="#methodology">II &middot; Methodology</a>
+              </li>
+              <li>
+                <a href="#corrections">III &middot; Independence</a>
+              </li>
+              <li>
+                <a href="#for-developers">IV &middot; For developers</a>
+              </li>
+              <li>
+                <a href="#acknowledgments">V &middot; Acknowledgments</a>
+              </li>
+            </ul>
+          </div>
+          <div className="glance-desktop">{atAGlance}</div>
+          <div className="rail-block">
+            <div className="rail-kicker">Get in touch</div>
+            <p>
+              For tips, corrections, or removal requests, the{' '}
+              <Link to="/submit">submissions desk</Link> is the front door.
+            </p>
+            <p style={{ marginBottom: 0 }}>
+              For anything sensitive:{' '}
+              <a href="mailto:hello@urbanistatlas.com">
+                hello@urbanistatlas.com
+              </a>
+              .
+            </p>
+          </div>
+          <div className="rail-block muted">
+            <div className="rail-kicker">Colophon</div>
+            <p style={{ fontSize: 14 }}>
+              Set in <em>Fraunces</em> &amp; <em>Source Serif 4</em> for display
+              and body, <em>Inter</em> for captions,{' '}
+              <em>JetBrains Mono</em> for URLs and code.
+            </p>
+            <p style={{ fontSize: 14, marginBottom: 0 }}>
+              See the <Link to="/colophon">full colophon</Link> for sources,
+              stack, and licensing.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </>
   );
 }
