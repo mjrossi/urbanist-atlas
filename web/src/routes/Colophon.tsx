@@ -1,119 +1,135 @@
+import { Link } from 'react-router';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
-/**
- * `/colophon` — the receipts page. Pinned data-source vintages, the
- * stack lineup, the typography credit, and the dataset attribution
- * block shown verbatim as the API returns it. Pure content; no data
- * fetching. Same `.page` shell as About.
- */
 export function Colophon() {
   useDocumentTitle('Colophon — Urbanist Atlas');
   return (
-    <div className="page">
-      <header className="page-header">
-        <h1>Colophon</h1>
-        <p>
-          <em>
-            What the Atlas is built from — the upstream data, the stack, the
-            type, the licensing. A short page of receipts for the curious.
-          </em>
-        </p>
-      </header>
+    <>
+      <div className="kicker">
+        <div>
+          <Link to="/">Atlas</Link>
+          <span className="crumb-sep">/</span>
+          <span className="crumb-here">Colophon</span>
+        </div>
+        <div>Volume I · 2026 Edition</div>
+      </div>
 
-      <section>
-        <h2>Data sources</h2>
-        <p>
-          United States postal-code geography comes from the{' '}
-          <a href="https://www.census.gov">U.S. Census Bureau</a>’s ZIP Code
-          Tabulation Area crosswalks (2020 vintage), backfilled by the{' '}
-          <a href="https://www.huduser.gov/portal/dataset/uspszip-api.html">
-            HUD USPS ZIP-to-County crosswalk
-          </a>{' '}
-          (2026 Q1 release) for the ~9,000 operational ZIPs that exist only as
-          P.O. boxes, single buildings, or APO/FPO military codes. Metropolitan
-          regions come from the Census Bureau’s CBSA delineation file (July
-          2023).
+      <div className="lede" style={{ marginTop: 48 }}>
+        <div className="eyebrow">
+          § The colophon<span className="eyebrow-rule" />
+        </div>
+        <h1>
+          What the Atlas <span className="accent">is built from.</span>
+        </h1>
+        <p className="deck">
+          A short page of receipts. The upstream data, the stack, the type, the
+          licensing — and the share-alike obligation the API carries in-band on
+          every response.
         </p>
-        <p>
-          Canadian postal-code geography and metropolitan regions come from{' '}
-          <a href="https://www.statcan.gc.ca">Statistics Canada</a>’s Forward
-          Sortation Area and Census Metropolitan Area boundary files (2021
-          census).
-        </p>
-        <p>
-          Organizations, editorial overrides, and the curated city/borough
-          region graph are hand-maintained in TOML files in the{' '}
-          <a href="https://github.com/mjrossi/urbanist-atlas">public repository</a>.
-          There is no algorithmic ingestion. The directory grows one editorial
-          decision at a time.
-        </p>
-      </section>
+      </div>
 
-      <section>
-        <h2>Stack</h2>
-        <p>
-          The API is a small Go service — standard-library-first, with chi for
-          HTTP routing, sqlc for type-safe SQL, pgx for the Postgres driver,
-          and goose for migrations. It runs on{' '}
-          <a href="https://fly.io">Fly.io</a> in Virginia, with a sibling
-          Postgres 17 app on a 1 GB volume reached over Fly’s private network.
-          Nightly <code>pg_dump</code> backups land in Cloudflare R2 with
-          thirty-day retention.
-        </p>
-        <p>
-          The web app is a React + Vite SPA, with TanStack Query for server
-          state and React Router for navigation. It deploys to Cloudflare
-          Workers + Pages as static assets with SPA fallback. The wire
-          contract between the two halves lives in a single OpenAPI document
-          that both sides codegen from — no hand-rolled types on either edge.
-        </p>
-        <p>
-          Continuous integration and deploys run on GitHub Actions. The
-          maintainer pushes to <code>main</code>; the API redeploys
-          automatically after migrations run, the web app builds and uploads,
-          and a post-deploy smoke test verifies the live API. The roadmap and
-          the editorial decision log are in the public repository alongside
-          the code.
-        </p>
-      </section>
+      <div className="spread">
+        <main className="prose">
+          <div className="section-kicker">§ I — Data sources</div>
+          <h2>Where the geography comes from.</h2>
+          <div className="h2-rule" />
+          <p>
+            United States postal-code geography comes from the{' '}
+            <a href="https://www.census.gov">U.S. Census Bureau</a>&rsquo;s ZIP
+            Code Tabulation Area crosswalks (2020 vintage), backfilled by the{' '}
+            <a href="https://www.huduser.gov/portal/dataset/uspszip-api.html">
+              HUD USPS ZIP-to-County crosswalk
+            </a>{' '}
+            (2026 Q1 release) for the ~9,000 operational ZIPs that exist only as
+            P.O. boxes, single buildings, or APO/FPO military codes.
+            Metropolitan regions come from the Census Bureau&rsquo;s CBSA
+            delineation file (July 2023).
+          </p>
+          <p>
+            Canadian postal-code geography and metropolitan regions come from{' '}
+            <a href="https://www.statcan.gc.ca">Statistics Canada</a>&rsquo;s
+            Forward Sortation Area and Census Metropolitan Area boundary files
+            (2021 census).
+          </p>
+          <p>
+            Organizations, editorial overrides, and the curated city/borough
+            region graph are hand-maintained in TOML files in the{' '}
+            <a href="https://github.com/mjrossi/urbanist-atlas">
+              public repository
+            </a>
+            . There is no algorithmic ingestion. The directory grows one
+            editorial decision at a time.
+          </p>
 
-      <section>
-        <h2>Type</h2>
-        <p>
-          Headlines are set in <strong>Fraunces</strong>, the variable-axis
-          serif used in <a href="https://mjrossi.com/blog">Urbanist Lexicon</a>{' '}
-          (this project’s sibling publication, from which the broadsheet
-          identity is inherited). Body copy is{' '}
-          <strong>Source Serif 4</strong>; user-interface chrome (the
-          navigation, the search box, the form fields) is{' '}
-          <strong>Inter</strong>. All three families are self-hosted via the
-          Fontsource variable packages — no external font requests on any
-          page.
-        </p>
-      </section>
+          <div className="section-kicker">§ II — Stack</div>
+          <h2>How the Atlas runs.</h2>
+          <div className="h2-rule" />
+          <p>
+            The API is a small Go service — standard-library-first, with chi for
+            HTTP routing, sqlc for type-safe SQL, pgx for the Postgres driver,
+            and goose for migrations. It runs on{' '}
+            <a href="https://fly.io">Fly.io</a> in Virginia, with a sibling
+            Postgres 17 app reached over Fly&rsquo;s private network. Nightly
+            <code> pg_dump </code> backups land in Cloudflare R2 with thirty-day
+            retention.
+          </p>
+          <p>
+            The web app is a React + Vite SPA, with TanStack Query for server
+            state and React Router for navigation. It deploys to Cloudflare
+            Workers + Pages as static assets with SPA fallback. The wire
+            contract between the two halves lives in a single OpenAPI document
+            that both sides codegen from — no hand-rolled types on either edge.
+          </p>
 
-      <section>
-        <h2>Licensing</h2>
-        <p>
-          The code is released under <strong>Apache 2.0</strong>. Documentation
-          and prose are <strong>CC BY-SA 4.0</strong>. The dataset itself —
-          every organization entry, every region row, every postal-code
-          mapping — is released under the{' '}
-          <a href="https://opendatacommons.org/licenses/odbl/">
-            Open Database License (ODbL) 1.0
-          </a>
-          .
-        </p>
-        <p>
-          Every successful response from the public API carries the
-          attribution in-band as HTTP headers, and collection responses also
-          carry it in a <code>meta</code> envelope, so downstream consumers
-          can’t miss the share-alike obligation. The block as it appears on
-          the wire:
-        </p>
-        <pre className="colophon-attribution">
-          <code>
-{`X-Data-License: ODbL-1.0
+          <div className="section-kicker">§ III — Type</div>
+          <h2>The broadsheet vocabulary.</h2>
+          <div className="h2-rule" />
+          <p>
+            Headlines are set in <strong>Fraunces</strong>, the variable-axis
+            serif used in <a href="https://mjrossi.com/blog">Urbanist Lexicon</a>{' '}
+            (this project&rsquo;s sibling publication, from which the broadsheet
+            identity is inherited). Body copy is{' '}
+            <strong>Source Serif 4</strong>; user-interface chrome is{' '}
+            <strong>Inter</strong>; URLs and code are{' '}
+            <strong>JetBrains Mono</strong>. All four families are self-hosted
+            via the Fontsource variable packages — no external font requests on
+            any page.
+          </p>
+
+          <div className="section-kicker">§ IV — Licensing</div>
+          <h2>What you can take, what you owe back.</h2>
+          <div className="h2-rule" />
+          <p>
+            The code is released under <strong>Apache 2.0</strong>. Documentation
+            and prose are <strong>CC BY-SA 4.0</strong>. The dataset itself —
+            every organization entry, every region row, every postal-code
+            mapping — is released under the{' '}
+            <a href="https://opendatacommons.org/licenses/odbl/">
+              Open Database License (ODbL) 1.0
+            </a>
+            .
+          </p>
+          <p>
+            Every successful response from the public API carries the
+            attribution in-band as HTTP headers, and collection responses also
+            carry it in a <code>meta</code> envelope, so downstream consumers
+            can&rsquo;t miss the share-alike obligation. The block as it appears
+            on the wire:
+          </p>
+          <pre
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 13,
+              lineHeight: 1.55,
+              background: 'var(--paper-2)',
+              border: '1px solid var(--rule)',
+              padding: '18px 22px',
+              overflowX: 'auto',
+              color: 'var(--ink-2)',
+            }}
+          >
+            <code>
+              {`X-Data-License: ODbL-1.0
 X-Data-Attribution: https://urbanistatlas.com
 
 {
@@ -124,37 +140,66 @@ X-Data-Attribution: https://urbanistatlas.com
   },
   "data": [...]
 }`}
-          </code>
-        </pre>
-      </section>
+            </code>
+          </pre>
 
-      <section>
-        <h2>Editorial cadence</h2>
-        <p>
-          The Atlas indexes organizations whose primary work is transit
-          advocacy or safe-streets advocacy, in the United States and Canada
-          (v1). National umbrella organizations are filtered from the default
-          local search; they’re easy to find on their own, and the Atlas
-          earns its keep on the harder local-and-regional layer. Housing,
-          consultancies, and academic centres are out of scope unless they
-          double as a membership advocacy organization. The criteria are
-          spelled out in detail on the{' '}
-          <a href="/about">About page</a>.
-        </p>
-        <p>
-          Listings drift — websites lapse, coalitions reorganize, chapters
-          fold. The editor runs a link-rot pass with the bundled{' '}
-          <code>just linkcheck</code> tool before each significant editorial
-          update, triages the report, and ships corrections as data-only
-          commits. Corrections from readers are read and applied by the same
-          editor; the channel is the{' '}
-          <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
-            issue tracker
-          </a>{' '}
-          today, and a moderated submission queue ships with the Phase 2
-          API-key program.
-        </p>
-      </section>
-    </div>
+          <div className="section-kicker">§ V — Editorial cadence</div>
+          <h2>How the directory stays current.</h2>
+          <div className="h2-rule" />
+          <p>
+            Listings drift — websites lapse, coalitions reorganize, chapters
+            fold. The editor runs a link-rot pass with the bundled{' '}
+            <code>just linkcheck</code> tool before each significant editorial
+            update, triages the report, and ships corrections as data-only
+            commits. Corrections from readers are read and applied by the same
+            editor; the channel is the{' '}
+            <Link to="/submit">submissions desk</Link> today, and a moderated
+            in-app queue ships with the Phase 2 API-key program.
+          </p>
+        </main>
+
+        <aside className="rail">
+          <div className="rail-block">
+            <div className="rail-kicker">Quick links</div>
+            <ul className="plain">
+              <li>
+                <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">
+                  OpenAPI spec
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/mjrossi/urbanist-atlas">
+                  Source on GitHub
+                </a>
+              </li>
+              <li>
+                <Link to="/about#for-developers">Developer preview</Link>
+              </li>
+              <li>
+                <Link to="/submit">Submissions desk</Link>
+              </li>
+            </ul>
+          </div>
+          <div className="rail-block amber">
+            <div className="rail-kicker">Licensing at a glance</div>
+            <ul>
+              <li>Code · Apache 2.0</li>
+              <li>Prose · CC BY-SA 4.0</li>
+              <li>Dataset · ODbL 1.0 (share-alike)</li>
+              <li>Attribution required in headers</li>
+            </ul>
+          </div>
+          <div className="rail-block muted">
+            <div className="rail-kicker">Type</div>
+            <p style={{ fontSize: 14 }}>
+              Set in <em>Fraunces</em>, <em>Source Serif 4</em>,{' '}
+              <em>Inter</em>, and <em>JetBrains Mono</em>. Cream{' '}
+              <code>#FDF6EC</code>, amber <code>#8F5520</code>, ink{' '}
+              <code>#1A1612</code>.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </>
   );
 }

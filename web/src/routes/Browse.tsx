@@ -1,20 +1,58 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { ApiError, listMetros } from '../lib/api.ts';
 import type { MetroSummary } from '../lib/api.ts';
-import { groupCountLabel } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
-/**
- * `/browse` — single-column directory of every metro region with an
- * approved-org count. Reuses the same `.page` shell as the lookup
- * results page, but with a flat list of metros rather than the
- * Local/Regional split.
- *
- * Ordering matches what the API returns (`org_count` descending);
- * this component does not re-sort.
- */
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+const COUNTRY_TITLES: Record<string, string> = {
+  US: 'United States',
+  CA: 'Canada',
+};
+
+interface ByLetter {
+  letter: string;
+  metros: MetroSummary[];
+}
+
+interface ByCountry {
+  country: string;
+  total: MetroSummary[];
+  letters: ByLetter[];
+}
+
+function letterOf(name: string): string {
+  const m = name.trim().toUpperCase().match(/[A-Z]/);
+  return m ? m[0] : '#';
+}
+
+function groupForBrowse(all: ReadonlyArray<MetroSummary>): ByCountry[] {
+  const byCountry: Record<string, MetroSummary[]> = {};
+  for (const m of all) {
+    const c = m.region.country;
+    if (!byCountry[c]) byCountry[c] = [];
+    byCountry[c].push(m);
+  }
+  return Object.entries(byCountry)
+    .sort(([a], [b]) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)))
+    .map(([country, metros]) => {
+      const sorted = [...metros].sort((a, b) => a.region.name.localeCompare(b.region.name));
+      const grouped: Record<string, MetroSummary[]> = {};
+      for (const m of sorted) {
+        const letter = letterOf(m.region.name);
+        if (!grouped[letter]) grouped[letter] = [];
+        grouped[letter].push(m);
+      }
+      const letters = Object.entries(grouped)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([letter, metros]) => ({ letter, metros }));
+      return { country, total: sorted, letters };
+    });
+}
+
 export function Browse() {
   useDocumentTitle('Browse metros — Urbanist Atlas');
   const query = useQuery<MetroSummary[], ApiError>({
@@ -22,92 +60,180 @@ export function Browse() {
     queryFn: ({ signal }) => listMetros({ signal }),
   });
 
+  const grouped = useMemo(() => groupForBrowse(query.data ?? []), [query.data]);
+  const availableLetters = useMemo(() => {
+    const s = new Set<string>();
+    for (const g of grouped) for (const l of g.letters) s.add(l.letter);
+    return s;
+  }, [grouped]);
+
+  const totalMetros = query.data?.length ?? null;
+  const totalOrgs = query.data?.reduce((sum, m) => sum + m.org_count, 0) ?? null;
+
   return (
-    <div className="page">
-      <header className="page-header">
-        <h1>Browse by metro</h1>
+    <>
+      <div className="kicker">
+        <div>
+          <Link to="/">Atlas</Link>
+          <span className="crumb-sep">/</span>
+          <span className="crumb-here">The index</span>
+        </div>
+        <div>
+          {totalMetros !== null && totalOrgs !== null
+            ? `${totalMetros} metros · ${totalOrgs}+ org entries`
+            : 'The index'}
+        </div>
+      </div>
+
+      <div className="spread lede-first" style={{ marginTop: 48 }}>
+        <div className="lede" style={{ marginBottom: 0 }}>
+          <div className="eyebrow">
+            § The index<span className="eyebrow-rule" />
+          </div>
+          <h1>
+            Every metro <span className="accent">we&rsquo;ve indexed</span> —
+            alphabetical.
+          </h1>
+          <p className="deck">
+            Useful when you want to wander rather than search. Open a metro for
+            the groups working there, or jump to a letter on the strip below.
+          </p>
+        </div>
+        <div className="rail-block muted" style={{ marginTop: 12 }}>
+          <div className="rail-kicker">Sorting</div>
+          <p>
+            Metros are sorted alphabetically within each country. The number in
+            italic is the count of organizations the Atlas currently lists for
+            that region.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            Searching by ZIP or postal code?{' '}
+            <Link to="/">Use the front-page lookup</Link>.
+          </p>
+        </div>
+      </div>
+
+      <BrowseBody query={query} grouped={grouped} availableLetters={availableLetters} />
+
+      <section className="editors-note" style={{ marginTop: 56 }}>
+        <div className="label">Don&rsquo;t see your region?</div>
         <p>
-          A directory of the metropolitan regions the Atlas has indexed so far,
-          with the number of organizations active in each.
+          We index a metro once we&rsquo;ve verified at least one active group
+          working there, and we add new entries as editors get to them. If your
+          city is missing, tell us where to look —{' '}
+          <Link to="/submit">file a tip at the submissions desk</Link>.
         </p>
-        <p>
-          Useful when you want to wander rather than search. Open a metro for
-          the list of groups working there.
-        </p>
-      </header>
-      <BrowseBody query={query} />
-    </div>
+      </section>
+    </>
   );
 }
 
 function BrowseBody({
   query,
+  grouped,
+  availableLetters,
 }: {
   query: ReturnType<typeof useQuery<MetroSummary[], ApiError>>;
+  grouped: ByCountry[];
+  availableLetters: Set<string>;
 }) {
   if (query.isPending) {
-    return (
-      <p className="results-state" role="status">
-        Loading metros…
-      </p>
-    );
+    return <p className="results-state" role="status">Loading the index…</p>;
   }
   if (query.isError) {
-    const err = query.error;
     return (
       <p className="results-state error" role="alert">
-        {err.message}
-        {err.requestId ? (
-          <span className="results-state-detail">request id: {err.requestId}</span>
-        ) : null}
+        {query.error.message}
       </p>
     );
   }
-  if (query.data.length === 0) {
-    return (
-      <p className="results-state">
-        No metros indexed yet — try the search box at the top of every page.
-      </p>
-    );
+  if (grouped.length === 0) {
+    return <p className="results-state">No metros indexed yet.</p>;
   }
   return (
-    <section aria-labelledby="browse-section">
-      <h2 id="browse-section" className="section-label">
-        Metros
-      </h2>
-      <ul className="entry-list">
-        {query.data.map((m) => (
-          <MetroRow key={m.region.slug} metro={m} />
-        ))}
-      </ul>
+    <>
+      <div className="az-index" aria-label="Jump to letter">
+        <span className="az-label">Jump to</span>
+        {ALPHABET.map((letter) =>
+          availableLetters.has(letter) ? (
+            <a key={letter} href={`#${letter}`}>
+              {letter}
+            </a>
+          ) : (
+            <span key={letter} className="dim">
+              {letter}
+            </span>
+          ),
+        )}
+      </div>
+      {grouped.map((country) => (
+        <CountrySection key={country.country} country={country} />
+      ))}
+    </>
+  );
+}
+
+function CountrySection({ country }: { country: ByCountry }) {
+  const total = country.total.length;
+  const orgs = country.total.reduce((sum, m) => sum + m.org_count, 0);
+  const name = COUNTRY_TITLES[country.country] ?? country.country;
+  return (
+    <section className="country-section">
+      <header className="country-head">
+        <h2 className="cname">{name}</h2>
+        <div className="crule" />
+        <div className="cnum">
+          <span className="em">{total}</span> metros ·{' '}
+          <span className="em">{orgs}+</span> orgs
+        </div>
+      </header>
+      {country.letters.map((group) => (
+        <LetterRow key={group.letter} letter={group.letter} metros={group.metros} />
+      ))}
     </section>
   );
 }
 
-function MetroRow({ metro }: { metro: MetroSummary }) {
-  const { region, org_count } = metro;
+function LetterRow({ letter, metros }: { letter: string; metros: MetroSummary[] }) {
+  const half = Math.ceil(metros.length / 2);
+  const colA = metros.slice(0, half);
+  const colB = metros.slice(half);
   return (
-    <li className="entry">
-      <div className="entry-header">
-        <h3 className="entry-name">
-          <Link to={`/m/${region.slug}`}>{region.name}</Link>
-        </h3>
-        <span className="entry-domain">{groupCountLabel(org_count)}</span>
+    <div className="index-letter-row" id={letter}>
+      <div className="index-letter">
+        {letter}
+        <span className="meta">
+          {metros.length} {metros.length === 1 ? 'metro' : 'metros'}
+        </span>
       </div>
-      <p className="entry-desc">{datelineFor(region)}</p>
-    </li>
+      <div>
+        {colA.map((m) => (
+          <IndexRow key={m.region.slug} metro={m} />
+        ))}
+      </div>
+      <div>
+        {colB.map((m) => (
+          <IndexRow key={m.region.slug} metro={m} />
+        ))}
+      </div>
+    </div>
   );
 }
 
-function datelineFor(region: MetroSummary['region']): string {
-  // Country first, parent slugs after, so a Portuguese metro reads
-  // "PT · NUTS II Grande Lisboa" rather than the other way round. The
-  // parent_slugs are just slugs (no names yet), so we render them in
-  // small caps as a quiet hint about where this metro sits in the
-  // graph; the canonical hierarchy lives on the metro detail page.
-  const parts = [region.country];
-  if (region.parent_slugs.length > 0) {
-    parts.push(region.parent_slugs.join(' · '));
-  }
-  return parts.join(' · ');
+function IndexRow({ metro }: { metro: MetroSummary }) {
+  const { region, org_count } = metro;
+  const subtitle = region.parent_slugs[0] ?? region.country.toLowerCase();
+  return (
+    <Link className="index-row" to={`/m/${region.slug}`}>
+      <div>
+        <span className="iname">{region.name}</span>
+        <span className="imeta">
+          {region.country} · {subtitle}
+        </span>
+      </div>
+      <span className="icount">
+        {org_count} <span className="total">{org_count === 1 ? 'group' : 'groups'}</span>
+      </span>
+    </Link>
+  );
 }
