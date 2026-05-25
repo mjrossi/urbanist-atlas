@@ -44,10 +44,19 @@ describe('About', () => {
   it('mentions the ODbL license', () => {
     renderAbout();
     expect(screen.getAllByText(/odbl/i).length).toBeGreaterThan(0);
-    // And links out to opendatacommons.org.
-    const odblLink = screen
-      .getAllByRole('link')
-      .find((a) => a.getAttribute('href')?.includes('opendatacommons.org'));
+    // And links out to opendatacommons.org. Parse the URL and check
+    // the hostname rather than a substring match so a path like
+    // `/opendatacommons.org/` on a different host can't satisfy the
+    // assertion (CodeQL js/incomplete-url-substring-sanitization).
+    const odblLink = screen.getAllByRole('link').find((a) => {
+      const href = a.getAttribute('href');
+      if (!href) return false;
+      try {
+        return new URL(href).hostname === 'opendatacommons.org';
+      } catch {
+        return false;
+      }
+    });
     expect(odblLink).toBeDefined();
   });
 
