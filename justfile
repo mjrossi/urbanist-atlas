@@ -92,6 +92,13 @@ api-sqlc-gen:
 api-oapi-gen:
     cd api && mise exec -- go generate ./...
 
+# run the link checker over the seed orgs, write to /tmp/links.tsv
+[group('api')]
+[doc('check website_url for every seed org and write a TSV report')]
+linkcheck:
+    cd api && go run ./cmd/server linkcheck --src ./seed/orgs.toml --out /tmp/links.tsv
+    @echo "report: /tmp/links.tsv"
+
 # run the postgres-backed integration tests under the `integration`
 # build tag (requires Docker). Cheap default test suite stays
 # tag-free so `just api-test` keeps running on machines without

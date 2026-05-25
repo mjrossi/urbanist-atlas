@@ -136,6 +136,36 @@ Then commit the seed-file diffs (not the upstream sources) and run
 [`etl/SOURCES.md`](../etl/SOURCES.md) with the new vintage's
 checksums in the same PR.
 
+## Handling link rot
+
+Org websites move, shut down, or get squatted. The `linkcheck`
+subcommand probes every `website_url` in `api/seed/orgs.toml` and
+writes a TSV report with the actionable rows (transport errors,
+HTTP >= 400) sorted to the top:
+
+```sh
+just linkcheck
+# or, for a custom path:
+urbanist-atlas-server linkcheck --out /tmp/links.tsv
+```
+
+Run it before significant editorial passes — once a month is plenty;
+this is editorial cadence, not CI. A flapping site (intermittent
+500s, slow TLS handshake, captive portal) would make CI noise without
+catching real rot, so the report stays a human-driven step.
+
+Triage rules:
+
+- **Dead URL with a clear successor** (org rebranded, moved
+  domains) → edit `website_url` in place.
+- **Org has visibly shut down** (404 with no forwarding, dead
+  social, no recent activity) → **delete** the entry. No
+  `archived = true` field; the dataset stays current-state.
+- **Hijacked URL** (domain expired and a parked-page / casino /
+  unrelated site took it over) → delete the entry and note the
+  hijack in the slice commit message so the history records why
+  the entry vanished.
+
 ## Adding a new country
 
 Out of scope until v1.1+. US + CA are the only shipping countries in
