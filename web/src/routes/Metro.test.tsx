@@ -133,6 +133,15 @@ describe('Metro', () => {
     });
   });
 
+  it('sets the browser tab title to the metro name on success', async () => {
+    getMetroMock.mockResolvedValueOnce(makeDetail());
+    renderAt('/m/nyc-metro');
+
+    await waitFor(() => {
+      expect(document.title).toMatch(/new york metro.*urbanist atlas/i);
+    });
+  });
+
   it('renders a non-404 ApiError as an error state, not the 404 empty-state', async () => {
     getMetroMock.mockRejectedValueOnce(
       new ApiError(

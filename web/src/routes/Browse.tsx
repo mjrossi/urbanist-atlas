@@ -4,6 +4,7 @@ import { ApiError, listMetros } from '../lib/api.ts';
 import type { MetroSummary } from '../lib/api.ts';
 import { groupCountLabel } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 /**
  * `/browse` — single-column directory of every metro region with an
@@ -15,6 +16,7 @@ import { queryKeys } from '../lib/queryKeys.ts';
  * this component does not re-sort.
  */
 export function Browse() {
+  useDocumentTitle('Browse metros — Urbanist Atlas');
   const query = useQuery<MetroSummary[], ApiError>({
     queryKey: queryKeys.metros(),
     queryFn: ({ signal }) => listMetros({ signal }),

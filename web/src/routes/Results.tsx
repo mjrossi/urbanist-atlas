@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router';
 import { Dateline } from '../components/Dateline.tsx';
@@ -7,6 +7,7 @@ import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
 import type { Country, LookupOrg, LookupResult, Region } from '../lib/api.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 /**
  * `/r/:postalCode` — resolves the postal code via `GET /api/v1/lookup`
@@ -70,6 +71,21 @@ export function Results() {
     queryFn: ({ signal }) => lookup(postalCode, effectiveCountry, { signal }),
     enabled: postalCode.length > 0 && country !== null,
   });
+
+  useDocumentTitle(
+    postalCode ? `${postalCode} — Urbanist Atlas` : 'Lookup — Urbanist Atlas',
+  );
+  // /r/:postalCode covers ~35k permutations; let crawlers follow the
+  // org links out but keep the thin per-ZIP pages out of the index.
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex,follow';
+    document.head.appendChild(meta);
+    return () => {
+      meta.remove();
+    };
+  }, []);
 
   const placeLabel = query.data?.resolved_place_label;
   const ancestry = query.data?.resolved_ancestry ?? [];

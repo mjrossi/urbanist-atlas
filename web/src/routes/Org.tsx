@@ -4,6 +4,7 @@ import { TagChip } from '../components/TagChip.tsx';
 import { ApiError, getOrg } from '../lib/api.ts';
 import type { Org as OrgT, Region } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 /**
  * `/orgs/:slug` — the addressable detail page for one organization.
@@ -25,6 +26,12 @@ export function Org() {
     queryFn: ({ signal }) => getOrg(slug, { signal }),
     enabled: slug.length > 0,
   });
+
+  useDocumentTitle(
+    query.data
+      ? `${query.data.name} — Urbanist Atlas`
+      : 'Loading organization — Urbanist Atlas',
+  );
 
   return (
     <div className="page">

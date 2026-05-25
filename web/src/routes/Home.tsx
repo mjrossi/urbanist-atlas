@@ -7,6 +7,7 @@ import { ApiError, listMetros, listRecent } from '../lib/api.ts';
 import type { MetroSummary, Org } from '../lib/api.ts';
 import { groupCountLabel } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 /** How many metros the home-page aside shows before linking to /browse. */
 const METROS_LIMIT = 6;
@@ -25,6 +26,7 @@ const RECENT_LIMIT = 5;
  * troubled.
  */
 export function Home() {
+  useDocumentTitle('Urbanist Atlas — Transit and safe-streets advocacy near you');
   const metros = useQuery<MetroSummary[], ApiError>({
     queryKey: queryKeys.metros(),
     queryFn: ({ signal }) => listMetros({ signal }),

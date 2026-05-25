@@ -4,6 +4,7 @@ import { Entry } from '../components/Entry.tsx';
 import { ApiError, getMetro } from '../lib/api.ts';
 import type { LookupOrg, MetroDetail, Org } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 /**
  * `/m/:metroSlug` — one metro region and the approved organizations
@@ -22,6 +23,12 @@ export function Metro() {
     queryFn: ({ signal }) => getMetro(slug, { signal }),
     enabled: slug.length > 0,
   });
+
+  useDocumentTitle(
+    query.data
+      ? `${query.data.region.name} — Urbanist Atlas`
+      : 'Loading metro — Urbanist Atlas',
+  );
 
   return (
     <div className="page">

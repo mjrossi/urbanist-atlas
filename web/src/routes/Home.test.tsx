@@ -215,4 +215,13 @@ describe('Home', () => {
       expect(nyc.getAttribute('href')).toBe('/m/nyc-metro');
     });
   });
+
+  it('sets the browser tab title', async () => {
+    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRecentMock.mockReturnValue(new Promise(() => {}));
+    renderHome();
+    await waitFor(() => {
+      expect(document.title).toMatch(/urbanist atlas/i);
+    });
+  });
 });

@@ -149,4 +149,23 @@ describe('Results', () => {
     expect(alert.textContent).toMatch(/country.*DE.*isn.t supported/i);
     expect(lookupMock).not.toHaveBeenCalled();
   });
+
+  it('sets the browser tab title to the postal code', async () => {
+    lookupMock.mockReturnValue(new Promise(() => {}));
+    renderAt('/r/11217?country=US');
+    await waitFor(() => {
+      expect(document.title).toMatch(/11217.*urbanist atlas/i);
+    });
+  });
+
+  it('adds a noindex,follow robots meta tag while mounted', async () => {
+    lookupMock.mockReturnValue(new Promise(() => {}));
+    const { unmount } = renderAt('/r/11217?country=US');
+    await waitFor(() => {
+      const meta = document.head.querySelector('meta[name="robots"]');
+      expect(meta?.getAttribute('content')).toBe('noindex,follow');
+    });
+    unmount();
+    expect(document.head.querySelector('meta[name="robots"]')).toBeNull();
+  });
 });

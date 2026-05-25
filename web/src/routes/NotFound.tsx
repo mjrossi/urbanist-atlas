@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { BroadsheetNav } from '../components/BroadsheetNav.tsx';
 import { Footer } from '../components/Footer.tsx';
 import { Masthead } from '../components/Masthead.tsx';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 /**
  * Newspaper-style 404. Wired as `errorElement` on the root route in
@@ -16,6 +17,7 @@ import { Masthead } from '../components/Masthead.tsx';
  * to be reconstructed.
  */
 export function NotFound() {
+  useDocumentTitle('Page not in this edition — Urbanist Atlas');
   return (
     <div className="page">
       <header className="page-header">

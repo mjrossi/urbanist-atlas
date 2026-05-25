@@ -133,4 +133,12 @@ describe('Browse', () => {
       expect(alert.textContent).toContain('Database is on fire');
     });
   });
+
+  it('sets the browser tab title', async () => {
+    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    renderBrowse();
+    await waitFor(() => {
+      expect(document.title).toMatch(/browse.*urbanist atlas/i);
+    });
+  });
 });

@@ -212,6 +212,15 @@ describe('Org', () => {
     ).toBe('/browse');
   });
 
+  it('sets the browser tab title to the org name on success', async () => {
+    getOrgMock.mockResolvedValueOnce(makeOrg());
+    renderAt('/orgs/transalt');
+
+    await waitFor(() => {
+      expect(document.title).toMatch(/transportation alternatives.*urbanist atlas/i);
+    });
+  });
+
   it('renders a non-404 ApiError as an error state', async () => {
     getOrgMock.mockRejectedValueOnce(
       new ApiError(

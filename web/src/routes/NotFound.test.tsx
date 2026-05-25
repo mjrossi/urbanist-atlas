@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { NotFound } from './NotFound.tsx';
 
@@ -44,5 +44,12 @@ describe('NotFound', () => {
     const { container } = renderNotFound();
     expect(container.querySelector('.page')).not.toBeNull();
     expect(container.querySelector('.page-header')).not.toBeNull();
+  });
+
+  it('sets the browser tab title', async () => {
+    renderNotFound();
+    await waitFor(() => {
+      expect(document.title).toMatch(/page not in this edition.*urbanist atlas/i);
+    });
   });
 });
