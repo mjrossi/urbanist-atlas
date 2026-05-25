@@ -735,8 +735,10 @@ a {
   flex-shrink: 0;
 }
 
-.btn-primary:hover {
-  background: var(--ink);
+@media (hover: hover) {
+  .btn-primary:hover {
+    background: var(--ink);
+  }
 }
 
 .btn-primary:active {
@@ -758,8 +760,10 @@ a {
   transition: transform 120ms ease;
 }
 
-.btn-primary:hover .arrow {
-  transform: translateX(3px);
+@media (hover: hover) {
+  .btn-primary:hover .arrow {
+    transform: translateX(3px);
+  }
 }
 
 .btn-ghost {
@@ -1204,14 +1208,15 @@ a.tag:hover::before {
   transition: background 120ms ease, padding 120ms ease;
 }
 
-.metros .metro:hover {
-  background: var(--amber-tint);
-  padding-left: 12px;
-  padding-right: 12px;
-}
-
-.metros .metro:hover .name {
-  color: var(--amber);
+@media (hover: hover) {
+  .metros .metro:hover {
+    background: var(--amber-tint);
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .metros .metro:hover .name {
+    color: var(--amber);
+  }
 }
 
 .metros .metro:last-child {
@@ -1396,9 +1401,8 @@ a.tag:hover::before {
 }
 
 .org-strip .org-card {
-  border-right: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-  padding: 22px 24px 24px 0;
+  padding: 22px 0;
   text-decoration: none;
   color: inherit;
   display: flex;
@@ -1406,26 +1410,57 @@ a.tag:hover::before {
   transition: background 120ms ease;
 }
 
-.org-strip .org-card:not(:first-child) {
-  padding-left: 24px;
+.org-strip .org-card:last-child {
+  border-bottom: none;
 }
 
-@media (min-width: 1024px) {
+/* Tablet 2-col: right column (2n) sits across a left border + left
+   padding from the left column. Last two cards drop the bottom
+   border so the section terminates cleanly. */
+@media (min-width: 720px) {
   .org-strip .org-card {
+    padding: 22px 24px 22px 0;
+  }
+  .org-strip .org-card:nth-child(2n) {
+    padding-left: 24px;
+    padding-right: 0;
+    border-left: 1px solid var(--rule);
+  }
+  .org-strip .org-card:nth-last-child(-n+2) {
     border-bottom: none;
   }
+}
+
+/* Desktop 4-col: vertical dividers between every column; no
+   horizontal dividers. Reset the 2-col rules that only apply to
+   the right column. */
+@media (min-width: 1024px) {
+  .org-strip .org-card {
+    padding: 22px 24px;
+    border-bottom: none;
+    border-left: 1px solid var(--rule);
+  }
+  .org-strip .org-card:nth-child(2n) {
+    padding-left: 24px;
+    padding-right: 24px;
+    border-left: 1px solid var(--rule);
+  }
+  .org-strip .org-card:first-child {
+    padding-left: 0;
+    border-left: none;
+  }
   .org-strip .org-card:last-child {
-    border-right: none;
     padding-right: 0;
   }
 }
 
-.org-strip .org-card:hover {
-  background: var(--amber-tint);
-}
-
-.org-strip .org-card:hover .org-name {
-  color: var(--amber);
+@media (hover: hover) {
+  .org-strip .org-card:hover {
+    background: var(--amber-tint);
+  }
+  .org-strip .org-card:hover .org-name {
+    color: var(--amber);
+  }
 }
 
 .org-strip .org-card .added {
