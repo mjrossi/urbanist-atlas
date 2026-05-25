@@ -1106,6 +1106,15 @@ a.tag:hover::before {
   border-top-color: var(--rule-strong);
 }
 
+/* "On this page" anchor-TOC blocks. Useful as a sticky sidebar on
+   desktop; pointless when stacked at the bottom of a mobile scroll
+   (you'd scroll up to read sections, not jump from the end). */
+@media (max-width: 899px) {
+  .rail-toc {
+    display: none;
+  }
+}
+
 .rail-kicker {
   font-family: var(--sans);
   font-size: 10.5px;

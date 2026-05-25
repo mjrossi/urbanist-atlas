@@ -189,7 +189,7 @@ export function About() {
         </main>
 
         <aside className="rail">
-          <div className="rail-block">
+          <div className="rail-block rail-toc">
             <div className="rail-kicker">On this page</div>
             <ul className="plain">
               <li>
