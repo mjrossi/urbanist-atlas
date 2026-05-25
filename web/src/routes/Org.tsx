@@ -225,7 +225,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
             .{' '}
             {org.regions.length > 0
               ? `Below: the regions the Atlas files ${org.name} under.`
-              : `${org.name} doesn’t have a region attached yet — file a tip if you can place them.`}
+              : `No region attached to ${org.name} yet — file a tip if you can place them.`}
           </p>
 
           {org.regions.length > 0 ? (

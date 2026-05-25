@@ -168,11 +168,11 @@ export function About() {
             licensing picture.
           </p>
           <p>
-            During the Phase 1 dogfood window the API sits behind a
-            shared-secret gate while we shake out schema and query bugs. The
-            Phase 2 program will open self-serve free keys. If you&rsquo;d like
-            an early key before Phase 2 — to build a directory widget, a
-            regional dashboard, anything — write to{' '}
+            The API today sits behind a shared-secret gate while Phase 1
+            shakes out schema and query bugs in a low-stakes window. Phase 2
+            opens self-serve free keys. If you&rsquo;d like an early key in
+            the meantime — to build a directory widget, a regional
+            dashboard, anything — write to{' '}
             <a href="mailto:hello@urbanistatlas.com?subject=Atlas%20API%20early%20access">
               hello@urbanistatlas.com
             </a>{' '}

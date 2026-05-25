@@ -53,7 +53,7 @@ export function Home() {
               The Urbanist Atlas catalogues the people in your city, your county,
               your region who are organizing — patiently, stubbornly, sometimes
               gloriously — for safer streets and better transit. Type a US ZIP or
-              a Canadian postal code and we will name them for you.
+              a Canadian postal code and we name them for you.
             </p>
             <p>
               We index local and regional advocates only. National outfits do

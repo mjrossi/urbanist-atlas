@@ -96,7 +96,7 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
         </h1>
         <p className="deck">
           {orgs.length === 0
-            ? `The Atlas hasn’t indexed any organizations in ${region.name} yet — but the region is on the map.`
+            ? `No organizations indexed in ${region.name} yet — but the region is on the map.`
             : `${orgs.length} indexed ${orgs.length === 1 ? 'group' : 'groups'} pushing for safer streets and better transit across ${region.name}.`}
         </p>
         <div className="byline">
