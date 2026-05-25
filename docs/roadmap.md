@@ -21,6 +21,11 @@ postal codes seeded. Nightly R2 backups are live (workflow at
 with a 30-day lifecycle), with the enablement steps documented at
 [`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md).
 
+**Next:** production cutover to `urbanistatlas.com` +
+`api.urbanistatlas.com` (zero-code config swap per
+[`docs/deploy.md`](./deploy.md) § QA → prod transition), then the
+launch blog post on *Urbanist Lexicon*.
+
 **Done:**
 
 - Monorepo bones (`api/`, `web/`, `.github/`, READMEs, `.gitignore`)
@@ -310,6 +315,35 @@ with a 30-day lifecycle), with the enablement steps documented at
   partial dumps, stragglers past 30 days). `docs/deploy.md` §7
   collapses to a pointer at the runbook so the deep content has
   one home.
+- **Submit form bridge (slice #13 — Phase 1 half, PR #42):**
+  `/submit` ships with `react-hook-form`, broadsheet-style fieldsets,
+  field-level validation, and a disclosure step. On submit it opens
+  a pre-filled GitHub issue in a new tab — there is no in-app POST
+  yet. The in-app `/api/v1/submissions` half stays Phase 2 alongside
+  #5 and #26; the form prose is honest about the GitHub handoff.
+- **`linkcheck` Go subcommand (PR #42):**
+  `urbanist-atlas-server linkcheck` probes every org's
+  `website_url` and emits a TSV with non-OK rows sorted to the top —
+  connection failures, 4xx/5xx, off-domain redirects after follow,
+  parked-page title signatures. The canonical recurring-hygiene
+  tool; supersedes the standalone Bash sweep on PR #39. Workflow
+  documented in [`docs/editorial.md`](./editorial.md) § Handling
+  link rot.
+- **URL hygiene editorial pass (2026-05-24/25):** Trans4M repoint
+  after `trans4m.org` lapsed to a parked attorney page — now points
+  at the Michigan Municipal League's transportation advocacy page,
+  which hosts the coalition's current online presence. First
+  `linkcheck` sweep across the 203-org corpus triaged any other
+  Trans4M-class failures. Establishes the monthly link-hygiene
+  cadence formalized in the new Editorial cadence section below.
+- **Colophon route + footer disclaimer + page redesigns (PR #40 + PR #42):**
+  New `/colophon` route covers data, stack, type, licensing, and
+  editorial cadence. Footer rebuilt as a four-column broadsheet
+  contact strip carrying the independence disclaimer ("an
+  independent informational directory; not affiliated with the
+  organizations listed"). Home / About / Browse / Submit / Metro /
+  Org pages restyled around the same `.kicker` + `.lede` + `.spread`
+  pattern with shared `useDocumentTitle` / `useScrollToTop` hooks.
 
 ## Deferred from this milestone
 
@@ -318,15 +352,16 @@ A few numbered slices were deferred during the v1.0 build:
 - **#4.7 Second EU country validation (Spain)** — deferred
   2026-05-18. After Portugal (#4.6) the data model was deemed
   sufficient for v1.0; Spain becomes a v1.1+ candidate.
-- **#5 Submissions + admin queue** and **#13 Submit form** —
-  deferred to Phase 2 alongside slice #26 (API keys + email-verified
-  registration). The reasoning: a public submission flow needs both
-  an operational triage workflow and an account model; the natural
-  home is the same account / email-verification machinery Phase 2
-  already requires for API keys. Building accounts now just for
-  submissions would mean building them twice. Slice #16 (Admin
-  queue page) and the form-validation half of slice #17 ride this
-  deferral.
+- **#5 Submissions + admin queue** — deferred to Phase 2 alongside
+  slice #26 (API keys + email-verified registration). The reasoning:
+  a public submission flow needs both an operational triage workflow
+  and an account model; the natural home is the same account /
+  email-verification machinery Phase 2 already requires for API keys.
+  Building accounts now just for submissions would mean building them
+  twice. **#13 (Submit form)** shipped in Phase 1 as a GitHub-issue
+  bridge (see Done above); only the in-app POST half rides this
+  deferral. Slice #16 (Admin triage, reshaped to a CLI subcommand)
+  and the form-validation half of slice #17 also ride it.
 
 The rows remain in the tables below for traceability.
 
@@ -350,7 +385,7 @@ The rows remain in the tables below for traceability.
 
 | # | Slice | What lands |
 |---|-------|------------|
-| 13 | **Submit form** | `/submit` with `react-hook-form`, broadsheet-style fieldsets, optional Turnstile, POSTs to `/api/v1/submissions`. |
+| 13 | **Submit form** *(Phase 1: GitHub bridge ✅ · Phase 2: in-app endpoint ⏳)* | **Phase 1 (shipped, PR #42):** `/submit` with `react-hook-form`, broadsheet-style fieldsets, validation, and a pre-filled GitHub-issue handoff on submit. **Phase 2:** replace the GitHub bridge with an in-app `POST /api/v1/submissions` (depends on #5 + #26) and optional Turnstile. |
 | 16 | **Admin triage — CLI subcommand** *(reshaped 2026-05-22 from `/admin/queue` web page)* | `urbanist-atlas-server submissions {list, approve <id>, reject <id> [--reason=...]}` subcommands. Faster to ship than a web page and fine for solo moderation. A `/admin/queue` web page becomes a v1.1+ candidate if submission volume warrants a second moderator. Tracked alongside the rest of Phase 2 in the launch umbrella issue. |
 | 17 | **Web CI tests (form-validation half)** | `lint` / `test` / `build` already run in CI and dedicated `lib/api.ts` tests shipped (see Done). Form-validation tests remain, deferred to land with slice #13. |
 
@@ -374,6 +409,25 @@ execution against live infra; ⏳ = not yet started.
 | 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. | ⏳ |
 | 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. | ⏳ |
 | 28 | **Phase 2 cutover** | Add `urbanistatlas.com` as a second Workers + Pages custom domain + `flyctl certs add api.urbanistatlas.com -a urbanist-atlas` + A/AAAA records for `api`; loosen CORS to include the prod origin; remove the shared-secret middleware; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. | ⏳ |
+
+## Editorial cadence
+
+The roadmap above is about code and infra. Data and editorial
+workflow are evergreen:
+
+- **Monthly** — `urbanist-atlas-server linkcheck` against the seed;
+  triage non-OK rows per [`docs/editorial.md`](./editorial.md)
+  § Handling link rot. Repoint, retire, or document hijacks.
+- **Quarterly** — refresh ETL sources (US Census, StatsCan, HUD)
+  only when upstream vintages change.
+- **Semi-annual** — depth review against the documented metro /
+  state / city floors (precedent: slices #7.7 and #7.8). Add new
+  orgs, retire defunct ones, revisit gap log.
+- **As-needed** — corrections via GitHub issues, filed by readers
+  from `/submit` or opened directly.
+
+All editorial workflows are documented in
+[`docs/editorial.md`](./editorial.md).
 
 ## Deferred (v1.1+)
 
