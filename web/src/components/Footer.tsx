@@ -24,6 +24,10 @@ export function Footer() {
         <div className="broadsheet-footer-row">
           <span className="footer-left">urbanistatlas.com</span>
           <span className="footer-right">
+            <a href="/colophon">Colophon →</a>
+            {' · '}
+            <a href="/about#for-developers">Developer preview →</a>
+            {' · '}
             <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
               Report an issue →
             </a>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { About } from './About.tsx';
 
@@ -35,9 +35,9 @@ describe('About', () => {
     expect(screen.getAllByText(/safe.streets/i).length).toBeGreaterThan(0);
   });
 
-  it('mentions the ODbL license in the methodology section', () => {
+  it('mentions the ODbL license', () => {
     renderAbout();
-    expect(screen.getByText(/odbl/i)).toBeDefined();
+    expect(screen.getAllByText(/odbl/i).length).toBeGreaterThan(0);
   });
 
   it('links to the companion publication at mjrossi.com/blog', () => {
@@ -50,5 +50,12 @@ describe('About', () => {
     const { container } = renderAbout();
     expect(container.querySelector('.page')).not.toBeNull();
     expect(container.querySelector('.page-header')).not.toBeNull();
+  });
+
+  it('sets the browser tab title', async () => {
+    renderAbout();
+    await waitFor(() => {
+      expect(document.title).toMatch(/about.*urbanist atlas/i);
+    });
   });
 });

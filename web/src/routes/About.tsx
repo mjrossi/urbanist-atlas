@@ -1,3 +1,5 @@
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+
 /**
  * `/about` — mission / methodology / criteria / acknowledgments for
  * the Urbanist Atlas. Pure content; no data fetching.
@@ -8,6 +10,7 @@
  * and the small-caps `<h2>` styling automatically.
  */
 export function About() {
+  useDocumentTitle('About — Urbanist Atlas');
   return (
     <div className="page">
       <header className="page-header">
@@ -97,6 +100,36 @@ export function About() {
           experience cleaner. Consultancies, think tanks, and academic centres
           are also out of scope unless they double as a membership advocacy
           organization.
+        </p>
+      </section>
+
+      <section id="for-developers">
+        <h2>For developers</h2>
+        <p>
+          The Atlas runs on a small Go service whose entire surface is
+          described by the OpenAPI document at{' '}
+          <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">
+            <code>/api/v1/openapi.yaml</code>
+          </a>
+          . It is deliberately small — postal-code lookup, metro browse, org
+          detail — and the dataset is licensed under the{' '}
+          <a href="https://opendatacommons.org/licenses/odbl/">
+            Open Database License (ODbL) 1.0
+          </a>{' '}
+          for downstream reuse with attribution and share-alike. See the{' '}
+          <a href="/colophon">colophon</a> for the full data-source and
+          licensing picture.
+        </p>
+        <p>
+          During the Phase 1 dogfood window the API sits behind a shared-secret
+          gate while we shake out schema and query bugs against the QA
+          frontend. The Phase 2 program will open self-serve free keys. If
+          you’d like an early key before Phase 2 — to build a directory
+          widget, a regional dashboard, anything — write to{' '}
+          <a href="mailto:hello@urbanistatlas.com?subject=Atlas%20API%20early%20access">
+            hello@urbanistatlas.com
+          </a>{' '}
+          and we’ll set one up by hand.
         </p>
       </section>
 
