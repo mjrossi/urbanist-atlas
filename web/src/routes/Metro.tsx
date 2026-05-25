@@ -85,49 +85,32 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
 
   return (
     <>
-      <div className="spread lede-first" style={{ marginTop: 48 }}>
-        <div className="lede" style={{ marginBottom: 0 }}>
-          <div className="eyebrow">
-            § Metro report · {region.country}
-            <span className="eyebrow-rule" />
-          </div>
-          <h1>
-            {region.name}
-            <span className="accent">.</span>
-          </h1>
-          <p className="deck">
-            {orgs.length === 0
-              ? `The Atlas hasn’t indexed any organizations in ${region.name} yet — but the region is on the map.`
-              : `${orgs.length} indexed ${orgs.length === 1 ? 'group' : 'groups'} pushing for safer streets and better transit across ${region.name}.`}
-          </p>
-          <div className="byline">
-            <span>{region.country}</span>
-            <span className="crumb-sep">·</span>
-            <span>
-              Region slug <span className="em">{region.slug}</span>
-            </span>
-            {region.parent_slugs.length > 0 ? (
-              <>
-                <span className="crumb-sep">·</span>
-                <span>Parent {region.parent_slugs.join(' · ')}</span>
-              </>
-            ) : null}
-          </div>
+      <div className="lede" style={{ marginTop: 48 }}>
+        <div className="eyebrow">
+          § Metro report · {region.country}
+          <span className="eyebrow-rule" />
         </div>
-        <div>
-          <div className="metro-inset" aria-hidden="true">
-            <div className="roads" />
-            <div className="water" />
-            <span className="label-tl">Region inset</span>
-            <span className="label-tr">N ↑</span>
-            <span className="pin" style={{ top: '52%', left: '48%' }} />
-            <span className="pin" style={{ top: '42%', left: '53%' }} />
-            <span className="pin" style={{ top: '58%', left: '42%' }} />
-            <span className="pin" style={{ top: '48%', left: '56%' }} />
-          </div>
-          <p className="fineprint" style={{ margin: 0 }}>
-            Schematic only. Pins mark approximate group activity in the region.
-          </p>
+        <h1>
+          {region.name}
+          <span className="accent">.</span>
+        </h1>
+        <p className="deck">
+          {orgs.length === 0
+            ? `The Atlas hasn’t indexed any organizations in ${region.name} yet — but the region is on the map.`
+            : `${orgs.length} indexed ${orgs.length === 1 ? 'group' : 'groups'} pushing for safer streets and better transit across ${region.name}.`}
+        </p>
+        <div className="byline">
+          <span>{region.country}</span>
+          <span className="crumb-sep">·</span>
+          <span>
+            Region slug <span className="em">{region.slug}</span>
+          </span>
+          {region.parent_slugs.length > 0 ? (
+            <>
+              <span className="crumb-sep">·</span>
+              <span>Parent {region.parent_slugs.join(' · ')}</span>
+            </>
+          ) : null}
         </div>
       </div>
 
