@@ -71,6 +71,13 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* When scrollIntoView lands on an anchored section header, leave a
+   little breathing room so the kicker doesn't sit flush against the
+   top edge of the viewport. */
+[id] {
+  scroll-margin-top: 24px;
+}
+
 :focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 3px;
