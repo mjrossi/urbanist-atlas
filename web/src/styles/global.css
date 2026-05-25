@@ -423,10 +423,8 @@ a {
 
 .kicker {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 24px;
-  justify-content: space-between;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 6px;
   font-family: var(--sans);
   font-size: 10.5px;
   font-weight: 600;
@@ -435,6 +433,16 @@ a {
   color: var(--muted);
   padding: 18px 0;
   border-bottom: 1px solid var(--rule);
+}
+
+@media (min-width: 480px) {
+  .kicker {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    justify-content: space-between;
+    align-items: baseline;
+  }
 }
 
 .kicker a {
@@ -589,12 +597,19 @@ a {
 .prose > p.lead.drop::first-letter {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 74px;
+  font-size: 56px;
   line-height: 0.8;
   float: left;
-  padding: 8px 12px 0 0;
+  padding: 6px 10px 0 0;
   color: var(--amber);
   font-variation-settings: 'opsz' 144;
+}
+
+@media (min-width: 720px) {
+  .prose > p.lead.drop::first-letter {
+    font-size: 74px;
+    padding: 8px 12px 0 0;
+  }
 }
 
 .prose h2 {
@@ -2187,7 +2202,7 @@ a.tag:hover::before {
 .index-letter-row {
   display: grid;
   grid-template-columns: 56px 1fr;
-  gap: 24px;
+  gap: 20px;
   padding: 18px 0 22px;
   border-bottom: 1px solid var(--rule);
   align-items: start;
@@ -2195,7 +2210,7 @@ a.tag:hover::before {
 
 @media (min-width: 900px) {
   .index-letter-row {
-    grid-template-columns: 60px 1fr 1fr;
+    grid-template-columns: 60px 1fr;
     gap: 32px;
   }
 }
@@ -2215,10 +2230,22 @@ a.tag:hover::before {
   font-family: var(--sans);
   font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
   margin-top: 4px;
+  white-space: nowrap;
+}
+
+.index-rows {
+  display: block;
+}
+
+@media (min-width: 900px) {
+  .index-rows {
+    column-count: 2;
+    column-gap: 32px;
+  }
 }
 
 .index-row {
@@ -2230,6 +2257,7 @@ a.tag:hover::before {
   text-decoration: none;
   color: inherit;
   border-bottom: 1px dotted var(--rule);
+  break-inside: avoid;
 }
 
 .index-row:last-child {
@@ -2281,12 +2309,18 @@ a.tag:hover::before {
 /* ── Metro inset (schematic) ───────────────────────── */
 
 .metro-inset {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   background: linear-gradient(135deg, #f1e7d3 0%, #e5d4b0 100%);
   position: relative;
   border: 1px solid var(--rule-strong);
   overflow: hidden;
   margin-bottom: 14px;
+}
+
+@media (min-width: 720px) {
+  .metro-inset {
+    aspect-ratio: 4 / 3;
+  }
 }
 
 .metro-inset .roads {

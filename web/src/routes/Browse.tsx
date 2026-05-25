@@ -80,7 +80,7 @@ export function Browse() {
         </div>
         <div>
           {totalMetros !== null && totalOrgs !== null
-            ? `${totalMetros} metros · ${totalOrgs}+ org entries`
+            ? `${totalMetros} metros · ${totalOrgs} org entries`
             : 'The index'}
         </div>
       </div>
@@ -184,7 +184,7 @@ function CountrySection({ country }: { country: ByCountry }) {
         <div className="crule" />
         <div className="cnum">
           <span className="em">{total}</span> metros ·{' '}
-          <span className="em">{orgs}+</span> orgs
+          <span className="em">{orgs}</span> orgs
         </div>
       </header>
       {country.letters.map((group) => (
@@ -195,9 +195,6 @@ function CountrySection({ country }: { country: ByCountry }) {
 }
 
 function LetterRow({ letter, metros }: { letter: string; metros: MetroSummary[] }) {
-  const half = Math.ceil(metros.length / 2);
-  const colA = metros.slice(0, half);
-  const colB = metros.slice(half);
   return (
     <div className="index-letter-row" id={letter}>
       <div className="index-letter">
@@ -206,13 +203,8 @@ function LetterRow({ letter, metros }: { letter: string; metros: MetroSummary[] 
           {metros.length} {metros.length === 1 ? 'metro' : 'metros'}
         </span>
       </div>
-      <div>
-        {colA.map((m) => (
-          <IndexRow key={m.region.slug} metro={m} />
-        ))}
-      </div>
-      <div>
-        {colB.map((m) => (
+      <div className="index-rows">
+        {metros.map((m) => (
           <IndexRow key={m.region.slug} metro={m} />
         ))}
       </div>
