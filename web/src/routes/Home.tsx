@@ -81,7 +81,7 @@ export function Home() {
               All metros <span className="arrow">→</span>
             </Link>
           </div>
-          <div className="rail-block amber">
+          <div className="rail-block amber desktop-only">
             <div className="rail-kicker">From the editors</div>
             <p className="pullquote-rail">
               National advocacy is easy to find. The harder search is the
@@ -260,7 +260,7 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
             view.
           </p>
         </div>
-        <aside className="rail">
+        <aside className="rail desktop-only">
           <div className="rail-block">
             <div className="rail-kicker">For developers</div>
             <p>

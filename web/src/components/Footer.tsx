@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 export function Footer() {
   return (
     <>
-      <footer className="site-foot">
+      <footer className="site-foot desktop-only">
         <div>
           <h3 className="colophon-title">
             Urbanist <span className="em">Atlas</span>
@@ -77,6 +77,29 @@ export function Footer() {
             </li>
           </ul>
         </div>
+      </footer>
+      {/* Phones get a single compact block: wordmark, tagline, three
+          essential links, and the colophon strip below. Everything else
+          (full link lists, methodology, contact handles) lives one tap
+          away on /about and /colophon. */}
+      <footer className="site-foot-compact mobile-only">
+        <h3 className="colophon-title">
+          Urbanist <span className="em">Atlas</span>
+        </h3>
+        <p className="colophon-tag">
+          A directory of the people fighting for better streets, where you live.
+        </p>
+        <ul className="site-foot-links">
+          <li>
+            <Link to="/about">About</Link>
+          </li>
+          <li>
+            <Link to="/submit">Submit a tip</Link>
+          </li>
+          <li>
+            <a href="mailto:hello@urbanistatlas.com">Contact</a>
+          </li>
+        </ul>
       </footer>
       <div className="colophon-strip">
         <span>

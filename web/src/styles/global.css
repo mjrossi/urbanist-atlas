@@ -2920,38 +2920,233 @@ a.tag:hover::before {
   display: none;
 }
 
+/* ── Mobile nav drawer chrome (hidden until the phone block) ───────── */
+
+.nav-toggle {
+  display: none;
+  align-items: center;
+  gap: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 20px;
+  height: 52px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.nav-toggle-icon {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 22px;
+  height: 14px;
+}
+
+.nav-toggle-icon span {
+  display: block;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 1px;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.nav-open .nav-toggle-icon span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+.nav-open .nav-toggle-icon span:nth-child(2) {
+  opacity: 0;
+}
+.nav-open .nav-toggle-icon span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.nav-toggle-label {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+/* ── Mobile compact footer (hidden until the phone block) ──────────── */
+
+.site-foot-compact {
+  margin-top: 48px;
+  padding: 28px 0 12px;
+  border-top: 2px solid var(--ink);
+  text-align: left;
+}
+
+.site-foot-compact .colophon-title {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.012em;
+  margin: 0 0 6px;
+}
+
+.site-foot-compact .colophon-title .em {
+  color: var(--amber);
+}
+
+.site-foot-compact .colophon-tag {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--muted);
+  margin: 0 0 16px;
+  max-width: 36ch;
+  line-height: 1.4;
+}
+
+.site-foot-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--rule);
+}
+
+.site-foot-links li {
+  border-bottom: 1px solid var(--rule);
+}
+
+.site-foot-links a {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 4px;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-foot-links a::after {
+  content: '→';
+  margin-left: auto;
+  color: var(--amber);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 18px;
+}
+
 /* ─────────────────────────────────────────────────────────────────────
    Phone overrides (≤ 768px). Mobile-first cascade sets the baseline;
-   this block tightens specific rules that the cascade can't express
-   naturally — flipping rail order, collapsing the lookup row to
-   vertical, swapping nav to horizontal scroll, hiding redundant
-   masthead chrome, tightening display type for ≤ 402px reference.
+   this block actively redesigns for phones — collapsing the broadsheet
+   masthead to a single wordmark, swapping the nav strip for a hamburger
+   drawer, tightening type, fixing the 2-col stats grid, and replacing
+   the 4-column footer with a single compact card. The visual identity
+   (paper, ink, amber, serifs) is preserved; the page architecture
+   (Masthead → Nav → Outlet → Footer) is unchanged.
    ───────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  /* Drop the redundant country tag inside the masthead; the folio
-     already carries Vol/edition context. */
+  /* ── Sheet padding tightened so the wordmark hugs the edge ─── */
+  .sheet {
+    padding: 16px 20px 48px;
+  }
+
+  /* ── Masthead: just the wordmark. Folio + tagline are desktop
+     theater; on mobile they consume two screens of vertical space
+     before the user can do anything. Strip the lot, keep the brand. */
+  .masthead {
+    padding: 8px 0 14px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .masthead-folio,
+  .masthead-tagline-row,
   .masthead-meta {
     display: none;
   }
-
-  /* Nav becomes a horizontal-scrolling strip; all 4 sections stay
-     reachable without a hamburger. Override .nav's flex-wrap: wrap. */
-  .nav {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+  .masthead-name-row {
+    padding: 0;
+    margin: 0;
+    border: none;
   }
-  .nav::-webkit-scrollbar {
-    display: none;
+  .masthead-name {
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: -0.022em;
+  }
+
+  /* ── Nav: hamburger drawer. The button shows the current page
+     name when collapsed and "Close" when expanded. The list slides
+     down below the button as a vertical menu. ────────────────────── */
+  .nav {
+    display: block;
+    overflow: visible;
+    background: var(--paper);
+    margin-top: 0;
+    border-top: none;
+  }
+  .nav-toggle {
+    display: flex;
   }
   .nav-list {
-    flex-wrap: nowrap;
-    width: max-content;
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    padding: 0;
+    background: var(--paper);
+    border-top: 1px solid var(--rule);
+  }
+  .nav.nav-open .nav-list {
+    display: flex;
+  }
+  .nav-item {
+    border-bottom: 1px solid var(--rule);
+  }
+  .nav-item:last-child {
+    border-bottom: none;
+  }
+  .nav-item a,
+  .nav-item .current {
+    display: flex;
+    width: 100%;
+    height: 52px;
+    padding: 0 20px;
+    border-right: none;
+    justify-content: flex-start;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+  }
+  .nav-item .current::after {
+    display: none;
+  }
+  .nav-item .roman {
+    font-size: 16px;
+    margin-right: 14px;
+  }
+  .nav-right {
+    display: none;
   }
 
-  /* Right rail moves below the main column. Existing dual-render of
-     .glance-mobile/.glance-desktop continues to work because both
-     classes are already gated by the 900px breakpoint. */
+  /* ── Kicker breadcrumb: keep the left side, hide the right meta
+     (it duplicates the masthead-meta that we just hid anyway). ─── */
+  .kicker {
+    padding: 12px 0 0;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    gap: 6px;
+  }
+  .kicker > div:nth-child(2) {
+    display: none;
+  }
+
+  /* ── Spread: rail drops below main, generous gap so the rail
+     content reads as "appendix" rather than "second column". ───── */
+  .spread {
+    gap: 32px;
+    margin-top: 24px;
+  }
   .spread > aside {
     order: 2;
   }
@@ -2960,24 +3155,67 @@ a.tag:hover::before {
     order: 1;
   }
 
-  /* Display type — tightened to the handoff's 38/22 spec. */
+  /* ── Display type — 38/22/17 spec ────────────────────────────── */
+  .lede {
+    margin-bottom: 24px;
+  }
   .lede h1 {
     font-size: 38px;
     line-height: 1.0;
   }
   .lede .deck {
     font-size: 17px;
-    line-height: 1.38;
+    line-height: 1.4;
+  }
+  .lede .eyebrow {
+    margin-bottom: 12px;
+  }
+
+  /* Drop the Roman numerals on mobile — they're a broadsheet conceit
+     and read as decorative noise next to the section title. */
+  .section-break {
+    margin: 32px 0 16px;
+    padding-top: 16px;
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
   .section-break .num {
-    font-size: 18px;
+    display: none;
   }
   .section-break .title {
     font-size: 22px;
     line-height: 1.15;
   }
+  .section-break .aside {
+    font-size: 10px;
+  }
 
-  /* Lookup card: input above CTA, both full-bleed. */
+  /* ── Prose body: bump to 17px for readable mobile body text. */
+  .prose > p {
+    font-size: 17px;
+    line-height: 1.55;
+  }
+  .prose > p.lead {
+    font-size: 19px;
+    line-height: 1.45;
+  }
+
+  /* ── Lookup card: phone hero. Stronger border, generous padding,
+     and a stacked input → CTA layout. ────────────────────────────── */
+  .lookup {
+    padding: 24px 20px 22px;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+  }
+  .lookup::before {
+    /* The desktop inset frame would look fussy at this size. */
+    display: none;
+  }
+  .lookup-title {
+    font-size: 22px;
+    line-height: 1.15;
+    margin-bottom: 14px;
+  }
   .lookup-row {
     flex-direction: column;
     align-items: stretch;
@@ -2987,24 +3225,143 @@ a.tag:hover::before {
   }
   .lookup-input {
     font-size: 26px;
-    padding: 8px 0;
+    padding: 10px 0;
     border-bottom: 2px solid var(--ink);
     width: 100%;
   }
   .lookup-row .btn-primary {
     width: 100%;
     height: 52px;
-    margin: 14px 0 0;
+    margin: 16px 0 0;
     justify-content: center;
   }
-
-  /* Tag pills: 30px tall for thumb tap target. */
-  .tag {
-    height: 30px;
-    padding: 0 12px;
+  .lookup-suggestions {
+    margin-top: 14px;
+    gap: 6px;
+  }
+  .lookup-suggestions .label {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+  .lookup-suggestions a {
+    border: 1px solid var(--rule);
+    padding: 6px 10px;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
   }
 
-  /* A–Z jump strip: widen each cell so letters are tappable. */
+  /* ── Tag pills: 32px tall, comfortable thumb target ──────────── */
+  .tag {
+    height: 32px;
+    padding: 0 14px;
+    font-size: 10.5px;
+  }
+  .tag-list {
+    gap: 8px;
+  }
+
+  /* ── Recently filed strip: stack as borderless cards with a top
+     rule between each. Tighter padding than desktop. ─────────────── */
+  .org-strip {
+    border-top: 1px solid var(--rule);
+  }
+  .org-strip .org-card {
+    padding: 18px 0;
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+  }
+  .org-strip .org-card:last-child {
+    border-bottom: none;
+  }
+  .org-card .org-name {
+    font-size: 22px;
+  }
+  .org-card .org-desc {
+    font-size: 15.5px;
+    line-height: 1.5;
+  }
+
+  /* ── Stats grid: clean 2×2 with correct borders. The desktop rules
+     leave stat 3 with a stray right border at the column gridline and
+     padding-left that shifts content off-axis; reset and redo. ─────── */
+  .stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    padding: 0;
+    margin: 16px 0 24px;
+  }
+  .stats .stat {
+    padding: 16px 18px;
+    border-right: none;
+    border-bottom: none;
+  }
+  /* Left column (odd children): no left padding, right border drawn
+     at the inter-column line. */
+  .stats .stat:nth-child(odd) {
+    padding-left: 0;
+    border-right: 1px solid var(--rule);
+  }
+  .stats .stat:nth-child(even) {
+    padding-right: 0;
+  }
+  /* First row (children 1 and 2): bottom border separates rows. */
+  .stats .stat:nth-child(1),
+  .stats .stat:nth-child(2) {
+    border-bottom: 1px solid var(--rule);
+  }
+  /* Override the desktop-era :last-child reset that would otherwise
+     strip the 4th stat's borders we never set anyway. */
+  .stats .stat:last-child {
+    padding-right: 0;
+    border-right: none;
+  }
+  .stats .stat .n {
+    font-size: 36px;
+  }
+  .stats .stat .label {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+  }
+  .stats .stat .sub {
+    font-size: 12.5px;
+  }
+
+  /* ── Rail blocks: tighter padding, smaller heading. The rail is
+     now content-below-main rather than a sidebar, so we don't want
+     it consuming as much vertical space as the main column. ──────── */
+  .rail-block {
+    padding: 18px 18px;
+  }
+  .rail-block h3 {
+    font-size: 18px;
+  }
+  .rail-block p {
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  .pullquote-rail {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  /* ── Metros list inside the rail: tighter rows, bigger names. */
+  .metros .metro {
+    padding: 14px 0;
+    min-height: 56px;
+  }
+  .metros.compact .name,
+  .metro .name {
+    font-size: 17px;
+  }
+  .metro .meta {
+    font-size: 9.5px;
+  }
+  .metros .count .n {
+    font-size: 22px;
+  }
+
+  /* ── A-Z jump strip: wider tap cells. ────────────────────────── */
   .az-index a,
   .az-index span.dim {
     min-width: 32px;
@@ -3013,39 +3370,55 @@ a.tag:hover::before {
     padding: 4px 0;
   }
 
-  /* Browse index: collapse 60px letter gutter to a 44px gutter, tighten
-     the letter type so it doesn't overpower the metro list. */
+  /* ── Browse index: 44px letter gutter, smaller letter type. ── */
   .index-letter-row {
     grid-template-columns: 44px 1fr;
     gap: 12px;
+    padding: 14px 0 18px;
   }
   .index-letter {
     font-size: 32px;
-    padding: 16px 0;
+    padding: 12px 0;
+  }
+  .index-letter .meta {
+    font-size: 9px;
+  }
+  .country-head {
+    padding: 24px 0 10px;
   }
   .country-head .cname {
     font-size: 28px;
   }
 
-  /* Org hero name lands at 44px (handoff §14). */
+  /* ── Org page: hero name, meta-strip flattened to dt/dd rows. */
+  .org-feature {
+    margin-top: 20px;
+  }
   .org-feature .name {
-    font-size: 44px;
+    font-size: 40px;
     line-height: 0.98;
   }
-
-  /* Meta strip flattens to stacked dt/dd rows so values get the width. */
+  .org-feature .url-line {
+    font-size: 13.5px;
+  }
+  .org-feature .deck {
+    font-size: 18px;
+    line-height: 1.4;
+  }
   .org-feature .meta-strip {
     display: grid;
     grid-template-columns: 1fr;
     gap: 0;
     padding: 0;
-    margin: 14px 0 28px;
+    margin: 14px 0 24px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
   }
   .org-feature .meta-strip .item {
     display: grid;
     grid-template-columns: 130px 1fr;
     gap: 12px;
-    padding: 11px 0;
+    padding: 12px 0;
     border-bottom: 1px dotted var(--rule);
     align-items: baseline;
   }
@@ -3054,27 +3427,54 @@ a.tag:hover::before {
   }
   .org-feature .meta-strip .item .val {
     margin-top: 0;
+    font-size: 15.5px;
   }
 
-  /* Criteria table: verdict drops to its own line, justified left. */
+  /* ── Org-entry on Metro pages: stacked, tighter ──────────────── */
+  .org-entry {
+    padding: 18px 0;
+  }
+  .org-entry .name {
+    font-size: 20px;
+  }
+  .org-entry .desc {
+    font-size: 15px;
+  }
+
+  /* ── Criteria table: verdict on its own line, justified left. */
+  .criteria .row {
+    padding: 14px 0;
+    gap: 6px;
+  }
+  .criteria .row .term {
+    font-size: 17px;
+  }
+  .criteria .row .def {
+    font-size: 15px;
+  }
   .criteria .row .verdict {
     justify-self: start;
     margin-top: 6px;
   }
 
-  /* Form CTA + form-field hint placement. Hint sits below the input
-     row, not crammed beside it. */
+  /* ── Form fields: 16px font already set globally; tighten field
+     padding and put the hint on its own line below the input. ─── */
+  .field {
+    padding: 14px 0;
+  }
+  .field-label .hint {
+    max-width: none;
+    margin-top: 6px;
+  }
   .btn-primary {
     height: 52px;
     font-size: 13px;
     letter-spacing: 0.22em;
   }
-  .field-label .hint {
-    max-width: none;
-  }
 
-  /* About-page <details> accordion. CSS-only — first section is opened
-     via the `open` attribute on Section II in About.tsx. */
+  /* ── About-page <details> accordion. CSS-only; first section is
+     opened by the `open` attribute in About.tsx. The +/- toggle
+     glyph rotates to match the disclosure state. ──────────────── */
   .prose details {
     border-bottom: 1px solid var(--rule);
   }
@@ -3113,11 +3513,22 @@ a.tag:hover::before {
     display: none;
   }
 
-  /* Colophon strip stacks vertically. */
+  /* ── Editor's notes: tighter padding. */
+  .editors-note {
+    margin: 20px 0;
+    padding: 16px 18px;
+  }
+
+  /* ── Footer + colophon ───────────────────────────────────────── */
+  /* .site-foot (full 4-col layout) is hidden by .desktop-only.
+     .site-foot-compact is revealed by .mobile-only. */
   .colophon-strip {
     flex-direction: column;
     gap: 6px;
     align-items: flex-start;
+    margin-top: 24px;
+    padding: 12px 0;
+    font-size: 9.5px;
   }
 
   /* Visibility utilities are flipped inside the phone block. */
