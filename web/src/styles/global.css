@@ -3071,7 +3071,13 @@ a.tag:hover::before {
     margin: 0;
     border: none;
   }
-  .masthead-name {
+  /* The two selectors match the specificity of the desktop interior
+     rule (.masthead.interior .masthead-name), so this 30px wins on
+     both home and interior pages. Without the second selector, the
+     interior pages fall back to clamp(40px, 5.6vw, 56px) — making
+     /about render LARGER than /, which is exactly backwards. */
+  .masthead-name,
+  .masthead.interior .masthead-name {
     font-size: 30px;
     line-height: 1;
     letter-spacing: -0.022em;
@@ -3548,8 +3554,12 @@ a.tag:hover::before {
    scale so 320px-class devices don't horizontally clip headlines.
    ───────────────────────────────────────────────────────────────────── */
 @media (max-width: 360px) {
-  .masthead-name {
-    font-size: 30px;
+  /* Both selectors so the narrow-phone step wins on interior pages too
+     (.masthead.interior .masthead-name has higher specificity than a
+     bare .masthead-name; match it). */
+  .masthead-name,
+  .masthead.interior .masthead-name {
+    font-size: 26px;
   }
   .lede h1 {
     font-size: 34px;
