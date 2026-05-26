@@ -26,7 +26,6 @@ export function Masthead() {
       <div className="masthead-folio">
         <span>
           A directory<span className="dot">·</span>Vol. I
-          <span className="dot">·</span>2026 Edition
         </span>
         <span>{folioRight(pathname)}</span>
       </div>
@@ -42,7 +41,6 @@ export function Masthead() {
         )}
         <div className="masthead-meta">
           <span>United States · Canada</span>
-          <span className="masthead-meta-edition">Vol. I · 2026 Edition</span>
         </div>
       </div>
       <div className="masthead-tagline-row">

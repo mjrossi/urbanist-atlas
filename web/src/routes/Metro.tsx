@@ -132,9 +132,9 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
           <div className="editors-note" style={{ marginTop: 32 }}>
             <div className="label">Know a group we&rsquo;re missing?</div>
             <p>
-              The Atlas grows one editorial decision at a time. If a coalition
-              you know about isn&rsquo;t here yet,{' '}
-              <Link to="/submit">file a tip</Link> and we&rsquo;ll look.
+              The Atlas adds groups one editorial decision at a time.{' '}
+              <Link to="/submit">File a tip</Link> if a coalition is missing —
+              see <Link to="/about#methodology">our criteria</Link>.
             </p>
           </div>
         </main>

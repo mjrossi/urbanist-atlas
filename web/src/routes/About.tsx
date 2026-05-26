@@ -53,22 +53,17 @@ export function About() {
             the people already organizing for better streets and better transit
             nearby, in under a minute.
           </p>
-          <p>
-            National advocacy outfits do plenty of good work, but they are easy
-            to find on their own. The harder search is for the neighbourhood
-            committee, the metro-area rider alliance, the county-level Vision
-            Zero coalition. The Atlas indexes those.
-          </p>
-          <p className="pullquote">
-            The harder search is for the neighbourhood committee, the metro-area
-            rider alliance, the county-level Vision Zero coalition.
-          </p>
 
-          <div className="section-kicker" id="methodology">
-            § II — Methodology
-          </div>
-          <h2>How we curate.</h2>
-          <div className="h2-rule" />
+          <details className="method-section" open>
+            <summary>
+              <div>
+                <div className="section-kicker" id="methodology">
+                  § II — Methodology
+                </div>
+                <h2>How we curate.</h2>
+              </div>
+              <div className="h2-rule" />
+            </summary>
           <p>
             Entries are curated by hand. Each organization in the Atlas was
             reviewed by an editor against the criteria below before being added.
@@ -126,12 +121,18 @@ export function About() {
               <span className="verdict no">Excluded</span>
             </div>
           </div>
+          </details>
 
-          <div className="section-kicker" id="corrections">
-            § III — Independence and corrections
-          </div>
-          <h2>How we keep ourselves honest.</h2>
-          <div className="h2-rule" />
+          <details className="method-section">
+            <summary>
+              <div>
+                <div className="section-kicker" id="corrections">
+                  § III — Independence and corrections
+                </div>
+                <h2>How we keep ourselves honest.</h2>
+              </div>
+              <div className="h2-rule" />
+            </summary>
           <p>
             The Atlas is an independent reference work. It is not affiliated
             with, endorsed by, or representing any of the organizations listed
@@ -147,12 +148,18 @@ export function About() {
             Corrections are read and applied by the same editor who maintains
             the directory.
           </p>
+          </details>
 
-          <div className="section-kicker" id="for-developers">
-            § IV — For developers
-          </div>
-          <h2>The dataset is open.</h2>
-          <div className="h2-rule" />
+          <details className="method-section">
+            <summary>
+              <div>
+                <div className="section-kicker" id="for-developers">
+                  § IV — For developers
+                </div>
+                <h2>The dataset is open.</h2>
+              </div>
+              <div className="h2-rule" />
+            </summary>
           <p>
             The Atlas runs on a small Go service whose entire surface is
             described by the OpenAPI document at{' '}
@@ -178,26 +185,29 @@ export function About() {
             </a>{' '}
             and we&rsquo;ll set one up by hand.
           </p>
+          </details>
 
-          <div className="section-kicker" id="acknowledgments">
-            § V — Acknowledgments
-          </div>
-          <h2>Who the directory rests on.</h2>
-          <div className="h2-rule" />
+          <details className="method-section">
+            <summary>
+              <div>
+                <div className="section-kicker" id="acknowledgments">
+                  § V — Acknowledgments
+                </div>
+                <h2>Who the directory rests on.</h2>
+              </div>
+              <div className="h2-rule" />
+            </summary>
           <p>
-            Postal-code geography in the United States comes from the{' '}
-            <a href="https://www.census.gov">U.S. Census Bureau</a>&rsquo;s ZIP
-            Code Tabulation Areas (ZCTAs) and the HUD USPS ZIP-to-County
-            crosswalk; Canadian postal-code geography comes from{' '}
-            <a href="https://www.statcan.gc.ca">Statistics Canada</a>&rsquo;s
-            boundary files. Both are public-domain or open-licensed.
-          </p>
-          <p>
-            Above all, this directory is built on the work of the organizations
-            it indexes — the volunteers, organizers, and staff who show up to
+            Above all, this directory rests on the work of the organizations it
+            indexes — the volunteers, organizers, and staff who show up to
             their city&rsquo;s transportation meetings, week after week, and
-            patiently argue for better.
+            patiently argue for better. Postal-code geography comes from the{' '}
+            <a href="https://www.census.gov">U.S. Census Bureau</a>{' '}
+            (ZCTAs + the HUD USPS ZIP-to-County crosswalk) and{' '}
+            <a href="https://www.statcan.gc.ca">Statistics Canada</a>&rsquo;s
+            boundary files, both public-domain or open-licensed.
           </p>
+          </details>
         </main>
 
         <aside className="rail">

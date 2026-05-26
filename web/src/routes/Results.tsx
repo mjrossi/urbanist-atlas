@@ -176,7 +176,7 @@ function ResultSection({
 }) {
   if (orgs.length === 0) return null;
   return (
-    <section style={{ marginTop: 32 }}>
+    <section className="org-section" style={{ marginTop: 32 }}>
       <header className="section-break" style={{ marginTop: 0 }}>
         <span className="num">{kind === 'local' ? 'I.' : 'II.'}</span>
         <h2 className="title">
