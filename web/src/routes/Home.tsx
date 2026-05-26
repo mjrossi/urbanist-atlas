@@ -65,11 +65,9 @@ export function Home() {
             <div className="editors-note">
               <div className="label">Editor&rsquo;s note · Vol. I</div>
               <p>
-                Curated by hand, one organization at a time, against a
-                published set of criteria. There is no algorithmic
-                ingestion. If your region is missing or an entry needs
-                work,{' '}
-                <Link to="/submit">file a tip at the submissions desk</Link>.
+                Each entry is curated by hand against{' '}
+                <Link to="/about#methodology">our criteria</Link>.{' '}
+                <Link to="/submit">File a tip</Link> if your region is missing.
               </p>
             </div>
           </div>

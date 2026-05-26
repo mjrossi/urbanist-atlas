@@ -385,29 +385,11 @@ https://kuow.org/stories/..."
 
         <aside className="rail">
           <div className="rail-block">
-            <div className="rail-kicker">Editor&rsquo;s note</div>
-            <p className="pullquote-rail">
-              The Atlas only lists groups doing the work — not adjacent
-              nonprofits, not consultancies, not bike clubs.
+            <div className="rail-kicker">Inclusion criteria</div>
+            <p>
+              The full criteria — what we include, what we skip — lives at{' '}
+              <Link to="/about#methodology">About / Methodology</Link>.
             </p>
-          </div>
-          <div className="rail-block amber">
-            <div className="rail-kicker">What we look for</div>
-            <ul className="bulleted">
-              <li>Active in the last 12 months</li>
-              <li>A geographic focus — city, metro, or state</li>
-              <li>Public-facing campaigns, not just a mailing list</li>
-              <li>Transit or safe-streets advocacy</li>
-            </ul>
-          </div>
-          <div className="rail-block">
-            <div className="rail-kicker">What we skip</div>
-            <ul className="dont">
-              <li>National think tanks &amp; trade groups</li>
-              <li>Single-event coalitions with no ongoing work</li>
-              <li>Consultancies, even pro-bono ones</li>
-              <li>Government agencies &amp; DOT subsidiaries</li>
-            </ul>
           </div>
           <div className="rail-block muted">
             <div className="rail-kicker">Other ways to reach us</div>

@@ -118,10 +118,9 @@ export function Browse() {
       <section className="editors-note" style={{ marginTop: 56 }}>
         <div className="label">Don&rsquo;t see your region?</div>
         <p>
-          We index a metro once we&rsquo;ve verified at least one active group
-          working there, and we add new entries as editors get to them. If your
-          city is missing, tell us where to look —{' '}
-          <Link to="/submit">file a tip at the submissions desk</Link>.
+          If your region is missing,{' '}
+          <Link to="/submit">file a tip at the submissions desk</Link>. See{' '}
+          <Link to="/about#methodology">how we curate</Link>.
         </p>
       </section>
     </>
