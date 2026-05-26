@@ -3124,10 +3124,9 @@ a.tag:hover::before {
     display: none;
   }
   .nav-item .roman {
-    /* Italic serifs read ~1px smaller than sans at the same px size,
-       so 12px sits visually at the label's 11px sans baseline. */
-    font-size: 12px;
-    margin-right: 12px;
+    /* Romans are a broadsheet conceit; they read as visual noise in a
+       phone drawer next to four short labels. Drop on mobile. */
+    display: none;
   }
   .nav-right {
     display: none;
