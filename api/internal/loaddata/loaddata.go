@@ -35,7 +35,7 @@ import (
 //   - regionFiles: file suffixes for regions_<suffix>.toml, in load
 //     order. Earlier files load first; later files may reference
 //     earlier-loaded regions as parents via cross-file resolution
-//     (see internal/loadregions/write.go's RegionIDBySlug fallback).
+//     (see internal/loadregions/write.go's RegionIDsBySlugs lookup).
 //     For US/CA the convention is to load the state/province tier
 //     before the main file so leaves can parent under them.
 //   - postal:      file suffix for postal_codes_<suffix>.csv.

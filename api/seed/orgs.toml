@@ -1522,14 +1522,6 @@ region_slugs = ["ny"]
 # --- Pennsylvania ---
 
 [[org]]
-slug = "pa-walks-and-bikes"
-name = "PA Walks and Bikes"
-short_desc = "Pennsylvania's statewide pedestrian and bicycle advocacy nonprofit. Works from Harrisburg to make the Commonwealth safer for walking and biking."
-website_url = "https://www.pawalksandbikes.org"
-tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
-region_slugs = ["pa"]
-
-[[org]]
 slug = "transit-for-all-pa"
 name = "Transit for All PA!"
 short_desc = "Pennsylvania statewide coalition of transit riders, workers, and supportive organizations and businesses, operating as a named program of Pittsburghers for Public Transit. More than 40,000 supporters across all 253 PA legislative districts; 2025 legislative-package introduction; 2026 four-region paid fellowship program."

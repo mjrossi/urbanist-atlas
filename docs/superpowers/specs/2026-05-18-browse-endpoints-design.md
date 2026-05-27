@@ -295,3 +295,43 @@ r.Get("/recent", recentHandler(cfg.Store, logger))
 - **National-tier in `/recent`.** A regression of the slice-#4.6 filter
   would surface MUBi in `/recent`. The test in `recent_test.go` MUST
   explicitly assert the absence of any national-tier org.
+
+## 2026-05-27 — region detail goes descendants-only
+
+The original `/regions/{slug}` spec (above) built its in-scope org set
+from the union of descendants and ancestors, deliberately mirroring
+`/lookup`'s upward walk so a city detail page would surface the
+parent-metro and state orgs that also covered the city. That choice
+turned out to be the wrong UX:
+
+- The browse list (`/api/v1/regions`) reports `org_count` from a
+  **descendant-only** walk (see `ListRegions` in `browse.sql`).
+- The browse cards therefore promised N orgs.
+- The detail endpoint delivered N + every ancestor org, sometimes 5×
+  the promised count for a small city under a large state.
+
+The mismatch was loudest on cities: clicking Boston (a city under
+Greater Boston Metro under Massachusetts) used to surface every
+metro and state-level org as "regional," dwarfing what the Boston
+card had advertised. The same browse-vs-detail comparison was nearly
+identical on Greater Boston Metro (few ancestor orgs at metro level),
+which is why the inconsistency hadn't been spotted earlier.
+
+**Fix:** `GetRegion` now builds its in-scope set from descendants
+only. `AncestorRegions` is still called, but only to populate the
+breadcrumb (`ancestry`) — not the org buckets. Postal-code `/lookup`
+keeps its upward ancestor walk in `pkg/atlas/lookup.go` (answering
+"what works at this address?", which legitimately spans every scope
+the address sits within).
+
+**Files touched:**
+- `api/pkg/atlas/region.go` — drop the ancestor union from `inScope`.
+- `api/pkg/atlas/browse.go` — updated `RegionDetail` docstring.
+- `api/pkg/atlas/browse_test.go` — renamed `_Metro_BucketsBothDirections` → `_Metro_BucketsByScope`; renamed `_City_IncludesAncestorOrgs` → `_City_DescendantsOnly`; updated `_AnyNonNationalKind_Resolves` and `_PopulatesMatchedRegionSlugs` expectations.
+- `api/internal/store/postgres/browse_test.go` — same rename; tightened the Chicago test to pin out the active-transportation-alliance ancestor-leakage case.
+- `api/openapi.yaml` — `/api/v1/regions/{slug}` description and `RegionDetail` schema description rewritten.
+- `web/src/routes/Region.tsx` — rail-block copy updated (no more "wider footprints that include it" — now points to the postal lookup for the upward walk).
+
+**Property preserved:** `RegionSummary.org_count` (browse card) and
+`len(local) + len(regional)` (detail page) now refer to the same set
+of orgs.

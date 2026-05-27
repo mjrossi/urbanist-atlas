@@ -44,8 +44,9 @@ func TestDetectCycles_LongCycle(t *testing.T) {
 func TestDetectCycles_CrossFileParentIsAllowed(t *testing.T) {
 	// A parent slug not defined in this file is allowed — it's
 	// assumed to be in the DB (loaded by an earlier file). Resolution
-	// happens at write time via RegionIDBySlug. DetectCycles must not
-	// reject it; otherwise the multi-file seed split breaks.
+	// happens at write time via RegionIDsBySlugs (one batched query
+	// per file). DetectCycles must not reject it; otherwise the
+	// multi-file seed split breaks.
 	f := File{Regions: []Region{
 		{Slug: "a", ScopeTier: "local", Kind: "x", Name: "A", Parents: []string{"ghost"}},
 	}}

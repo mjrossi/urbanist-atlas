@@ -62,7 +62,8 @@ One-time setup: install [mise](https://mise.jdx.dev) and add
 mise install                  # provision Go, Node, sqlc, goose, staticcheck, oapi-codegen
 just pg-up                    # start the dev Postgres in a docker container on :55432
 just migrate-up               # apply migrations against the dev DB
-just api-run                  # API on :8080 (text logs)
+just loaddata                 # load regions + postal codes + seed orgs from api/seed/
+just api-run                  # API on :8080 (text logs); also serves /healthz + /readyz
 
 # in another shell:
 cd web && npm install && npm run dev    # SPA on :5173

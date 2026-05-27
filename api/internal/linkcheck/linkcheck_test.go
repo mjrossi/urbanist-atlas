@@ -12,7 +12,10 @@ import (
 )
 
 func TestCheck(t *testing.T) {
-	t.Run("200 clean", func(t *testing.T) {
+	t.Run("200 clean populates FinalURL", func(t *testing.T) {
+		// Pins the slice that closed the direct-hit FinalURL coverage
+		// gap: even when no redirect occurs, FinalURL must echo the
+		// resolved URL so the TSV report has a value in every row.
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -29,8 +32,10 @@ func TestCheck(t *testing.T) {
 		if r.Err != "" {
 			t.Errorf("err: want empty, got %q", r.Err)
 		}
-		if r.FinalURL != "" {
-			t.Errorf("final_url: want empty (no redirect), got %q", r.FinalURL)
+		// HEAD probe is what the linkcheck issues; the httptest server
+		// answers it directly so resp.Request.URL.String() ≡ srv.URL.
+		if r.FinalURL != srv.URL {
+			t.Errorf("final_url: want %q, got %q", srv.URL, r.FinalURL)
 		}
 	})
 

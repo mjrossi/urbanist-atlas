@@ -17,11 +17,15 @@ WITH RECURSIVE descendants(id, country, kind, name, slug, scope_tier, sort_prior
     FROM regions r
     WHERE r.id = $1 AND r.scope_tier <> 'national'
     UNION
+    -- Bounded by depth < 20 as a belt-and-suspenders against any
+    -- unexpected cycle in the data. Matches the ListRegions descendants
+    -- CTE above and the AncestorRegions CTE in lookup.sql.
     SELECT r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, d.depth + 1
     FROM regions r
     JOIN region_parents rp ON rp.region_id = r.id
     JOIN descendants d     ON rp.parent_region_id = d.id
     WHERE r.scope_tier <> 'national'
+      AND d.depth < 20
 ),
 deduped AS (
     SELECT DISTINCT ON (id) id, country, kind, name, slug, scope_tier, sort_priority, depth
@@ -190,21 +194,26 @@ roots AS (
     WHERE kind = ANY($1::text[])
       AND scope_tier <> 'national'
 ),
-descendants(root_id, region_id) AS (
-    -- Seed: each root is its own descendant (an org tagged directly
-    -- to the root must count).
-    SELECT r.id, r.id FROM roots r
+descendants(root_id, region_id, depth) AS (
+    -- Seed: each root is its own descendant at depth 0 (an org tagged
+    -- directly to the root must count).
+    SELECT r.id, r.id, 0 FROM roots r
     UNION
     -- Recurse downward through region_parents. Filter scope_tier
     -- 'national' on the recursion so an editorial slip-up (a
     -- national region wired as a child of a metro) can't inflate the
     -- root's org_count via orgs attached only to that national row.
     -- Matches the sibling DescendantRegions CTE below.
-    SELECT d.root_id, rp.region_id
+    --
+    -- Bounded by depth < 20 as a belt-and-suspenders against any
+    -- unexpected cycle in the data. The DAG is acyclic by
+    -- construction; the deepest legitimate walk in the v1 seed is ~5.
+    SELECT d.root_id, rp.region_id, d.depth + 1
     FROM descendants d
     JOIN region_parents rp ON rp.parent_region_id = d.region_id
     JOIN regions r2        ON r2.id = rp.region_id
     WHERE r2.scope_tier <> 'national'
+      AND d.depth < 20
 ),
 ancestors(root_id, ancestor_id, depth) AS (
     -- Seed: direct parents of each root.
@@ -256,7 +265,6 @@ JOIN organization_regions orx ON orx.region_id = d.region_id
 JOIN organizations o          ON o.id = orx.organization_id
 WHERE o.status = 'approved'
 GROUP BY r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, nbp.slug
-HAVING COUNT(DISTINCT o.id) > 0
 ORDER BY org_count DESC, r.name ASC
 `
 
@@ -317,6 +325,10 @@ type ListRegionsRow struct {
 //     hit per root and resolves ties alphabetically.
 //
 // Ordered by org_count DESC then name ASC.
+// No HAVING needed: the INNER JOIN chain (roots → descendants →
+// organization_regions → organizations) guarantees every surviving
+// row has COUNT(DISTINCT o.id) ≥ 1. Regions with zero approved orgs
+// never reach this aggregate.
 func (q *Queries) ListRegions(ctx context.Context, kinds []string) ([]ListRegionsRow, error) {
 	rows, err := q.db.Query(ctx, listRegions, kinds)
 	if err != nil {

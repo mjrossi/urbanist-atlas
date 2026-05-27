@@ -16,6 +16,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"log"
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -32,12 +35,44 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// startPostgres provisions a fresh Postgres container, applies the
-// embedded migrations, and returns a connection string plus a t.Cleanup
-// hook that terminates the container.
-func startPostgres(t *testing.T) (*Store, func()) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+// Shared Postgres container for the integration suite. Booted once in
+// TestMain, migrated, then snapshotted; each test restores from the
+// snapshot in microseconds instead of spinning up its own container
+// (which costs ~1.5s of wall time). Snapshot/Restore is a
+// CREATE DATABASE … TEMPLATE operation under the hood.
+//
+// The package-shared state is intentional: tests in this package run
+// serially (no t.Parallel), and Restore is destructive — it drops the
+// app database and recreates it from the template, killing any open
+// connections. Each test gets a freshly-opened pgxpool, so stale
+// connections from a prior test never leak into the next one.
+var (
+	sharedContainer *tcpostgres.PostgresContainer
+	sharedDBURL     string
+)
+
+func TestMain(m *testing.M) {
+	cleanup, err := setupSharedPostgres()
+	if err != nil {
+		log.Printf("integration test setup failed: %v", err)
+		if cleanup != nil {
+			cleanup()
+		}
+		os.Exit(1)
+	}
+	code := m.Run()
+	if cleanup != nil {
+		cleanup()
+	}
+	os.Exit(code)
+}
+
+// setupSharedPostgres boots the package-shared container, runs the
+// embedded migrations, and saves a "migrated_template" snapshot that
+// startPostgres restores per test. Returns a cleanup that terminates
+// the container.
+func setupSharedPostgres() (func(), error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	container, err := tcpostgres.Run(ctx,
@@ -49,32 +84,53 @@ func startPostgres(t *testing.T) (*Store, func()) {
 		tcpostgres.WithSQLDriver("pgx"),
 	)
 	if err != nil {
-		t.Fatalf("start postgres container: %v", err)
+		return nil, fmt.Errorf("start postgres container: %w", err)
 	}
-	t.Cleanup(func() {
+	cleanup := func() {
 		shutdown, c := context.WithTimeout(context.Background(), 30*time.Second)
 		defer c()
 		_ = container.Terminate(shutdown)
-	})
+	}
 
 	// Belt-and-suspenders: wait until the DB is actually accepting
 	// connections. The Run() above already waits for log readiness,
 	// but on slower hosts the listener can lag by a beat.
 	waitStrategy := wait.ForListeningPort("5432/tcp").WithStartupTimeout(60 * time.Second)
 	if err := waitStrategy.WaitUntilReady(ctx, container); err != nil {
-		t.Fatalf("wait for postgres: %v", err)
+		return cleanup, fmt.Errorf("wait for postgres: %w", err)
 	}
 
 	dbURL, err := container.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		t.Fatalf("connection string: %v", err)
+		return cleanup, fmt.Errorf("connection string: %w", err)
 	}
-
 	if err := applyMigrations(ctx, dbURL); err != nil {
-		t.Fatalf("apply migrations: %v", err)
+		return cleanup, fmt.Errorf("apply migrations: %w", err)
+	}
+	if err := container.Snapshot(ctx); err != nil {
+		return cleanup, fmt.Errorf("snapshot migrated template: %w", err)
 	}
 
-	store, closeFn, err := Open(ctx, dbURL)
+	sharedContainer = container
+	sharedDBURL = dbURL
+	return cleanup, nil
+}
+
+// startPostgres restores the shared container's post-migration
+// snapshot and hands back a freshly-opened pool. The returned closeFn
+// closes the pool; the container itself lives for the lifetime of the
+// test binary (see TestMain). Restore is destructive — never call
+// startPostgres concurrently with another test holding a pool against
+// the same container.
+func startPostgres(t *testing.T) (*Store, func()) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if err := sharedContainer.Restore(ctx); err != nil {
+		t.Fatalf("restore postgres snapshot: %v", err)
+	}
+	store, closeFn, err := Open(ctx, sharedDBURL)
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}

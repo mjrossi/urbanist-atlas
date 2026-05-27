@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
 import type { RegionSummary, Org } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
+import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
 const { listRegionsMock, listRecentMock } = vi.hoisted(() => ({
   listRegionsMock: vi.fn(),
@@ -22,16 +21,7 @@ vi.mock('../lib/api.ts', async () => {
 const { Home } = await import('./Home.tsx');
 
 function renderHome() {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/']}>
-        <Home />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
+  return renderWithProviders(<Home />);
 }
 
 function makeRegion(

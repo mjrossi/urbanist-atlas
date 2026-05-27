@@ -5,8 +5,8 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, preview, fly, smoke, ci. Each
-# group corresponds to a section comment below.
+# Groups: api, data, verify, postgres, web, preview, fly, smoke, ci.
+# Each group corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -34,19 +34,13 @@ api-build:
 api-fmt:
     cd api && gofmt -w .
 
-# fail if any Go file would be rewritten by gofmt. `gofmt -l` prints
-# the offending paths and exits 0 even on drift, so the explicit
-# non-empty check turns that into a CI signal.
+# fail if any Go file would be rewritten by gofmt. `gofmt -l` lists
+# offenders and exits 0 even on drift, so the explicit non-empty
+# check turns that into a CI signal.
 [group('api')]
 [doc('fail if any Go file is not gofmt-clean')]
 api-fmt-check:
-    @cd api && \
-      drift="$(gofmt -l .)"; \
-      if [ -n "$drift" ]; then \
-        echo "gofmt drift in:"; echo "$drift"; \
-        echo "run \`just api-fmt\` and commit." >&2; \
-        exit 1; \
-      fi
+    @cd api && drift="$(gofmt -l .)"; [ -z "$drift" ] || { echo "gofmt drift:"; echo "$drift"; echo "run \`just api-fmt\` and commit." >&2; exit 1; }
 
 # go vet ./...
 [group('api')]
@@ -75,21 +69,14 @@ api-check: api-fmt-check api-vet api-staticcheck api-test api-gen-check
 api-tidy:
     cd api && go mod tidy
 
-# regenerate sqlc Go bindings from internal/store/postgres/queries/*.sql.
-# Wrapped in `mise exec --` so the pinned sqlc version is used even
-# when the shell doesn't have mise activated.
+# regenerate every codegen artifact: oapi-codegen Go types, the
+# embedded copy of openapi.yaml, and sqlc bindings. All three flow
+# through `go generate ./...` via //go:generate directives, so adding
+# a new generated artifact is just a matter of dropping another
+# directive on the right file.
 [group('api')]
-[doc('regenerate sqlc Go bindings (mise-pinned sqlc)')]
-api-sqlc-gen:
-    cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
-
-# regenerate oapi-codegen Go types AND refresh the embedded copy of
-# openapi.yaml next to the handler that serves it. Both flow through
-# `go generate ./...` so adding a new generated artifact is just a
-# matter of dropping a //go:generate directive on the right file.
-[group('api')]
-[doc('regenerate oapi-codegen types + sync embedded openapi.yaml')]
-api-oapi-gen:
+[doc('regenerate all codegen (oapi-codegen + embedded spec + sqlc)')]
+api-gen:
     cd api && mise exec -- go generate ./...
 
 # run the link checker over the seed orgs, write to /tmp/links.tsv
@@ -108,20 +95,20 @@ linkcheck:
 api-test-integration:
     cd api && go test -tags=integration -race -count=1 ./internal/store/postgres/...
 
-# fail if any generated file would change. Regenerates oapi-codegen
-# and the embedded spec copy via `go generate`, then regenerates sqlc,
-# then asks git if anything moved. Used inside api-check so `just ci`
-# rejects commits that forgot to regenerate.
+# fail if any generated file would change after a fresh regen. One
+# `go generate ./...` covers all three artifacts via the
+# //go:generate directives in oapi/doc.go, httpapi/openapi_handler.go,
+# and postgres/gen.go. Used inside api-check so `just ci` rejects
+# commits that forgot to regenerate.
 [group('api')]
 [doc('fail if any generated file would drift after a regen')]
 api-gen-check:
     @cd api && mise exec -- go generate ./...
-    @cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
     @cd api && git diff --exit-code -- \
         internal/httpapi/oapi/types.gen.go \
         internal/httpapi/openapi.yaml \
         internal/store/postgres/gen/ \
-        || (echo "generated files drifted; run \`just api-oapi-gen && just api-sqlc-gen\` and commit." && exit 1)
+        || (echo "generated files drifted; run \`just api-gen\` and commit." && exit 1)
 
 # ── data: operational subcommands ─────────────────────
 # These wrap the server binary's urfave/cli subcommands for the
@@ -189,6 +176,30 @@ etl-download country:
 [doc('etl: regenerate seed files from staged sources (e.g. `just etl-regenerate US`)')]
 etl-regenerate country:
     cd api && go run ./cmd/server etl regenerate --country {{country}} --src ../etl/sources --out seed
+
+# ── verify: out-of-band data hygiene checks ───────────
+# These probe third-party URLs from the seed data. Because a handful
+# of advocacy-org domains have lapsed and now resolve to parked
+# domains that log requester IPs, the recipes egress via a gluetun
+# container speaking Proton WireGuard. Set WIREGUARD_PRIVATE_KEY in
+# mise.local.toml [env] before first run (see mise.local.toml.example).
+
+# probe every website_url + contact_url in api/seed/orgs.toml through
+# the VPN; writes tmp/org-url-report.{md,tsv}. Leaves gluetun running
+# so re-runs are fast — `just verify-org-urls-down` when you're done.
+[group('verify')]
+[doc('probe every seed org website_url + contact_url via VPN; writes tmp/org-url-report.{md,tsv}')]
+verify-org-urls:
+    @mkdir -p tmp
+    docker compose -f scripts/verify-org-urls.compose.yml --profile verify run --rm --build verify
+
+# stop the gluetun VPN container brought up by `verify-org-urls`.
+# The verify container itself is removed by --rm each run; gluetun
+# is what lingers.
+[group('verify')]
+[doc('stop the gluetun VPN container used by verify-org-urls')]
+verify-org-urls-down:
+    docker compose -f scripts/verify-org-urls.compose.yml down
 
 # ── postgres: dev container lifecycle ─────────────────
 # Local dev Postgres runs in a named docker container with a
@@ -439,67 +450,16 @@ healthz port='8080':
 lookup code country='US' port='8080':
     @curl -sS "http://localhost:{{port}}/api/v1/lookup?postal_code={{code}}&country={{country}}" | jq
 
-# End-to-end smoke against the LIVE QA endpoint. Verifies:
-# /healthz reachable, /api/v1/lookup behind the X-Atlas-Client gate
-# (401 without, 200 with), ODbL attribution headers + meta envelope
-# present, OpenAPI YAML served. Requires URBANIST_CLIENT_SECRET in
-# the environment (or pass as a positional arg).
+# End-to-end smoke against the LIVE QA endpoint. The script lives at
+# scripts/smoke.sh so CI can invoke it directly without needing `just`
+# on the runner. Requires URBANIST_CLIENT_SECRET in the environment
+# (or pass as a positional arg).
 # usage: URBANIST_CLIENT_SECRET=... just smoke
 #        or: just smoke <secret> [host]
 [group('smoke')]
 [doc('e2e smoke against qa-api.urbanistatlas.com (set URBANIST_CLIENT_SECRET first)')]
 smoke secret='' host='qa-api.urbanistatlas.com':
-    #!/usr/bin/env bash
-    set -euo pipefail
-    SECRET="{{secret}}"
-    if [ -z "$SECRET" ]; then SECRET="${URBANIST_CLIENT_SECRET:-}"; fi
-    if [ -z "$SECRET" ]; then
-        echo "smoke: URBANIST_CLIENT_SECRET is required (env var or first positional arg)" >&2
-        exit 2
-    fi
-    BASE="https://{{host}}"
-    fail=0
-    echo "→ GET $BASE/healthz"
-    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/healthz")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-
-    echo "→ GET $BASE/api/v1/lookup?postal_code=10001&country=US (no X-Atlas-Client)"
-    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/lookup?postal_code=10001&country=US")
-    if [ "$code" != "401" ]; then echo "  FAIL: expected 401, got $code"; fail=1; else echo "  OK 401"; fi
-
-    echo "→ GET $BASE/api/v1/lookup?postal_code=10001&country=US (with secret)"
-    headers=$(mktemp)
-    body=$(mktemp)
-    code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
-        -H "X-Atlas-Client: $SECRET" \
-        "$BASE/api/v1/lookup?postal_code=10001&country=US")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-    if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
-    if ! grep -qi '^X-Data-Attribution: ' "$headers"; then echo "  FAIL: missing X-Data-Attribution header"; fail=1; else echo "  OK X-Data-Attribution"; fi
-    rm -f "$headers" "$body"
-
-    # /lookup is a single-resource endpoint; the {meta, data} envelope
-    # only wraps collection responses (per the slice #24 ODbL design,
-    # see docs/api-architecture.md § Response envelope). Check meta on
-    # /regions, which is a collection endpoint.
-    echo "→ GET $BASE/api/v1/regions (collection meta envelope)"
-    headers=$(mktemp)
-    body=$(mktemp)
-    code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
-        -H "X-Atlas-Client: $SECRET" \
-        "$BASE/api/v1/regions")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-    if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
-    if ! jq -e '.meta.license and .meta.attribution_url and .meta.generated_at' "$body" >/dev/null; then echo "  FAIL: meta envelope missing license/attribution_url/generated_at"; fail=1; else echo "  OK meta envelope"; fi
-    if ! jq -e '.data | type == "array"' "$body" >/dev/null; then echo "  FAIL: data is not an array"; fail=1; else echo "  OK data array"; fi
-    rm -f "$headers" "$body"
-
-    echo "→ GET $BASE/api/v1/openapi.yaml"
-    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/openapi.yaml")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-
-    if [ "$fail" -ne 0 ]; then echo "smoke: FAILED"; exit 1; fi
-    echo "smoke: PASS"
+    ./scripts/smoke.sh "{{secret}}" "{{host}}"
 
 # ── ci-equivalent ─────────────────────────────────────
 

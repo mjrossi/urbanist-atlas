@@ -56,16 +56,27 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	//
 	// State/province-tier files load BEFORE each country's main regions
 	// file so the main file's leaves can parent under the states via
-	// cross-file resolution (internal/loadregions/write.go's
-	// RegionIDBySlug fallback).
+	// cross-file resolution (internal/loadregions/write.go's batched
+	// RegionIDsBySlugs lookup).
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
 		t.Fatalf("loadregions US states: %v", err)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMultistate, "US"); err != nil {
 		t.Fatalf("loadregions US multistate: %v", err)
 	}
-	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMSAs, "US"); err != nil {
+	msaSum, err := loadregions.LoadFile(ctx, store.Pool(), nil, usMSAs, "US")
+	if err != nil {
 		t.Fatalf("loadregions US msas: %v", err)
+	}
+	// Batching contract — symmetric with the loadpostal assertion
+	// below. The MSA file is ~393 regions + ~393 parent edges; at the
+	// loader's batchSize=500 that's two UNNEST batches. A regression
+	// that reverted to per-row Exec would balloon Batches into the
+	// hundreds, so locking Batches < Regions is enough to detect it
+	// without coupling to the exact chunk count.
+	if msaSum.Batches >= msaSum.Regions {
+		t.Errorf("MSA batching: Batches=%d, Regions=%d (expected many fewer batches than regions; per-row Exec regression?)",
+			msaSum.Batches, msaSum.Regions)
 	}
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usRegions, "US"); err != nil {
 		t.Fatalf("loadregions US: %v", err)

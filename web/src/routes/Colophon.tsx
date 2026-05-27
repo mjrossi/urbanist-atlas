@@ -1,20 +1,18 @@
 import { Link } from 'react-router';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 export function Colophon() {
   useDocumentTitle('Colophon — Urbanist Atlas');
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">Colophon</span>
-        </div>
-        <div>Volume I · 2026 Edition</div>
-      </div>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="Colophon"
+        meta="Volume I · 2026 Edition"
+      />
 
-      <div className="lede" style={{ marginTop: 48 }}>
+      <div className="lede mt-48">
         <div className="eyebrow">
           § The colophon<span className="eyebrow-rule" />
         </div>
@@ -116,18 +114,7 @@ export function Colophon() {
             can&rsquo;t miss the share-alike obligation. The block as it appears
             on the wire:
           </p>
-          <pre
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 13,
-              lineHeight: 1.55,
-              background: 'var(--paper-2)',
-              border: '1px solid var(--rule)',
-              padding: '18px 22px',
-              overflowX: 'auto',
-              color: 'var(--ink-2)',
-            }}
-          >
+          <pre className="codeblock">
             <code>
               {`X-Data-License: ODbL-1.0
 X-Data-Attribution: https://urbanistatlas.com
@@ -191,7 +178,7 @@ X-Data-Attribution: https://urbanistatlas.com
           </div>
           <div className="rail-block muted">
             <div className="rail-kicker">Type</div>
-            <p style={{ fontSize: 14 }}>
+            <p className="text-sm">
               Set in <em>Fraunces</em>, <em>Source Serif 4</em>,{' '}
               <em>Inter</em>, and <em>JetBrains Mono</em>. Cream{' '}
               <code>#FDF6EC</code>, amber <code>#8F5520</code>, ink{' '}

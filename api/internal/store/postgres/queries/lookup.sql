@@ -29,11 +29,15 @@ WITH RECURSIVE ancestors(id, country, kind, name, slug, scope_tier, sort_priorit
     FROM regions r
     WHERE r.id = $1 AND r.scope_tier <> 'national'
     UNION
+    -- Bounded by depth < 20 as a belt-and-suspenders against any
+    -- unexpected cycle in the data. Matches the descendants CTEs in
+    -- browse.sql.
     SELECT r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, a.depth + 1
     FROM regions r
     JOIN region_parents rp ON rp.parent_region_id = r.id
     JOIN ancestors a       ON rp.region_id = a.id
     WHERE r.scope_tier <> 'national'
+      AND a.depth < 20
 ),
 deduped AS (
     SELECT DISTINCT ON (id) id, country, kind, name, slug, scope_tier, sort_priority, depth

@@ -46,6 +46,12 @@ func Open(ctx context.Context, dbURL string) (*Store, func(), error) {
 
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
+// Ping verifies the Postgres pool is reachable. Used by the HTTP
+// /readyz handler to distinguish liveness (process is up) from
+// readiness (DB is responsive). Returns whatever error pgxpool surfaces
+// so callers can log it.
+func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+
 // ResolveLeafRegion implements atlas.Store.
 func (s *Store) ResolveLeafRegion(ctx context.Context, country atlas.Country, postalCode string) (atlas.Region, error) {
 	normalized := atlas.NormalizePostalCode(country, postalCode)
@@ -59,15 +65,7 @@ func (s *Store) ResolveLeafRegion(ctx context.Context, country atlas.Country, po
 		}
 		return atlas.Region{}, fmt.Errorf("postgres: resolve leaf region: %w", err)
 	}
-	r := atlas.Region{
-		ID:           row.ID,
-		Country:      atlas.Country(row.Country),
-		Kind:         atlas.RegionKind(row.Kind),
-		Name:         row.Name,
-		Slug:         row.Slug,
-		ScopeTier:    atlas.ScopeTier(row.ScopeTier),
-		SortPriority: int(row.SortPriority),
-	}
+	r := newRegion(row.ID, row.Country, row.Kind, row.Name, row.Slug, row.ScopeTier, row.SortPriority)
 	parents, err := s.parentSlugsByRegion(ctx, []int64{r.ID})
 	if err != nil {
 		return atlas.Region{}, err
@@ -86,15 +84,7 @@ func (s *Store) AncestorRegions(ctx context.Context, leafRegionID int64) ([]atla
 	regions := make([]atlas.Region, len(rows))
 	for i, row := range rows {
 		ids[i] = row.ID
-		regions[i] = atlas.Region{
-			ID:           row.ID,
-			Country:      atlas.Country(row.Country),
-			Kind:         atlas.RegionKind(row.Kind),
-			Name:         row.Name,
-			Slug:         row.Slug,
-			ScopeTier:    atlas.ScopeTier(row.ScopeTier),
-			SortPriority: int(row.SortPriority),
-		}
+		regions[i] = newRegion(row.ID, row.Country, row.Kind, row.Name, row.Slug, row.ScopeTier, row.SortPriority)
 	}
 	parents, err := s.parentSlugsByRegion(ctx, ids)
 	if err != nil {
@@ -143,17 +133,26 @@ func (s *Store) regionsByID(ctx context.Context, ids []int64) (map[int64]atlas.R
 		return nil, fmt.Errorf("postgres: get regions: %w", err)
 	}
 	for _, r := range rows {
-		out[r.ID] = atlas.Region{
-			ID:           r.ID,
-			Country:      atlas.Country(r.Country),
-			Kind:         atlas.RegionKind(r.Kind),
-			Name:         r.Name,
-			Slug:         r.Slug,
-			ScopeTier:    atlas.ScopeTier(r.ScopeTier),
-			SortPriority: int(r.SortPriority),
-		}
+		out[r.ID] = newRegion(r.ID, r.Country, r.Kind, r.Name, r.Slug, r.ScopeTier, r.SortPriority)
 	}
 	return out, nil
+}
+
+// newRegion converts the seven columns every sqlc-generated row type
+// for `regions` carries into the domain Region. Each generated row
+// type is structurally identical (sqlc emits one per query), so a
+// single positional constructor keeps each call site to one line and
+// gives schema-shape changes a single place to land.
+func newRegion(id int64, country, kind, name, slug, scopeTier string, sortPriority int32) atlas.Region {
+	return atlas.Region{
+		ID:           id,
+		Country:      atlas.Country(country),
+		Kind:         atlas.RegionKind(kind),
+		Name:         name,
+		Slug:         slug,
+		ScopeTier:    atlas.ScopeTier(scopeTier),
+		SortPriority: int(sortPriority),
+	}
 }
 
 // ListRegions implements atlas.Store. The SQL is in browse.sql;
@@ -184,17 +183,10 @@ func (s *Store) ListRegions(ctx context.Context) ([]atlas.RegionSummary, error) 
 		if r.BrowseParentSlug.Valid {
 			browseParent = r.BrowseParentSlug.String
 		}
+		region := newRegion(r.ID, r.Country, r.Kind, r.Name, r.Slug, r.ScopeTier, r.SortPriority)
+		region.ParentSlugs = parents[r.ID]
 		out[i] = atlas.RegionSummary{
-			Region: atlas.Region{
-				ID:           r.ID,
-				Country:      atlas.Country(r.Country),
-				Kind:         atlas.RegionKind(r.Kind),
-				Name:         r.Name,
-				Slug:         r.Slug,
-				ScopeTier:    atlas.ScopeTier(r.ScopeTier),
-				SortPriority: int(r.SortPriority),
-				ParentSlugs:  parents[r.ID],
-			},
+			Region:           region,
 			OrgCount:         r.OrgCount,
 			DirectOrgCount:   r.DirectOrgCount,
 			BrowseParentSlug: browseParent,
@@ -215,15 +207,7 @@ func (s *Store) ResolveRegionBySlug(ctx context.Context, slug string) (atlas.Reg
 		}
 		return atlas.Region{}, fmt.Errorf("postgres: resolve region by slug: %w", err)
 	}
-	region := atlas.Region{
-		ID:           row.ID,
-		Country:      atlas.Country(row.Country),
-		Kind:         atlas.RegionKind(row.Kind),
-		Name:         row.Name,
-		Slug:         row.Slug,
-		ScopeTier:    atlas.ScopeTier(row.ScopeTier),
-		SortPriority: int(row.SortPriority),
-	}
+	region := newRegion(row.ID, row.Country, row.Kind, row.Name, row.Slug, row.ScopeTier, row.SortPriority)
 	parents, err := s.parentSlugsByRegion(ctx, []int64{region.ID})
 	if err != nil {
 		return atlas.Region{}, err
@@ -248,15 +232,7 @@ func (s *Store) DescendantRegions(ctx context.Context, focusRegionID int64) ([]a
 	regions := make([]atlas.Region, len(rows))
 	for i, row := range rows {
 		ids[i] = row.ID
-		regions[i] = atlas.Region{
-			ID:           row.ID,
-			Country:      atlas.Country(row.Country),
-			Kind:         atlas.RegionKind(row.Kind),
-			Name:         row.Name,
-			Slug:         row.Slug,
-			ScopeTier:    atlas.ScopeTier(row.ScopeTier),
-			SortPriority: int(row.SortPriority),
-		}
+		regions[i] = newRegion(row.ID, row.Country, row.Kind, row.Name, row.Slug, row.ScopeTier, row.SortPriority)
 	}
 	parents, err := s.parentSlugsByRegion(ctx, ids)
 	if err != nil {

@@ -283,19 +283,22 @@ type Region struct {
 
 // RegionDetail A region (any non-national kind) with the organizations
 // in scope for it, bucketed by attachment tier. "In scope"
-// means orgs attached to the region itself, any descendant
-// in the DAG (so a metro surfaces its constituent cities'
-// orgs), or any ancestor (so a city surfaces the orgs
-// covering its parent metro / state / multi-state region).
+// means orgs attached to the region itself or any DAG
+// descendant — a metro surfaces its constituent cities'
+// orgs, a state surfaces every metro/city beneath it.
+// Ancestor orgs are NOT pulled in: this is "what does the
+// region contain?", not "what works at this address?" (the
+// latter is `/lookup`'s job, with its upward ancestor walk).
 //
-// This makes `/regions/{slug}` answer the same question
-// `/lookup` answers for a postal code: "every advocate
-// someone navigating to this region might care about."
+// Keeping the in-scope set descendant-only means the
+// `RegionSummary.org_count` shown on the browse card matches
+// the count delivered by this endpoint — no surprises when a
+// user clicks through.
+//
 // Orgs are bucketed by the `scope_tier` of the attachment
 // region they matched on — `local` for city/county-tier
-// attachments, `regional` for metro/state/multi-state. The
-// rule mirrors `/lookup`'s; `national`-tier attachments are
-// always filtered.
+// attachments, `regional` for metro/state/multi-state.
+// `national`-tier attachments are always filtered.
 //
 // Each `LookupOrg.matched_region_slugs` names the
 // attachment regions in scope that caused the org to

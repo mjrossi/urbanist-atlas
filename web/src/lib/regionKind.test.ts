@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   isBrowseableKind,
   isMetroKind,
   regionKindLabel,
 } from './regionKind.ts';
+
+// The dev-mode unknown-kind console.warn introduced for schema-drift
+// detection fires whenever a kind isn't in REGION_KINDS. Restore the
+// real console.warn after each test so spies don't leak across cases.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('regionKind', () => {
   it('regionKindLabel returns a real label for the default browse set', () => {
@@ -49,9 +56,20 @@ describe('regionKind', () => {
   });
 
   it('unknown kinds fall back to safe defaults', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(regionKindLabel('xx:unknown')).toBe('Region');
     expect(isBrowseableKind('xx:unknown')).toBe(false);
     expect(isMetroKind('xx:unknown')).toBe(false);
+  });
+
+  it('dev-mode logs a warning when an unknown kind is seen', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Use a fresh kind so the per-session dedup Set doesn't swallow
+    // the warning from a sibling test (e.g. the xx:unknown case above).
+    const unseen = `xx:drift-${Math.random().toString(36).slice(2, 8)}`;
+    regionKindLabel(unseen);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toMatch(/unknown kind/);
   });
 
   it('metro-equivalent kinds are flagged for primary-metro picks', () => {

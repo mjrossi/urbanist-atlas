@@ -7,6 +7,7 @@ import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
 import { EntryList } from '../components/EntryList.tsx';
+import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 
@@ -59,43 +60,35 @@ export function Region() {
 }
 
 function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }) {
-  if (query.isPending) {
-    return (
-      <p className="results-state" role="status" style={{ marginTop: 48 }}>
-        Loading region…
-      </p>
-    );
-  }
-  if (query.isError) {
-    if (query.error.status === 404) {
-      return (
-        <div className="lede" style={{ marginTop: 48 }}>
-          <div className="eyebrow">
-            § Region report<span className="eyebrow-rule" />
+  return (
+    <QueryState
+      query={query}
+      loading="Loading region…"
+      className="mt-48"
+      error={(e) =>
+        e.status === 404 ? (
+          <div className="lede mt-48">
+            <div className="eyebrow">
+              § Region report<span className="eyebrow-rule" />
+            </div>
+            <h1>
+              This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
+            </h1>
+            <p className="deck">
+              Try <Link to="/browse">browse</Link> for the regions we have indexed,
+              or <Link to="/submit">file a tip</Link> if you know advocates here.
+            </p>
           </div>
-          <h1>
-            This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
-          </h1>
-          <p className="deck">
-            Try <Link to="/browse">browse</Link> for the regions we have indexed,
-            or <Link to="/submit">file a tip</Link> if you know advocates here.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
-        {query.error.message}
-        {query.error.requestId ? (
-          <span className="results-state-detail">
-            request id: {query.error.requestId}
-          </span>
-        ) : null}
-      </p>
-    );
-  }
+        ) : undefined
+      }
+    >
+      {(data) => <RegionContent data={data} />}
+    </QueryState>
+  );
+}
 
-  const { region, local, regional, ancestry, descendant_region_names } = query.data;
+function RegionContent({ data }: { data: RegionDetail }) {
+  const { region, local, regional, ancestry, descendant_region_names } = data;
   const kindLabel = regionKindLabel(region.kind);
   const totalOrgs = local.length + regional.length;
 
@@ -123,7 +116,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
 
   return (
     <>
-      <div className="lede" style={{ marginTop: 48 }}>
+      <div className="lede mt-48">
         <div className="eyebrow">
           § {kindLabel} report · {region.country}
           <span className="eyebrow-rule" />
@@ -146,15 +139,15 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
         </div>
       </div>
 
-      <div className="spread" style={{ marginTop: 32 }}>
+      <div className="spread mt-32">
         <main>
           {totalOrgs === 0 ? (
-            <p className="results-state" style={{ marginTop: 24 }}>
+            <p className="results-state mt-24">
               No organizations indexed yet for {region.name}.{' '}
               <Link to="/submit">File a tip.</Link>
             </p>
           ) : (
-            <div style={{ marginTop: 24 }}>
+            <div className="mt-24">
               <EntryList
                 local={local}
                 regional={regional}
@@ -162,7 +155,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               />
             </div>
           )}
-          <div className="editors-note" style={{ marginTop: 32 }}>
+          <div className="editors-note mt-32">
             <div className="label">Know a group we&rsquo;re missing?</div>
             <p>
               The Atlas adds groups one editorial decision at a time.{' '}
@@ -180,10 +173,11 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               {parentNames.length > 0
                 ? `, sitting under ${parentNames.join(' · ')}.`
                 : '.'}{' '}
-              Local orgs work directly on this region; regional orgs cover
-              wider footprints that include it.
+              This page lists orgs anchored to {region.name} itself or to
+              regions it contains. For the wider footprint above (state,
+              multi-state coalitions), use the front-page postal lookup.
             </p>
-            <p style={{ marginBottom: 0 }}>
+            <p className="mb-0">
               Looking up by postal code?{' '}
               <Link to="/">Use the front-page lookup</Link>.
             </p>

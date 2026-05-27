@@ -96,6 +96,11 @@ func do(ctx context.Context, method, url string, timeout time.Duration) (int, st
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("User-Agent", userAgent)
 
+	// finalURL is captured progressively during redirects so it stays
+	// populated even if Do() ultimately errors mid-chain. The successful
+	// path overwrites it with resp.Request.URL below — that value is the
+	// authoritative post-redirect URL (or the original when no redirects
+	// happened), and was previously left empty for direct 200 hits.
 	var finalURL string
 	client := &http.Client{
 		Timeout: timeout,
@@ -113,5 +118,6 @@ func do(ctx context.Context, method, url string, timeout time.Duration) (int, st
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, resp.Body)
+	finalURL = resp.Request.URL.String()
 	return resp.StatusCode, finalURL, nil
 }

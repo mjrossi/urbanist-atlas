@@ -53,14 +53,12 @@ function Section({
 }) {
   if (orgs.length === 0) return null;
   return (
-    <section className="org-section" style={{ marginTop: 32 }}>
-      <header className="section-break" style={{ marginTop: 0 }}>
+    <section className="org-section mt-32">
+      <header className="section-break mt-0">
         <span className="num">{roman}</span>
         <h2 className="title">
           {title}
-          <span className="accent" style={{ color: 'var(--amber)' }}>
-            .
-          </span>
+          <span className="accent">.</span>
         </h2>
         <span className="aside">
           {orgs.length} {orgs.length === 1 ? 'entry' : 'entries'}

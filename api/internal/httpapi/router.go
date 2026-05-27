@@ -54,6 +54,7 @@ func New(cfg Config) http.Handler {
 	}
 
 	r.Get("/healthz", healthHandler())
+	r.Get("/readyz", readyHandler(cfg.Store, logger))
 
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
 		r.Use(odblHeadersMiddleware)

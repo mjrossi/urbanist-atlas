@@ -11,6 +11,15 @@ the plan is the *design* view.
 
 ## Status
 
+**Terminology — what "v1.0" means here.** v1.0 is the Phase 1 QA
+deliverable: every feature below in this table marked `Done` plus the
+gating/security pieces in the *Gatekeeping* section. The apex
+domains (`urbanistatlas.com`, `api.urbanistatlas.com`) wait on the
+Phase 2 work (slices #26–#28 — API keys, rate limiting, public CORS).
+"Production-ready" therefore means the QA stack is on the apex DNS
+once Phase 2 lands; the QA gate itself stays on for safety until
+then.
+
 **Phase 1 QA dogfooding is LIVE (2026-05-21):**
 `qa.urbanistatlas.com` (SPA on Cloudflare Workers + Pages) +
 `qa-api.urbanistatlas.com` (API on Fly.io, region `iad`, behind the
