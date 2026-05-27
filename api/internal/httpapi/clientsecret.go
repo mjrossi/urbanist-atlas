@@ -28,9 +28,13 @@ func clientSecretMiddleware(secret string) func(http.Handler) http.Handler {
 			// safe compare matters less than `subtle.ConstantTimeEq`-
 			// for-real-credentials but it's idiomatic and free.
 			if subtle.ConstantTimeCompare(got, expected) != 1 {
+				// Use the context-sourced rid (set by requestIDMiddleware
+				// upstream) so the problem document's request_id matches
+				// the X-Request-ID response header even when the client
+				// didn't send one — same behavior as every other handler.
 				writeProblem(w, r, http.StatusUnauthorized, problemUnauthorized,
 					"Unauthorized", "missing or invalid X-Atlas-Client header",
-					r.Header.Get("X-Request-ID"))
+					requestIDFromContext(r.Context()))
 				return
 			}
 			next.ServeHTTP(w, r)
