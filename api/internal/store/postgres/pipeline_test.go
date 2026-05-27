@@ -56,8 +56,8 @@ func TestPipeline_LoadpostalSeedLookup(t *testing.T) {
 	//
 	// State/province-tier files load BEFORE each country's main regions
 	// file so the main file's leaves can parent under the states via
-	// cross-file resolution (internal/loadregions/write.go's
-	// RegionIDBySlug fallback).
+	// cross-file resolution (internal/loadregions/write.go's batched
+	// RegionIDsBySlugs lookup).
 	if _, err := loadregions.LoadFile(ctx, store.Pool(), nil, usStates, "US"); err != nil {
 		t.Fatalf("loadregions US states: %v", err)
 	}
