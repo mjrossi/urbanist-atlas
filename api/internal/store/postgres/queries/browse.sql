@@ -55,10 +55,16 @@ descendants(root_id, region_id) AS (
     -- to the root must count).
     SELECT r.id, r.id FROM roots r
     UNION
-    -- Recurse downward through region_parents.
+    -- Recurse downward through region_parents. Filter scope_tier
+    -- 'national' on the recursion so an editorial slip-up (a
+    -- national region wired as a child of a metro) can't inflate the
+    -- root's org_count via orgs attached only to that national row.
+    -- Matches the sibling DescendantRegions CTE below.
     SELECT d.root_id, rp.region_id
     FROM descendants d
     JOIN region_parents rp ON rp.parent_region_id = d.region_id
+    JOIN regions r2        ON r2.id = rp.region_id
+    WHERE r2.scope_tier <> 'national'
 ),
 ancestors(root_id, ancestor_id, depth) AS (
     -- Seed: direct parents of each root.

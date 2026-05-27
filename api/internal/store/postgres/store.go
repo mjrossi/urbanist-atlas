@@ -106,7 +106,10 @@ func (s *Store) AncestorRegions(ctx context.Context, leafRegionID int64) ([]atla
 	return regions, nil
 }
 
-// OrgsForRegions implements atlas.Store.
+// OrgsForRegions implements atlas.Store. Routes through the shared
+// hydrateOrgRows path so the wire shape (Regions sorted ascending by
+// region ID via SQL; Org.CreatedAt populated) stays uniform across
+// the three callers (this method, GetOrgBySlug, ListRecent).
 func (s *Store) OrgsForRegions(ctx context.Context, regionIDs []int64) ([]atlas.Org, error) {
 	if len(regionIDs) == 0 {
 		return nil, nil
@@ -115,58 +118,19 @@ func (s *Store) OrgsForRegions(ctx context.Context, regionIDs []int64) ([]atlas.
 	if err != nil {
 		return nil, fmt.Errorf("postgres: orgs for regions: %w", err)
 	}
-	if len(rows) == 0 {
-		return nil, nil
-	}
-	seen := map[int64]struct{}{}
-	for _, row := range rows {
-		for _, rid := range row.RegionIds {
-			seen[rid] = struct{}{}
+	return s.hydrateOrgRows(ctx, orgsForRegionsRows(rows))
+}
+
+func orgsForRegionsRows(rows []gen.OrgsForRegionsAndAllRegionIDsRow) []orgRow {
+	out := make([]orgRow, len(rows))
+	for i, r := range rows {
+		out[i] = orgRow{
+			ID: r.ID, Slug: r.Slug, Name: r.Name, ShortDesc: r.ShortDesc,
+			WebsiteUrl: r.WebsiteUrl, ContactUrl: r.ContactUrl, Tags: r.Tags,
+			CreatedAt: r.CreatedAt, RegionIds: r.RegionIds,
 		}
 	}
-	ids := make([]int64, 0, len(seen))
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	regionsByID, err := s.regionsByID(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	parents, err := s.parentSlugsByRegion(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for id, r := range regionsByID {
-		r.ParentSlugs = parents[id]
-		regionsByID[id] = r
-	}
-	out := make([]atlas.Org, 0, len(rows))
-	for _, row := range rows {
-		regions := make([]atlas.Region, 0, len(row.RegionIds))
-		for _, rid := range row.RegionIds {
-			if r, ok := regionsByID[rid]; ok {
-				regions = append(regions, r)
-			}
-		}
-		tags := make([]atlas.Tag, len(row.Tags))
-		for i, t := range row.Tags {
-			tags[i] = atlas.Tag(t)
-		}
-		org := atlas.Org{
-			ID:         row.ID,
-			Slug:       row.Slug,
-			Name:       row.Name,
-			ShortDesc:  row.ShortDesc,
-			WebsiteURL: row.WebsiteUrl,
-			Tags:       tags,
-			Regions:    regions,
-		}
-		if row.ContactUrl.Valid {
-			org.ContactURL = row.ContactUrl.String
-		}
-		out = append(out, org)
-	}
-	return out, nil
+	return out
 }
 
 func (s *Store) regionsByID(ctx context.Context, ids []int64) (map[int64]atlas.Region, error) {
