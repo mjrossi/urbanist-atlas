@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { SearchBox } from './SearchBox.tsx';
 
@@ -62,46 +63,45 @@ function getButton() {
   return screen.getByRole('button', { name: /look up/i });
 }
 
-function typeInto(input: HTMLInputElement, value: string) {
-  fireEvent.change(input, { target: { value } });
-}
-
 describe('SearchBox', () => {
-  it('normalizes a US ZIP and navigates with country=US', () => {
+  it('normalizes a US ZIP and navigates with country=US', async () => {
+    const user = userEvent.setup();
     renderWithRouter();
-    typeInto(getInput(), '11217');
-    fireEvent.click(getButton());
+    await user.type(getInput(), '11217');
+    await user.click(getButton());
 
     const { pathname, search } = getLocation();
     expect(pathname).toBe('/r/11217');
     expect(search).toBe('?country=US');
   });
 
-  it('uppercases and strips whitespace from a Canadian postal code', () => {
+  it('uppercases and strips whitespace from a Canadian postal code', async () => {
+    const user = userEvent.setup();
     renderWithRouter();
-    typeInto(getInput(), 'm5v 2t6');
-    fireEvent.click(getButton());
+    await user.type(getInput(), 'm5v 2t6');
+    await user.click(getButton());
 
     const { pathname, search } = getLocation();
     expect(pathname).toBe('/r/M5V2T6');
     expect(search).toBe('?country=CA');
   });
 
-  it('accepts a 3-char FSA for Canadian lookups', () => {
+  it('accepts a 3-char FSA for Canadian lookups', async () => {
+    const user = userEvent.setup();
     renderWithRouter();
-    typeInto(getInput(), 'm5v');
-    fireEvent.click(getButton());
+    await user.type(getInput(), 'm5v');
+    await user.click(getButton());
 
     expect(getLocation().pathname).toBe('/r/M5V');
   });
 
-  it('shows an inline error and does not navigate when input is invalid', () => {
+  it('shows an inline error and does not navigate when input is invalid', async () => {
+    const user = userEvent.setup();
     renderWithRouter();
-    typeInto(getInput(), '123');
-    fireEvent.click(getButton());
+    await user.type(getInput(), '123');
+    await user.click(getButton());
 
     expect(screen.getByRole('alert').textContent).toMatch(/5 digits/i);
     expect(getLocation().pathname).toBe('/');
   });
-
 });
