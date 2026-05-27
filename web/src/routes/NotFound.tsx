@@ -17,7 +17,7 @@ export function NotFound() {
         </div>
         <div>404 · Page retracted</div>
       </div>
-      <div className="lede" style={{ marginTop: 56 }}>
+      <div className="lede mt-56">
         <div className="eyebrow">
           § Retractions desk<span className="eyebrow-rule" />
         </div>
@@ -30,7 +30,7 @@ export function NotFound() {
           retired.
         </p>
       </div>
-      <div className="spread" style={{ marginTop: 24 }}>
+      <div className="spread mt-24">
         <div className="prose">
           <p>
             If you followed a link from another site and you think this page

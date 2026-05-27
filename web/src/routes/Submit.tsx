@@ -74,7 +74,7 @@ export function Submit() {
         <div>Open year-round</div>
       </div>
 
-      <div className="spread" style={{ marginTop: 48 }}>
+      <div className="spread mt-48">
         <div>
           <div className="lede">
             <div className="eyebrow">
@@ -223,7 +223,7 @@ export function Submit() {
                 <label htmlFor="submit-oneline" className="field-label">
                   One-line description of what they actually do
                   <span className="required">*</span>
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     Plain English. ~140 characters.
                   </span>
                 </label>
@@ -246,7 +246,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-why" className="field-label">
                   Why this org belongs
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     Recent campaigns, who they organize, who they push. Specifics beat
                     adjectives.
                   </span>
@@ -265,7 +265,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-sources" className="field-label">
                   Sources
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     News coverage, social handles, prior wins. One per line.
                   </span>
                 </label>

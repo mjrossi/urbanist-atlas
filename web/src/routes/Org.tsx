@@ -66,7 +66,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
       marginTop={48}
       error={(e) =>
         e.status === 404 ? (
-          <div className="lede" style={{ marginTop: 48 }}>
+          <div className="lede mt-48">
             <div className="eyebrow">
               § Organization file<span className="eyebrow-rule" />
             </div>
@@ -146,7 +146,7 @@ function OrgContent({ org }: { org: OrgT }) {
         </p>
         <div className="deck-row">
           <p className="deck">{org.short_desc}</p>
-          <div style={{ paddingTop: 6 }}>
+          <div className="pt-6">
             {org.tags.length > 0 ? (
               <ul className="tag-list">
                 {org.tags.map((tag, i) => (
@@ -206,7 +206,7 @@ function OrgContent({ org }: { org: OrgT }) {
         </div>
       </header>
 
-      <div className="spread" style={{ marginTop: 0 }}>
+      <div className="spread mt-0">
         <main className="prose">
           <div className="glance-mobile">{atAGlance}</div>
           <div className="section-kicker">§ I — The entry</div>
@@ -252,7 +252,7 @@ function OrgContent({ org }: { org: OrgT }) {
             </>
           ) : null}
 
-          <div className="editors-note" style={{ marginTop: 16 }}>
+          <div className="editors-note mt-16">
             <div className="label">Something off?</div>
             <p>
               We try to verify every entry on a rolling cadence. If a campaign

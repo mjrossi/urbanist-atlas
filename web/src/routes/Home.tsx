@@ -45,11 +45,11 @@ export function Home() {
         <div>Vol. I · 2026 Edition</div>
       </div>
 
-      <div className="spread lede-first" style={{ marginTop: 40 }}>
+      <div className="spread lede-first mt-40">
         <div>
           <SearchBox />
 
-          <div className="prose" style={{ marginTop: 48 }}>
+          <div className="prose mt-48">
             <p className="lead drop">
               The Urbanist Atlas catalogues the people in your city, your county,
               your region who are organizing — patiently, stubbornly, sometimes
@@ -78,7 +78,7 @@ export function Home() {
           <div className="rail-block">
             <div className="rail-kicker">Browse the atlas</div>
             <TopPlaces query={places} />
-            <Link to="/browse" className="read-on" style={{ marginTop: 14 }}>
+            <Link to="/browse" className="read-on mt-14">
               All places <span className="arrow">→</span>
             </Link>
           </div>
@@ -213,7 +213,7 @@ function ByTheNumbers({
 
   return (
     <>
-      <section className="section-break" style={{ marginTop: 56 }}>
+      <section className="section-break mt-56">
         <span className="num">III.</span>
         <h2 className="title">The Atlas, by the numbers.</h2>
         <span className="aside">From the live directory</span>
@@ -257,21 +257,21 @@ function ByTheNumbers({
 function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
   return (
     <>
-      <section className="section-break" style={{ marginTop: 56 }}>
+      <section className="section-break mt-56">
         <span className="num">IV.</span>
         <h2 className="title">The topics the Atlas covers.</h2>
         <span className="aside">Editorial scope</span>
       </section>
-      <div className="spread lede-first" style={{ marginTop: 12 }}>
+      <div className="spread lede-first mt-12">
         <div>
-          <ul className="tag-list" style={{ gap: 12 }}>
+          <ul className="tag-list gap-12">
             {tags.map((label) => (
               <li key={label}>
                 <span className="tag">{label}</span>
               </li>
             ))}
           </ul>
-          <p className="fineprint" style={{ marginTop: 22 }}>
+          <p className="fineprint mt-22">
             Tags are editorial labels, applied by hand. An organization can
             carry up to five. Per-topic filtering ships with Phase 2; until
             then, <Link to="/browse">the place index</Link> is the wander

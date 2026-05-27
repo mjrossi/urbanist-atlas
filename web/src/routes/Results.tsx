@@ -96,14 +96,14 @@ function ResultsBody({
   // Pre-query gates: URL hasn't reached a state where a lookup makes sense yet.
   if (postalCode.length === 0) {
     return (
-      <p className="results-state" style={{ marginTop: 48 }}>
+      <p className="results-state mt-48">
         No postal code in the URL. <Link to="/">Try the lookup</Link>.
       </p>
     );
   }
   if (country === null) {
     return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
+      <p className="results-state error mt-48" role="alert">
         Country <code>{rawCountry}</code> isn&rsquo;t supported yet. Try{' '}
         <code>?country=US</code> or <code>?country=CA</code>.
       </p>
@@ -142,7 +142,7 @@ function ResultsContent({
 
   return (
     <>
-      <div className="lede" style={{ marginTop: 48 }}>
+      <div className="lede mt-48">
         <div className="eyebrow">
           § Postal-code lookup<span className="eyebrow-rule" />
         </div>
@@ -158,7 +158,7 @@ function ResultsContent({
       </div>
 
       {empty ? (
-        <div className="editors-note" style={{ marginTop: 24 }}>
+        <div className="editors-note mt-24">
           <div className="label">No entries here yet</div>
           <p>
             Know an organization that should be in the Atlas for {placeLabel}?{' '}
@@ -167,7 +167,7 @@ function ResultsContent({
           </p>
         </div>
       ) : (
-        <div style={{ marginTop: 24 }}>
+        <div className="mt-24">
           <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />
         </div>
       )}

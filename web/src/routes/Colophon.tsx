@@ -14,7 +14,7 @@ export function Colophon() {
         <div>Volume I · 2026 Edition</div>
       </div>
 
-      <div className="lede" style={{ marginTop: 48 }}>
+      <div className="lede mt-48">
         <div className="eyebrow">
           § The colophon<span className="eyebrow-rule" />
         </div>
@@ -191,7 +191,7 @@ X-Data-Attribution: https://urbanistatlas.com
           </div>
           <div className="rail-block muted">
             <div className="rail-kicker">Type</div>
-            <p style={{ fontSize: 14 }}>
+            <p className="text-sm">
               Set in <em>Fraunces</em>, <em>Source Serif 4</em>,{' '}
               <em>Inter</em>, and <em>JetBrains Mono</em>. Cream{' '}
               <code>#FDF6EC</code>, amber <code>#8F5520</code>, ink{' '}

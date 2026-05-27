@@ -134,8 +134,8 @@ export function Browse() {
         </div>
       </div>
 
-      <div className="spread lede-first" style={{ marginTop: 48 }}>
-        <div className="lede" style={{ marginBottom: 0 }}>
+      <div className="spread lede-first mt-48">
+        <div className="lede mb-0">
           <div className="eyebrow">
             § The index<span className="eyebrow-rule" />
           </div>
@@ -151,7 +151,7 @@ export function Browse() {
             pulls in everything across the broader region.
           </p>
         </div>
-        <div className="rail-block muted" style={{ marginTop: 12 }}>
+        <div className="rail-block muted mt-12">
           <div className="rail-kicker">Sorting</div>
           <p>
             Regions are sorted alphabetically within each country. The number
@@ -159,7 +159,7 @@ export function Browse() {
             for that region (the metro count includes orgs tagged to its
             cities and counties via the region graph).
           </p>
-          <p style={{ marginBottom: 0 }}>
+          <p className="mb-0">
             Searching by ZIP or postal code?{' '}
             <Link to="/">Use the front-page lookup</Link>.
           </p>
@@ -168,7 +168,7 @@ export function Browse() {
 
       <BrowseBody query={query} grouped={grouped} availableLetters={availableLetters} />
 
-      <section className="editors-note" style={{ marginTop: 56 }}>
+      <section className="editors-note mt-56">
         <div className="label">Don&rsquo;t see your region?</div>
         <p>
           If your region is missing,{' '}

@@ -25,7 +25,7 @@ export function About() {
         <div>Volume I · 2026 Edition</div>
       </div>
 
-      <div className="lede" style={{ marginTop: 48 }}>
+      <div className="lede mt-48">
         <div className="eyebrow">
           § About the Atlas<span className="eyebrow-rule" />
         </div>
@@ -238,7 +238,7 @@ export function About() {
               For tips, corrections, or removal requests, the{' '}
               <Link to="/submit">submissions desk</Link> is the front door.
             </p>
-            <p style={{ marginBottom: 0 }}>
+            <p className="mb-0">
               For anything sensitive:{' '}
               <a href="mailto:hello@urbanistatlas.com">
                 hello@urbanistatlas.com
@@ -248,12 +248,12 @@ export function About() {
           </div>
           <div className="rail-block muted">
             <div className="rail-kicker">Colophon</div>
-            <p style={{ fontSize: 14 }}>
+            <p className="text-sm">
               Set in <em>Fraunces</em> &amp; <em>Source Serif 4</em> for display
               and body, <em>Inter</em> for captions,{' '}
               <em>JetBrains Mono</em> for URLs and code.
             </p>
-            <p style={{ fontSize: 14, marginBottom: 0 }}>
+            <p className="text-sm mb-0">
               See the <Link to="/colophon">full colophon</Link> for sources,
               stack, and licensing.
             </p>
