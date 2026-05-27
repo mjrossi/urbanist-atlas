@@ -116,7 +116,10 @@ JOIN organization_regions orx ON orx.region_id = d.region_id
 JOIN organizations o          ON o.id = orx.organization_id
 WHERE o.status = 'approved'
 GROUP BY r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, nbp.slug
-HAVING COUNT(DISTINCT o.id) > 0
+-- No HAVING needed: the INNER JOIN chain (roots → descendants →
+-- organization_regions → organizations) guarantees every surviving
+-- row has COUNT(DISTINCT o.id) ≥ 1. Regions with zero approved orgs
+-- never reach this aggregate.
 ORDER BY org_count DESC, r.name ASC;
 
 -- name: DescendantRegions :many
