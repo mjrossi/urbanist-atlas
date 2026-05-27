@@ -112,24 +112,12 @@ export function Browse() {
     return s;
   }, [grouped]);
 
-  const totalRegions = query.data?.length ?? null;
-  // Sum direct_org_count (orgs attached directly to each row, no
-  // descendant walk) so the header reads a deduped total. Summing
-  // org_count would double-count orgs that surface under both a
-  // metro and one of its child cities.
-  const totalOrgs =
-    query.data?.reduce((sum, p) => sum + p.direct_org_count, 0) ?? null;
-
   return (
     <>
       <PageBreadcrumb
         prefix={[{ label: 'Atlas', to: '/' }]}
         current="The index"
-        meta={
-          totalRegions !== null && totalOrgs !== null
-            ? `${totalRegions} regions · ${totalOrgs} org entries`
-            : 'The index'
-        }
+        meta="Alphabetical · US and Canada"
       />
 
       <div className="spread lede-first mt-48">
