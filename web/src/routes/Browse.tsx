@@ -6,6 +6,7 @@ import type { RegionSummary } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -111,31 +112,16 @@ export function Browse() {
     return s;
   }, [grouped]);
 
-  const totalRegions = query.data?.length ?? null;
-  // Sum direct_org_count (orgs attached directly to each row, no
-  // descendant walk) so the header reads a deduped total. Summing
-  // org_count would double-count orgs that surface under both a
-  // metro and one of its child cities.
-  const totalOrgs =
-    query.data?.reduce((sum, p) => sum + p.direct_org_count, 0) ?? null;
-
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">The index</span>
-        </div>
-        <div>
-          {totalRegions !== null && totalOrgs !== null
-            ? `${totalRegions} regions · ${totalOrgs} org entries`
-            : 'The index'}
-        </div>
-      </div>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="The index"
+        meta="Alphabetical · US and Canada"
+      />
 
-      <div className="spread lede-first" style={{ marginTop: 48 }}>
-        <div className="lede" style={{ marginBottom: 0 }}>
+      <div className="spread lede-first mt-48">
+        <div className="lede mb-0">
           <div className="eyebrow">
             § The index<span className="eyebrow-rule" />
           </div>
@@ -151,7 +137,7 @@ export function Browse() {
             pulls in everything across the broader region.
           </p>
         </div>
-        <div className="rail-block muted" style={{ marginTop: 12 }}>
+        <div className="rail-block muted mt-12">
           <div className="rail-kicker">Sorting</div>
           <p>
             Regions are sorted alphabetically within each country. The number
@@ -159,7 +145,7 @@ export function Browse() {
             for that region (the metro count includes orgs tagged to its
             cities and counties via the region graph).
           </p>
-          <p style={{ marginBottom: 0 }}>
+          <p className="mb-0">
             Searching by ZIP or postal code?{' '}
             <Link to="/">Use the front-page lookup</Link>.
           </p>
@@ -168,7 +154,7 @@ export function Browse() {
 
       <BrowseBody query={query} grouped={grouped} availableLetters={availableLetters} />
 
-      <section className="editors-note" style={{ marginTop: 56 }}>
+      <section className="editors-note mt-56">
         <div className="label">Don&rsquo;t see your region?</div>
         <p>
           If your region is missing,{' '}

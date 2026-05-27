@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import {
   buildIssueBody,
@@ -7,6 +9,10 @@ import {
   titlePrefix,
   type SubmitForm,
 } from '../lib/submitForm.ts';
+
+// Brief lockout after a successful window.open so a triple-click on the
+// submit button doesn't open three identical GitHub-issue draft tabs.
+const SUBMIT_COOLDOWN_MS = 1500;
 
 /**
  * `/submit` — composes a pre-filled GitHub issue from the form values
@@ -28,28 +34,48 @@ export function Submit() {
     defaultValues: SUBMIT_FORM_DEFAULTS,
   });
 
+  const [justOpened, setJustOpened] = useState(false);
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
+
+  // Lift the cooldown timer into an effect so unmounting mid-cooldown
+  // tears the setTimeout down via the cleanup, and so the timer
+  // doesn't leak across renders.
+  useEffect(() => {
+    if (!justOpened) return;
+    const id = setTimeout(() => setJustOpened(false), SUBMIT_COOLDOWN_MS);
+    return () => clearTimeout(id);
+  }, [justOpened]);
+
   const onValid = (form: SubmitForm) => {
+    if (justOpened) return;
     const title = `${titlePrefix(form.type)} ${form.name}`;
     const body = buildIssueBody(form);
     // GitHub silently drops `body=` when `template=` is also present,
     // so we deliberately omit the template param and ship the full
     // pre-filled body instead.
-    const url = `https://github.com/mjrossi/urbanist-atlas/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
-    window.open(url, '_blank', 'noopener');
+    const params = new URLSearchParams({ title, body });
+    const url = `https://github.com/mjrossi/urbanist-atlas/issues/new?${params.toString()}`;
+    const opened = window.open(url, '_blank', 'noopener');
+    if (opened) {
+      setBlockedUrl(null);
+      setJustOpened(true);
+    } else {
+      // Pop-up blocked. Surface the URL inline so the user can copy /
+      // open it themselves; don't lock the button so they can retry
+      // after relaxing the browser's pop-up settings.
+      setBlockedUrl(url);
+    }
   };
 
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">Submissions</span>
-        </div>
-        <div>Open year-round</div>
-      </div>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="Submissions"
+        meta="Open year-round"
+      />
 
-      <div className="spread" style={{ marginTop: 48 }}>
+      <div className="spread mt-48">
         <div>
           <div className="lede">
             <div className="eyebrow">
@@ -198,7 +224,7 @@ export function Submit() {
                 <label htmlFor="submit-oneline" className="field-label">
                   One-line description of what they actually do
                   <span className="required">*</span>
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     Plain English. ~140 characters.
                   </span>
                 </label>
@@ -221,7 +247,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-why" className="field-label">
                   Why this org belongs
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     Recent campaigns, who they organize, who they push. Specifics beat
                     adjectives.
                   </span>
@@ -240,7 +266,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-sources" className="field-label">
                   Sources
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     News coverage, social handles, prior wins. One per line.
                   </span>
                 </label>
@@ -316,7 +342,20 @@ https://kuow.org/stories/..."
                 review it, edit anything, and post — or close the tab to start
                 over. <strong>Nothing is sent yet.</strong>
               </p>
-              <button type="submit" className="btn-primary" disabled={!isValid}>
+              {blockedUrl ? (
+                <p className="field-error" role="alert">
+                  Your browser blocked the pop-up.{' '}
+                  <a href={blockedUrl} target="_blank" rel="noopener noreferrer">
+                    Open the pre-filled issue manually
+                  </a>
+                  , or allow pop-ups from urbanistatlas.com and try again.
+                </p>
+              ) : null}
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={!isValid || justOpened}
+              >
                 Open as GitHub issue <span className="arrow">→</span>
               </button>
             </div>

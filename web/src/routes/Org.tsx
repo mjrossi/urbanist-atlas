@@ -3,9 +3,11 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getOrg } from '../lib/api.ts';
 import type { Org as OrgT } from '../lib/api.ts';
+import { domainOf } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 
 export function Org() {
@@ -34,16 +36,14 @@ export function Org() {
 function OrgKicker({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
   const org = query.data;
   return (
-    <div className="kicker">
-      <div>
-        <Link to="/">Atlas</Link>
-        <span className="crumb-sep">/</span>
-        <Link to="/browse">Browse</Link>
-        <span className="crumb-sep">/</span>
-        <span className="crumb-here">{org ? org.name : 'Organization'}</span>
-      </div>
-      <div>{org ? `Slug · ${org.slug}` : 'Organization file'}</div>
-    </div>
+    <PageBreadcrumb
+      prefix={[
+        { label: 'Atlas', to: '/' },
+        { label: 'Browse', to: '/browse' },
+      ]}
+      current={org ? org.name : 'Organization'}
+      meta={org ? `Slug · ${org.slug}` : 'Organization file'}
+    />
   );
 }
 
@@ -52,10 +52,10 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
     <QueryState
       query={query}
       loading="Loading organization…"
-      marginTop={48}
+      className="mt-48"
       error={(e) =>
         e.status === 404 ? (
-          <div className="lede" style={{ marginTop: 48 }}>
+          <div className="lede mt-48">
             <div className="eyebrow">
               § Organization file<span className="eyebrow-rule" />
             </div>
@@ -135,7 +135,7 @@ function OrgContent({ org }: { org: OrgT }) {
         </p>
         <div className="deck-row">
           <p className="deck">{org.short_desc}</p>
-          <div style={{ paddingTop: 6 }}>
+          <div className="pt-6">
             {org.tags.length > 0 ? (
               <ul className="tag-list">
                 {org.tags.map((tag, i) => (
@@ -177,9 +177,7 @@ function OrgContent({ org }: { org: OrgT }) {
           <div className="item">
             <div>Slug</div>
             <span className="val">
-              <code style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>
-                {org.slug}
-              </code>
+              <code>{org.slug}</code>
             </span>
           </div>
           {org.contact_url ? (
@@ -195,7 +193,7 @@ function OrgContent({ org }: { org: OrgT }) {
         </div>
       </header>
 
-      <div className="spread" style={{ marginTop: 0 }}>
+      <div className="spread mt-0">
         <main className="prose">
           <div className="glance-mobile">{atAGlance}</div>
           <div className="section-kicker">§ I — The entry</div>
@@ -241,7 +239,7 @@ function OrgContent({ org }: { org: OrgT }) {
             </>
           ) : null}
 
-          <div className="editors-note" style={{ marginTop: 16 }}>
+          <div className="editors-note mt-16">
             <div className="label">Something off?</div>
             <p>
               We try to verify every entry on a rolling cadence. If a campaign
@@ -289,12 +287,4 @@ function OrgContent({ org }: { org: OrgT }) {
 
 function prettyTag(tag: string): string {
   return tag.replace(/-/g, ' ');
-}
-
-function domainOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
 }

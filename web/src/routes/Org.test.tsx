@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import type { Org as OrgT } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
@@ -196,6 +196,21 @@ describe('Org', () => {
       expect(contactLink).toBeDefined();
       expect(contactLink?.getAttribute('target')).toBe('_blank');
     });
+  });
+
+  it('renders the page breadcrumb as a navigation landmark with the org name as current page', async () => {
+    getOrgMock.mockResolvedValueOnce(makeOrg());
+    renderAt('/orgs/transalt');
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Transportation Alternatives' }),
+      ).toBeDefined();
+    });
+
+    const nav = screen.getByRole('navigation', { name: /breadcrumb/i });
+    const current = within(nav).getByText('Transportation Alternatives');
+    expect(current.getAttribute('aria-current')).toBe('page');
   });
 
   it('passes the URL slug through to getOrg', async () => {

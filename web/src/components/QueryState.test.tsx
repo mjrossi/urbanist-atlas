@@ -84,4 +84,31 @@ describe('QueryState', () => {
     );
     expect(screen.queryByText('hello')).not.toBeNull();
   });
+
+  it('applies an extra className to the default loading container', () => {
+    render(
+      <QueryState query={mkQuery<string>({ isPending: true })} className="mt-48">
+        {(d) => <p>{d}</p>}
+      </QueryState>,
+    );
+    const node = screen.getByRole('status');
+    expect(node.classList.contains('results-state')).toBe(true);
+    expect(node.classList.contains('mt-48')).toBe(true);
+  });
+
+  it('applies an extra className to the default error container', () => {
+    const apiErr = new ApiError(500, 'Boom', undefined, undefined);
+    render(
+      <QueryState
+        query={mkQuery<string>({ isError: true, error: apiErr })}
+        className="mt-48"
+      >
+        {(d) => <p>{d}</p>}
+      </QueryState>,
+    );
+    const node = screen.getByRole('alert');
+    expect(node.classList.contains('results-state')).toBe(true);
+    expect(node.classList.contains('error')).toBe(true);
+    expect(node.classList.contains('mt-48')).toBe(true);
+  });
 });
