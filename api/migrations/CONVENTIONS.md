@@ -17,8 +17,10 @@ drop data. The runbook for the destructive deploy should call this
 out so the SET happens via a one-shot `psql` session rather than
 becoming a sticky default.
 
-Pattern (mirrors the safety check 0003's `Down` already uses for the
-`national` rollback):
+Pattern (extends the safety check 0003's `Down` already uses for the
+`national` rollback, adding an explicit operator opt-in via the
+`atlas.allow_destructive` GUC so the destructive step requires more
+than just "the rollback table is non-empty"):
 
 ```sql
 -- +goose StatementBegin
