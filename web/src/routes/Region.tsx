@@ -180,8 +180,9 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               {parentNames.length > 0
                 ? `, sitting under ${parentNames.join(' · ')}.`
                 : '.'}{' '}
-              Local orgs work directly on this region; regional orgs cover
-              wider footprints that include it.
+              This page lists orgs anchored to {region.name} itself or to
+              regions it contains. For the wider footprint above (state,
+              multi-state coalitions), use the front-page postal lookup.
             </p>
             <p style={{ marginBottom: 0 }}>
               Looking up by postal code?{' '}
