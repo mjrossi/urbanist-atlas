@@ -107,7 +107,7 @@ them locally before opening PRs that touch SQL.
 When to add an integration test:
 
 - New SQL query (added to `internal/store/postgres/queries/` and
-  regenerated via `just api-sqlc-gen`).
+  regenerated via `just api-gen`).
 - New migration in `api/migrations/` — verify it applies cleanly
   on top of the previous schema and that the data shape works.
 - Recursive CTEs or any SQL where the postgres-specific behavior

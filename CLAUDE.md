@@ -230,7 +230,7 @@ shape, the error envelope, and admin-endpoint auth. Both halves
 generate types from it:
 
 - **Go:** `oapi-codegen` → `api/internal/httpapi/oapi/types.gen.go`
-  (committed, regenerated via `just api-oapi-gen`). The spec is
+  (committed, regenerated via `just api-gen`). The spec is
   embedded into the binary via `//go:embed` and served at
   `GET /api/v1/openapi.yaml` (content-type `application/yaml`) so
   external consumers can discover the contract at runtime. Because
