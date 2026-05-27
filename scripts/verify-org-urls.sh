@@ -91,10 +91,17 @@ mkdir -p "$(dirname "$REPORT")"
 # row; orgs with both emit two.
 parse_orgs() {
   awk '
+    function probeable(u) {
+      # Only http(s) URLs get probed. Skip mailto:, tel:, javascript:,
+      # and friends — they trigger surprising curl behavior (e.g. mailto:
+      # follows to the host websites bare-domain HTTPS, then trips the
+      # off-domain-redirect classifier as a false positive).
+      return u ~ /^https?:\/\//
+    }
     function emit() {
       if (slug == "") return
-      if (website != "") print slug "\t" name "\twebsite\t" website
-      if (contact != "") print slug "\t" name "\tcontact\t" contact
+      if (probeable(website)) print slug "\t" name "\twebsite\t" website
+      if (probeable(contact)) print slug "\t" name "\tcontact\t" contact
     }
     /^\[\[org\]\]/ {
       emit()
