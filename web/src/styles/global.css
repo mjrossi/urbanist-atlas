@@ -568,8 +568,16 @@ a {
   font-size: clamp(48px, 8vw, 92px);
 }
 
-.lede h1 .accent {
+/* Accent text — italicised amber emphasis. The plain `.accent` rule
+   sets just the color, so the class can be reused outside lede headings
+   (e.g. section-break titles) without dragging headline typography
+   along. The .lede h1 nesting keeps the italic + weight treatment
+   that the broadsheet headlines were designed around. */
+.accent {
   color: var(--amber);
+}
+
+.lede h1 .accent {
   font-style: italic;
   font-weight: 500;
 }
@@ -1026,6 +1034,10 @@ a.tag:hover::before {
   font-style: italic;
   font-size: 14.5px;
   color: var(--muted);
+}
+
+.lookup-hint.error {
+  color: var(--amber);
 }
 
 .lookup-suggestions {

@@ -91,7 +91,7 @@ export function SearchBox() {
         </button>
       </form>
       {submitError ? (
-        <p id={`${inputId}-error`} className="lookup-hint" role="alert" style={{ color: 'var(--amber)' }}>
+        <p id={`${inputId}-error`} className="lookup-hint error" role="alert">
           {submitError}
         </p>
       ) : (

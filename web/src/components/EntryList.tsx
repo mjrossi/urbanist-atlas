@@ -58,9 +58,7 @@ function Section({
         <span className="num">{roman}</span>
         <h2 className="title">
           {title}
-          <span className="accent" style={{ color: 'var(--amber)' }}>
-            .
-          </span>
+          <span className="accent">.</span>
         </h2>
         <span className="aside">
           {orgs.length} {orgs.length === 1 ? 'entry' : 'entries'}
