@@ -63,6 +63,7 @@ function makeDetail(overrides: Partial<RegionDetail> = {}): RegionDetail {
         regions: [],
       },
     ],
+    ancestry: [],
     ...overrides,
   };
 }
@@ -156,6 +157,69 @@ describe('Region', () => {
       expect(h1.textContent).toMatch(/new york/i);
     });
     expect(screen.getAllByText(/state report/i).length).toBeGreaterThan(0);
+  });
+
+  // The breadcrumb kicker walks `ancestry` and renders each ancestor
+  // as a clickable Link. The API returns ancestry closest-first;
+  // the SPA reverses it so the breadcrumb reads root → leaf.
+  it('renders ancestry as clickable breadcrumb links in the kicker', async () => {
+    getRegionMock.mockResolvedValueOnce(
+      makeDetail({
+        region: {
+          id: 99,
+          kind: 'us:city',
+          name: 'Brooklyn',
+          slug: 'brooklyn-ny',
+          country: 'US',
+          scope_tier: 'local',
+          parent_slugs: ['kings-county-ny'],
+        },
+        // API order: closest-first (direct parent → grandparent → …).
+        ancestry: [
+          {
+            id: 2,
+            kind: 'us:county',
+            name: 'Kings County, NY',
+            slug: 'kings-county-ny',
+            country: 'US',
+            scope_tier: 'local',
+            parent_slugs: ['nyc-metro', 'ny'],
+          },
+          {
+            id: 3,
+            kind: 'us:metro',
+            name: 'New York Metro',
+            slug: 'nyc-metro',
+            country: 'US',
+            scope_tier: 'regional',
+            parent_slugs: ['nyc-tristate'],
+          },
+          {
+            id: 4,
+            kind: 'us:state',
+            name: 'NY',
+            slug: 'ny',
+            country: 'US',
+            scope_tier: 'regional',
+            parent_slugs: [],
+          },
+        ],
+      }),
+    );
+    renderAt('/region/brooklyn-ny');
+
+    await waitFor(() => {
+      const h1 = screen.getByRole('heading', { level: 1 });
+      expect(h1.textContent).toMatch(/brooklyn/i);
+    });
+
+    // Each ancestor renders as a link to /region/<slug>.
+    const kings = screen.getByRole('link', { name: 'Kings County, NY' });
+    expect(kings.getAttribute('href')).toBe('/region/kings-county-ny');
+    const metro = screen.getByRole('link', { name: 'New York Metro' });
+    expect(metro.getAttribute('href')).toBe('/region/nyc-metro');
+    const ny = screen.getByRole('link', { name: 'NY' });
+    expect(ny.getAttribute('href')).toBe('/region/ny');
   });
 
   it('renders the inline empty-state on 404 (not a crash)', async () => {

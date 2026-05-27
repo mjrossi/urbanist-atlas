@@ -756,8 +756,7 @@ components:
       type: object
       description: |
         A region (any non-national kind) plus its approved-org count.
-        Used by `GET /api/v1/regions` to populate the Browse index
-        and any future kind-filtered region views.
+        Used by `GET /api/v1/regions` to populate the Browse index.
       required: [region, org_count]
       properties:
         region:
@@ -766,6 +765,17 @@ components:
           type: integer
           format: int32
           minimum: 0
+        browse_parent_slug:
+          type: string
+          nullable: true
+          description: |
+            For cities, the slug of the nearest ancestor in the
+            default browse set (a metro / CMA / regional-district).
+            Lets clients group cities visually under their parent
+            metro without a second request. Null for metros and for
+            standalone cities whose walk doesn't reach a browseable
+            ancestor.
+          example: chicago-metro
 
     RegionDetail:
       type: object
@@ -775,8 +785,11 @@ components:
         every org attached to this region directly or to any
         region nested below it in the DAG (so a metro surfaces
         its constituent cities' orgs, a county surfaces its
-        cities' orgs, etc.).
-      required: [region, orgs]
+        cities' orgs, etc.). The `ancestry` array is the upward
+        walk to the root, leaf-to-root (excluding the region
+        itself), with national-tier regions filtered out — clients
+        use it to render a breadcrumb.
+      required: [region, orgs, ancestry]
       properties:
         region:
           $ref: '#/components/schemas/Region'
@@ -784,6 +797,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Org'
+        ancestry:
+          type: array
+          description: |
+            Ancestors of `region`, ordered closest-first (the
+            region's direct parent at index 0, then the
+            grandparent, … up to the root). Excludes the region
+            itself and any `scope_tier='national'` rows.
+          items:
+            $ref: '#/components/schemas/Region'
 
     RegionSummariesEnvelope:
       type: object

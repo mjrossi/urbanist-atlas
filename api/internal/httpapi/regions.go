@@ -62,15 +62,24 @@ func getRegionHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 }
 
 // toOAPIRegionSummaries converts the domain-level region list to the
-// wire-level slice. Returns a non-nil zero-length slice when the input
-// is empty so the JSON body is `[]`, not `null`.
+// wire-level slice. Returns a non-nil zero-length slice when the
+// input is empty so the JSON body is `[]`, not `null`.
+//
+// Empty BrowseParentSlug maps to JSON null (omitempty pointer); a
+// non-empty value renders as a string. Lets the SPA group cities
+// under their parent metro without a second request.
 func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 	out := make([]oapi.RegionSummary, 0, len(in))
 	for _, rs := range in {
-		out = append(out, oapi.RegionSummary{
+		summary := oapi.RegionSummary{
 			Region:   toOAPIRegion(rs.Region),
 			OrgCount: int32(rs.OrgCount),
-		})
+		}
+		if rs.BrowseParentSlug != "" {
+			s := rs.BrowseParentSlug
+			summary.BrowseParentSlug = &s
+		}
+		out = append(out, summary)
 	}
 	return out
 }
@@ -79,9 +88,18 @@ func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 // shape. Orgs are mapped via toOAPIOrgs (shared with /recent; the
 // /lookup endpoint uses toOAPILookupOrgs which extends the same
 // base). See oapi_adapters.go.
+//
+// Ancestry mirrors the closest-first walk pkg/atlas built (direct
+// parent at index 0, root at the end, national-tier rows filtered).
+// The SPA renders it as a breadcrumb in the Region page kicker.
 func toOAPIRegionDetail(in atlas.RegionDetail) oapi.RegionDetail {
+	ancestry := make([]oapi.Region, 0, len(in.Ancestry))
+	for _, r := range in.Ancestry {
+		ancestry = append(ancestry, toOAPIRegion(r))
+	}
 	return oapi.RegionDetail{
-		Region: toOAPIRegion(in.Region),
-		Orgs:   toOAPIOrgs(in.Orgs),
+		Region:   toOAPIRegion(in.Region),
+		Orgs:     toOAPIOrgs(in.Orgs),
+		Ancestry: ancestry,
 	}
 }

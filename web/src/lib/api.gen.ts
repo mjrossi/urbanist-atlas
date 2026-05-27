@@ -445,13 +445,22 @@ export interface components {
         };
         /**
          * @description A region (any non-national kind) plus its approved-org count.
-         *     Used by `GET /api/v1/regions` to populate the Browse index
-         *     and any future kind-filtered region views.
+         *     Used by `GET /api/v1/regions` to populate the Browse index.
          */
         RegionSummary: {
             region: components["schemas"]["Region"];
             /** Format: int32 */
             org_count: number;
+            /**
+             * @description For cities, the slug of the nearest ancestor in the
+             *     default browse set (a metro / CMA / regional-district).
+             *     Lets clients group cities visually under their parent
+             *     metro without a second request. Null for metros and for
+             *     standalone cities whose walk doesn't reach a browseable
+             *     ancestor.
+             * @example chicago-metro
+             */
+            browse_parent_slug?: string | null;
         };
         /**
          * @description A region (any non-national kind) with the approved
@@ -459,11 +468,21 @@ export interface components {
          *     every org attached to this region directly or to any
          *     region nested below it in the DAG (so a metro surfaces
          *     its constituent cities' orgs, a county surfaces its
-         *     cities' orgs, etc.).
+         *     cities' orgs, etc.). The `ancestry` array is the upward
+         *     walk to the root, leaf-to-root (excluding the region
+         *     itself), with national-tier regions filtered out — clients
+         *     use it to render a breadcrumb.
          */
         RegionDetail: {
             region: components["schemas"]["Region"];
             orgs: components["schemas"]["Org"][];
+            /**
+             * @description Ancestors of `region`, ordered closest-first (the
+             *     region's direct parent at index 0, then the
+             *     grandparent, … up to the root). Excludes the region
+             *     itself and any `scope_tier='national'` rows.
+             */
+            ancestry: components["schemas"]["Region"][];
         };
         /**
          * @description Collection envelope for `GET /api/v1/regions`. Wraps the

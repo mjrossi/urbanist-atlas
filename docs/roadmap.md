@@ -123,6 +123,32 @@ with a 30-day lifecycle), with the enablement steps documented at
   + scope-tier-partitioning semantics are deliberately unchanged —
   a Naperville ZIP still excludes Chicago-city-only orgs because
   they live in a sibling DAG subtree, not an ancestor.
+
+- **Browse nesting + region ancestry + Results/Region rendering
+  consolidation (2026-05-26):** Three UX gaps in one slice. (1) The
+  `/regions` list response now carries `browse_parent_slug` per row
+  (computed in `ListRegions` via a recursive CTE walking parents
+  upward to the nearest browseable-kind ancestor); the SPA's
+  `Browse.tsx` uses it to nest cities under their parent metro, so
+  "New York City" sits indented beneath "New York Metro" instead of
+  rendering as a side-by-side row that reads like a duplicate.
+  Same fix for "Chicago" under "Chicago Metro," "Toronto" under
+  "Toronto CMA," "Montréal" under "Montréal CMA," and the
+  Boston-area cities under "Greater Boston." (2) `RegionDetail`
+  gains `ancestry: Region[]` (closest-first walk excluding self +
+  national); a new shared `RegionBreadcrumb` component renders it
+  as a clickable kicker breadcrumb on the Region page —
+  `Atlas / Browse / NYC Tri-State / New York Metro / New York City
+  / Kings County / Brooklyn`. The `Results.tsx` (postal-code
+  lookup) page adopts the same `RegionBreadcrumb` from
+  `resolved_ancestry`, so the path-shape of the page reads
+  consistently with the Region detail page. (3) Both pages drop
+  their inline org-row + section duplicates and consume the shared
+  `Entry` / `EntryList` components (rewritten in this slice to use
+  the actual broadsheet CSS — they were orphan dead code before).
+  Dead `TagChip` component deleted. The narrower `metroKinds`
+  predicate and `/lookup`'s `placeLabel` semantics stay unchanged.
+
 - **Browse + region pages (slice #14):** `/browse` lists every
   default-browse region (metros + cities, post-rename) with org
   counts, ordered by org count desc + name asc tiebreak; the

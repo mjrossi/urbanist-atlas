@@ -153,6 +153,48 @@ func TestMemStore_ListRegions_CitiesAppearAsTheirOwnEntries(t *testing.T) {
 	}
 }
 
+// TestMemStore_ListRegions_BrowseParentSlug pins the SPA grouping
+// hook: cities carry the slug of their nearest browseable-kind
+// ancestor; metros without a browseable ancestor carry "". The
+// walk traverses non-browseable intermediates (county, state) so a
+// city whose direct parent isn't in the default set still
+// resolves through.
+func TestMemStore_ListRegions_BrowseParentSlug(t *testing.T) {
+	s := newBrowseFixture()
+	got, err := s.ListRegions(context.Background())
+	if err != nil {
+		t.Fatalf("ListRegions: %v", err)
+	}
+	bySlug := map[string]string{}
+	for _, p := range got {
+		bySlug[p.Region.Slug] = p.BrowseParentSlug
+	}
+	cases := []struct {
+		slug, wantParent string
+	}{
+		// Brooklyn walks up: kings-county (not browseable) -> nyc-metro
+		// (browseable, us:metro). Skipped intermediate proves the walk
+		// passes through non-browseable nodes.
+		{"brooklyn-ny", "nyc-metro"},
+		// Toronto's direct parent IS browseable (toronto-cma).
+		{"toronto-on", "toronto-cma"},
+		// Metros have no browseable ancestor in the fixture
+		// (their parents are us:state / ca:province / us:multi-state).
+		{"nyc-metro", ""},
+		{"toronto-cma", ""},
+	}
+	for _, tc := range cases {
+		got, ok := bySlug[tc.slug]
+		if !ok {
+			t.Errorf("slug %s missing from ListRegions output", tc.slug)
+			continue
+		}
+		if got != tc.wantParent {
+			t.Errorf("%s: BrowseParentSlug want %q, got %q", tc.slug, tc.wantParent, got)
+		}
+	}
+}
+
 func TestMemStore_GetRegion_Metro_DescendantsIncluded(t *testing.T) {
 	s := newBrowseFixture()
 	got, err := s.GetRegion(context.Background(), "nyc-metro")
@@ -193,6 +235,69 @@ func TestMemStore_GetRegion_City_OnlyOwnDescendants(t *testing.T) {
 	want := []string{"transalt-brooklyn"}
 	if diff := cmp.Diff(want, gotSlugs); diff != "" {
 		t.Errorf("orgs (-want +got):\n%s", diff)
+	}
+}
+
+// TestMemStore_GetRegion_Ancestry_LeafToRoot pins the breadcrumb
+// data: ancestry comes back closest-first (direct parent at index 0,
+// root last), excludes the region itself, and filters national-tier
+// rows. The SPA renders this as a clickable breadcrumb in the
+// Region page kicker.
+func TestMemStore_GetRegion_Ancestry_LeafToRoot(t *testing.T) {
+	s := newBrowseFixture()
+	got, err := s.GetRegion(context.Background(), "brooklyn-ny")
+	if err != nil {
+		t.Fatalf("GetRegion: %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result")
+	}
+	var slugs []string
+	for _, r := range got.Ancestry {
+		slugs = append(slugs, r.Slug)
+		if r.Slug == "brooklyn-ny" {
+			t.Errorf("ancestry includes the region itself; want excluded")
+		}
+		if r.ScopeTier == ScopeNational {
+			t.Errorf("national-tier region leaked into ancestry: %s", r.Slug)
+		}
+	}
+	// Brooklyn's parents map: brooklyn-ny -> kings-county-ny ->
+	// {nyc-metro, ny}; nyc-metro -> ny. BFS gives kings-county-ny
+	// first, then [nyc-metro, ny] in the order kings-county added
+	// them. The fixture's ParentSlugs is ["nyc-metro", "ny"] so
+	// nyc-metro precedes ny. Result is closest-first:
+	want := []string{"kings-county-ny", "nyc-metro", "ny"}
+	if diff := cmp.Diff(want, slugs); diff != "" {
+		t.Errorf("ancestry (-want +got):\n%s", diff)
+	}
+}
+
+// TestMemStore_GetRegion_Ancestry_EmptyForRoot pins the
+// no-ancestors case: a top-level region (no parents) returns an
+// empty ancestry slice, not nil.
+func TestMemStore_GetRegion_Ancestry_EmptyForRoot(t *testing.T) {
+	s := newBrowseFixture()
+	// NY is a us:state, top-of-hierarchy (no parents in the fixture).
+	got, err := s.GetRegion(context.Background(), "ny")
+	if err != nil {
+		t.Fatalf("GetRegion(ny): %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for ny")
+	}
+	if got.Ancestry == nil {
+		t.Errorf("ancestry: want non-nil empty slice, got nil")
+	}
+	if len(got.Ancestry) != 0 {
+		t.Errorf("ancestry: want empty for top-level region, got %v",
+			func() []string {
+				out := []string{}
+				for _, r := range got.Ancestry {
+					out = append(out, r.Slug)
+				}
+				return out
+			}())
 	}
 }
 

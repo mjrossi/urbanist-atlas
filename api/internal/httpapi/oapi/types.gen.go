@@ -286,9 +286,17 @@ type Region struct {
 // every org attached to this region directly or to any
 // region nested below it in the DAG (so a metro surfaces
 // its constituent cities' orgs, a county surfaces its
-// cities' orgs, etc.).
+// cities' orgs, etc.). The `ancestry` array is the upward
+// walk to the root, leaf-to-root (excluding the region
+// itself), with national-tier regions filtered out — clients
+// use it to render a breadcrumb.
 type RegionDetail struct {
-	Orgs []Org `json:"orgs"`
+	// Ancestry Ancestors of `region`, ordered closest-first (the
+	// region's direct parent at index 0, then the
+	// grandparent, … up to the root). Excludes the region
+	// itself and any `scope_tier='national'` rows.
+	Ancestry []Region `json:"ancestry"`
+	Orgs     []Org    `json:"orgs"`
 
 	// Region A geographic unit an organization can serve. Regions form a
 	// directed acyclic graph; `parent_slugs` lists the direct parents
@@ -324,10 +332,16 @@ type RegionSummariesEnvelope struct {
 }
 
 // RegionSummary A region (any non-national kind) plus its approved-org count.
-// Used by `GET /api/v1/regions` to populate the Browse index
-// and any future kind-filtered region views.
+// Used by `GET /api/v1/regions` to populate the Browse index.
 type RegionSummary struct {
-	OrgCount int32 `json:"org_count"`
+	// BrowseParentSlug For cities, the slug of the nearest ancestor in the
+	// default browse set (a metro / CMA / regional-district).
+	// Lets clients group cities visually under their parent
+	// metro without a second request. Null for metros and for
+	// standalone cities whose walk doesn't reach a browseable
+	// ancestor.
+	BrowseParentSlug *string `json:"browse_parent_slug,omitempty"`
+	OrgCount         int32   `json:"org_count"`
 
 	// Region A geographic unit an organization can serve. Regions form a
 	// directed acyclic graph; `parent_slugs` lists the direct parents

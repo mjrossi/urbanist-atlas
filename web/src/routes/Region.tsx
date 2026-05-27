@@ -2,10 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getRegion } from '../lib/api.ts';
-import type { RegionDetail, Org } from '../lib/api.ts';
+import type { RegionDetail } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
+import { Entry } from '../components/Entry.tsx';
+import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
+import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
+
+const BREADCRUMB_PREFIX: ReadonlyArray<BreadcrumbItem> = [
+  { label: 'Atlas', to: '/' },
+  { label: 'Browse', to: '/browse' },
+];
 
 export function Region() {
   const params = useParams<{ regionSlug: string }>();
@@ -22,28 +30,26 @@ export function Region() {
       : 'Loading region — Urbanist Atlas',
   );
 
-  const regionReport = query.data
-    ? `${regionKindLabel(query.data.region.kind)} report`
+  // Breadcrumb wants ancestors broad-first (left-to-right reads
+  // root → leaf), but the API hands them back closest-first.
+  // Reverse a copy so the API contract stays leaf-centric and the
+  // SPA owns its display ordering.
+  const ancestorsRootFirst = query.data
+    ? [...query.data.ancestry].reverse()
+    : [];
+  const currentLabel = query.data ? query.data.region.name : 'Region';
+  const metaRight = query.data
+    ? `${query.data.orgs.length} ${query.data.orgs.length === 1 ? 'org' : 'orgs'} indexed`
     : 'Region report';
 
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <Link to="/browse">Browse</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">
-            {query.data ? query.data.region.name : 'Region'}
-          </span>
-        </div>
-        <div>
-          {query.data
-            ? `${query.data.orgs.length} ${query.data.orgs.length === 1 ? 'org' : 'orgs'} indexed`
-            : regionReport}
-        </div>
-      </div>
+      <RegionBreadcrumb
+        prefix={BREADCRUMB_PREFIX}
+        ancestors={ancestorsRootFirst}
+        current={currentLabel}
+        metaRight={metaRight}
+      />
       <RegionBody query={query} />
     </>
   );
@@ -111,12 +117,6 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
           <span>
             Region slug <span className="em">{region.slug}</span>
           </span>
-          {region.parent_slugs.length > 0 ? (
-            <>
-              <span className="crumb-sep">·</span>
-              <span>Parent {region.parent_slugs.join(' · ')}</span>
-            </>
-          ) : null}
         </div>
       </div>
 
@@ -133,7 +133,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               <Link to="/submit">File a tip.</Link>
             </p>
           ) : (
-            orgs.map((org) => <OrgRow key={org.id} org={org} />)
+            orgs.map((org) => <Entry key={org.id} org={org} />)
           )}
           <div className="editors-note" style={{ marginTop: 32 }}>
             <div className="label">Know a group we&rsquo;re missing?</div>
@@ -207,66 +207,8 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
   );
 }
 
-function OrgRow({ org }: { org: Org }) {
-  const domain = domainOf(org.website_url);
-  return (
-    <article className="org-entry">
-      <div>
-        <div className="head">
-          <h3 className="name">
-            <Link to={`/orgs/${encodeURIComponent(org.slug)}`}>{org.name}</Link>
-          </h3>
-        </div>
-        {org.website_url ? (
-          <div className="url">
-            <a href={org.website_url} target="_blank" rel="noopener noreferrer">
-              {domain ?? org.website_url}
-            </a>
-          </div>
-        ) : null}
-        <p className="desc">{org.short_desc}</p>
-        {org.tags.length > 0 ? (
-          <ul className="tag-list">
-            {org.tags.map((tag) => (
-              <li key={tag}>
-                <span className="tag">{tag.replace(/-/g, ' ')}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="foot">
-          {org.contact_url ? (
-            <a
-              href={org.contact_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'var(--amber)', textDecoration: 'none' }}
-            >
-              Contact →
-            </a>
-          ) : null}
-          <Link
-            to={`/orgs/${encodeURIComponent(org.slug)}`}
-            style={{ color: 'var(--amber)', textDecoration: 'none' }}
-          >
-            Open the org file →
-          </Link>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function countTags(orgs: Org[]): number {
+function countTags(orgs: ReadonlyArray<{ tags: ReadonlyArray<string> }>): number {
   const s = new Set<string>();
   for (const o of orgs) for (const t of o.tags) s.add(t);
   return s.size;
-}
-
-function domainOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
 }

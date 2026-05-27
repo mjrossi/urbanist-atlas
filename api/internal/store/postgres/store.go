@@ -216,6 +216,10 @@ func (s *Store) ListRegions(ctx context.Context) ([]atlas.RegionSummary, error) 
 	}
 	out := make([]atlas.RegionSummary, len(rows))
 	for i, r := range rows {
+		browseParent := ""
+		if r.BrowseParentSlug.Valid {
+			browseParent = r.BrowseParentSlug.String
+		}
 		out[i] = atlas.RegionSummary{
 			Region: atlas.Region{
 				ID:           r.ID,
@@ -227,7 +231,8 @@ func (s *Store) ListRegions(ctx context.Context) ([]atlas.RegionSummary, error) 
 				SortPriority: int(r.SortPriority),
 				ParentSlugs:  parents[r.ID],
 			},
-			OrgCount: r.OrgCount,
+			OrgCount:         r.OrgCount,
+			BrowseParentSlug: browseParent,
 		}
 	}
 	return out, nil
@@ -268,7 +273,24 @@ func (s *Store) GetRegion(ctx context.Context, slug string) (*atlas.RegionDetail
 	if err != nil {
 		return nil, err
 	}
-	return &atlas.RegionDetail{Region: region, Orgs: orgs}, nil
+
+	// Build ancestry via the existing /lookup helper, skipping self
+	// (index 0) and national-tier rows. AncestorRegions hydrates
+	// ParentSlugs for each row already (via its own
+	// parentSlugsByRegion call) — see the AncestorRegions adapter.
+	walk, err := s.AncestorRegions(ctx, region.ID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: ancestors for region: %w", err)
+	}
+	ancestry := make([]atlas.Region, 0, len(walk))
+	for i, r := range walk {
+		if i == 0 || r.ScopeTier == atlas.ScopeNational {
+			continue
+		}
+		ancestry = append(ancestry, r)
+	}
+
+	return &atlas.RegionDetail{Region: region, Orgs: orgs, Ancestry: ancestry}, nil
 }
 
 // GetOrgBySlug implements atlas.Store. Returns atlas.ErrOrgNotFound for

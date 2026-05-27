@@ -57,8 +57,8 @@ endpoint:
 | `ResolveLeafRegion(country, postalCode)` | `/lookup` | Returns `ErrPostalCodeNotFound` for unknown codes. |
 | `AncestorRegions(leafID)` | `/lookup` | Walks the region DAG **upward**; dedupes diamonds. |
 | `OrgsForRegions(regionIDs)` | `/lookup` | Hydrates each org's full attachment list. |
-| `ListRegions()` | `/regions` | Regions in the default browse set (metros + cities, per `atlas.DefaultBrowseKinds`) with ≥1 attached org; walks the DAG **downward** from each match; excludes national-tier. The endpoint ships without filter parameters — the right axis (taxonomy via `kind`, DAG via `ancestor`, …) gets designed when a concrete browse UI use case appears. |
-| `GetRegion(slug)` | `/regions/{slug}` | Resolves any non-national region (metro, city, county, borough, state, multi-state coalition). Returns `(nil, nil)` for unknown or national-tier slugs. |
+| `ListRegions()` | `/regions` | Regions in the default browse set (metros + cities, per `atlas.DefaultBrowseKinds`) with ≥1 attached org; walks the DAG **downward** from each match; excludes national-tier. Each summary also carries a `browse_parent_slug` — the SPA's grouping hook for nesting cities under their parent metro. The endpoint ships without filter parameters — the right axis (taxonomy via `kind`, DAG via `ancestor`, …) gets designed when a concrete browse UI use case appears. |
+| `GetRegion(slug)` | `/regions/{slug}` | Resolves any non-national region (metro, city, county, borough, state, multi-state coalition). Returns `(nil, nil)` for unknown or national-tier slugs. Detail responses include `ancestry: Region[]` — the upward walk from the leaf, closest-first, excluding self and national-tier rows. Drives the breadcrumb on the Region page. |
 | `GetOrgBySlug(slug)` | `/orgs/{slug}` | Returns `ErrOrgNotFound` for unknown or non-approved slugs. |
 | `ListRecent()` | `/recent` | Hardcoded cap of 10; excludes national-only orgs. |
 

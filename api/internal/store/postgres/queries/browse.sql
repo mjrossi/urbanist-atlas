@@ -29,12 +29,19 @@
 -- contexts; same gate as /lookup). Always excludes regions with
 -- zero approved orgs.
 --
--- The descendants CTE walks region_parents in the parent->child
--- direction (parent_region_id = current id) starting from each
--- matched root. We materialize the (root_id, descendant_id) pairs
--- and aggregate. Ordered by org_count DESC then name ASC
--- (alphabetical tiebreak keeps the response stable when counts
--- collide).
+-- Each row also carries `browse_parent_slug`: the slug of the
+-- nearest ancestor (walking upward via region_parents) whose kind
+-- is also in $1. Lets clients group cities visually under their
+-- parent metro without a second request. NULL for rows whose walk
+-- doesn't reach a browseable-kind ancestor (typical for metros).
+--
+-- Three CTEs:
+--   * `roots` — regions matching the kind filter.
+--   * `descendants` — downward walk for the org-count.
+--   * `ancestors` — upward walk for browse_parent_slug; the
+--     `nearest_browseable_parent` aggregate picks the shallowest
+--     hit per root and resolves ties alphabetically.
+-- Ordered by org_count DESC then name ASC.
 WITH RECURSIVE
 roots AS (
     SELECT id, country, kind, name, slug, scope_tier, sort_priority
@@ -51,6 +58,32 @@ descendants(root_id, region_id) AS (
     SELECT d.root_id, rp.region_id
     FROM descendants d
     JOIN region_parents rp ON rp.parent_region_id = d.region_id
+),
+ancestors(root_id, ancestor_id, depth) AS (
+    -- Seed: direct parents of each root.
+    SELECT r.id, rp.parent_region_id, 1
+    FROM roots r
+    JOIN region_parents rp ON rp.region_id = r.id
+    UNION ALL
+    -- Recurse upward through region_parents (child -> parent).
+    -- Bounded by depth < 20 to defend against any unexpected
+    -- cycle in the data (the DAG is acyclic by construction; the
+    -- deepest legitimate walk in the v1 seed is ~5).
+    SELECT a.root_id, rp.parent_region_id, a.depth + 1
+    FROM ancestors a
+    JOIN region_parents rp ON rp.region_id = a.ancestor_id
+    WHERE a.depth < 20
+),
+nearest_browseable_parent AS (
+    -- For each root, pick the shallowest ancestor whose kind is also
+    -- in the @kinds set. Alphabetic tiebreak when multiple ancestors
+    -- share min depth (e.g., a city with two browseable parents).
+    SELECT DISTINCT ON (a.root_id) a.root_id, r.slug
+    FROM ancestors a
+    JOIN regions r ON r.id = a.ancestor_id
+    WHERE r.kind = ANY(@kinds::text[])
+      AND r.scope_tier <> 'national'
+    ORDER BY a.root_id, a.depth ASC, r.slug ASC
 )
 SELECT
     r.id,
@@ -60,13 +93,15 @@ SELECT
     r.slug,
     r.scope_tier,
     r.sort_priority,
+    nbp.slug AS browse_parent_slug,
     COUNT(DISTINCT o.id)::bigint AS org_count
 FROM roots r
+LEFT JOIN nearest_browseable_parent nbp ON nbp.root_id = r.id
 JOIN descendants d            ON d.root_id = r.id
 JOIN organization_regions orx ON orx.region_id = d.region_id
 JOIN organizations o          ON o.id = orx.organization_id
 WHERE o.status = 'approved'
-GROUP BY r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority
+GROUP BY r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, nbp.slug
 HAVING COUNT(DISTINCT o.id) > 0
 ORDER BY org_count DESC, r.name ASC;
 

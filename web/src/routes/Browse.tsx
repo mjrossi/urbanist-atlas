@@ -14,9 +14,14 @@ const COUNTRY_TITLES: Record<string, string> = {
   CA: 'Canada',
 };
 
+interface AnchorWithChildren {
+  anchor: RegionSummary;
+  children: RegionSummary[];
+}
+
 interface ByLetter {
   letter: string;
-  regions: RegionSummary[];
+  anchors: AnchorWithChildren[];
 }
 
 interface ByCountry {
@@ -30,7 +35,22 @@ function letterOf(name: string): string {
   return m ? m[0] : '#';
 }
 
+/**
+ * Groups the flat /regions response into the broadsheet's
+ * country → letter → anchor → children shape. Cities whose
+ * `browse_parent_slug` points to a visible anchor (metro, CMA,
+ * etc.) render nested beneath that anchor; cities with no
+ * browseable ancestor render as their own anchor rows.
+ *
+ * The anchor letter wins for grouping — Hoboken (parent: NYC
+ * Metro) nests under New York Metro in the "N" section, not under
+ * its own "H" section. For the v1 seed every parent/child pair
+ * shares a first letter so this is moot in practice, but the
+ * convention reads cleaner than splitting children across letters.
+ */
 function groupForBrowse(all: ReadonlyArray<RegionSummary>): ByCountry[] {
+  const slugSet = new Set<string>(all.map((r) => r.region.slug));
+
   const byCountry: Record<string, RegionSummary[]> = {};
   for (const p of all) {
     const c = p.region.country;
@@ -40,17 +60,39 @@ function groupForBrowse(all: ReadonlyArray<RegionSummary>): ByCountry[] {
   return Object.entries(byCountry)
     .sort(([a], [b]) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)))
     .map(([country, regions]) => {
-      const sorted = [...regions].sort((a, b) => a.region.name.localeCompare(b.region.name));
-      const grouped: Record<string, RegionSummary[]> = {};
-      for (const r of sorted) {
-        const letter = letterOf(r.region.name);
+      // Children: regions whose browse_parent_slug points at a
+      // sibling in the visible set. Anchors: everything else.
+      const childrenByAnchor = new Map<string, RegionSummary[]>();
+      const anchors: RegionSummary[] = [];
+      for (const r of regions) {
+        const parentSlug = r.browse_parent_slug;
+        if (parentSlug && slugSet.has(parentSlug)) {
+          const arr = childrenByAnchor.get(parentSlug) ?? [];
+          arr.push(r);
+          childrenByAnchor.set(parentSlug, arr);
+        } else {
+          anchors.push(r);
+        }
+      }
+      // Sort children alphabetically within each anchor.
+      for (const arr of childrenByAnchor.values()) {
+        arr.sort((a, b) => a.region.name.localeCompare(b.region.name));
+      }
+      // Sort anchors alphabetically (within-letter rule); letter-group.
+      anchors.sort((a, b) => a.region.name.localeCompare(b.region.name));
+      const grouped: Record<string, AnchorWithChildren[]> = {};
+      for (const a of anchors) {
+        const letter = letterOf(a.region.name);
         if (!grouped[letter]) grouped[letter] = [];
-        grouped[letter].push(r);
+        grouped[letter].push({
+          anchor: a,
+          children: childrenByAnchor.get(a.region.slug) ?? [],
+        });
       }
       const letters = Object.entries(grouped)
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([letter, regions]) => ({ letter, regions }));
-      return { country, total: sorted, letters };
+        .map(([letter, anchors]) => ({ letter, anchors }));
+      return { country, total: regions, letters };
     });
 }
 
@@ -192,39 +234,51 @@ function CountrySection({ country }: { country: ByCountry }) {
         </div>
       </header>
       {country.letters.map((group) => (
-        <LetterRow key={group.letter} letter={group.letter} regions={group.regions} />
+        <LetterRow key={group.letter} letter={group.letter} anchors={group.anchors} />
       ))}
     </section>
   );
 }
 
-function LetterRow({ letter, regions }: { letter: string; regions: RegionSummary[] }) {
+function LetterRow({
+  letter,
+  anchors,
+}: {
+  letter: string;
+  anchors: AnchorWithChildren[];
+}) {
+  const totalRows = anchors.reduce((sum, a) => sum + 1 + a.children.length, 0);
   return (
     <div className="index-letter-row" id={letter}>
       <div className="index-letter">
         {letter}
         <span className="meta">
-          {regions.length} {regions.length === 1 ? 'region' : 'regions'}
+          {totalRows} {totalRows === 1 ? 'region' : 'regions'}
         </span>
       </div>
       <div className="index-rows">
-        {regions.map((p) => (
-          <IndexRow key={p.region.slug} region={p} />
+        {anchors.map((a) => (
+          <div key={a.anchor.region.slug} className="index-anchor-group">
+            <IndexRow region={a.anchor} />
+            {a.children.map((c) => (
+              <IndexRow key={c.region.slug} region={c} isChild />
+            ))}
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-function IndexRow({ region: r }: { region: RegionSummary }) {
+function IndexRow({ region: r, isChild }: { region: RegionSummary; isChild?: boolean }) {
   const { region, org_count } = r;
-  // Subtitle reads "<Country> · <Kind label>" so duplicate-looking
-  // pairs like "Chicago Metro" and "Chicago" — which both surface
-  // when a city has its own direct org attachments — read
-  // distinctly without needing badges or separate sections.
+  // Subtitle reads "<Country> · <Kind label>" so adjacent rows like
+  // "Chicago Metro" and "Chicago" — when a city is nested beneath
+  // its parent metro — still read distinctly via the kind label.
   const subtitle = regionKindLabel(region.kind);
+  const className = isChild ? 'index-row child' : 'index-row';
   return (
-    <Link className="index-row" to={`/region/${region.slug}`}>
+    <Link className={className} to={`/region/${region.slug}`}>
       <div>
         <span className="iname">{region.name}</span>
         <span className="imeta">

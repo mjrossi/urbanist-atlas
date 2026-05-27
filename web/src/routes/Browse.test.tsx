@@ -32,8 +32,12 @@ function renderBrowse() {
   );
 }
 
-function makeRegion(overrides: Partial<RegionSummary['region']> = {}, org_count = 4): RegionSummary {
-  return {
+function makeRegion(
+  overrides: Partial<RegionSummary['region']> & { browse_parent_slug?: string } = {},
+  org_count = 4,
+): RegionSummary {
+  const { browse_parent_slug, ...regionOverrides } = overrides;
+  const summary: RegionSummary = {
     region: {
       id: 1,
       kind: 'us:metro',
@@ -42,10 +46,14 @@ function makeRegion(overrides: Partial<RegionSummary['region']> = {}, org_count 
       country: 'US',
       scope_tier: 'regional',
       parent_slugs: [],
-      ...overrides,
+      ...regionOverrides,
     },
     org_count,
   };
+  if (browse_parent_slug !== undefined) {
+    summary.browse_parent_slug = browse_parent_slug;
+  }
+  return summary;
 }
 
 describe('Browse', () => {
@@ -99,8 +107,96 @@ describe('Browse', () => {
     expect(screen.getByRole('link', { name: /^AML/i }).getAttribute('href')).toBe('/region/aml');
   });
 
-  // City entries surface alongside their parent metros under the
-  // default browse set. Pins the broadened-kind behavior.
+  // Cities whose `browse_parent_slug` points at a visible anchor in
+  // the response nest under that anchor with the `.child` modifier
+  // on the row. Pins the nested-layout fix for the duplicate-feeling
+  // "Toronto" + "Toronto CMA" pairs.
+  it('nests cities under their parent metro via browse_parent_slug', async () => {
+    listRegionsMock.mockResolvedValueOnce([
+      makeRegion({ id: 1, slug: 'chicago-metro', name: 'Chicago Metro', kind: 'us:metro' }, 4),
+      makeRegion(
+        {
+          id: 2,
+          slug: 'chicago',
+          name: 'Chicago',
+          kind: 'us:city',
+          browse_parent_slug: 'chicago-metro',
+        },
+        3,
+      ),
+      makeRegion({ id: 3, slug: 'toronto-cma', name: 'Toronto CMA', kind: 'ca:cma', country: 'CA' }, 4),
+      makeRegion(
+        {
+          id: 4,
+          slug: 'toronto-on',
+          name: 'Toronto',
+          kind: 'ca:city',
+          country: 'CA',
+          browse_parent_slug: 'toronto-cma',
+        },
+        2,
+      ),
+    ]);
+    const { container } = renderBrowse();
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /chicago metro/i })).toBeDefined();
+    });
+
+    // Chicago renders as a child row of Chicago Metro.
+    const chicagoLink = screen.getByRole('link', { name: /^ChicagoUS · City/i });
+    expect(chicagoLink.getAttribute('href')).toBe('/region/chicago');
+    expect(chicagoLink.classList.contains('child')).toBe(true);
+
+    // Chicago Metro is the anchor (no `.child` class).
+    const chicagoMetroLink = screen.getByRole('link', { name: /chicago metro/i });
+    expect(chicagoMetroLink.classList.contains('child')).toBe(false);
+
+    // Both Chicago Metro + Chicago live inside the same anchor group
+    // (their DOM parent has class `.index-anchor-group`).
+    const groups = Array.from(container.querySelectorAll('.index-anchor-group'));
+    const chicagoGroup = groups.find((g) =>
+      g.contains(chicagoMetroLink),
+    );
+    expect(chicagoGroup).toBeDefined();
+    expect(chicagoGroup?.contains(chicagoLink)).toBe(true);
+
+    // Toronto city nests under Toronto CMA the same way.
+    const torontoLink = screen.getByRole('link', { name: /^TorontoCA · City/i });
+    expect(torontoLink.getAttribute('href')).toBe('/region/toronto-on');
+    expect(torontoLink.classList.contains('child')).toBe(true);
+  });
+
+  // Cities whose `browse_parent_slug` doesn't match a visible
+  // anchor (parent absent from this response) fall back to
+  // rendering as their own top-level anchor — no orphan rows.
+  it('renders a city as top-level anchor when its parent slug is not in the response', async () => {
+    listRegionsMock.mockResolvedValueOnce([
+      // No nyc-metro row in this response — just NYC the city.
+      makeRegion(
+        {
+          id: 10,
+          slug: 'nyc',
+          name: 'New York City',
+          kind: 'us:city',
+          browse_parent_slug: 'nyc-metro',
+        },
+        3,
+      ),
+    ]);
+    renderBrowse();
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /new york city/i })).toBeDefined();
+    });
+    const link = screen.getByRole('link', { name: /new york city/i });
+    expect(link.classList.contains('child')).toBe(false);
+  });
+
+  // Legacy "duplicate" scenario: cities WITHOUT browse_parent_slug
+  // (e.g. metros, or cities where the API didn't compute a parent)
+  // continue to render flat next to their metros — pre-nesting
+  // behavior preserved for the unchanged-data case.
   it('renders city-kind entries (us:city, ca:city) alongside metros', async () => {
     listRegionsMock.mockResolvedValueOnce([
       makeRegion({ id: 1, slug: 'chicago-metro', name: 'Chicago Metro', kind: 'us:metro' }, 4),

@@ -123,6 +123,11 @@ func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Reg
 // toward both Chicago and Chicago Metro). Excludes national-tier
 // regions and regions with zero approved orgs. Orders by org count
 // DESC, then name ASC.
+//
+// Each summary's BrowseParentSlug is the slug of the nearest
+// ancestor whose kind is also in defaultBrowseKinds — the SPA's
+// grouping hook for nesting cities under their parent metro. Empty
+// string when no such ancestor exists.
 func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -136,7 +141,11 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 		if count == 0 {
 			continue
 		}
-		out = append(out, RegionSummary{Region: r, OrgCount: int64(count)})
+		out = append(out, RegionSummary{
+			Region:           r,
+			OrgCount:         int64(count),
+			BrowseParentSlug: s.nearestBrowseableAncestorSlug(id),
+		})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].OrgCount != out[j].OrgCount {
@@ -145,6 +154,40 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 		return out[i].Region.Name < out[j].Region.Name
 	})
 	return out, nil
+}
+
+// nearestBrowseableAncestorSlug walks upward from rootID via the
+// parents map and returns the slug of the first ancestor whose kind
+// is in defaultBrowseKinds (and is non-national). Returns "" when no
+// browseable ancestor exists. Caller must hold s.mu.RLock().
+//
+// BFS processes shallowest first, so the first hit is the nearest
+// ancestor. Walking continues past non-browseable intermediates
+// (counties, multi-state regions) so a city like Chicago (parent:
+// cook-county) still finds chicago-metro as its grouping anchor.
+func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
+	visited := map[int64]bool{rootID: true}
+	queue := append([]int64{}, s.parents[rootID]...)
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if visited[id] {
+			continue
+		}
+		visited[id] = true
+		r, ok := s.regionsByID[id]
+		if !ok {
+			continue
+		}
+		if r.ScopeTier == ScopeNational {
+			continue
+		}
+		if defaultBrowseKinds[r.Kind] {
+			return r.Slug
+		}
+		queue = append(queue, s.parents[id]...)
+	}
+	return ""
 }
 
 // GetRegion implements Store. Resolves any non-national region by
@@ -177,7 +220,30 @@ func (s *MemStore) GetRegion(_ context.Context, slug string) (*RegionDetail, err
 		}
 		return a.ID > b.ID
 	})
-	return &RegionDetail{Region: region, Orgs: orgs}, nil
+	// Build ancestry closest-first, skipping self and national-tier.
+	// Reuses the same BFS pattern as AncestorRegions but filters
+	// national rows and drops the leaf.
+	ancestry := []Region{}
+	visited := map[int64]bool{id: true}
+	queue := append([]int64{}, s.parents[id]...)
+	for len(queue) > 0 {
+		aid := queue[0]
+		queue = queue[1:]
+		if visited[aid] {
+			continue
+		}
+		visited[aid] = true
+		ar, ok := s.regionsByID[aid]
+		if !ok {
+			continue
+		}
+		if ar.ScopeTier == ScopeNational {
+			continue
+		}
+		ancestry = append(ancestry, ar)
+		queue = append(queue, s.parents[aid]...)
+	}
+	return &RegionDetail{Region: region, Orgs: orgs, Ancestry: ancestry}, nil
 }
 
 // GetOrgBySlug implements Store. Scans the in-memory orgs by slug,

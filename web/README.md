@@ -90,8 +90,12 @@ contract. It exposes:
   `GET /api/v1/lookup`.
 - `listRegions(init?)`, `getRegion(slug)`, `listRecent()` — typed
   wrappers for the browse + recent endpoints. `listRegions`
-  returns the editorial default browse set (metros + cities); the
-  list endpoint deliberately ships without query parameters today.
+  returns the editorial default browse set (metros + cities), with
+  each summary carrying a `browse_parent_slug` so the SPA can nest
+  cities under their parent metro. `getRegion` includes an
+  `ancestry: Region[]` array (closest-first) used by the Region
+  detail page's breadcrumb. The list endpoint deliberately ships
+  without query parameters today.
   Collection responses arrive as `{ meta, data }` envelopes (slice
   #24); these helpers unwrap `data` so call sites see plain arrays.
 - `getOrg(slug)` — typed wrapper for `GET /api/v1/orgs/{slug}`.

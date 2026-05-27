@@ -98,6 +98,13 @@ func TestGetRegion_HappyPath_Metro(t *testing.T) {
 			t.Errorf("org %s has no regions populated", o.Slug)
 		}
 	}
+	// Ancestry must be present (non-nil) on every successful detail
+	// response — the SPA's breadcrumb depends on it being an array,
+	// even an empty one. nyc-metro's parent in the dev fixture is
+	// ny (us:state), so we expect at least one ancestor.
+	if got.Ancestry == nil {
+		t.Error("ancestry: want non-nil array, got nil")
+	}
 }
 
 // TestGetRegion_NonBrowseableKindResolves pins the broadened-detail
