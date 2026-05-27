@@ -58,8 +58,20 @@ const REGION_KINDS: Record<string, RegionKindInfo> = {
 
 const UNKNOWN: RegionKindInfo = { label: 'Region', browseable: false, metro: false };
 
+// Track kinds we've already warned about so dev-mode console spam stays
+// bounded — schema drift only needs to flag once per kind per session.
+const warnedKinds = new Set<string>();
+
 function infoFor(kind: string): RegionKindInfo {
-  return REGION_KINDS[kind] ?? UNKNOWN;
+  const info = REGION_KINDS[kind];
+  if (!info && import.meta.env.DEV && !warnedKinds.has(kind)) {
+    warnedKinds.add(kind);
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[regionKind] unknown kind "${kind}" — add to REGION_KINDS in src/lib/regionKind.ts`,
+    );
+  }
+  return info ?? UNKNOWN;
 }
 
 export function regionKindLabel(kind: string): string {
