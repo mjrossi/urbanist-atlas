@@ -151,7 +151,7 @@ when full-stack PR volume justifies it.
   [testing-strategy doc](./docs/testing-strategy.md) explains which
   tier to use.
 - **Wire contract first.** If you're adding or changing an endpoint,
-  edit `api/openapi.yaml` first, regenerate via `just api-oapi-gen`
+  edit `api/openapi.yaml` first, regenerate via `just api-gen`
   and `just web-oapi-gen`, then implement against the generated
   types. Both halves are guarded against drift.
 - **Commits.** Small, focused, with a present-tense subject ("add

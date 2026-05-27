@@ -56,7 +56,7 @@ real copy of `openapi.yaml` lives at
 Whenever you edit the canonical spec, run:
 
 ```
-just api-oapi-gen   # `go generate ./...` — refreshes both the embedded copy AND the oapi-codegen types
+just api-gen   # `go generate ./...` — refreshes both the embedded copy AND the oapi-codegen types
 ```
 
 `TestEmbeddedOpenAPISpecMatchesCanonical` (in

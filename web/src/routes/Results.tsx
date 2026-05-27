@@ -8,6 +8,7 @@ import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { EntryList } from '../components/EntryList.tsx';
+import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 
@@ -92,6 +93,7 @@ function ResultsBody({
   country: Country | null;
   rawCountry: string | null;
 }) {
+  // Pre-query gates: URL hasn't reached a state where a lookup makes sense yet.
   if (postalCode.length === 0) {
     return (
       <p className="results-state" style={{ marginTop: 48 }}>
@@ -107,28 +109,27 @@ function ResultsBody({
       </p>
     );
   }
-  if (query.isPending) {
-    return (
-      <p className="results-state" role="status" style={{ marginTop: 48 }}>
-        Looking up groups near {postalCode}…
-      </p>
-    );
-  }
-  if (query.isError) {
-    return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
-        {query.error.message}
-        {query.error.requestId ? (
-          <span className="results-state-detail">
-            request id: {query.error.requestId}
-          </span>
-        ) : null}
-      </p>
-    );
-  }
 
-  const placeLabel = query.data.resolved_place_label ?? postalCode;
-  const { local, regional, resolved_ancestry } = query.data;
+  return (
+    <QueryState
+      query={query}
+      loading={<>Looking up groups near {postalCode}…</>}
+      marginTop={48}
+    >
+      {(data) => <ResultsContent data={data} postalCode={postalCode} />}
+    </QueryState>
+  );
+}
+
+function ResultsContent({
+  data,
+  postalCode,
+}: {
+  data: LookupResult;
+  postalCode: string;
+}) {
+  const placeLabel = data.resolved_place_label ?? postalCode;
+  const { local, regional, resolved_ancestry } = data;
   const empty = local.length === 0 && regional.length === 0;
 
   // EntryList needs a slug -> display name map for its "Matched

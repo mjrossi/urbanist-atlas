@@ -11,25 +11,35 @@ import (
 // scope_tier, plus the upward ancestry walk used to render a breadcrumb
 // in the SPA.
 //
-// "In scope" matches Lookup's rule, extended to the whole subtree under
-// the focus: orgs attached to the focus itself, any descendant (so a
-// metro surfaces its constituent cities' orgs), or any ancestor (so a
-// city surfaces orgs covering its parent metro / state / multi-state
-// region). Local + Regional buckets are decided by the scope_tier of the
-// org's matched attachment regions — same rule Lookup uses.
+// "In scope" means the focus region itself and every DAG descendant —
+// so a metro surfaces its constituent cities' orgs, and a state
+// surfaces every metro/city beneath it. Ancestor orgs are NOT pulled
+// in: a city's detail page shouldn't be flooded with the state's
+// catch-all coalitions just because the city sits under the state.
+// This matches the descendant-walk org_count shown on the browse list
+// (ListRegions), so the card's promised count and the detail page's
+// delivered count agree.
 //
-// Counterpart to Lookup: same composition shape, same primitives,
-// different scope rule (Lookup walks up only; GetRegion walks both ways).
-// Living in pkg/atlas keeps the algorithm in one place — Store
-// implementations only own data access.
+// Local + Regional buckets are decided by the scope_tier of the org's
+// matched attachment regions — same rule Lookup uses for its own
+// in-scope set.
+//
+// Sibling to Lookup, not a clone of it: Lookup answers "what works at
+// this postal-code address?" and walks ancestors upward (a Brooklyn
+// ZIP's address is also in NYC Metro and New York State, so orgs
+// covering those should surface). GetRegion answers "what does this
+// region contain?" and walks descendants downward. Same primitives,
+// opposite direction.
 //
 // Algorithm:
 //  1. ResolveRegionBySlug(slug) → focus Region. Returns ErrRegionNotFound
 //     for unknown slugs and for national-tier rows. Callers map both to
 //     404 — the wire contract makes no distinction.
-//  2. AncestorRegions(focusID) → []Region, leaf-first, national-filtered.
-//  3. DescendantRegions(focusID) → []Region, root-first, national-filtered.
-//  4. OrgsForRegions(union of all in-scope region IDs) → []Org.
+//  2. DescendantRegions(focusID) → []Region, root-first, national-filtered.
+//     Used for both the in-scope set and DescendantRegionNames.
+//  3. AncestorRegions(focusID) → []Region, leaf-first, national-filtered.
+//     Used only for the SPA breadcrumb (Ancestry) — never for org scope.
+//  4. OrgsForRegions(focus ∪ descendants) → []Org.
 //  5. BucketOrgsByScope splits into Local / Regional.
 //  6. Build the breadcrumb-friendly ancestry slice (closest-first,
 //     excluding the focus itself).
@@ -42,24 +52,18 @@ func GetRegion(ctx context.Context, store Store, slug string) (*RegionDetail, er
 		return nil, fmt.Errorf("atlas: resolve region: %w", err)
 	}
 
-	ancestors, err := store.AncestorRegions(ctx, region.ID)
-	if err != nil {
-		return nil, fmt.Errorf("atlas: ancestor regions: %w", err)
-	}
-
 	descendants, err := store.DescendantRegions(ctx, region.ID)
 	if err != nil {
 		return nil, fmt.Errorf("atlas: descendant regions: %w", err)
 	}
 
-	inScope := make(map[int64]Region, len(ancestors)+len(descendants))
-	for _, r := range ancestors {
-		inScope[r.ID] = r
+	ancestors, err := store.AncestorRegions(ctx, region.ID)
+	if err != nil {
+		return nil, fmt.Errorf("atlas: ancestor regions: %w", err)
 	}
+
+	inScope := make(map[int64]Region, len(descendants))
 	for _, r := range descendants {
-		if _, ok := inScope[r.ID]; ok {
-			continue
-		}
 		inScope[r.ID] = r
 	}
 

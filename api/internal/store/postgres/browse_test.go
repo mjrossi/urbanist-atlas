@@ -124,10 +124,11 @@ func TestPostgresStore_GetRegion_HappyPath(t *testing.T) {
 	if got.Region.Slug != "nyc-metro" {
 		t.Errorf("region slug: want nyc-metro, got %s", got.Region.Slug)
 	}
-	// Lookup-style scope: orgs from descendants AND ancestors, bucketed
-	// by attachment scope_tier. Both buckets should populate for
-	// nyc-metro (Brooklyn-tagged orgs in Local; nyc-metro-/state-tagged
-	// orgs in Regional).
+	// Descendant-walk scope: orgs from the focus and DAG descendants,
+	// bucketed by attachment scope_tier. Both buckets should populate
+	// for nyc-metro (Brooklyn-tagged orgs in Local; nyc-metro-tagged
+	// orgs in Regional). State-level orgs tagged only to `ny` are an
+	// ancestor and must NOT surface here.
 	if len(got.Local) == 0 && len(got.Regional) == 0 {
 		t.Error("local + regional both empty for nyc-metro; want at least one bucket non-empty")
 	}
@@ -155,11 +156,13 @@ func TestPostgresStore_GetRegion_HappyPath(t *testing.T) {
 	}
 }
 
-// TestPostgresStore_GetRegion_City_IncludesAncestorOrgs pins the
-// behavioral change for cities: clicking a city in Browse now
-// surfaces orgs from its parent metro / state regions, matching
-// what /lookup would return for a postal code in that city.
-func TestPostgresStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
+// TestPostgresStore_GetRegion_City_DescendantsOnly pins the
+// browse/detail-consistency rule (2026-05-27): clicking a city in
+// Browse now returns ONLY orgs tagged to the city itself or any DAG
+// descendant. Parent-metro and state orgs do NOT surface — that
+// path belongs to /lookup of an address inside the city. Keeps the
+// detail-page count symmetric with the browse-list descendant walk.
+func TestPostgresStore_GetRegion_City_DescendantsOnly(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
@@ -172,13 +175,30 @@ func TestPostgresStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
 	if got == nil {
 		t.Fatal("nil result for chicago")
 	}
-	// Both buckets should populate: Chicago city orgs in Local; orgs
-	// at chicago-metro / chicagoland / il (ancestors) in Regional.
+	// Local: Chicago-tagged orgs (Better Streets, Bike Grid, Commuters)
+	// stay in scope.
 	if len(got.Local) == 0 {
 		t.Error("local: want >=1 Chicago-tagged org (Better Streets, Bike Grid, Commuters), got 0")
 	}
-	if len(got.Regional) == 0 {
-		t.Error("regional: want >=1 ancestor org (active-transportation-alliance from chicago-metro), got 0")
+	// Regional: must NOT include orgs tagged only to ancestors of
+	// Chicago (chicago-metro, chicagoland, il). The active-
+	// transportation-alliance org is the canonical ancestor case;
+	// pin it out explicitly so a regression here fails loudly.
+	for _, o := range got.Regional {
+		if o.Slug == "active-transportation-alliance" {
+			t.Errorf("regional: ancestor org %q leaked into Chicago detail; descendants-only rule violated", o.Slug)
+		}
+		for _, r := range o.Regions {
+			if r.Slug == "chicago-metro" || r.Slug == "chicagoland" || r.Slug == "il" {
+				// Only fail if the matched_region_slugs picked the ancestor
+				// (which would mean it was used as an in-scope match).
+				for _, m := range o.MatchedRegionSlugs {
+					if m == "chicago-metro" || m == "chicagoland" || m == "il" {
+						t.Errorf("regional: org %q matched via ancestor region %q; descendants-only rule violated", o.Slug, m)
+					}
+				}
+			}
+		}
 	}
 }
 

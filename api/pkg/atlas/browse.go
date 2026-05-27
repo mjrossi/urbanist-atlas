@@ -32,16 +32,23 @@ type RegionSummary struct {
 // scope_tier, plus the upward ancestry walk and a descendant
 // slug→name lookup used by the SPA.
 //
-// "In scope" means orgs attached to the region itself, any
-// descendant (so a metro surfaces its constituent cities' orgs), or
-// any ancestor (so a city surfaces orgs covering its parent metro /
-// state / multi-state region). Local + Regional buckets are decided
-// by the scope_tier of the org's matched attachment regions — same
-// rule Lookup uses. National-tier attachments are always filtered.
+// "In scope" means orgs attached to the region itself or any DAG
+// descendant — a metro surfaces its constituent cities' orgs, a
+// state surfaces every metro/city beneath it. Ancestor orgs are NOT
+// pulled in: this is the "what does this region contain?" question,
+// not the "what works at this address?" question (the latter is
+// Lookup's job, with its upward ancestor walk). Keeping the in-scope
+// set symmetric with ListRegions' descendant-walk org_count means
+// the count on the browse card matches the count on the detail page.
+//
+// Local + Regional buckets are decided by the scope_tier of the org's
+// matched attachment regions — same rule Lookup uses. National-tier
+// attachments are always filtered.
 //
 // Ancestry is ordered closest-first (direct parent at index 0, then
 // grandparent, …) and excludes the region itself plus any
-// national-tier rows.
+// national-tier rows. It feeds the SPA's breadcrumb only — it does
+// not affect org scope.
 //
 // DescendantRegionNames maps descendant region slugs (referenced via
 // matched_region_slugs on the bucketed orgs) to their display names.

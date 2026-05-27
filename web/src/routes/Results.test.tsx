@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
 import type { LookupResult } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
+import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
 
@@ -19,18 +18,10 @@ vi.mock('../lib/api.ts', async () => {
 const { Results } = await import('./Results.tsx');
 
 function renderAt(path: string) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+  return renderWithProviders(<Results />, {
+    initialEntries: [path],
+    routePath: '/r/:postalCode',
   });
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/r/:postalCode" element={<Results />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
 }
 
 function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {

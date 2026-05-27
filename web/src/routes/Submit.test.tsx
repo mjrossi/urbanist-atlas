@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
 import { Submit } from './Submit.tsx';
+import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
 function renderSubmit() {
-  return render(
-    <MemoryRouter initialEntries={['/submit']}>
-      <Submit />
-    </MemoryRouter>,
-  );
+  return renderWithProviders(<Submit />, { initialEntries: ['/submit'] });
 }
 
 async function fillRequired(

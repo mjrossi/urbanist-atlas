@@ -13,11 +13,38 @@ export interface paths {
         };
         /**
          * Liveness probe.
-         * @description Used by Fly's health checks. Deliberately does not touch any
-         *     downstream dependency (database, etc.) so it stays cheap and
-         *     predictable.
+         * @description Used by Fly as a liveness check. Deliberately does NOT touch
+         *     any downstream dependency (database, etc.) so a DB outage
+         *     doesn't cause Fly to recycle the machine and lose the recovery
+         *     window. Pair with `/readyz` for the downstream-aware probe.
          */
         get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness probe.
+         * @description Returns 200 only when the data store is reachable (a 1-second
+         *     Postgres ping has succeeded). Returns 503 with an
+         *     `application/problem+json` body (`type=https://urbanistatlas.com/problems/not-ready`)
+         *     when the store is unavailable. Use this as the Fly readiness
+         *     check so traffic stops routing to a machine that can't serve
+         *     queries; keep `/healthz` as the liveness check so a transient
+         *     DB blip doesn't trigger a machine recycle.
+         */
+        get: operations["getReady"];
         put?: never;
         post?: never;
         delete?: never;
@@ -128,21 +155,23 @@ export interface paths {
          * @description Resolves any non-national region in the graph by slug — metros,
          *     cities, counties, boroughs, states/provinces, multi-state
          *     coalitions. Returns a `RegionDetail` with the focus region plus
-         *     the orgs in scope for it, bucketed into `local` and `regional`
-         *     by the `scope_tier` of each org's matched attachment region —
-         *     the same rule `/lookup` uses, extended to walk BOTH ancestors
-         *     AND descendants of the focus (a Brooklyn page surfaces orgs
-         *     tagged to Brooklyn, NYC Metro, NY, and the tri-state region,
-         *     all bucketed by tier). `scope_tier='national'` slugs return
-         *     404 (same v1 editorial gate as `/lookup` and the list
-         *     endpoint).
+         *     the orgs attached to it OR any DAG descendant, bucketed into
+         *     `local` and `regional` by the `scope_tier` of each org's
+         *     matched attachment region. Ancestor orgs are NOT pulled in —
+         *     the city detail page is "what does Brooklyn contain?", not
+         *     "what works at a Brooklyn address?" (the latter is `/lookup`'s
+         *     job, with its upward walk). Keeping the in-scope set
+         *     symmetric with `/api/v1/regions`'s descendant-walk `org_count`
+         *     means the card's promised count matches this page's
+         *     delivered count. `scope_tier='national'` slugs return 404
+         *     (same v1 editorial gate as `/lookup` and the list endpoint).
          *
-         *     `ancestry` carries the upward walk for breadcrumbs.
-         *     `descendant_region_names` is a slug → display-name map
-         *     covering every descendant region referenced by an org's
-         *     `matched_region_slugs`, so clients can render
-         *     "Matched via Brooklyn" instead of "matched via brooklyn-ny"
-         *     without a second request.
+         *     `ancestry` carries the upward walk for breadcrumbs only — it
+         *     does not affect org scope. `descendant_region_names` is a
+         *     slug → display-name map covering every descendant region
+         *     referenced by an org's `matched_region_slugs`, so clients can
+         *     render "Matched via Brooklyn" instead of "matched via
+         *     brooklyn-ny" without a second request.
          */
         get: operations["getRegion"];
         put?: never;
@@ -501,19 +530,22 @@ export interface components {
         /**
          * @description A region (any non-national kind) with the organizations
          *     in scope for it, bucketed by attachment tier. "In scope"
-         *     means orgs attached to the region itself, any descendant
-         *     in the DAG (so a metro surfaces its constituent cities'
-         *     orgs), or any ancestor (so a city surfaces the orgs
-         *     covering its parent metro / state / multi-state region).
+         *     means orgs attached to the region itself or any DAG
+         *     descendant — a metro surfaces its constituent cities'
+         *     orgs, a state surfaces every metro/city beneath it.
+         *     Ancestor orgs are NOT pulled in: this is "what does the
+         *     region contain?", not "what works at this address?" (the
+         *     latter is `/lookup`'s job, with its upward ancestor walk).
          *
-         *     This makes `/regions/{slug}` answer the same question
-         *     `/lookup` answers for a postal code: "every advocate
-         *     someone navigating to this region might care about."
+         *     Keeping the in-scope set descendant-only means the
+         *     `RegionSummary.org_count` shown on the browse card matches
+         *     the count delivered by this endpoint — no surprises when a
+         *     user clicks through.
+         *
          *     Orgs are bucketed by the `scope_tier` of the attachment
          *     region they matched on — `local` for city/county-tier
-         *     attachments, `regional` for metro/state/multi-state. The
-         *     rule mirrors `/lookup`'s; `national`-tier attachments are
-         *     always filtered.
+         *     attachments, `regional` for metro/state/multi-state.
+         *     `national`-tier attachments are always filtered.
          *
          *     Each `LookupOrg.matched_region_slugs` names the
          *     attachment regions in scope that caused the org to
@@ -683,6 +715,14 @@ export interface components {
          *     extension is included on every error response and matches the
          *     `X-Request-ID` response header so clients can quote it when
          *     reporting bugs.
+         * @example {
+         *       "type": "https://urbanistatlas.com/problems/not-found",
+         *       "title": "Postal code not found",
+         *       "status": 404,
+         *       "detail": "No region is mapped to postal code 00000 (US).",
+         *       "instance": "/api/v1/lookup",
+         *       "request_id": "a1b2c3d4e5f6g7h8"
+         *     }
          */
         ProblemDetails: {
             /**
@@ -855,6 +895,35 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+        };
+    };
+    getReady: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Service can serve queries (store is reachable). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Service is up but the data store is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

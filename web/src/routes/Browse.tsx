@@ -6,6 +6,7 @@ import type { RegionSummary } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
+import { QueryState } from '../components/QueryState.tsx';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -188,39 +189,38 @@ function BrowseBody({
   grouped: ByCountry[];
   availableLetters: Set<string>;
 }) {
-  if (query.isPending) {
-    return <p className="results-state" role="status">Loading the index…</p>;
-  }
-  if (query.isError) {
-    return (
-      <p className="results-state error" role="alert">
-        {query.error.message}
-      </p>
-    );
-  }
-  if (grouped.length === 0) {
-    return <p className="results-state">No regions indexed yet.</p>;
-  }
   return (
-    <>
-      <div className="az-index" aria-label="Jump to letter">
-        <span className="az-label">Jump to</span>
-        {ALPHABET.map((letter) =>
-          availableLetters.has(letter) ? (
-            <a key={letter} href={`#${letter}`}>
-              {letter}
-            </a>
-          ) : (
-            <span key={letter} className="dim">
-              {letter}
-            </span>
-          ),
-        )}
-      </div>
-      {grouped.map((country) => (
-        <CountrySection key={country.country} country={country} />
-      ))}
-    </>
+    <QueryState
+      query={query}
+      loading="Loading the index…"
+      empty={{
+        // grouped is derived from query.data — empty data also means empty grouped.
+        when: () => grouped.length === 0,
+        render: <p className="results-state">No regions indexed yet.</p>,
+      }}
+    >
+      {() => (
+        <>
+          <div className="az-index" aria-label="Jump to letter">
+            <span className="az-label">Jump to</span>
+            {ALPHABET.map((letter) =>
+              availableLetters.has(letter) ? (
+                <a key={letter} href={`#${letter}`}>
+                  {letter}
+                </a>
+              ) : (
+                <span key={letter} className="dim">
+                  {letter}
+                </span>
+              ),
+            )}
+          </div>
+          {grouped.map((country) => (
+            <CountrySection key={country.country} country={country} />
+          ))}
+        </>
+      )}
+    </QueryState>
   );
 }
 
