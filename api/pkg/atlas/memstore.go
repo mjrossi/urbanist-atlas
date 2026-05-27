@@ -57,7 +57,7 @@ func (s *MemStore) AddRegion(r Region) {
 // AddOrg registers an organization with the IDs of the regions it
 // serves. The org's Regions field is overwritten on read; CreatedAt is
 // preserved (it powers newest-first ordering in ListRecent and
-// GetMetro). Callers that don't care about ordering may leave it zero.
+// OrgsForRegions). Callers that don't care about ordering may leave it zero.
 func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

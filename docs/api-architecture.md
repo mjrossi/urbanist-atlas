@@ -49,18 +49,35 @@ abstraction to stay clean.
 ## Store abstraction
 
 `atlas.Store` ([`api/pkg/atlas/store.go`](../api/pkg/atlas/store.go))
-is the persistence seam. Seven methods compose to satisfy every
-endpoint:
+is the persistence seam. Eight methods compose to satisfy every
+endpoint. `/lookup` and `/regions/{slug}` are not Store methods —
+they're orchestrators in `pkg/atlas` (`atlas.Lookup`,
+`atlas.GetRegion`) that compose the primitives below:
 
 | Method | Used by | Notes |
 |---|---|---|
-| `ResolveLeafRegion(country, postalCode)` | `/lookup` | Returns `ErrPostalCodeNotFound` for unknown codes. |
-| `AncestorRegions(leafID)` | `/lookup` | Walks the region DAG **upward**; dedupes diamonds. |
-| `OrgsForRegions(regionIDs)` | `/lookup` | Hydrates each org's full attachment list. |
-| `ListRegions()` | `/regions` | Regions in the default browse set (metros + cities, per `atlas.DefaultBrowseKinds`) with ≥1 attached org; walks the DAG **downward** from each match; excludes national-tier. Each summary also carries a `browse_parent_slug` — the SPA's grouping hook for nesting cities under their parent metro. The endpoint ships without filter parameters — the right axis (taxonomy via `kind`, DAG via `ancestor`, …) gets designed when a concrete browse UI use case appears. |
-| `GetRegion(slug)` | `/regions/{slug}` | Resolves any non-national region. Returns `(nil, nil)` for unknown or national-tier slugs. Builds a **lookup-style scope** by walking both ancestors (upward) and descendants (downward) from the focus, then bucketing orgs by attachment `scope_tier` via `atlas.BucketOrgsByScope` — same rule `/lookup` uses. Detail responses carry `local: LookupOrg[]`, `regional: LookupOrg[]`, and `ancestry: Region[]` (closest-first, excludes self + national). Net effect: clicking SF from Browse returns the same set of advocates `/lookup` returns for an SF ZIP. |
+| `ResolveLeafRegion(country, postalCode)` | `/lookup` (via `atlas.Lookup`) | Returns `ErrPostalCodeNotFound` for unknown codes. |
+| `ResolveRegionBySlug(slug)` | `/regions/{slug}` (via `atlas.GetRegion`) | Entry point for the region-detail orchestrator. Returns `ErrRegionNotFound` for unknown slugs and for national-tier rows; the handler maps both to 404. |
+| `AncestorRegions(leafID)` | `/lookup`, `/regions/{slug}` | Walks the region DAG **upward** from the seed; dedupes diamonds; excludes national-tier from seed and recursion. |
+| `DescendantRegions(focusID)` | `/regions/{slug}` | Mirror of `AncestorRegions`: walks the DAG **downward** from the focus. Includes the focus at index 0; dedupes diamonds; excludes national-tier from seed and recursion. |
+| `OrgsForRegions(regionIDs)` | `/lookup`, `/regions/{slug}` | Hydrates each org's full attachment list (`Org.Regions` sorted ascending by region ID, `Org.CreatedAt` populated). |
+| `ListRegions()` | `/regions` | Regions in the default browse set (metros + cities, per `atlas.DefaultBrowseKinds`) with ≥1 attached org; walks the DAG **downward** from each match; excludes national-tier. Each summary carries `OrgCount` (descendant-walk) plus `DirectOrgCount` (no walk — used by the SPA's Browse totals to avoid double-counting orgs surfacing under both a metro and one of its child cities) and `BrowseParentSlug` — the SPA's grouping hook for nesting cities under their parent metro. The endpoint ships without filter parameters; the right axis (taxonomy via `kind`, DAG via `ancestor`, …) gets designed when a concrete browse UI use case appears. |
 | `GetOrgBySlug(slug)` | `/orgs/{slug}` | Returns `ErrOrgNotFound` for unknown or non-approved slugs. |
-| `ListRecent()` | `/recent` | Hardcoded cap of 10; excludes national-only orgs. |
+| `ListRecent()` | `/recent` | Hardcoded cap of 10; excludes orgs whose only attachments are national-tier. |
+
+The `atlas.GetRegion` orchestrator composes
+`ResolveRegionBySlug` + `AncestorRegions` + `DescendantRegions` +
+`OrgsForRegions` to build the region-detail response: a
+**lookup-style scope** that walks both directions from the focus,
+then buckets orgs by attachment `scope_tier` via
+`atlas.BucketOrgsByScope` — same rule `/lookup` uses. Detail
+responses carry `local: LookupOrg[]`, `regional: LookupOrg[]`,
+`ancestry: Region[]` (closest-first, excludes self + national), and
+`descendant_region_names: map[string]string` (slug → display name for
+descendants the SPA needs labels for; excludes the focus and every
+ancestor since the SPA already has those names). Net effect:
+clicking SF from Browse returns the same set of advocates `/lookup`
+returns for an SF ZIP.
 
 `/lookup` and `/regions/{slug}` share rendering primitives (the
 Local/Regional bucketing) but walk the DAG differently:

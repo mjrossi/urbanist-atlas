@@ -66,6 +66,12 @@ func RunContractSuite(t *testing.T, factory Factory) {
 	t.Run("ListRegions_FiltersNationalInDescendantWalk", func(t *testing.T) {
 		testListRegionsFiltersNationalInDescendantWalk(t, factory)
 	})
+	t.Run("ListRegions_DirectOrgCountExcludesDescendantOrgs", func(t *testing.T) {
+		testListRegionsDirectOrgCountExcludesDescendantOrgs(t, factory)
+	})
+	t.Run("GetRegion_DescendantRegionNames_ExcludesFocusAndAncestors", func(t *testing.T) {
+		testGetRegionDescendantRegionNamesExcludesFocusAndAncestors(t, factory)
+	})
 }
 
 // testAncestorRegionsFiltersNational seeds a city under a metro under
@@ -312,6 +318,135 @@ func testListRegionsFiltersNationalInDescendantWalk(t *testing.T, factory Factor
 	}
 	if metroCount != 1 {
 		t.Errorf("test-metro org_count = %d, want 1 (national-only org must not count)", metroCount)
+	}
+}
+
+// testListRegionsDirectOrgCountExcludesDescendantOrgs pins the
+// editorial-totals contract: OrgCount walks the DAG downward and
+// includes descendant attachments, while DirectOrgCount counts only
+// orgs attached to the row itself. A regression that collapses the two
+// would silently double-count any org surfacing under both a metro and
+// one of its child cities — exactly what the SPA's Browse totals avoid
+// by summing DirectOrgCount instead of OrgCount.
+func testListRegionsDirectOrgCountExcludesDescendantOrgs(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	// Metro with no direct org attachments; only the descendant city
+	// carries the org. ListRegions must still surface the metro (because
+	// the downward walk picks up the city's org) but its DirectOrgCount
+	// stays at zero.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:metro", Name: "Test Metro", Slug: "test-metro",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 40,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 2, Kind: "us:city", Name: "Test City", Slug: "test-city",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 15,
+		ParentSlugs: []string{"test-metro"},
+	})
+	seed.SeedOrg(t, atlas.Org{
+		ID: 100, Slug: "city-only", Name: "City Only",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{2})
+
+	regions, err := store.ListRegions(context.Background())
+	if err != nil {
+		t.Fatalf("ListRegions: %v", err)
+	}
+	var metro, city *atlas.RegionSummary
+	for i := range regions {
+		switch regions[i].Region.Slug {
+		case "test-metro":
+			metro = &regions[i]
+		case "test-city":
+			city = &regions[i]
+		}
+	}
+	if metro == nil {
+		t.Fatalf("test-metro missing from ListRegions output (downward walk should surface it via city's org)")
+	}
+	if city == nil {
+		t.Fatalf("test-city missing from ListRegions output")
+	}
+	if metro.OrgCount != 1 {
+		t.Errorf("test-metro OrgCount = %d, want 1 (descendant walk picks up city's org)", metro.OrgCount)
+	}
+	if metro.DirectOrgCount != 0 {
+		t.Errorf("test-metro DirectOrgCount = %d, want 0 (no orgs attached directly to the metro)", metro.DirectOrgCount)
+	}
+	if city.OrgCount != 1 {
+		t.Errorf("test-city OrgCount = %d, want 1", city.OrgCount)
+	}
+	if city.DirectOrgCount != 1 {
+		t.Errorf("test-city DirectOrgCount = %d, want 1 (org is attached directly)", city.DirectOrgCount)
+	}
+}
+
+// testGetRegionDescendantRegionNamesExcludesFocusAndAncestors pins the
+// exclusion logic in atlas.GetRegion: the descendant slug→name map
+// must include child slugs but exclude the focus's own slug and every
+// ancestor slug. The SPA already has names for the focus (via
+// `region`) and the ancestors (via `ancestry`), so leaking them into
+// the map is wasted bytes and risks display bugs if the SPA composes
+// them into a list.
+func testGetRegionDescendantRegionNamesExcludesFocusAndAncestors(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	// Multi-state ancestor → metro (focus) → two city children.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:multistate", Name: "Test Multistate", Slug: "test-multistate",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 50,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 2, Kind: "us:metro", Name: "Focus Metro", Slug: "focus-metro",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 40,
+		ParentSlugs: []string{"test-multistate"},
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 3, Kind: "us:city", Name: "City Alpha", Slug: "city-alpha",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 15,
+		ParentSlugs: []string{"focus-metro"},
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 4, Kind: "us:city", Name: "City Beta", Slug: "city-beta",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 15,
+		ParentSlugs: []string{"focus-metro"},
+	})
+	// One org per city so the focus has populated buckets; the test
+	// asserts on the descendant_region_names map, not the bucketing.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 100, Slug: "alpha-org", Name: "Alpha Org",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{3})
+	seed.SeedOrg(t, atlas.Org{
+		ID: 101, Slug: "beta-org", Name: "Beta Org",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{4})
+
+	detail, err := atlas.GetRegion(context.Background(), store, "focus-metro")
+	if err != nil {
+		t.Fatalf("GetRegion: %v", err)
+	}
+	if detail == nil {
+		t.Fatalf("GetRegion returned nil for focus-metro")
+	}
+	names := detail.DescendantRegionNames
+	if names == nil {
+		t.Fatalf("DescendantRegionNames is nil; want empty-but-non-nil map at minimum")
+	}
+	if _, ok := names["focus-metro"]; ok {
+		t.Errorf("DescendantRegionNames leaked focus slug %q (SPA has it via .region)", "focus-metro")
+	}
+	if _, ok := names["test-multistate"]; ok {
+		t.Errorf("DescendantRegionNames leaked ancestor slug %q (SPA has it via .ancestry)", "test-multistate")
+	}
+	if got, want := names["city-alpha"], "City Alpha"; got != want {
+		t.Errorf("DescendantRegionNames[city-alpha] = %q, want %q", got, want)
+	}
+	if got, want := names["city-beta"], "City Beta"; got != want {
+		t.Errorf("DescendantRegionNames[city-beta] = %q, want %q", got, want)
 	}
 }
 
