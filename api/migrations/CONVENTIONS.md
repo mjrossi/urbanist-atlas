@@ -28,7 +28,7 @@ BEGIN
        AND current_setting('atlas.allow_destructive', true) IS DISTINCT FROM 'on'
     THEN
         RAISE EXCEPTION
-            'Migration %% would drop existing % data. Set '
+            'Migration % would drop existing % data. Set '
             'atlas.allow_destructive=on for this session if intended.',
             '<migration_id>', '<target>';
     END IF;
