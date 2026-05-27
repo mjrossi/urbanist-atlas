@@ -39,11 +39,14 @@ describe('Submit', () => {
   let openSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    // Return a truthy stand-in for the new tab so the popup-blocked
+    // branch only fires in tests that explicitly opt in.
+    openSpy = vi.spyOn(window, 'open').mockImplementation(() => ({}) as Window);
   });
 
   afterEach(() => {
     openSpy.mockRestore();
+    vi.useRealTimers();
   });
 
   it('renders all required field labels', () => {
@@ -139,5 +142,46 @@ describe('Submit', () => {
     expect(header?.textContent).toMatch(/github/i);
     expect(header?.textContent).toMatch(/pre-filled/i);
     expect(header?.textContent).toMatch(/issue/i);
+  });
+
+  it('a second submit within the cooldown is suppressed', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user);
+    await user.tab();
+    const button = screen.getByRole('button', { name: /open as github issue/i });
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+    });
+    await user.click(button);
+    // Button should be disabled by the justOpened cooldown — a second
+    // click during the lockout window must not open a second tab.
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+    await user.click(button);
+    expect(openSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an inline pop-up-blocked notice when window.open returns null', async () => {
+    openSpy.mockImplementation(() => null);
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user);
+    await user.tab();
+    const button = screen.getByRole('button', { name: /open as github issue/i });
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+    });
+    await user.click(button);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/blocked/i);
+    const manualLink = screen.getByRole('link', { name: /open the pre-filled issue manually/i });
+    expect(manualLink.getAttribute('href')).toContain(
+      'github.com/mjrossi/urbanist-atlas/issues/new',
+    );
+    // Button must remain clickable so the user can retry after allowing pop-ups.
+    expect((button as HTMLButtonElement).disabled).toBe(false);
   });
 });

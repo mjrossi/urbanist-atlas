@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -7,6 +8,10 @@ import {
   titlePrefix,
   type SubmitForm,
 } from '../lib/submitForm.ts';
+
+// Brief lockout after a successful window.open so a triple-click on the
+// submit button doesn't open three identical GitHub-issue draft tabs.
+const SUBMIT_COOLDOWN_MS = 1500;
 
 /**
  * `/submit` — composes a pre-filled GitHub issue from the form values
@@ -28,14 +33,28 @@ export function Submit() {
     defaultValues: SUBMIT_FORM_DEFAULTS,
   });
 
+  const [justOpened, setJustOpened] = useState(false);
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
+
   const onValid = (form: SubmitForm) => {
+    if (justOpened) return;
     const title = `${titlePrefix(form.type)} ${form.name}`;
     const body = buildIssueBody(form);
     // GitHub silently drops `body=` when `template=` is also present,
     // so we deliberately omit the template param and ship the full
     // pre-filled body instead.
     const url = `https://github.com/mjrossi/urbanist-atlas/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
-    window.open(url, '_blank', 'noopener');
+    const opened = window.open(url, '_blank', 'noopener');
+    if (opened) {
+      setBlockedUrl(null);
+      setJustOpened(true);
+      setTimeout(() => setJustOpened(false), SUBMIT_COOLDOWN_MS);
+    } else {
+      // Pop-up blocked. Surface the URL inline so the user can copy /
+      // open it themselves; don't lock the button so they can retry
+      // after relaxing the browser's pop-up settings.
+      setBlockedUrl(url);
+    }
   };
 
   return (
@@ -316,7 +335,20 @@ https://kuow.org/stories/..."
                 review it, edit anything, and post — or close the tab to start
                 over. <strong>Nothing is sent yet.</strong>
               </p>
-              <button type="submit" className="btn-primary" disabled={!isValid}>
+              {blockedUrl ? (
+                <p className="field-error" role="alert">
+                  Your browser blocked the pop-up.{' '}
+                  <a href={blockedUrl} target="_blank" rel="noopener noreferrer">
+                    Open the pre-filled issue manually
+                  </a>
+                  , or allow pop-ups from urbanistatlas.com and try again.
+                </p>
+              ) : null}
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={!isValid || justOpened}
+              >
                 Open as GitHub issue <span className="arrow">→</span>
               </button>
             </div>

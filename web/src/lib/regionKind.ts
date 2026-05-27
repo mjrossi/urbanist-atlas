@@ -66,7 +66,6 @@ function infoFor(kind: string): RegionKindInfo {
   const info = REGION_KINDS[kind];
   if (!info && import.meta.env.DEV && !warnedKinds.has(kind)) {
     warnedKinds.add(kind);
-    // eslint-disable-next-line no-console
     console.warn(
       `[regionKind] unknown kind "${kind}" — add to REGION_KINDS in src/lib/regionKind.ts`,
     );
