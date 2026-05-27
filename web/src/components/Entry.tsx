@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import type { Org } from '../lib/api.ts';
+import { domainOf } from '../lib/format.ts';
 
 /**
  * One row in the classified-section list. Renders the broadsheet
@@ -80,12 +81,4 @@ export function Entry({
       </div>
     </article>
   );
-}
-
-function domainOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
 }

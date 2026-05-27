@@ -3,6 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getOrg } from '../lib/api.ts';
 import type { Org as OrgT } from '../lib/api.ts';
+import { domainOf } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
@@ -289,12 +290,4 @@ function OrgContent({ org }: { org: OrgT }) {
 
 function prettyTag(tag: string): string {
   return tag.replace(/-/g, ' ');
-}
-
-function domainOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
 }
