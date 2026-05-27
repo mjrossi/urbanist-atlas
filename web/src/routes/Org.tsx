@@ -218,53 +218,20 @@ function OrgContent({ org }: { org: OrgT }) {
               <div className="section-kicker">§ II — Where they work</div>
               <h2>Regions served.</h2>
               <div className="h2-rule" />
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px' }}>
+              <ul className="org-regions-list">
                 {org.regions.map((region) => (
-                  <li
-                    key={region.id}
-                    style={{
-                      padding: '14px 0',
-                      borderBottom: '1px solid var(--rule)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'baseline',
-                      gap: 18,
-                    }}
-                  >
+                  <li key={region.id} className="org-region-item">
                     <div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--serif)',
-                          fontWeight: 600,
-                          fontSize: 19,
-                        }}
-                      >
+                      <div className="name">
                         {isBrowseableKind(region.kind) ? (
-                          <Link
-                            to={`/region/${encodeURIComponent(region.slug)}`}
-                            style={{
-                              color: 'inherit',
-                              textDecoration: 'none',
-                              borderBottom: '1px solid var(--rule)',
-                            }}
-                          >
+                          <Link to={`/region/${encodeURIComponent(region.slug)}`}>
                             {region.name}
                           </Link>
                         ) : (
                           region.name
                         )}
                       </div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--sans)',
-                          fontSize: 10.5,
-                          fontWeight: 600,
-                          letterSpacing: '0.16em',
-                          textTransform: 'uppercase',
-                          color: 'var(--muted)',
-                          marginTop: 2,
-                        }}
-                      >
+                      <div className="meta">
                         {region.country} · {region.kind}
                       </div>
                     </div>
