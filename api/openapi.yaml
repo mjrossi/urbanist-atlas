@@ -75,9 +75,10 @@ paths:
       tags: [meta]
       summary: Liveness probe.
       description: |
-        Used by Fly's health checks. Deliberately does not touch any
-        downstream dependency (database, etc.) so it stays cheap and
-        predictable.
+        Used by Fly as a liveness check. Deliberately does NOT touch
+        any downstream dependency (database, etc.) so a DB outage
+        doesn't cause Fly to recycle the machine and lose the recovery
+        window. Pair with `/readyz` for the downstream-aware probe.
       operationId: getHealth
       responses:
         '200':
@@ -87,6 +88,34 @@ paths:
               schema:
                 type: string
                 example: "ok\n"
+
+  /readyz:
+    get:
+      tags: [meta]
+      summary: Readiness probe.
+      description: |
+        Returns 200 only when the data store is reachable (a 1-second
+        Postgres ping has succeeded). Returns 503 with an
+        `application/problem+json` body (`type=https://urbanistatlas.com/problems/not-ready`)
+        when the store is unavailable. Use this as the Fly readiness
+        check so traffic stops routing to a machine that can't serve
+        queries; keep `/healthz` as the liveness check so a transient
+        DB blip doesn't trigger a machine recycle.
+      operationId: getReady
+      responses:
+        '200':
+          description: Service can serve queries (store is reachable).
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "ok\n"
+        '503':
+          description: Service is up but the data store is unreachable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/v1/openapi.yaml:
     get:

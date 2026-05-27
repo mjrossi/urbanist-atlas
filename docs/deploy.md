@@ -336,9 +336,12 @@ completes — useful before DNS lands:
 ```sh
 FLY_URL="https://urbanist-atlas.fly.dev"
 
-# /healthz is bypass-listed and works without a header.
+# /healthz (liveness) and /readyz (readiness) are bypass-listed and
+# work without a header.
 curl -i "$FLY_URL/healthz"
 # → 200
+curl -i "$FLY_URL/readyz"
+# → 200 when the sibling Postgres app is reachable; 503 problem+json otherwise
 
 # /api/v1/* requires X-Atlas-Client.
 curl -sS "$FLY_URL/api/v1/lookup?postal_code=10001&country=US"

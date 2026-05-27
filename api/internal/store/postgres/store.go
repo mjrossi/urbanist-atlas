@@ -46,6 +46,12 @@ func Open(ctx context.Context, dbURL string) (*Store, func(), error) {
 
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
+// Ping verifies the Postgres pool is reachable. Used by the HTTP
+// /readyz handler to distinguish liveness (process is up) from
+// readiness (DB is responsive). Returns whatever error pgxpool surfaces
+// so callers can log it.
+func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+
 // ResolveLeafRegion implements atlas.Store.
 func (s *Store) ResolveLeafRegion(ctx context.Context, country atlas.Country, postalCode string) (atlas.Region, error) {
 	normalized := atlas.NormalizePostalCode(country, postalCode)

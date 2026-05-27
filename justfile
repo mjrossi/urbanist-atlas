@@ -463,6 +463,10 @@ smoke secret='' host='qa-api.urbanistatlas.com':
     code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/healthz")
     if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
 
+    echo "→ GET $BASE/readyz"
+    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/readyz")
+    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
+
     echo "→ GET $BASE/api/v1/lookup?postal_code=10001&country=US (no X-Atlas-Client)"
     code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/lookup?postal_code=10001&country=US")
     if [ "$code" != "401" ]; then echo "  FAIL: expected 401, got $code"; fail=1; else echo "  OK 401"; fi

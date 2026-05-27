@@ -13,11 +13,38 @@ export interface paths {
         };
         /**
          * Liveness probe.
-         * @description Used by Fly's health checks. Deliberately does not touch any
-         *     downstream dependency (database, etc.) so it stays cheap and
-         *     predictable.
+         * @description Used by Fly as a liveness check. Deliberately does NOT touch
+         *     any downstream dependency (database, etc.) so a DB outage
+         *     doesn't cause Fly to recycle the machine and lose the recovery
+         *     window. Pair with `/readyz` for the downstream-aware probe.
          */
         get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness probe.
+         * @description Returns 200 only when the data store is reachable (a 1-second
+         *     Postgres ping has succeeded). Returns 503 with an
+         *     `application/problem+json` body (`type=https://urbanistatlas.com/problems/not-ready`)
+         *     when the store is unavailable. Use this as the Fly readiness
+         *     check so traffic stops routing to a machine that can't serve
+         *     queries; keep `/healthz` as the liveness check so a transient
+         *     DB blip doesn't trigger a machine recycle.
+         */
+        get: operations["getReady"];
         put?: never;
         post?: never;
         delete?: never;
@@ -860,6 +887,35 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+        };
+    };
+    getReady: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Service can serve queries (store is reachable). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Service is up but the data store is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
