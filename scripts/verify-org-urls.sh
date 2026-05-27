@@ -103,11 +103,13 @@ probe() {
     final="$(printf '%s' "$metrics" | cut -f2)"
     bytes="$(printf '%s' "$metrics" | cut -f3)"
     # First <title> tag, tags stripped, collapsed whitespace, capped at 200 chars.
+    # `|| true` swallows SIGPIPE (141) from `head -n1` closing the pipe early
+    # under `set -o pipefail`; we don't care if extraction came up empty.
     title="$(tr '\n\r\t' '   ' < "$body" \
       | grep -oiE '<title[^>]*>[^<]{0,500}</title>' \
       | head -n1 \
       | sed -E 's/<[^>]+>//g; s/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:space:]]+/ /g' \
-      | cut -c1-200)"
+      | cut -c1-200 || true)"
     [[ -z "$title" ]] && title="(no <title>)"
   fi
 
@@ -140,6 +142,15 @@ classify() {
   # Parked-page signatures in <title>. Body scan adds noise; keep it tight.
   if printf '%s' "$title" | grep -qiE \
     '(domain.*for sale|buy this domain|this domain (is for sale|may be for sale)|parked|godaddy|sedo|bodis|hugedomains|namecheap|dan\.com|expired|domain is available|host_not_allowed)'; then
+    echo "parked"; return
+  fi
+
+  # SEO-spam takeovers — lapsed domains repurposed for gambling/crypto/pharma
+  # spam. Distinct from parking pages: the site is "alive" (200 OK, big body)
+  # but the content is unrelated to the original org. Caught pawalksandbikes
+  # 2026-05-27 (Turkish slots SEO farm). Title-only — body scan is too noisy.
+  if printf '%s' "$title" | grep -qiE \
+    '(\bslot\b|\bslots\b|\bcasino\b|bonanza|\boyunu\b|\bbahis\b|\bpoker\b|\bbet[0-9]|sportsbook|\bcrypto\b|\bforex\b|viagra|cialis|pharmacy)'; then
     echo "parked"; return
   fi
 

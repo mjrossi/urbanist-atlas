@@ -72,6 +72,8 @@ services:
     environment:
       - CONCURRENCY=${CONCURRENCY:-8}
       - TIMEOUT=${TIMEOUT:-20}
+      - ORGS_TOML=/work/api/seed/orgs.toml
+      - REPORT=/work/tmp/org-url-report.md
     volumes:
       - ../api/seed:/work/api/seed:ro
       - ../tmp:/work/tmp
