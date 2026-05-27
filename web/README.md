@@ -79,7 +79,7 @@ npm run generate:api
 ```
 
 `src/lib/api.ts` imports the wire shapes (`LookupResult`, `Org`,
-`Region`, `ProblemDetails`, `MetroSummary`, `MetroDetail`, `Meta`,
+`Region`, `ProblemDetails`, `RegionSummary`, `RegionDetail`, `Meta`,
 etc.) from `api.gen.ts`, so they stay in lockstep with the
 contract. It exposes:
 
@@ -88,10 +88,21 @@ contract. It exposes:
   bodies into a typed `ProblemDetails`.
 - `lookup(postal_code, country)` — typed wrapper for
   `GET /api/v1/lookup`.
-- `listMetros()`, `getMetro(slug)`, `listRecent()` — typed wrappers
-  for the browse + recent endpoints. Collection responses arrive as
-  `{ meta, data }` envelopes (slice #24); these helpers unwrap
-  `data` so call sites see plain arrays.
+- `listRegions(init?)`, `getRegion(slug)`, `listRecent()` — typed
+  wrappers for the browse + recent endpoints. `listRegions`
+  returns the editorial default browse set (metros + cities), with
+  each summary carrying a `browse_parent_slug` so the SPA can nest
+  cities under their parent metro. `getRegion` returns a
+  lookup-style scope: `local: LookupOrg[]` (orgs attached to the
+  region or any descendant whose attachment is `scope_tier=local`),
+  `regional: LookupOrg[]` (everything else in scope, including
+  ancestor regions' orgs), and `ancestry: Region[]` for the
+  breadcrumb. Clicking a region from Browse now returns the same
+  org set `/lookup` returns for a ZIP in that region. The list
+  endpoint deliberately ships without query parameters today.
+  Collection responses arrive as `{ meta, data }` envelopes (slice
+  #24); these helpers unwrap `data` so call sites see plain arrays.
+- `getOrg(slug)` — typed wrapper for `GET /api/v1/orgs/{slug}`.
 
 `src/lib/queryKeys.ts` centralizes the `@tanstack/react-query` keys so
 cache invalidation has a single source of truth.

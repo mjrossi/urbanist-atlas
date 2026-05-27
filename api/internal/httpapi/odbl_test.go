@@ -16,7 +16,7 @@ import (
 func TestODbLHeaders_PresentOnAPISuccessResponse(t *testing.T) {
 	srv := newTestServer(t)
 
-	resp, err := http.Get(srv.URL + "/api/v1/metros")
+	resp, err := http.Get(srv.URL + "/api/v1/regions")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestODbLHeaders_AbsentOnHealthz(t *testing.T) {
 func TestODbLHeaders_PresentOnAPIErrorResponse(t *testing.T) {
 	srv := newTestServer(t)
 
-	resp, err := http.Get(srv.URL + "/api/v1/metros/totally-bogus")
+	resp, err := http.Get(srv.URL + "/api/v1/regions/totally-bogus")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestODbLHeaders_PresentOnAPIErrorResponse(t *testing.T) {
 //   - data is the items passed in, in order
 func TestRespondCollection_WrapsItemsAndSetsHeaders(t *testing.T) {
 	w := httptest.NewRecorder()
-	items := []oapi.MetroSummary{
+	items := []oapi.RegionSummary{
 		{Region: oapi.Region{Slug: "a"}, OrgCount: 3},
 		{Region: oapi.Region{Slug: "b"}, OrgCount: 1},
 	}
@@ -97,7 +97,7 @@ func TestRespondCollection_WrapsItemsAndSetsHeaders(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
 		t.Errorf("Content-Type: want application/json prefix, got %q", ct)
 	}
-	var env oapi.MetroSummariesEnvelope
+	var env oapi.RegionSummariesEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
 		t.Fatalf("decode envelope: %v", err)
 	}

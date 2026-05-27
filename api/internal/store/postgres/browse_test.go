@@ -11,6 +11,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"sort"
@@ -67,30 +68,30 @@ func loadAllSeeds(ctx context.Context, t *testing.T, store *Store) {
 	}
 }
 
-func TestPostgresStore_ListMetros_ShapeAndOrdering(t *testing.T) {
+func TestPostgresStore_ListRegions_ShapeAndOrdering(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.ListMetros(ctx)
+	got, err := store.ListRegions(ctx)
 	if err != nil {
-		t.Fatalf("ListMetros: %v", err)
+		t.Fatalf("ListPlaces: %v", err)
 	}
 	if len(got) == 0 {
-		t.Fatal("want >=1 metro, got 0")
+		t.Fatal("want >=1 place, got 0")
 	}
-	// Every entry should be a metro-equivalent kind, non-national, and
-	// have at least one org.
+	// Every entry should be in the default-browse set, non-national,
+	// and have at least one org.
 	for _, m := range got {
-		if !atlas.IsMetroKind(m.Region.Kind) {
-			t.Errorf("non-metro kind in result: %q (%s)", m.Region.Kind, m.Region.Slug)
+		if !atlas.IsDefaultBrowseKind(m.Region.Kind) {
+			t.Errorf("kind outside default-browse set in result: %q (%s)", m.Region.Kind, m.Region.Slug)
 		}
 		if m.Region.ScopeTier == atlas.ScopeNational {
 			t.Errorf("national-tier region in result: %s", m.Region.Slug)
 		}
 		if m.OrgCount == 0 {
-			t.Errorf("zero-org metro in result: %s", m.Region.Slug)
+			t.Errorf("zero-org region in result: %s", m.Region.Slug)
 		}
 	}
 	// Ordering: org_count DESC, then name ASC for ties.
@@ -107,30 +108,39 @@ func TestPostgresStore_ListMetros_ShapeAndOrdering(t *testing.T) {
 	}
 }
 
-func TestPostgresStore_GetMetro_HappyPath(t *testing.T) {
+func TestPostgresStore_GetRegion_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetMetro(ctx, "nyc-metro")
+	got, err := atlas.GetRegion(ctx, store, "nyc-metro")
 	if err != nil {
-		t.Fatalf("GetMetro: %v", err)
+		t.Fatalf("GetRegion: %v", err)
 	}
 	if got == nil {
-		t.Fatal("nil result for known metro slug")
+		t.Fatal("nil result for known region slug")
 	}
 	if got.Region.Slug != "nyc-metro" {
 		t.Errorf("region slug: want nyc-metro, got %s", got.Region.Slug)
 	}
-	if len(got.Orgs) == 0 {
-		t.Errorf("nyc-metro has no orgs; expected at least one (TransitCenter / TransAlt via nyc descendant)")
+	// Lookup-style scope: orgs from descendants AND ancestors, bucketed
+	// by attachment scope_tier. Both buckets should populate for
+	// nyc-metro (Brooklyn-tagged orgs in Local; nyc-metro-/state-tagged
+	// orgs in Regional).
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for nyc-metro; want at least one bucket non-empty")
 	}
-	// At least one of the seeded orgs that attach to nyc-metro or its
-	// descendants should be present.
-	gotSlugs := make(map[string]bool, len(got.Orgs))
-	for _, o := range got.Orgs {
+	allOrgs := append(append([]atlas.Org{}, got.Local...), got.Regional...)
+	gotSlugs := make(map[string]bool, len(allOrgs))
+	for _, o := range allOrgs {
 		gotSlugs[o.Slug] = true
+		if len(o.Regions) == 0 {
+			t.Errorf("org %s has empty Regions; hydration failed", o.Slug)
+		}
+		if len(o.MatchedRegionSlugs) == 0 {
+			t.Errorf("org %s has empty MatchedRegionSlugs; bucketing didn't tag matches", o.Slug)
+		}
 	}
 	wantOneOf := []string{"transitcenter", "transportation-alternatives", "riders-alliance"}
 	found := false
@@ -141,50 +151,44 @@ func TestPostgresStore_GetMetro_HappyPath(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("none of %v in nyc-metro orgs; got %v", wantOneOf, sortedKeys(gotSlugs))
-	}
-	// Each org's Regions must be hydrated.
-	for _, o := range got.Orgs {
-		if len(o.Regions) == 0 {
-			t.Errorf("org %s has empty Regions; hydration failed", o.Slug)
-		}
+		t.Errorf("none of %v in nyc-metro scope; got %v", wantOneOf, sortedKeys(gotSlugs))
 	}
 }
 
-func TestPostgresStore_GetMetro_OrgsOrderedNewestFirst(t *testing.T) {
+// TestPostgresStore_GetRegion_City_IncludesAncestorOrgs pins the
+// behavioral change for cities: clicking a city in Browse now
+// surfaces orgs from its parent metro / state regions, matching
+// what /lookup would return for a postal code in that city.
+func TestPostgresStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetMetro(ctx, "nyc-metro")
+	got, err := atlas.GetRegion(ctx, store, "chicago")
 	if err != nil {
-		t.Fatalf("GetMetro: %v", err)
+		t.Fatalf("GetRegion(chicago): %v", err)
 	}
-	if got == nil || len(got.Orgs) < 2 {
-		t.Skipf("nyc-metro needs >=2 orgs to assert ordering; got %d", len(got.Orgs))
+	if got == nil {
+		t.Fatal("nil result for chicago")
 	}
-	// Postgres ORDER BY o.created_at DESC, o.id DESC. Assert it holds.
-	for i := 1; i < len(got.Orgs); i++ {
-		prev, cur := got.Orgs[i-1], got.Orgs[i]
-		if cur.CreatedAt.After(prev.CreatedAt) {
-			t.Errorf("not descending by created_at: [%d]=%v (%s), [%d]=%v (%s)",
-				i-1, prev.CreatedAt, prev.Slug, i, cur.CreatedAt, cur.Slug)
-		}
-		if cur.CreatedAt.Equal(prev.CreatedAt) && cur.ID > prev.ID {
-			t.Errorf("tied created_at not descending by id: [%d]=%d, [%d]=%d",
-				i-1, prev.ID, i, cur.ID)
-		}
+	// Both buckets should populate: Chicago city orgs in Local; orgs
+	// at chicago-metro / chicagoland / il (ancestors) in Regional.
+	if len(got.Local) == 0 {
+		t.Error("local: want >=1 Chicago-tagged org (Better Streets, Bike Grid, Commuters), got 0")
+	}
+	if len(got.Regional) == 0 {
+		t.Error("regional: want >=1 ancestor org (active-transportation-alliance from chicago-metro), got 0")
 	}
 }
 
-func TestPostgresStore_GetMetro_UnknownSlug_ReturnsNil(t *testing.T) {
+func TestPostgresStore_GetRegion_UnknownSlug_ReturnsNil(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetMetro(ctx, "does-not-exist")
+	got, err := atlas.GetRegion(ctx, store, "does-not-exist")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
@@ -193,19 +197,70 @@ func TestPostgresStore_GetMetro_UnknownSlug_ReturnsNil(t *testing.T) {
 	}
 }
 
-func TestPostgresStore_GetMetro_NonMetroSlug_ReturnsNil(t *testing.T) {
+// TestPostgresStore_GetRegion_StateSlugResolves pins the broadened
+// detail-endpoint contract: a us:state slug (outside the default
+// browse set) now resolves and returns its descendant orgs. Replaces
+// the prior "non-place slug returns nil" test.
+func TestPostgresStore_GetRegion_StateSlugResolves(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	// "ny" is a us:state slug — exists but is not a metro kind.
-	got, err := store.GetMetro(ctx, "ny")
+	got, err := atlas.GetRegion(ctx, store, "ny")
+	if err != nil {
+		t.Fatalf("err: want nil, got %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for ny (us:state) — expected the broadened detail endpoint to resolve it")
+	}
+	if got.Region.Slug != "ny" || got.Region.Kind != "us:state" {
+		t.Errorf("region: want slug=ny kind=us:state, got slug=%s kind=%s",
+			got.Region.Slug, got.Region.Kind)
+	}
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for ny (state); descendants include nyc-metro + nyc + boroughs")
+	}
+}
+
+// TestPostgresStore_GetRegion_MultiStateSlugResolves pins resolution
+// for us:multi-state regions (Chicagoland, NYC tri-state, DMV).
+func TestPostgresStore_GetRegion_MultiStateSlugResolves(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := atlas.GetRegion(ctx, store, "chicagoland")
+	if err != nil {
+		t.Fatalf("err: want nil, got %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for chicagoland (us:multi-state)")
+	}
+	if got.Region.Kind != "us:multi-state" {
+		t.Errorf("region.kind: want us:multi-state, got %s", got.Region.Kind)
+	}
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for chicagoland; descendants include chicago-metro + Chicago")
+	}
+}
+
+// TestPostgresStore_GetRegion_NationalReturnsNil pins the v1
+// editorial gate: national-tier slugs (pt-nacional, future MUBi-
+// equivalents) still 404 even though the kind gate is gone.
+func TestPostgresStore_GetRegion_NationalReturnsNil(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := atlas.GetRegion(ctx, store, "pt-nacional")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
 	if got != nil {
-		t.Errorf("result: want nil for non-metro slug, got %+v", got)
+		t.Errorf("result: want nil for national-tier slug, got %+v", got)
 	}
 }
 
@@ -252,6 +307,55 @@ func TestPostgresStore_ListRecent_ExcludesNationalTier(t *testing.T) {
 		if o.Slug == "mubi-nacional" {
 			t.Errorf("national-tier org mubi-nacional leaked into ListRecent: %+v", o)
 		}
+	}
+}
+
+func TestPostgresStore_GetOrgBySlug_HappyPath(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	// transportation-alternatives is a known org in api/seed/orgs.toml
+	// attached to nyc-metro + brooklyn descendants.
+	got, err := store.GetOrgBySlug(ctx, "transportation-alternatives")
+	if err != nil {
+		t.Fatalf("GetOrgBySlug: %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for known seed slug")
+	}
+	if got.Slug != "transportation-alternatives" {
+		t.Errorf("slug: want transportation-alternatives, got %s", got.Slug)
+	}
+	if got.Name == "" {
+		t.Error("name: want non-empty")
+	}
+	if len(got.Regions) == 0 {
+		t.Errorf("regions: want >= 1 (denormalized), got 0")
+	}
+	for _, r := range got.Regions {
+		if r.Slug == "" {
+			t.Error("region with empty slug — hydration failed")
+		}
+	}
+}
+
+func TestPostgresStore_GetOrgBySlug_UnknownSlug(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.GetOrgBySlug(ctx, "totally-fake-org")
+	if err == nil {
+		t.Fatalf("err: want ErrOrgNotFound, got nil (result=%+v)", got)
+	}
+	if !errors.Is(err, atlas.ErrOrgNotFound) {
+		t.Errorf("err: want ErrOrgNotFound, got %v", err)
+	}
+	if got != nil {
+		t.Errorf("result: want nil, got %+v", got)
 	}
 }
 

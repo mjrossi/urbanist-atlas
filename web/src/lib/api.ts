@@ -21,10 +21,10 @@ export type Org = components['schemas']['Org'];
 export type LookupOrg = components['schemas']['LookupOrg'];
 export type LookupQuery = components['schemas']['LookupQuery'];
 export type LookupResult = components['schemas']['LookupResult'];
-export type MetroSummary = components['schemas']['MetroSummary'];
-export type MetroDetail = components['schemas']['MetroDetail'];
+export type RegionSummary = components['schemas']['RegionSummary'];
+export type RegionDetail = components['schemas']['RegionDetail'];
 export type Meta = components['schemas']['Meta'];
-export type MetroSummariesEnvelope = components['schemas']['MetroSummariesEnvelope'];
+export type RegionSummariesEnvelope = components['schemas']['RegionSummariesEnvelope'];
 export type RecentEnvelope = components['schemas']['RecentEnvelope'];
 export type Submission = components['schemas']['Submission'];
 export type SubmissionPayload = components['schemas']['SubmissionPayload'];
@@ -143,28 +143,44 @@ export function lookup(
 }
 
 /**
- * `GET /api/v1/metros` — list every metro region with its
- * approved-org count. Feeds the `/browse` page and the homepage
- * "Browse by metro" aside.
+ * `GET /api/v1/regions` — list the editorial default browse set
+ * (metros + cities) with their approved-org counts. The endpoint
+ * ships without filter parameters today; the right filter axis
+ * (taxonomy via `kind`, DAG via `ancestor`, …) will be designed
+ * when a concrete browse UI use case appears.
  *
- * The wire shape is `{ meta, data: MetroSummary[] }`; this helper
+ * The wire shape is `{ meta, data: RegionSummary[] }`; this helper
  * unwraps `data` so callers continue to receive the bare array.
  * Read `meta` (license, attribution_url, generated_at) by calling
- * `apiFetch<MetroSummariesEnvelope>` directly if you need it.
+ * `apiFetch<RegionSummariesEnvelope>` directly if you need it.
  */
-export function listMetros(init?: RequestInit): Promise<MetroSummary[]> {
-  return apiFetch<MetroSummariesEnvelope>('/api/v1/metros', init).then(
+export function listRegions(init?: RequestInit): Promise<RegionSummary[]> {
+  return apiFetch<RegionSummariesEnvelope>('/api/v1/regions', init).then(
     (env) => env.data,
   );
 }
 
 /**
- * `GET /api/v1/metros/{slug}` — one metro region plus the approved
- * organizations that serve it. Throws {@link ApiError} with status
- * 404 when the slug isn't in the atlas.
+ * `GET /api/v1/regions/{slug}` — one region (any non-national kind)
+ * plus the approved organizations that serve it (directly or via the
+ * region DAG). Resolves metros, cities, counties, boroughs, states,
+ * multi-state coalitions. Throws {@link ApiError} with status 404
+ * when the slug is unknown or names a national-tier region.
  */
-export function getMetro(slug: string, init?: RequestInit): Promise<MetroDetail> {
-  return apiFetch<MetroDetail>(`/api/v1/metros/${encodeURIComponent(slug)}`, init);
+export function getRegion(slug: string, init?: RequestInit): Promise<RegionDetail> {
+  return apiFetch<RegionDetail>(`/api/v1/regions/${encodeURIComponent(slug)}`, init);
+}
+
+/**
+ * `GET /api/v1/orgs/{slug}` — one organization, with every region it
+ * serves denormalized at `regions`. Throws {@link ApiError} with status
+ * 404 when the slug isn't in the atlas (or names a non-approved org).
+ *
+ * Single-object response — no `{meta, data}` envelope. ODbL travels via
+ * the `X-Data-License` + `X-Data-Attribution` response headers.
+ */
+export function getOrg(slug: string, init?: RequestInit): Promise<Org> {
+  return apiFetch<Org>(`/api/v1/orgs/${encodeURIComponent(slug)}`, init);
 }
 
 /**

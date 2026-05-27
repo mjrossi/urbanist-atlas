@@ -5,11 +5,12 @@ import { RouterProvider } from 'react-router';
 
 // Self-hosted variable fonts. The @font-face rules these ship populate
 // the family names ("Fraunces Variable", "Source Serif 4 Variable",
-// "Inter Variable") that the --font-* CSS variables in global.css
-// reference.
+// "Inter Variable", "JetBrains Mono Variable") that the --font-* CSS
+// variables in global.css reference.
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/source-serif-4';
 import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
 
 import './styles/global.css';
 import { router } from './router.tsx';

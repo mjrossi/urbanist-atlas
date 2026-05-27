@@ -58,8 +58,13 @@ ORDER BY rp.region_id, r.slug;
 -- returns the org row plus ALL the region IDs that org is attached
 -- to (array_agg). The adapter then hydrates each ID into a Region via
 -- GetRegionsByIDs in one round-trip.
+--
+-- Includes o.created_at so the adapter can populate Org.CreatedAt —
+-- atlas.Store's contract is that OrgsForRegions returns the same
+-- shape ListRecent does (the storetest harness pins this).
 SELECT
     o.id, o.slug, o.name, o.short_desc, o.website_url, o.contact_url, o.tags,
+    o.created_at,
     ARRAY(
         SELECT orx.region_id
         FROM organization_regions orx

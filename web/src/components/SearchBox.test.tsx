@@ -55,7 +55,7 @@ function getLocation() {
 }
 
 function getInput() {
-  return screen.getByLabelText(/find local groups/i) as HTMLInputElement;
+  return screen.getByLabelText(/postal code/i) as HTMLInputElement;
 }
 
 function getButton() {

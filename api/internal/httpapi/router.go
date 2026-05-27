@@ -64,8 +64,9 @@ func New(cfg Config) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
 			r.Get("/lookup", lookupHandler(cfg.Store, logger))
-			r.Get("/metros", listMetrosHandler(cfg.Store, logger))
-			r.Get("/metros/{slug}", getMetroHandler(cfg.Store, logger))
+			r.Get("/regions", listRegionsHandler(cfg.Store, logger))
+			r.Get("/regions/{slug}", getRegionHandler(cfg.Store, logger))
+			r.Get("/orgs/{slug}", getOrgHandler(cfg.Store, logger))
 			r.Get("/recent", recentHandler(cfg.Store, logger))
 		})
 	})

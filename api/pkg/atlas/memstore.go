@@ -57,7 +57,7 @@ func (s *MemStore) AddRegion(r Region) {
 // AddOrg registers an organization with the IDs of the regions it
 // serves. The org's Regions field is overwritten on read; CreatedAt is
 // preserved (it powers newest-first ordering in ListRecent and
-// GetMetro). Callers that don't care about ordering may leave it zero.
+// OrgsForRegions). Callers that don't care about ordering may leave it zero.
 func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -91,7 +91,10 @@ func (s *MemStore) ResolveLeafRegion(_ context.Context, country Country, postalC
 }
 
 // AncestorRegions implements Store. Returns the leaf followed by all
-// transitive ancestors via BFS, dedupes via a visited set.
+// transitive ancestors via BFS, dedupes via a visited set. Excludes
+// scope_tier='national' rows from both the seed and the recursion
+// (matches the Postgres CTE contract; the storetest harness pins
+// this).
 func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -109,23 +112,34 @@ func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Reg
 		if !ok {
 			continue
 		}
+		if r.ScopeTier == ScopeNational {
+			continue
+		}
 		out = append(out, r)
 		queue = append(queue, s.parents[id]...)
 	}
 	return out, nil
 }
 
-// ListMetros implements Store. Walks every registered region, filters
-// by IsMetroKind, and counts the orgs whose region attachments are in
-// the metro's downward DAG closure (so an org tagged only to Brooklyn
-// counts toward NYC metro). Excludes national-tier metros and metros
-// with zero approved orgs. Orders by org count DESC, then name ASC.
-func (s *MemStore) ListMetros(_ context.Context) ([]MetroSummary, error) {
+// ListRegions implements Store. Walks every registered region,
+// filters by membership in defaultBrowseKinds (metros + cities),
+// and counts the orgs whose region attachments are in each
+// region's downward DAG closure (so an org tagged only to Brooklyn
+// counts toward NYC metro, and an org tagged to Chicago counts
+// toward both Chicago and Chicago Metro). Excludes national-tier
+// regions and regions with zero approved orgs. Orders by org count
+// DESC, then name ASC.
+//
+// Each summary's BrowseParentSlug is the slug of the nearest
+// ancestor whose kind is also in defaultBrowseKinds — the SPA's
+// grouping hook for nesting cities under their parent metro. Empty
+// string when no such ancestor exists.
+func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := []MetroSummary{}
+	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
-		if !IsMetroKind(r.Kind) || r.ScopeTier == ScopeNational {
+		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
 			continue
 		}
 		descendants := s.descendantRegionIDs(id)
@@ -133,7 +147,12 @@ func (s *MemStore) ListMetros(_ context.Context) ([]MetroSummary, error) {
 		if count == 0 {
 			continue
 		}
-		out = append(out, MetroSummary{Region: r, OrgCount: int64(count)})
+		out = append(out, RegionSummary{
+			Region:           r,
+			OrgCount:         int64(count),
+			DirectOrgCount:   int64(s.countOrgsForRegions([]int64{id})),
+			BrowseParentSlug: s.nearestBrowseableAncestorSlug(id),
+		})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].OrgCount != out[j].OrgCount {
@@ -144,34 +163,114 @@ func (s *MemStore) ListMetros(_ context.Context) ([]MetroSummary, error) {
 	return out, nil
 }
 
-// GetMetro implements Store. Returns nil for unknown slugs and for
-// known slugs that don't name a metro-equivalent kind. Returned orgs
-// are newest-first by CreatedAt.
-func (s *MemStore) GetMetro(_ context.Context, slug string) (*MetroDetail, error) {
+// nearestBrowseableAncestorSlug walks upward from rootID via the
+// parents map and returns the slug of the nearest ancestor whose kind
+// is in defaultBrowseKinds (and is non-national). Returns "" when no
+// browseable ancestor exists. Caller must hold s.mu.RLock().
+//
+// Walks depth-by-depth past non-browseable intermediates (counties,
+// multi-state regions) so a city like Chicago (parent: cook-county)
+// still finds chicago-metro as its grouping anchor. When multiple
+// browseable parents share the minimum depth, ties are broken by
+// slug ASC — same rule as Postgres' nearest_browseable_parent CTE
+// (browse.sql `ORDER BY a.depth ASC, r.slug ASC`).
+func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
+	visited := map[int64]bool{rootID: true}
+	current := append([]int64{}, s.parents[rootID]...)
+	for len(current) > 0 {
+		var hits []string
+		var next []int64
+		for _, id := range current {
+			if visited[id] {
+				continue
+			}
+			visited[id] = true
+			r, ok := s.regionsByID[id]
+			if !ok {
+				continue
+			}
+			if r.ScopeTier == ScopeNational {
+				continue
+			}
+			if defaultBrowseKinds[r.Kind] {
+				hits = append(hits, r.Slug)
+				continue
+			}
+			next = append(next, s.parents[id]...)
+		}
+		if len(hits) > 0 {
+			sort.Strings(hits)
+			return hits[0]
+		}
+		current = next
+	}
+	return ""
+}
+
+// ResolveRegionBySlug implements Store. Returns ErrRegionNotFound for
+// unknown slugs and for national-tier rows.
+func (s *MemStore) ResolveRegionBySlug(_ context.Context, slug string) (Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	id, ok := s.regionsBySlug[slug]
 	if !ok {
-		return nil, nil
+		return Region{}, ErrRegionNotFound
 	}
-	region, ok := s.regionsByID[id]
+	r, ok := s.regionsByID[id]
 	if !ok {
+		return Region{}, ErrRegionNotFound
+	}
+	if r.ScopeTier == ScopeNational {
+		return Region{}, ErrRegionNotFound
+	}
+	return r, nil
+}
+
+// DescendantRegions implements Store. Walks the parent->child relation
+// via the parents map and returns the focus at index 0 followed by
+// every reachable descendant. Excludes national-tier rows from both
+// the seed and the recursion (matches the Postgres CTE contract).
+func (s *MemStore) DescendantRegions(_ context.Context, focusRegionID int64) ([]Region, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	focus, ok := s.regionsByID[focusRegionID]
+	if !ok || focus.ScopeTier == ScopeNational {
 		return nil, nil
 	}
-	if !IsMetroKind(region.Kind) || region.ScopeTier == ScopeNational {
-		return nil, nil
-	}
-	descendants := s.descendantRegionIDs(id)
-	orgs := s.orgsForRegionIDs(descendants)
-	// Match Postgres OrgsForMetro: created_at DESC, id DESC.
-	sort.Slice(orgs, func(i, j int) bool {
-		a, b := orgs[i], orgs[j]
-		if !a.CreatedAt.Equal(b.CreatedAt) {
-			return a.CreatedAt.After(b.CreatedAt)
+	ids := s.descendantRegionIDs(focusRegionID)
+	out := make([]Region, 0, len(ids))
+	for _, id := range ids {
+		r, ok := s.regionsByID[id]
+		if !ok || r.ScopeTier == ScopeNational {
+			continue
 		}
-		return a.ID > b.ID
-	})
-	return &MetroDetail{Region: region, Orgs: orgs}, nil
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+// GetOrgBySlug implements Store. Scans the in-memory orgs by slug,
+// hydrates Regions like the wire contract expects, returns
+// ErrOrgNotFound when no row matches.
+//
+// Behavioral note: the Postgres impl additionally gates on
+// status='approved', but atlas.Org has no Status field so MemStore
+// can't replicate that filter. Dev/test callers are responsible for
+// only loading approved orgs into MemStore (LoadDevFixtures does;
+// hand-built fixtures should too).
+func (s *MemStore) GetOrgBySlug(_ context.Context, slug string) (*Org, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, org := range s.orgs {
+		if org.Slug != slug {
+			continue
+		}
+		out := org
+		out.Regions = s.regionsForOrg(org.ID)
+		out.MatchedRegionSlugs = nil
+		return &out, nil
+	}
+	return nil, ErrOrgNotFound
 }
 
 // ListRecent implements Store. Excludes orgs whose ONLY region
@@ -219,15 +318,16 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 	return candidates, nil
 }
 
-// descendantRegionIDs returns rootID followed by every region reachable
-// by walking the parents map in reverse (child-of relation). Used to
-// answer "which orgs serve a metro or anything under it".
+// descendantRegionIDs returns rootID followed by every non-national
+// region reachable by walking the parents map in reverse (child-of
+// relation). Excludes scope_tier='national' rows from both the seed
+// and the recursion so an editorial slip-up (a national region wired
+// under a metro) can't inflate a metro's org_count via ListRegions or
+// leak into GetRegion's in-scope set. Matches the Postgres
+// DescendantRegions CTE.
 //
 // Must be called with s.mu held (read or write).
 func (s *MemStore) descendantRegionIDs(rootID int64) []int64 {
-	// Build a child->parent index on the fly. With ~30 regions in v1
-	// this is cheap; if it ever shows up in a profile, the index can
-	// be cached on MemStore directly.
 	childrenOf := map[int64][]int64{}
 	for childID, parents := range s.parents {
 		for _, p := range parents {
@@ -244,6 +344,13 @@ func (s *MemStore) descendantRegionIDs(rootID int64) []int64 {
 			continue
 		}
 		visited[id] = true
+		r, ok := s.regionsByID[id]
+		if !ok {
+			continue
+		}
+		if r.ScopeTier == ScopeNational {
+			continue
+		}
 		out = append(out, id)
 		queue = append(queue, childrenOf[id]...)
 	}
@@ -272,39 +379,9 @@ func (s *MemStore) countOrgsForRegions(regionIDs []int64) int {
 	return count
 }
 
-// orgsForRegionIDs returns the distinct orgs with at least one
-// attachment in regionIDs, with Regions hydrated. Must be called with
-// s.mu held.
-func (s *MemStore) orgsForRegionIDs(regionIDs []int64) []Org {
-	if len(regionIDs) == 0 {
-		return nil
-	}
-	wanted := make(map[int64]bool, len(regionIDs))
-	for _, id := range regionIDs {
-		wanted[id] = true
-	}
-	var out []Org
-	for _, org := range s.orgs {
-		match := false
-		for _, rid := range s.orgRegions[org.ID] {
-			if wanted[rid] {
-				match = true
-				break
-			}
-		}
-		if !match {
-			continue
-		}
-		hydrated := org
-		hydrated.Regions = s.regionsForOrg(org.ID)
-		hydrated.MatchedRegionSlugs = nil
-		out = append(out, hydrated)
-	}
-	return out
-}
-
-// regionsForOrg gathers the Region rows for an org's attachments. Must
-// be called with s.mu held.
+// regionsForOrg gathers the Region rows for an org's attachments,
+// sorted ascending by region ID so the wire shape matches the Postgres
+// `ARRAY(... ORDER BY orx.region_id)`. Must be called with s.mu held.
 func (s *MemStore) regionsForOrg(orgID int64) []Region {
 	ids := s.orgRegions[orgID]
 	regions := make([]Region, 0, len(ids))
@@ -313,10 +390,12 @@ func (s *MemStore) regionsForOrg(orgID int64) []Region {
 			regions = append(regions, r)
 		}
 	}
+	sort.Slice(regions, func(i, j int) bool { return regions[i].ID < regions[j].ID })
 	return regions
 }
 
-// OrgsForRegions implements Store.
+// OrgsForRegions implements Store. Each org's Regions slice is
+// hydrated sorted ascending by region ID (matches Postgres SQL).
 func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -340,13 +419,7 @@ func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, 
 		if !match {
 			continue
 		}
-		regions := make([]Region, 0, len(orgRegionIDs))
-		for _, rid := range orgRegionIDs {
-			if r, ok := s.regionsByID[rid]; ok {
-				regions = append(regions, r)
-			}
-		}
-		org.Regions = regions
+		org.Regions = s.regionsForOrg(org.ID)
 		out = append(out, org)
 	}
 	return out, nil

@@ -49,17 +49,56 @@ abstraction to stay clean.
 ## Store abstraction
 
 `atlas.Store` ([`api/pkg/atlas/store.go`](../api/pkg/atlas/store.go))
-is the persistence seam. Six methods compose to satisfy every
-endpoint:
+is the persistence seam. Eight methods compose to satisfy every
+endpoint. `/lookup` and `/regions/{slug}` are not Store methods —
+they're orchestrators in `pkg/atlas` (`atlas.Lookup`,
+`atlas.GetRegion`) that compose the primitives below:
 
 | Method | Used by | Notes |
 |---|---|---|
-| `ResolveLeafRegion(country, postalCode)` | `/lookup` | Returns `ErrPostalCodeNotFound` for unknown codes. |
-| `AncestorRegions(leafID)` | `/lookup` | Walks the region DAG upward; dedupes diamonds. |
-| `OrgsForRegions(regionIDs)` | `/lookup` | Hydrates each org's full attachment list. |
-| `ListMetros()` | `/metros` | Metro-equivalent regions with ≥1 attached org; excludes national-tier. |
-| `GetMetro(slug)` | `/metros/{slug}` | Returns `(nil, nil)` for unknown or non-metro slugs. |
-| `ListRecent()` | `/recent` | Hardcoded cap of 10; excludes national-only orgs. |
+| `ResolveLeafRegion(country, postalCode)` | `/lookup` (via `atlas.Lookup`) | Returns `ErrPostalCodeNotFound` for unknown codes. |
+| `ResolveRegionBySlug(slug)` | `/regions/{slug}` (via `atlas.GetRegion`) | Entry point for the region-detail orchestrator. Returns `ErrRegionNotFound` for unknown slugs and for national-tier rows; the handler maps both to 404. |
+| `AncestorRegions(leafID)` | `/lookup`, `/regions/{slug}` | Walks the region DAG **upward** from the seed; dedupes diamonds; excludes national-tier from seed and recursion. |
+| `DescendantRegions(focusID)` | `/regions/{slug}` | Mirror of `AncestorRegions`: walks the DAG **downward** from the focus. Includes the focus at index 0; dedupes diamonds; excludes national-tier from seed and recursion. |
+| `OrgsForRegions(regionIDs)` | `/lookup`, `/regions/{slug}` | Hydrates each org's full attachment list (`Org.Regions` sorted ascending by region ID, `Org.CreatedAt` populated). |
+| `ListRegions()` | `/regions` | Regions in the default browse set (metros + cities, per `atlas.DefaultBrowseKinds`) with ≥1 attached org; walks the DAG **downward** from each match; excludes national-tier. Each summary carries `OrgCount` (descendant-walk) plus `DirectOrgCount` (no walk — used by the SPA's Browse totals to avoid double-counting orgs surfacing under both a metro and one of its child cities) and `BrowseParentSlug` — the SPA's grouping hook for nesting cities under their parent metro. The endpoint ships without filter parameters; the right axis (taxonomy via `kind`, DAG via `ancestor`, …) gets designed when a concrete browse UI use case appears. |
+| `GetOrgBySlug(slug)` | `/orgs/{slug}` | Returns `ErrOrgNotFound` for unknown or non-approved slugs. |
+| `ListRecent()` | `/recent` | Hardcoded cap of 10; excludes orgs whose only attachments are national-tier. |
+
+The `atlas.GetRegion` orchestrator composes
+`ResolveRegionBySlug` + `AncestorRegions` + `DescendantRegions` +
+`OrgsForRegions` to build the region-detail response: a
+**lookup-style scope** that walks both directions from the focus,
+then buckets orgs by attachment `scope_tier` via
+`atlas.BucketOrgsByScope` — same rule `/lookup` uses. Detail
+responses carry `local: LookupOrg[]`, `regional: LookupOrg[]`,
+`ancestry: Region[]` (closest-first, excludes self + national), and
+`descendant_region_names: map[string]string` (slug → display name for
+descendants the SPA needs labels for; excludes the focus and every
+ancestor since the SPA already has those names). Net effect:
+clicking SF from Browse returns the same set of advocates `/lookup`
+returns for an SF ZIP.
+
+`/lookup` and `/regions/{slug}` share rendering primitives (the
+Local/Regional bucketing) but walk the DAG differently:
+
+- **`/lookup`** is keyed by a postal code → leaf region. It walks
+  **upward** from the leaf (and only upward), so the result is
+  "orgs serving the resolved point." A Naperville ZIP correctly
+  excludes Chicago-city-only orgs because Chicago is a sibling
+  subtree, not an ancestor.
+- **`/regions/{slug}`** is keyed by a region slug. It walks
+  **both directions** from the focus, so the result is "orgs in
+  scope for this region as a unit." Browsing `/regions/chicago-metro`
+  pulls in Chicago city orgs (descendants), Chicagoland orgs
+  (ancestor), and orgs covering Illinois (ancestor too) — same set
+  Lookup would surface for any Chicago ZIP.
+
+The `/regions` list endpoint's `org_count` stays purely a
+downward-walk number — preserving the editorial differentiation
+between "Chicago Metro" (4) and "Chicago" (3) on the index. The
+expanded lookup-style scope only kicks in when a user lands on the
+detail page.
 
 Two implementations:
 
@@ -144,7 +183,7 @@ Current catalog:
 | Constant | URI | Emitted by |
 |---|---|---|
 | `problemValidation` | `…/problems/validation` | `/lookup` parameter errors |
-| `problemNotFound` | `…/problems/not-found` | `/lookup`, `/metros/{slug}` unknown ids |
+| `problemNotFound` | `…/problems/not-found` | `/lookup`, `/regions/{slug}`, `/orgs/{slug}` unknown ids |
 | `problemInternal` | `…/problems/internal` | recoverer middleware + store errors |
 | `problemUnauthorized` | `…/problems/unauthorized` | Phase 1 client-secret gate |
 
@@ -190,8 +229,8 @@ Collection responses additionally wrap their payload in a
 ```
 
 The wrapper helper is `respondCollection[T any](w, items)`. Use it
-from any list handler (`/metros`, `/recent`, future `/orgs`).
-Single-resource handlers (`/lookup`, `/metros/{slug}`) keep using
+from any list handler (`/regions`, `/recent`). Single-resource
+handlers (`/lookup`, `/regions/{slug}`, `/orgs/{slug}`) keep using
 `writeJSON(...)` directly — there's no useful meta to attach to a
 scalar response, and the headers already carry attribution.
 

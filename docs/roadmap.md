@@ -88,24 +88,103 @@ with a 30-day lifecycle), with the enablement steps documented at
 - **Browse + recent endpoints (slice #6):** `GET /api/v1/metros`,
   `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` — the backend
   half of the homepage Browse + Recently-added panels. The metro
-  set is named by a single `atlas.IsMetroKind` predicate (us:metro,
-  ca:cma, ca:regional-district, pt:area-metropolitana) so adding a
-  country's metro-equivalent is a one-line append. SQL walks the
-  region DAG downward via a recursive CTE — an org tagged only to
-  Brooklyn counts toward NYC metro — and `/recent` excludes orgs
+  set was named by a single `atlas.IsMetroKind` predicate (us:metro,
+  ca:cma, ca:regional-district, pt:area-metropolitana). SQL walks
+  the region DAG downward via a recursive CTE — an org tagged only
+  to Brooklyn counts toward NYC metro — and `/recent` excludes orgs
   whose only region attachments are `scope_tier='national'` (the
   slice-#4.6 filter, so MUBi-nacional stays out of the homepage
   strip). Handler-test coverage (httptest + MemStore) +
   testcontainers-backed integration tests against the production
   seed. See `docs/superpowers/specs/2026-05-18-browse-endpoints-design.md`.
-- **Browse + metro pages (slice #14):** `/browse` lists every metro
-  with org counts, ordered by org count desc + name asc tiebreak;
-  `/m/:metroSlug` reuses the classified-section layout from
-  `/r/:postalCode`. The homepage right-column asides ("Browse by
-  metro" / "Recently added") now render real data via `useQuery`
-  against `/api/v1/metros` and `/api/v1/recent` — no more "Coming
-  soon" placeholders. See
-  `docs/superpowers/specs/2026-05-18-browse-pages-design.md`.
+  *Superseded by the "Browse goes generic" slice (see below) — the
+  endpoint is now `/api/v1/regions`, but the descendant-walk +
+  national-filter semantics described here are unchanged.*
+
+- **Browse goes generic — `/api/v1/regions` + slug-based detail
+  (2026-05-26):** Browse went `/metros` → `/places` → `/regions` so
+  the endpoint name matches the underlying DAG. The list returns
+  the editorial default browse set (metros + cities, per
+  `atlas.DefaultBrowseKinds`) — no query parameters; the right
+  filter axis (taxonomy via `kind`, DAG via `ancestor`, …) stays
+  open until a concrete browse UI use case appears. The detail
+  endpoint resolves any non-national region — `/regions/cook-county`
+  (county), `/regions/chicagoland` (multi-state), `/regions/ny`
+  (state), `/regions/brooklyn` (borough) all return the region
+  plus its descendant orgs. National-tier slugs still 404. The
+  narrower `atlas.MetroKinds` predicate survives in
+  `metro_kinds.go` — `/lookup`'s `placeLabel` still uses it so a
+  Brooklyn ZIP renders "Brooklyn, NYC — New York Metro" rather
+  than picking the city as the broad ancestor. SPA route flipped
+  `/p/:placeSlug` → `/region/:regionSlug`; `Place.tsx` →
+  `Region.tsx`; the kind-label helper expanded to cover the
+  broader kinds the detail endpoint now resolves (State / County /
+  Borough / Multi-state region / etc.). The `/lookup` upward-walk
+  + scope-tier-partitioning semantics are deliberately unchanged —
+  a Naperville ZIP still excludes Chicago-city-only orgs because
+  they live in a sibling DAG subtree, not an ancestor.
+
+- **Region detail unifies with Lookup scope (2026-05-26):** The
+  remaining UX gap after the Browse nesting slice: clicking a city
+  from Browse returned only orgs literally tagged to that city's
+  slug, while a ZIP-lookup for the same area returned the city's
+  orgs PLUS the metro / state / multi-state ancestors' orgs. Users
+  hit a less-useful list on Browse than they did via Lookup. This
+  slice extracts a shared `pkg/atlas.BucketOrgsByScope` helper
+  used by both endpoints; `/lookup` keeps walking upward only
+  (its "I'm at this point" semantic) while `/regions/{slug}` now
+  walks both directions, builds an in-scope region set, and
+  buckets by attachment `scope_tier`. Result: `/regions/sf`
+  returns the same 3 local + 4 regional orgs `/lookup?postal_code=94110`
+  does. Wire-level: `RegionDetail` drops `orgs: Org[]`, adds
+  `local: LookupOrg[]` + `regional: LookupOrg[]` (each with
+  `matched_region_slugs`). New `DescendantRegions` SQL query
+  parallel to the existing `AncestorRegions`. SPA: `Region.tsx`
+  adopts `EntryList` (same component `Results.tsx` uses), so the
+  Browse → Region and Lookup → Region experiences render
+  identically below the kicker. The Browse list's `org_count`
+  stays at the downward-walk number — preserves the editorial
+  differentiation between cities and their parent metros on the
+  index.
+
+- **Browse nesting + region ancestry + Results/Region rendering
+  consolidation (2026-05-26):** Three UX gaps in one slice. (1) The
+  `/regions` list response now carries `browse_parent_slug` per row
+  (computed in `ListRegions` via a recursive CTE walking parents
+  upward to the nearest browseable-kind ancestor); the SPA's
+  `Browse.tsx` uses it to nest cities under their parent metro, so
+  "New York City" sits indented beneath "New York Metro" instead of
+  rendering as a side-by-side row that reads like a duplicate.
+  Same fix for "Chicago" under "Chicago Metro," "Toronto" under
+  "Toronto CMA," "Montréal" under "Montréal CMA," and the
+  Boston-area cities under "Greater Boston." (2) `RegionDetail`
+  gains `ancestry: Region[]` (closest-first walk excluding self +
+  national); a new shared `RegionBreadcrumb` component renders it
+  as a clickable kicker breadcrumb on the Region page —
+  `Atlas / Browse / NYC Tri-State / New York Metro / New York City
+  / Kings County / Brooklyn`. The `Results.tsx` (postal-code
+  lookup) page adopts the same `RegionBreadcrumb` from
+  `resolved_ancestry`, so the path-shape of the page reads
+  consistently with the Region detail page. (3) Both pages drop
+  their inline org-row + section duplicates and consume the shared
+  `Entry` / `EntryList` components (rewritten in this slice to use
+  the actual broadsheet CSS — they were orphan dead code before).
+  Dead `TagChip` component deleted. The narrower `metroKinds`
+  predicate and `/lookup`'s `placeLabel` semantics stay unchanged.
+
+- **Browse + region pages (slice #14):** `/browse` lists every
+  default-browse region (metros + cities, post-rename) with org
+  counts, ordered by org count desc + name asc tiebreak; the
+  detail page (now `/region/:regionSlug`) reuses the classified-
+  section layout from `/r/:postalCode`. The homepage right-column
+  asides ("Browse the atlas" / "Recently added") render real data
+  via `useQuery` against `/api/v1/regions` and `/api/v1/recent` —
+  no more "Coming soon" placeholders. See
+  `docs/superpowers/specs/2026-05-18-browse-pages-design.md` for
+  the original design; the Browse generic surface slice (above)
+  documents the later `/metros` → `/places` → `/regions` rename
+  and the broadening to surface cities as their own browseable
+  entries.
 - **About + 404 page (slice #15):** `/about` uses a single-column
   `.page` treatment with mission / methodology / criteria /
   acknowledgments copy linking to *Urbanist Lexicon* at
@@ -115,8 +194,8 @@ with a 30-day lifecycle), with the enablement steps documented at
 - **ODbL attribution in responses (slice #24):** every
   `/api/v1/**` success response now carries `X-Data-License:
   ODbL-1.0` and `X-Data-Attribution: https://urbanistatlas.com`;
-  collection responses (`/metros`, `/recent`) wrap their payload in
-  a `{ meta, data }` envelope where `meta` adds `license`,
+  collection responses (`/regions`, `/recent`) wrap their payload
+  in a `{ meta, data }` envelope where `meta` adds `license`,
   `attribution_url`, and `generated_at` (RFC3339 UTC, second
   precision). The `respondCollection[T]` helper in
   `api/internal/httpapi/odbl.go` is the in-tree wrapping point; an
@@ -175,6 +254,25 @@ with a 30-day lifecycle), with the enablement steps documented at
   with dormant or out-of-scope candidates. Final tally: 23 net-new
   orgs (orgs.toml grows from 111 → 134). Design spec gate language
   updated in the same spec.
+- **Org-seed broadening / geographic reach (slice #7.8):** Extended
+  the canvas beyond v1 launch floors. New gates: **top-31–50 US
+  metro gate** (≥1), **CA CMA #6–10 gate** (≥1), **big-state depth**
+  (CA/NY/TX to ≥3, FL/PA/MI to ≥2 where genuinely-distinct
+  candidates exist), and a **city-leaf canvas** (Madison, Boise,
+  Anchorage, Ann Arbor, Boulder, New Haven, Tucson, Albany NY,
+  Spokane, Tallahassee, Charleston SC, Grand Rapids, Fresno,
+  Albuquerque, plus Halifax + Mississauga as CA bonuses). City-leaf
+  orgs anchor at existing MSA slugs (city dominates MSA) — no
+  region-tree changes. Albuquerque is covered by multi-anchoring the
+  pre-existing BikeABQ entry at [albuquerque-nm-metro, nm] per the
+  Street Trust precedent, rather than adding a new city-leaf row.
+  Final tally: +73 net-new orgs (orgs.toml grows from 130 → 203)
+  plus 3 top-31–50 metro gaps (Jacksonville, Oklahoma City,
+  Birmingham) and 8 city-leaf gaps documented inline.
+  New precedents: university-housed advocacy programs and state-
+  org sub-committees are not separately admitted (extends the slice
+  7.7 chapter/affiliate rule). Design spec:
+  [`docs/superpowers/specs/2026-05-22-org-seed-broadening-design.md`](./superpowers/specs/2026-05-22-org-seed-broadening-design.md).
 - **X-Atlas-Client shared-secret gate (slice #23):**
   `api/internal/httpapi/clientsecret.go` middleware checks
   `X-Atlas-Client` against `URBANIST_CLIENT_SECRET` via
@@ -258,8 +356,9 @@ with a 30-day lifecycle), with the enablement steps documented at
   `httptest`-based handler coverage via the `newTestServer(t)`
   helper in `api/internal/httpapi/lookup_test.go:19-31` (a
   MemStore + `httptest` pattern reused across the package).
-  Sibling files: `api/internal/httpapi/metros_test.go` (detail
-  handler patterns at 78-143) and `recent_test.go` — including
+  Sibling files: `api/internal/httpapi/regions_test.go` (detail
+  handler patterns + non-national slug resolution coverage) and
+  `recent_test.go` — including
   `TestListRecent_ExcludesNationalTier` at lines 62-90, which
   pins the slice-#4.6 national-tier filter. Submissions + admin
   half of #7 stays deferred to Phase 2 alongside #5 / #13 / #16.
@@ -360,7 +459,6 @@ execution against live infra; ⏳ = not yet started.
 
 Not blocking launch:
 
-- Org detail pages (`/orgs/{slug}`)
 - Email/Slack notifications on new submissions
 - Multi-moderator auth (replaces the v1 shared bearer token)
 - Map view
@@ -376,3 +474,36 @@ Not blocking launch:
   review locally in the meantime (see
   [`CONTRIBUTING.md`](../CONTRIBUTING.md#full-stack-pr-review)).
   Promote when full-stack PR volume justifies the extra machine.
+- **Browse filter — pick the axis when a use case appears.** The
+  list endpoint ships without query parameters today. Two axes are
+  in the design space when a concrete UI need arrives:
+  - **Taxonomy filter** (`?kind=us:state,us:multi-state`) — easy
+    to wire but binds the editorial kind vocabulary to the wire
+    contract (rename a kind, break the client).
+  - **DAG filter** (`?ancestor=<slug>`) — uses slugs (stable
+    identifiers) and matches the mental model "show me everything
+    under California." Costs an upward CTE in the SQL.
+
+  When a real Browse UI need shows up (segmented control,
+  state-level page, "everything in this region" view, etc.), pick
+  the axis that fits the actual use case rather than shipping a
+  speculative filter. Until then, the default browse set + the
+  detail endpoint's slug-based resolution covers the directory.
+  Resolving `national`-tier slugs is a separate deferred decision
+  about national-org browse experience.
+- **`loaddata --prune` flag** — `seed.LoadFile` is upsert-only:
+  removing an `[[org]]` block from `orgs.toml` does NOT delete the
+  corresponding row in production (the slug just stops being touched).
+  Surfaced 2026-05-23 during the pre-launch URL audit when STAR
+  (`sacramento-transit-advocates-and-riders`) had to be dropped after
+  its domain got hijacked — required a manual `DELETE FROM
+  organizations WHERE slug=...` against the prod DB on top of
+  `just fly-loaddata`. The slice: add an opt-in `--prune` flag to
+  the `loaddata` subcommand that deletes any org whose slug isn't in
+  the loaded file, inside the same transaction; default off so a
+  malformed file can't wipe prod data. FK cascades
+  (`organization_regions ON DELETE CASCADE`,
+  `submissions.promoted_org_id ON DELETE SET NULL`) make the DELETE
+  safe. Forward the flag through `just fly-loaddata` and document the
+  workflow in `docs/deploy.md`. Small, single-package change
+  (`api/internal/loaddata/`).

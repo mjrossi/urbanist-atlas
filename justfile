@@ -92,6 +92,13 @@ api-sqlc-gen:
 api-oapi-gen:
     cd api && mise exec -- go generate ./...
 
+# run the link checker over the seed orgs, write to /tmp/links.tsv
+[group('api')]
+[doc('check website_url for every seed org and write a TSV report')]
+linkcheck:
+    cd api && go run ./cmd/server linkcheck --src ./seed/orgs.toml --out /tmp/links.tsv
+    @echo "report: /tmp/links.tsv"
+
 # run the postgres-backed integration tests under the `integration`
 # build tag (requires Docker). Cheap default test suite stays
 # tag-free so `just api-test` keeps running on machines without
@@ -474,13 +481,13 @@ smoke secret='' host='qa-api.urbanistatlas.com':
     # /lookup is a single-resource endpoint; the {meta, data} envelope
     # only wraps collection responses (per the slice #24 ODbL design,
     # see docs/api-architecture.md § Response envelope). Check meta on
-    # /metros, which is a collection endpoint.
-    echo "→ GET $BASE/api/v1/metros (collection meta envelope)"
+    # /regions, which is a collection endpoint.
+    echo "→ GET $BASE/api/v1/regions (collection meta envelope)"
     headers=$(mktemp)
     body=$(mktemp)
     code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
         -H "X-Atlas-Client: $SECRET" \
-        "$BASE/api/v1/metros")
+        "$BASE/api/v1/regions")
     if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
     if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
     if ! jq -e '.meta.license and .meta.attribution_url and .meta.generated_at' "$body" >/dev/null; then echo "  FAIL: meta envelope missing license/attribution_url/generated_at"; fail=1; else echo "  OK meta envelope"; fi

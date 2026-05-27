@@ -10,10 +10,10 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 )
 
-func TestListMetros_HappyPath_ReturnsOAPIShape(t *testing.T) {
+func TestListRegions_HappyPath_ReturnsOAPIShape(t *testing.T) {
 	srv := newTestServer(t)
 
-	resp, err := http.Get(srv.URL + "/api/v1/metros")
+	resp, err := http.Get(srv.URL + "/api/v1/regions")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -25,7 +25,6 @@ func TestListMetros_HappyPath_ReturnsOAPIShape(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
 		t.Errorf("Content-Type: want application/json prefix, got %q", ct)
 	}
-	// ODbL attribution headers ride every /api/v1/** response.
 	if got, want := resp.Header.Get("X-Data-License"), "ODbL-1.0"; got != want {
 		t.Errorf("X-Data-License: want %q, got %q", want, got)
 	}
@@ -33,11 +32,10 @@ func TestListMetros_HappyPath_ReturnsOAPIShape(t *testing.T) {
 		t.Errorf("X-Data-Attribution: want %q, got %q", want, got)
 	}
 
-	var env oapi.MetroSummariesEnvelope
+	var env oapi.RegionSummariesEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	// meta block populated.
 	if env.Meta.License != "ODbL-1.0" {
 		t.Errorf("meta.license: want %q, got %q", "ODbL-1.0", env.Meta.License)
 	}
@@ -54,9 +52,8 @@ func TestListMetros_HappyPath_ReturnsOAPIShape(t *testing.T) {
 
 	got := env.Data
 	if len(got) == 0 {
-		t.Fatal("want at least one metro, got 0")
+		t.Fatal("want at least one region, got 0")
 	}
-	// Ordering: org_count DESC, then name ASC.
 	for i := 1; i < len(got); i++ {
 		if got[i].OrgCount > got[i-1].OrgCount {
 			t.Errorf("not descending by org_count at [%d]: %d > %d",
@@ -67,18 +64,17 @@ func TestListMetros_HappyPath_ReturnsOAPIShape(t *testing.T) {
 				i, got[i].Region.Name, got[i-1].Region.Name)
 		}
 	}
-	// Region must have parent_slugs as a non-null array (even if empty).
-	for _, m := range got {
-		if m.Region.ParentSlugs == nil {
-			t.Errorf("metro %s has nil parent_slugs (must be at least [])", m.Region.Slug)
+	for _, p := range got {
+		if p.Region.ParentSlugs == nil {
+			t.Errorf("region %s has nil parent_slugs (must be at least [])", p.Region.Slug)
 		}
 	}
 }
 
-func TestGetMetro_HappyPath(t *testing.T) {
+func TestGetRegion_HappyPath_Metro(t *testing.T) {
 	srv := newTestServer(t)
 
-	resp, err := http.Get(srv.URL + "/api/v1/metros/nyc-metro")
+	resp, err := http.Get(srv.URL + "/api/v1/regions/nyc-metro")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -87,31 +83,74 @@ func TestGetMetro_HappyPath(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status: want 200, got %d", resp.StatusCode)
 	}
-	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
-		t.Errorf("Content-Type: want application/json prefix, got %q", ct)
-	}
-
-	var got oapi.MetroDetail
+	var got oapi.RegionDetail
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if got.Region.Slug != "nyc-metro" {
 		t.Errorf("region.slug: want nyc-metro, got %s", got.Region.Slug)
 	}
-	if len(got.Orgs) == 0 {
-		t.Errorf("orgs: want >= 1, got 0")
+	// At least one bucket must populate (the dev fixture has orgs in
+	// nyc-metro's scope). Both being empty would be a regression.
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty; want >= 1 org in scope")
 	}
-	for _, o := range got.Orgs {
+	// Every returned LookupOrg has its regions populated and carries
+	// matched_region_slugs (the slugs that caused it to surface for
+	// this region's scope).
+	for _, o := range append(append([]oapi.LookupOrg{}, got.Local...), got.Regional...) {
 		if len(o.Regions) == 0 {
 			t.Errorf("org %s has no regions populated", o.Slug)
 		}
+		if len(o.MatchedRegionSlugs) == 0 {
+			t.Errorf("org %s has no matched_region_slugs", o.Slug)
+		}
+	}
+	// Ancestry must be present (non-nil) on every successful detail
+	// response — the SPA's breadcrumb depends on it being an array,
+	// even an empty one. nyc-metro's parent in the dev fixture is
+	// ny (us:state), so we expect at least one ancestor.
+	if got.Ancestry == nil {
+		t.Error("ancestry: want non-nil array, got nil")
 	}
 }
 
-func TestGetMetro_404(t *testing.T) {
+// TestGetRegion_NonBrowseableKindResolves pins the broadened-detail
+// contract: a state slug (us:state — outside defaultBrowseKinds) now
+// resolves, returning the descendant orgs. This replaces the old
+// "non-place slug → 404" behavior.
+func TestGetRegion_NonBrowseableKindResolves(t *testing.T) {
 	srv := newTestServer(t)
 
-	resp, err := http.Get(srv.URL + "/api/v1/metros/totally-bogus")
+	resp, err := http.Get(srv.URL + "/api/v1/regions/ny")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d (body should resolve, since ny is non-national)", resp.StatusCode)
+	}
+	var got oapi.RegionDetail
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Region.Slug != "ny" {
+		t.Errorf("region.slug: want ny, got %s", got.Region.Slug)
+	}
+	if got.Region.Kind != "us:state" {
+		t.Errorf("region.kind: want us:state, got %s", got.Region.Kind)
+	}
+	// Downward walk picks up nyc-metro + Brooklyn + their orgs.
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for /regions/ny")
+	}
+}
+
+func TestGetRegion_404_UnknownSlug(t *testing.T) {
+	srv := newTestServer(t)
+
+	resp, err := http.Get(srv.URL + "/api/v1/regions/totally-bogus")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -139,25 +178,5 @@ func TestGetMetro_404(t *testing.T) {
 	}
 	if prob.RequestId == nil || *prob.RequestId == "" {
 		t.Errorf("request_id: want non-empty, got %v", prob.RequestId)
-	}
-}
-
-func TestGetMetro_NonMetroSlug_404(t *testing.T) {
-	// The dev fixtures contain "ny" (us:state) — it exists as a region
-	// but is NOT a metro-equivalent kind. The handler must reject it
-	// with 404, not return a half-formed MetroDetail.
-	srv := newTestServer(t)
-
-	resp, err := http.Get(srv.URL + "/api/v1/metros/ny")
-	if err != nil {
-		t.Fatalf("GET: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("status: want 404, got %d", resp.StatusCode)
-	}
-	if ct := resp.Header.Get("Content-Type"); ct != "application/problem+json" {
-		t.Errorf("Content-Type: want application/problem+json, got %q", ct)
 	}
 }

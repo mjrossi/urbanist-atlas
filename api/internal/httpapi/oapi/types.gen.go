@@ -124,41 +124,6 @@ type Meta struct {
 	License string `json:"license"`
 }
 
-// MetroDetail A metro region with the approved organizations that serve it.
-type MetroDetail struct {
-	Orgs []Org `json:"orgs"`
-
-	// Region A geographic unit an organization can serve. Regions form a
-	// directed acyclic graph; `parent_slugs` lists the direct parents
-	// (not transitive). Empty for top-of-hierarchy regions (states,
-	// multi-state regions, transit federations).
-	Region Region `json:"region"`
-}
-
-// MetroSummariesEnvelope Collection envelope for `GET /api/v1/metros`. Wraps the
-// metro list in a `meta` + `data` shape so every list
-// response carries the ODbL attribution alongside its
-// payload, even when transport-level headers are stripped.
-type MetroSummariesEnvelope struct {
-	Data []MetroSummary `json:"data"`
-
-	// Meta Attribution block included on every collection response.
-	// Carries the ODbL license obligation in-band so consumers
-	// that strip headers still see the share-alike requirement.
-	Meta Meta `json:"meta"`
-}
-
-// MetroSummary A metro region plus its approved-org count, for the browse-by-metro panel.
-type MetroSummary struct {
-	OrgCount int32 `json:"org_count"`
-
-	// Region A geographic unit an organization can serve. Regions form a
-	// directed acyclic graph; `parent_slugs` lists the direct parents
-	// (not transitive). Empty for top-of-hierarchy regions (states,
-	// multi-state regions, transit federations).
-	Region Region `json:"region"`
-}
-
 // NewSubmissionRequest Request body for `POST /api/v1/submissions`.
 type NewSubmissionRequest struct {
 	// Payload The proposed organization, as submitted by a member of the public.
@@ -256,7 +221,7 @@ type ProblemDetails struct {
 }
 
 // RecentEnvelope Collection envelope for `GET /api/v1/recent`. Same shape
-// contract as `MetroSummariesEnvelope`.
+// contract as `RegionSummariesEnvelope`.
 type RecentEnvelope struct {
 	Data []Org `json:"data"`
 
@@ -316,6 +281,73 @@ type Region struct {
 	Slug string `json:"slug"`
 }
 
+// RegionDetail A region (any non-national kind) with the organizations
+// in scope for it, bucketed by attachment tier. "In scope"
+// means orgs attached to the region itself, any descendant
+// in the DAG (so a metro surfaces its constituent cities'
+// orgs), or any ancestor (so a city surfaces the orgs
+// covering its parent metro / state / multi-state region).
+//
+// This makes `/regions/{slug}` answer the same question
+// `/lookup` answers for a postal code: "every advocate
+// someone navigating to this region might care about."
+// Orgs are bucketed by the `scope_tier` of the attachment
+// region they matched on — `local` for city/county-tier
+// attachments, `regional` for metro/state/multi-state. The
+// rule mirrors `/lookup`'s; `national`-tier attachments are
+// always filtered.
+//
+// Each `LookupOrg.matched_region_slugs` names the
+// attachment regions in scope that caused the org to
+// surface — useful for "matched via X" affordances in
+// clients.
+//
+// The `ancestry` array is the upward walk from this region
+// to the root (closest-first, excluding self and any
+// `scope_tier='national'` rows). Clients use it to render
+// breadcrumbs.
+//
+// `descendant_region_names` is a slug → display-name map for
+// every descendant region (city, borough, county, …) that an
+// org in `local` or `regional` references via
+// `matched_region_slugs`. Lets clients render
+// "Matched via Brooklyn" instead of the raw slug
+// "matched via brooklyn-ny" without a second request. The
+// focus region's own slug and ancestry slugs are NOT included
+// (clients seed those from `region` + `ancestry`). Empty
+// object (`{}`) when no descendants need resolving.
+type RegionDetail struct {
+	// Ancestry Ancestors of `region`, ordered closest-first (the
+	// region's direct parent at index 0, then the
+	// grandparent, … up to the root). Excludes the region
+	// itself and any `scope_tier='national'` rows.
+	Ancestry []Region `json:"ancestry"`
+
+	// DescendantRegionNames Slug → display-name lookup for descendant regions
+	// referenced by `matched_region_slugs` in `local` or
+	// `regional`. Excludes the focus region and its
+	// ancestors (clients seed those from `region` and
+	// `ancestry`). Empty object when no descendants need
+	// resolving.
+	DescendantRegionNames map[string]string `json:"descendant_region_names"`
+
+	// Local Orgs in scope with at least one matched attachment
+	// region of `scope_tier='local'` (cities, counties,
+	// boroughs).
+	Local []LookupOrg `json:"local"`
+
+	// Region A geographic unit an organization can serve. Regions form a
+	// directed acyclic graph; `parent_slugs` lists the direct parents
+	// (not transitive). Empty for top-of-hierarchy regions (states,
+	// multi-state regions, transit federations).
+	Region Region `json:"region"`
+
+	// Regional Orgs in scope whose only matched attachment regions
+	// are `scope_tier='regional'` (metros, states,
+	// provinces, multi-state coalitions).
+	Regional []LookupOrg `json:"regional"`
+}
+
 // RegionKind Free-form taxonomy for region granularity. The recommended
 // vocabulary uses country-prefixed values: `us:city`, `us:borough`,
 // `us:county`, `us:metro`, `us:state`, `us:multi-state`,
@@ -328,6 +360,59 @@ type Region struct {
 // `fr:region`, `fr:metropole`. Clients should treat unknown kinds
 // gracefully (e.g. fall back to displaying `name`).
 type RegionKind = string
+
+// RegionSummariesEnvelope Collection envelope for `GET /api/v1/regions`. Wraps the
+// region list in a `meta` + `data` shape so every list
+// response carries the ODbL attribution alongside its
+// payload, even when transport-level headers are stripped.
+type RegionSummariesEnvelope struct {
+	Data []RegionSummary `json:"data"`
+
+	// Meta Attribution block included on every collection response.
+	// Carries the ODbL license obligation in-band so consumers
+	// that strip headers still see the share-alike requirement.
+	Meta Meta `json:"meta"`
+}
+
+// RegionSummary A region (any non-national kind) plus its approved-org counts.
+// Used by `GET /api/v1/regions` to populate the Browse index.
+//
+// Two counts are exposed:
+//
+//   - `org_count` — distinct approved orgs attached to this region
+//     OR any descendant in the DAG. Best for per-row "how much
+//     coverage does this region have" displays (a metro's count
+//     shows orgs from the metro + every city/borough/county
+//     under it).
+//   - `direct_org_count` — distinct approved orgs attached
+//     DIRECTLY to this region (no descendant walk). Use this when
+//     summing across rows in a country/page total: summing
+//     `org_count` double-counts orgs that surface under both a
+//     metro and one of its child cities.
+type RegionSummary struct {
+	// BrowseParentSlug For cities, the slug of the nearest ancestor in the
+	// default browse set (a metro / CMA / regional-district).
+	// Lets clients group cities visually under their parent
+	// metro without a second request. Null for metros and for
+	// standalone cities whose walk doesn't reach a browseable
+	// ancestor.
+	BrowseParentSlug *string `json:"browse_parent_slug,omitempty"`
+
+	// DirectOrgCount Distinct approved orgs attached DIRECTLY to this region
+	// (no descendant walk). Sums across rows yield a deduped
+	// total.
+	DirectOrgCount int32 `json:"direct_org_count"`
+
+	// OrgCount Distinct approved orgs attached to this region OR any
+	// descendant in the region DAG.
+	OrgCount int32 `json:"org_count"`
+
+	// Region A geographic unit an organization can serve. Regions form a
+	// directed acyclic graph; `parent_slugs` lists the direct parents
+	// (not transitive). Empty for top-of-hierarchy regions (states,
+	// multi-state regions, transit federations).
+	Region Region `json:"region"`
+}
 
 // RejectSubmissionRequest Request body for `POST /api/v1/admin/submissions/{id}/reject`.
 type RejectSubmissionRequest struct {
@@ -399,11 +484,11 @@ type SubmissionStatus string
 // changes as data is loaded.
 type CountryQuery = Country
 
-// MetroSlug defines model for MetroSlug.
-type MetroSlug = string
-
 // PostalCodeQuery defines model for PostalCodeQuery.
 type PostalCodeQuery = string
+
+// RegionSlug defines model for RegionSlug.
+type RegionSlug = string
 
 // SubmissionID defines model for SubmissionID.
 type SubmissionID = int64

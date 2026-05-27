@@ -76,7 +76,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/metros": {
+    "/api/v1/regions": {
         parameters: {
             query?: never;
             header?: never;
@@ -84,14 +84,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List metros with approved organization counts.
-         * @description Feeds the "Browse by metro" panel on the home page. Returns
-         *     every region whose kind is metro-equivalent (`us:metro`,
-         *     `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`, and
-         *     future country-prefixed equivalents) that has at least one
-         *     approved organization tagged to it, with a count.
+         * List regions with approved organization counts.
+         * @description Feeds the "Browse" panel on the home page. Returns the
+         *     editorial default browse set — metros and cities — with at
+         *     least one approved organization tagged to them directly or
+         *     via the region DAG, plus an org count for each.
+         *
+         *     The region graph models global civic geography as a DAG —
+         *     cities under metros, metros under multi-state regions, all
+         *     of them with state/province edges where they apply. A
+         *     ZIP-level lookup walks the graph **upward** (and partitions
+         *     by scope_tier); this endpoint walks **downward** from each
+         *     included region, so a metro's count includes orgs tagged to
+         *     its constituent cities and boroughs. "Chicago Metro" and
+         *     "Chicago" both appear, with the metro count strictly ≥ the
+         *     city count.
+         *
+         *     `scope_tier='national'` regions are always excluded (the v1
+         *     editorial decision; revisit when a national browse experience
+         *     ships). The list endpoint deliberately ships without filter
+         *     parameters; the right filter axis (taxonomy via `kind`, DAG
+         *     via `ancestor`, etc.) will be designed when a concrete browse
+         *     UI use case appears.
          */
-        get: operations["listMetros"];
+        get: operations["listRegions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -100,15 +116,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/metros/{slug}": {
+    "/api/v1/regions/{slug}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List approved organizations in a single metro. */
-        get: operations["getMetro"];
+        /**
+         * Get a single region and the organizations that serve it.
+         * @description Resolves any non-national region in the graph by slug — metros,
+         *     cities, counties, boroughs, states/provinces, multi-state
+         *     coalitions. Returns a `RegionDetail` with the focus region plus
+         *     the orgs in scope for it, bucketed into `local` and `regional`
+         *     by the `scope_tier` of each org's matched attachment region —
+         *     the same rule `/lookup` uses, extended to walk BOTH ancestors
+         *     AND descendants of the focus (a Brooklyn page surfaces orgs
+         *     tagged to Brooklyn, NYC Metro, NY, and the tri-state region,
+         *     all bucketed by tier). `scope_tier='national'` slugs return
+         *     404 (same v1 editorial gate as `/lookup` and the list
+         *     endpoint).
+         *
+         *     `ancestry` carries the upward walk for breadcrumbs.
+         *     `descendant_region_names` is a slug → display-name map
+         *     covering every descendant region referenced by an org's
+         *     `matched_region_slugs`, so clients can render
+         *     "Matched via Brooklyn" instead of "matched via brooklyn-ny"
+         *     without a second request.
+         */
+        get: operations["getRegion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a single organization by slug.
+         * @description Returns the addressable detail view for one approved organization.
+         *     The body is a bare `Org` — no `{meta, data}` envelope, since
+         *     this is a single-object response; ODbL attribution travels via
+         *     the `X-Data-License` and `X-Data-Attribution` response headers.
+         */
+        get: operations["getOrg"];
         put?: never;
         post?: never;
         delete?: never;
@@ -396,30 +455,136 @@ export interface components {
             local: components["schemas"]["LookupOrg"][];
             regional: components["schemas"]["LookupOrg"][];
         };
-        /** @description A metro region plus its approved-org count, for the browse-by-metro panel. */
-        MetroSummary: {
+        /**
+         * @description A region (any non-national kind) plus its approved-org counts.
+         *     Used by `GET /api/v1/regions` to populate the Browse index.
+         *
+         *     Two counts are exposed:
+         *
+         *     * `org_count` — distinct approved orgs attached to this region
+         *       OR any descendant in the DAG. Best for per-row "how much
+         *       coverage does this region have" displays (a metro's count
+         *       shows orgs from the metro + every city/borough/county
+         *       under it).
+         *     * `direct_org_count` — distinct approved orgs attached
+         *       DIRECTLY to this region (no descendant walk). Use this when
+         *       summing across rows in a country/page total: summing
+         *       `org_count` double-counts orgs that surface under both a
+         *       metro and one of its child cities.
+         */
+        RegionSummary: {
             region: components["schemas"]["Region"];
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Distinct approved orgs attached to this region OR any
+             *     descendant in the region DAG.
+             */
             org_count: number;
-        };
-        /** @description A metro region with the approved organizations that serve it. */
-        MetroDetail: {
-            region: components["schemas"]["Region"];
-            orgs: components["schemas"]["Org"][];
+            /**
+             * Format: int32
+             * @description Distinct approved orgs attached DIRECTLY to this region
+             *     (no descendant walk). Sums across rows yield a deduped
+             *     total.
+             */
+            direct_org_count: number;
+            /**
+             * @description For cities, the slug of the nearest ancestor in the
+             *     default browse set (a metro / CMA / regional-district).
+             *     Lets clients group cities visually under their parent
+             *     metro without a second request. Null for metros and for
+             *     standalone cities whose walk doesn't reach a browseable
+             *     ancestor.
+             * @example chicago-metro
+             */
+            browse_parent_slug?: string | null;
         };
         /**
-         * @description Collection envelope for `GET /api/v1/metros`. Wraps the
-         *     metro list in a `meta` + `data` shape so every list
+         * @description A region (any non-national kind) with the organizations
+         *     in scope for it, bucketed by attachment tier. "In scope"
+         *     means orgs attached to the region itself, any descendant
+         *     in the DAG (so a metro surfaces its constituent cities'
+         *     orgs), or any ancestor (so a city surfaces the orgs
+         *     covering its parent metro / state / multi-state region).
+         *
+         *     This makes `/regions/{slug}` answer the same question
+         *     `/lookup` answers for a postal code: "every advocate
+         *     someone navigating to this region might care about."
+         *     Orgs are bucketed by the `scope_tier` of the attachment
+         *     region they matched on — `local` for city/county-tier
+         *     attachments, `regional` for metro/state/multi-state. The
+         *     rule mirrors `/lookup`'s; `national`-tier attachments are
+         *     always filtered.
+         *
+         *     Each `LookupOrg.matched_region_slugs` names the
+         *     attachment regions in scope that caused the org to
+         *     surface — useful for "matched via X" affordances in
+         *     clients.
+         *
+         *     The `ancestry` array is the upward walk from this region
+         *     to the root (closest-first, excluding self and any
+         *     `scope_tier='national'` rows). Clients use it to render
+         *     breadcrumbs.
+         *
+         *     `descendant_region_names` is a slug → display-name map for
+         *     every descendant region (city, borough, county, …) that an
+         *     org in `local` or `regional` references via
+         *     `matched_region_slugs`. Lets clients render
+         *     "Matched via Brooklyn" instead of the raw slug
+         *     "matched via brooklyn-ny" without a second request. The
+         *     focus region's own slug and ancestry slugs are NOT included
+         *     (clients seed those from `region` + `ancestry`). Empty
+         *     object (`{}`) when no descendants need resolving.
+         */
+        RegionDetail: {
+            region: components["schemas"]["Region"];
+            /**
+             * @description Orgs in scope with at least one matched attachment
+             *     region of `scope_tier='local'` (cities, counties,
+             *     boroughs).
+             */
+            local: components["schemas"]["LookupOrg"][];
+            /**
+             * @description Orgs in scope whose only matched attachment regions
+             *     are `scope_tier='regional'` (metros, states,
+             *     provinces, multi-state coalitions).
+             */
+            regional: components["schemas"]["LookupOrg"][];
+            /**
+             * @description Ancestors of `region`, ordered closest-first (the
+             *     region's direct parent at index 0, then the
+             *     grandparent, … up to the root). Excludes the region
+             *     itself and any `scope_tier='national'` rows.
+             */
+            ancestry: components["schemas"]["Region"][];
+            /**
+             * @description Slug → display-name lookup for descendant regions
+             *     referenced by `matched_region_slugs` in `local` or
+             *     `regional`. Excludes the focus region and its
+             *     ancestors (clients seed those from `region` and
+             *     `ancestry`). Empty object when no descendants need
+             *     resolving.
+             * @example {
+             *       "brooklyn-ny": "Brooklyn",
+             *       "kings-county-ny": "Kings County, NY"
+             *     }
+             */
+            descendant_region_names: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * @description Collection envelope for `GET /api/v1/regions`. Wraps the
+         *     region list in a `meta` + `data` shape so every list
          *     response carries the ODbL attribution alongside its
          *     payload, even when transport-level headers are stripped.
          */
-        MetroSummariesEnvelope: {
+        RegionSummariesEnvelope: {
             meta: components["schemas"]["Meta"];
-            data: components["schemas"]["MetroSummary"][];
+            data: components["schemas"]["RegionSummary"][];
         };
         /**
          * @description Collection envelope for `GET /api/v1/recent`. Same shape
-         *     contract as `MetroSummariesEnvelope`.
+         *     contract as `RegionSummariesEnvelope`.
          */
         RecentEnvelope: {
             meta: components["schemas"]["Meta"];
@@ -647,8 +812,13 @@ export interface components {
         PostalCodeQuery: string;
         /** @description ISO-style country code. Case-insensitive. */
         CountryQuery: components["schemas"]["Country"];
-        /** @description The metro region's slug (e.g. `nyc-metro`). */
-        MetroSlug: string;
+        /**
+         * @description Any non-national region's slug. Examples: `nyc-metro` (metro),
+         *     `chicago` (city), `cook-county` (county), `chicagoland`
+         *     (multi-state region), `ny` (state), `toronto-cma`
+         *     (Canadian CMA), `metro-vancouver` (regional district).
+         */
+        RegionSlug: string;
         /** @description The submission's numeric ID. */
         SubmissionID: number;
     };
@@ -744,7 +914,7 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    listMetros: {
+    listRegions: {
         parameters: {
             query?: never;
             header?: never;
@@ -754,9 +924,9 @@ export interface operations {
         requestBody?: never;
         responses: {
             /**
-             * @description Metros with counts, ordered by org count descending.
-             *     Wrapped in a `{ meta, data }` envelope; the
-             *     `MetroSummary[]` lives at `data`.
+             * @description Regions with counts, ordered by org count descending then
+             *     name ascending. Wrapped in a `{ meta, data }` envelope;
+             *     the `RegionSummary[]` lives at `data`.
              */
             200: {
                 headers: {
@@ -765,26 +935,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MetroSummariesEnvelope"];
+                    "application/json": components["schemas"]["RegionSummariesEnvelope"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
-    getMetro: {
+    getRegion: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The metro region's slug (e.g. `nyc-metro`). */
-                slug: components["parameters"]["MetroSlug"];
+                /**
+                 * @description Any non-national region's slug. Examples: `nyc-metro` (metro),
+                 *     `chicago` (city), `cook-county` (county), `chicagoland`
+                 *     (multi-state region), `ny` (state), `toronto-cma`
+                 *     (Canadian CMA), `metro-vancouver` (regional district).
+                 */
+                slug: components["parameters"]["RegionSlug"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The metro region and its organizations. */
+            /** @description The region and its descendant organizations. */
             200: {
                 headers: {
                     "X-Data-License": components["headers"]["XDataLicense"];
@@ -792,7 +967,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MetroDetail"];
+                    "application/json": components["schemas"]["RegionDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example transportation-alternatives */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The organization, with every region it serves denormalized at `regions`. */
+            200: {
+                headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Org"];
                 };
             };
             401: components["responses"]["Unauthorized"];

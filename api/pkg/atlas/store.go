@@ -11,12 +11,36 @@ import (
 // a nearby code or a submission.
 var ErrPostalCodeNotFound = errors.New("atlas: postal code not found")
 
+// ErrOrgNotFound is returned by Store.GetOrgBySlug when no approved org
+// matches the slug. The HTTP layer maps this to a 404 problem document.
+var ErrOrgNotFound = errors.New("atlas: organization not found")
+
+// ErrRegionNotFound is returned by Store.ResolveRegionBySlug when no
+// row matches the slug OR the row names a scope_tier='national' region
+// (the v1 editorial gate keeps national-tier content out of browse
+// contexts). The HTTP layer maps both to 404 — the wire contract makes
+// no distinction between "unknown" and "national".
+var ErrRegionNotFound = errors.New("atlas: region not found")
+
 // Store is the persistence seam between pkg/atlas and the rest of the
-// system. Three operations compose to satisfy Lookup; Postgres-backed
-// implementations can optimize internally (e.g. fold AncestorRegions
-// + OrgsForRegions into a single CTE) without changing the contract.
+// system. Higher-level orchestrators in pkg/atlas (Lookup, GetRegion)
+// compose Store primitives; implementations stay free of business
+// logic. The package-level storetest harness exercises every contract
+// below against both MemStore and the Postgres adapter so the two
+// can't drift quietly.
 //
 // All implementations must be safe for concurrent use.
+//
+// # Behavioral contracts (enforced by storetest)
+//
+//   - AncestorRegions and DescendantRegions exclude scope_tier='national'
+//     rows from both the seed and the recursion.
+//   - ResolveRegionBySlug returns ErrRegionNotFound for unknown slugs
+//     and for slugs that name a national-tier region.
+//   - OrgsForRegions hydrates Org.Regions sorted ascending by region ID
+//     and populates Org.CreatedAt when the row carries one.
+//   - ListRegions' nearest-browseable-ancestor walk resolves ties
+//     (multiple browseable parents at min depth) by slug ASC.
 type Store interface {
 	// ResolveLeafRegion returns the leaf region a postal code points at.
 	// The code argument should be the user's raw input; implementations
@@ -24,30 +48,56 @@ type Store interface {
 	// ErrPostalCodeNotFound if no match exists.
 	ResolveLeafRegion(ctx context.Context, country Country, postalCode string) (Region, error)
 
+	// ResolveRegionBySlug returns the region identified by slug.
+	// Returns ErrRegionNotFound for unknown slugs and for national-tier
+	// rows. Used by the GetRegion orchestrator as the entry point to
+	// any /regions/{slug} call.
+	ResolveRegionBySlug(ctx context.Context, slug string) (Region, error)
+
 	// AncestorRegions returns the leaf region followed by all transitive
 	// ancestors in the region graph, ordered most-specific first
 	// (leaf, then immediate parents, then their parents, etc.).
-	// Includes the leaf itself; deduplicates DAG diamonds.
+	// Includes the leaf itself; deduplicates DAG diamonds; excludes
+	// scope_tier='national' rows from both the seed and the recursion.
 	AncestorRegions(ctx context.Context, leafRegionID int64) ([]Region, error)
+
+	// DescendantRegions returns the focus region followed by every
+	// descendant reachable by walking region_parents in the
+	// parent->child direction. Symmetric to AncestorRegions: includes
+	// the focus at index 0, deduplicates DAG diamonds, and excludes
+	// scope_tier='national' rows from both the seed and the recursion.
+	DescendantRegions(ctx context.Context, focusRegionID int64) ([]Region, error)
 
 	// OrgsForRegions returns all approved organizations attached to any
 	// of the given region IDs. Each returned Org has its full Regions
 	// slice populated (every region the org serves, not just the ones
-	// that matched). Order is unspecified — Lookup buckets and sorts.
+	// that matched), hydrated sorted ascending by region ID, with
+	// CreatedAt populated when the storage layer carries one. Order
+	// across orgs is unspecified — callers bucket and sort.
 	OrgsForRegions(ctx context.Context, regionIDs []int64) ([]Org, error)
 
-	// ListMetros returns every metro-equivalent region that has at
-	// least one approved organization attached to it (directly or via
-	// the region DAG), with the org count. Ordered by OrgCount DESC,
-	// Region.Name ASC. Excludes national-tier regions. An empty result
-	// is a non-error empty slice, not an error.
-	ListMetros(ctx context.Context) ([]MetroSummary, error)
+	// ListRegions returns every region in the default browse set
+	// (see defaultBrowseKinds in browse_kinds.go — metros + cities)
+	// that has at least one approved organization attached to it
+	// (directly or via the region DAG), with the org count. Ordered
+	// by OrgCount DESC, Region.Name ASC. Excludes national-tier
+	// regions. An empty result is a non-error empty slice, not an
+	// error.
+	//
+	// The list endpoint deliberately ships without a kind filter;
+	// the right filter axis (taxonomy vs DAG-ancestor vs scope-tier)
+	// will be designed when a concrete browse UI use case appears.
+	//
+	// Each RegionSummary.BrowseParentSlug carries the slug of the
+	// nearest browseable-kind ancestor. Ties at min depth are
+	// resolved by slug ASC so MemStore and Postgres agree.
+	ListRegions(ctx context.Context) ([]RegionSummary, error)
 
-	// GetMetro returns the metro region identified by slug, plus the
-	// approved orgs that serve it (directly or via the region DAG).
-	// Returns (nil, nil) when the slug is unknown or names a non-metro
-	// region — the handler maps the nil pointer to 404.
-	GetMetro(ctx context.Context, slug string) (*MetroDetail, error)
+	// GetOrgBySlug returns the approved organization identified by slug,
+	// with every region it serves denormalized at Org.Regions (sorted
+	// ascending by region ID). Returns ErrOrgNotFound when no row
+	// matches — the handler maps that to a 404 problem document.
+	GetOrgBySlug(ctx context.Context, slug string) (*Org, error)
 
 	// ListRecent returns the 10 most-recently-approved organizations
 	// across the whole atlas, ordered newest-first. Organizations

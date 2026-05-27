@@ -3,7 +3,6 @@ package atlas
 import (
 	"context"
 	"fmt"
-	"sort"
 )
 
 // Lookup is the core search operation: given a postal code, return the
@@ -14,11 +13,9 @@ import (
 //  2. AncestorRegions(leafID) → []Region (leaf + all transitive parents).
 //  3. OrgsForRegions(ancestorIDs) → []Org with each org's full
 //     attachment list populated.
-//  4. For each org, intersect its regions with the ancestor set. If any
-//     matched region has scope_tier=local, bucket as Local; else Regional.
-//     Compute the org's sort key as the minimum sort_priority across
-//     its matched regions.
-//  5. Within each bucket, sort by (sortKey asc, org.Name asc).
+//  4. bucketOrgsByScope splits orgs into Local / Regional by the
+//     scope_tier of the matched attachment region (shared with
+//     GetRegion, which walks both directions instead of just up).
 func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, error) {
 	leaf, err := store.ResolveLeafRegion(ctx, query.Country, query.PostalCode)
 	if err != nil {
@@ -35,10 +32,10 @@ func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, 
 	}
 
 	ancestorIDs := make([]int64, len(ancestry))
-	ancestorByID := make(map[int64]Region, len(ancestry))
+	inScope := make(map[int64]Region, len(ancestry))
 	for i, r := range ancestry {
 		ancestorIDs[i] = r.ID
-		ancestorByID[r.ID] = r
+		inScope[r.ID] = r
 	}
 
 	orgs, err := store.OrgsForRegions(ctx, ancestorIDs)
@@ -46,74 +43,15 @@ func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, 
 		return LookupResult{}, fmt.Errorf("atlas: orgs lookup: %w", err)
 	}
 
-	var local, regional []bucketed
-	for _, org := range orgs {
-		matched := make([]Region, 0)
-		for _, r := range org.Regions {
-			if ar, ok := ancestorByID[r.ID]; ok {
-				matched = append(matched, ar)
-			}
-		}
-		if len(matched) == 0 {
-			continue
-		}
-		hasLocal := false
-		bestSort := matched[0].SortPriority
-		matchedSlugs := make([]string, 0, len(matched))
-		for _, r := range matched {
-			if r.ScopeTier == ScopeLocal {
-				hasLocal = true
-			}
-			if r.SortPriority < bestSort {
-				bestSort = r.SortPriority
-			}
-			matchedSlugs = append(matchedSlugs, r.Slug)
-		}
-		org.MatchedRegionSlugs = matchedSlugs
-		b := bucketed{org: org, sortKey: bestSort}
-		if hasLocal {
-			local = append(local, b)
-		} else {
-			regional = append(regional, b)
-		}
-	}
-
-	sortBucket(local)
-	sortBucket(regional)
+	local, regional := BucketOrgsByScope(inScope, orgs)
 
 	return LookupResult{
 		Query:              query,
 		ResolvedPlaceLabel: placeLabel(ancestry),
 		ResolvedAncestry:   ancestry,
-		Local:              extractOrgs(local),
-		Regional:           extractOrgs(regional),
+		Local:              local,
+		Regional:           regional,
 	}, nil
-}
-
-// bucketed is a private result-row type used by Lookup for sorting.
-type bucketed struct {
-	org     Org
-	sortKey int
-}
-
-func sortBucket(b []bucketed) {
-	sort.SliceStable(b, func(i, j int) bool {
-		if b[i].sortKey != b[j].sortKey {
-			return b[i].sortKey < b[j].sortKey
-		}
-		return b[i].org.Name < b[j].org.Name
-	})
-}
-
-func extractOrgs(b []bucketed) []Org {
-	if len(b) == 0 {
-		return []Org{}
-	}
-	out := make([]Org, len(b))
-	for i, x := range b {
-		out[i] = x.org
-	}
-	return out
 }
 
 // placeLabel returns a human-readable header derived from the ancestry.

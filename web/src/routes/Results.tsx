@@ -1,54 +1,19 @@
-import { useMemo } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useSearchParams } from 'react-router';
-import { Dateline } from '../components/Dateline.tsx';
-import { EntryList } from '../components/EntryList.tsx';
+import type { UseQueryResult } from '@tanstack/react-query';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
-import type { Country, LookupOrg, LookupResult, Region } from '../lib/api.ts';
+import type { Country, LookupResult } from '../lib/api.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { EntryList } from '../components/EntryList.tsx';
+import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
+import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 
-/**
- * `/r/:postalCode` — resolves the postal code via `GET /api/v1/lookup`
- * and renders the classified-section list grouped into Local and
- * Regional. Country comes from the `?country=` search param
- * (defaults to `US`); the SearchBox always supplies one explicitly.
- */
-
-/**
- * Map the raw `?country=` search param onto a supported `Country`.
- * Missing param falls back to US (the SearchBox always sets one
- * explicitly; this default just keeps a hand-typed `/r/11217` URL
- * working). An unsupported value returns `null` so the caller can
- * render an error instead of silently coercing.
- */
 function parseCountry(raw: string | null): Country | null {
   if (raw === null) return 'US';
   return isSupportedCountry(raw) ? raw : null;
-}
-
-/**
- * Build a slug→name map from the resolved ancestry plus any regions
- * embedded in each org. The ancestry covers the common case; the org
- * regions handle the edge case where a matched_region_slug belongs to
- * a sibling region not in the ancestry chain.
- */
-function buildRegionNameMap(
-  ancestry: Region[],
-  orgs: LookupOrg[],
-): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const region of ancestry) {
-    map.set(region.slug, region.name);
-  }
-  for (const org of orgs) {
-    for (const region of org.regions) {
-      if (!map.has(region.slug)) {
-        map.set(region.slug, region.name);
-      }
-    }
-  }
-  return map;
 }
 
 export function Results() {
@@ -57,12 +22,6 @@ export function Results() {
   const postalCode = normalizePostal(params.postalCode ?? '');
   const rawCountry = search.get('country');
   const country = parseCountry(rawCountry);
-  // `country` is `null` when the param is an unsupported value; the
-  // `enabled` gate keeps the queryFn from running in that case, so the
-  // fallback to 'US' here is just to give useQuery a concrete key/arg.
-  // Keeping the gate as the single source of truth (rather than a cast)
-  // means a future change to `enabled` can't silently leak an
-  // unsupported-country fetch.
   const effectiveCountry: Country = country ?? 'US';
 
   const query = useQuery<LookupResult, ApiError>({
@@ -71,16 +30,46 @@ export function Results() {
     enabled: postalCode.length > 0 && country !== null,
   });
 
-  const placeLabel = query.data?.resolved_place_label;
-  const ancestry = query.data?.resolved_ancestry ?? [];
+  useDocumentTitle(
+    postalCode ? `${postalCode} — Urbanist Atlas` : 'Lookup — Urbanist Atlas',
+  );
+  // ~35k postal-code permutations; let crawlers follow the org links
+  // out but keep the thin per-ZIP pages out of the index.
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex,follow';
+    document.head.appendChild(meta);
+    return () => {
+      meta.remove();
+    };
+  }, []);
+
+  // Breadcrumb prefix: "Atlas / Lookup · <ZIP>". The ZIP renders as
+  // a non-clickable span (no `to`) so it shows context without
+  // implying a clickable lookup-only landing page.
+  const breadcrumbPrefix: ReadonlyArray<BreadcrumbItem> = [
+    { label: 'Atlas', to: '/' },
+    { label: `Lookup · ${postalCode || '—'}` },
+  ];
+
+  // Resolved-ancestry walk: API returns leaf-first; the breadcrumb
+  // wants root-first followed by the leaf as `current`. Reverse a
+  // copy and split off the (originally first, now last) leaf.
+  const ancestryRootFirst = query.data
+    ? [...query.data.resolved_ancestry].slice(1).reverse()
+    : [];
+  const leafName = query.data?.resolved_ancestry[0]?.name;
+  const currentLabel = leafName ?? (postalCode || '—');
+  const metaRight = country ? `${country} · postal-code lookup` : 'Postal-code lookup';
 
   return (
-    <div className="page">
-      <Dateline
-        postalCode={postalCode || '—'}
-        country={country ?? 'US'}
-        placeLabel={placeLabel}
-        ancestry={ancestry}
+    <>
+      <RegionBreadcrumb
+        prefix={breadcrumbPrefix}
+        ancestors={ancestryRootFirst}
+        current={currentLabel}
+        metaRight={metaRight}
       />
       <ResultsBody
         query={query}
@@ -88,7 +77,7 @@ export function Results() {
         country={country}
         rawCountry={rawCountry}
       />
-    </div>
+    </>
   );
 }
 
@@ -98,65 +87,89 @@ function ResultsBody({
   country,
   rawCountry,
 }: {
-  query: ReturnType<typeof useQuery<LookupResult, ApiError>>;
+  query: UseQueryResult<LookupResult, ApiError>;
   postalCode: string;
   country: Country | null;
   rawCountry: string | null;
 }) {
-  // Hooks must run unconditionally before any early return, hence the
-  // optional-chain into query.data and the empty-array fallbacks. When
-  // query.data is undefined the memo result is a fresh empty Map; cheap
-  // and discarded because we early-return before rendering EntryList.
-  const ancestry = query.data?.resolved_ancestry;
-  const local = query.data?.local;
-  const regional = query.data?.regional;
-  const regionNameBySlug = useMemo(
-    () => buildRegionNameMap(ancestry ?? [], [...(local ?? []), ...(regional ?? [])]),
-    [ancestry, local, regional],
-  );
-
   if (postalCode.length === 0) {
-    return <p className="results-state">No postal code in the URL.</p>;
+    return (
+      <p className="results-state" style={{ marginTop: 48 }}>
+        No postal code in the URL. <Link to="/">Try the lookup</Link>.
+      </p>
+    );
   }
   if (country === null) {
     return (
-      <p className="results-state error" role="alert">
-        Country <code>{rawCountry}</code> isn’t supported yet. Try{' '}
+      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
+        Country <code>{rawCountry}</code> isn&rsquo;t supported yet. Try{' '}
         <code>?country=US</code> or <code>?country=CA</code>.
       </p>
     );
   }
   if (query.isPending) {
     return (
-      <p className="results-state" role="status">
+      <p className="results-state" role="status" style={{ marginTop: 48 }}>
         Looking up groups near {postalCode}…
       </p>
     );
   }
   if (query.isError) {
-    const err = query.error;
     return (
-      <p className="results-state error" role="alert">
-        {err.message}
-        {err.requestId ? (
-          <span className="results-state-detail">request id: {err.requestId}</span>
+      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
+        {query.error.message}
+        {query.error.requestId ? (
+          <span className="results-state-detail">
+            request id: {query.error.requestId}
+          </span>
         ) : null}
       </p>
     );
   }
-  if (query.data.local.length === 0 && query.data.regional.length === 0) {
-    return (
-      <p className="results-state">
-        No groups indexed yet for {postalCode}. Know one?{' '}
-        <a href="/submit">Submit it.</a>
-      </p>
-    );
-  }
+
+  const placeLabel = query.data.resolved_place_label ?? postalCode;
+  const { local, regional, resolved_ancestry } = query.data;
+  const empty = local.length === 0 && regional.length === 0;
+
+  // EntryList needs a slug -> display name map for its "Matched
+  // via X" footer. Build it from the resolved-ancestry walk; this
+  // covers every slug an Org's matched_region_slugs can reference
+  // for this lookup.
+  const regionNameBySlug = new Map(
+    resolved_ancestry.map((r) => [r.slug, r.name]),
+  );
+
   return (
-    <EntryList
-      local={query.data.local}
-      regional={query.data.regional}
-      regionNameBySlug={regionNameBySlug}
-    />
+    <>
+      <div className="lede" style={{ marginTop: 48 }}>
+        <div className="eyebrow">
+          § Postal-code lookup<span className="eyebrow-rule" />
+        </div>
+        <h1>
+          {postalCode}
+          <span className="accent">.</span>
+        </h1>
+        <p className="deck">
+          {empty
+            ? `Nothing indexed yet for ${placeLabel}. The Atlas grows one editorial decision at a time — file a tip if you know who's doing the work here.`
+            : `Groups working in or around ${placeLabel}. Local entries are nearest; regional entries cover wider footprints that include this postal code.`}
+        </p>
+      </div>
+
+      {empty ? (
+        <div className="editors-note" style={{ marginTop: 24 }}>
+          <div className="label">No entries here yet</div>
+          <p>
+            Know an organization that should be in the Atlas for {placeLabel}?{' '}
+            <Link to="/submit">File a tip at the submissions desk</Link> and
+            we&rsquo;ll go look.
+          </p>
+        </div>
+      ) : (
+        <div style={{ marginTop: 24 }}>
+          <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />
+        </div>
+      )}
+    </>
   );
 }
