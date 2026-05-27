@@ -27,6 +27,11 @@ import type { Region } from '../lib/api.ts';
  * `current` is the rendered crumb-here label — usually the
  * region's name, but Results passes the leaf region's name when
  * the lookup resolved.
+ *
+ * A11y: the crumb chain renders as `<nav aria-label="Breadcrumb">
+ * <ol class="crumb-trail">...</ol></nav>`. The trailing crumb is
+ * marked `aria-current="page"` and visual `/` separators are
+ * `aria-hidden` so screen readers don't speak punctuation.
  */
 export interface BreadcrumbItem {
   label: string;
@@ -46,28 +51,36 @@ export function RegionBreadcrumb({
 }) {
   return (
     <div className="kicker">
-      <div>
-        {prefix.map((item, i) => (
-          <Crumb key={`p-${i}`} item={item} />
-        ))}
-        {ancestors.map((r) => (
-          <Crumb
-            key={`a-${r.slug}`}
-            item={{ label: r.name, to: `/region/${encodeURIComponent(r.slug)}` }}
-          />
-        ))}
-        <span className="crumb-here">{current}</span>
-      </div>
+      <nav aria-label="Breadcrumb">
+        <ol className="crumb-trail">
+          {prefix.map((item, i) => (
+            <CrumbLi key={`p-${i}`} item={item} />
+          ))}
+          {ancestors.map((r) => (
+            <CrumbLi
+              key={`a-${r.slug}`}
+              item={{ label: r.name, to: `/region/${encodeURIComponent(r.slug)}` }}
+            />
+          ))}
+          <li>
+            <span className="crumb-here" aria-current="page">
+              {current}
+            </span>
+          </li>
+        </ol>
+      </nav>
       {metaRight !== undefined ? <div>{metaRight}</div> : null}
     </div>
   );
 }
 
-function Crumb({ item }: { item: BreadcrumbItem }) {
+function CrumbLi({ item }: { item: BreadcrumbItem }) {
   return (
-    <>
+    <li>
       {item.to ? <Link to={item.to}>{item.label}</Link> : <span>{item.label}</span>}
-      <span className="crumb-sep">/</span>
-    </>
+      <span className="crumb-sep" aria-hidden="true">
+        /
+      </span>
+    </li>
   );
 }

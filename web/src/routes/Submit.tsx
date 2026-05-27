@@ -60,11 +60,17 @@ export function Submit() {
   return (
     <>
       <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">Submissions</span>
-        </div>
+        <nav aria-label="Breadcrumb">
+          <ol className="crumb-trail">
+            <li>
+              <Link to="/">Atlas</Link>
+              <span className="crumb-sep" aria-hidden="true">/</span>
+            </li>
+            <li>
+              <span className="crumb-here" aria-current="page">Submissions</span>
+            </li>
+          </ol>
+        </nav>
         <div>Open year-round</div>
       </div>
 

@@ -481,6 +481,24 @@ a {
   color: var(--ink-2);
 }
 
+/* Breadcrumb list reset: keep the visual rendering identical to the
+   pre-a11y inline-span layout while exposing semantic <ol>/<li>
+   structure to assistive tech. The list flows inline; the trailing
+   separator on the last <li> is suppressed since there's nothing
+   to separate from. */
+.kicker .crumb-trail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+.kicker .crumb-trail li {
+  display: inline;
+}
+.kicker .crumb-trail li:last-child .crumb-sep {
+  display: none;
+}
+
 /* ── Spread (two-column layout) ─────────────────────── */
 
 .spread {

@@ -36,13 +36,23 @@ function OrgKicker({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
   const org = query.data;
   return (
     <div className="kicker">
-      <div>
-        <Link to="/">Atlas</Link>
-        <span className="crumb-sep">/</span>
-        <Link to="/browse">Browse</Link>
-        <span className="crumb-sep">/</span>
-        <span className="crumb-here">{org ? org.name : 'Organization'}</span>
-      </div>
+      <nav aria-label="Breadcrumb">
+        <ol className="crumb-trail">
+          <li>
+            <Link to="/">Atlas</Link>
+            <span className="crumb-sep" aria-hidden="true">/</span>
+          </li>
+          <li>
+            <Link to="/browse">Browse</Link>
+            <span className="crumb-sep" aria-hidden="true">/</span>
+          </li>
+          <li>
+            <span className="crumb-here" aria-current="page">
+              {org ? org.name : 'Organization'}
+            </span>
+          </li>
+        </ol>
+      </nav>
       <div>{org ? `Slug · ${org.slug}` : 'Organization file'}</div>
     </div>
   );
