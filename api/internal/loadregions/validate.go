@@ -8,7 +8,7 @@ import (
 // DetectCycles checks the staged region graph for cycles via DFS with
 // 3-coloring (white/gray/black). Parents not defined in this file are
 // allowed and skipped during the walk — they're assumed to exist in
-// the DB (resolved at write time via RegionIDBySlug). Splitting region
+// the DB (resolved at write time via RegionIDsBySlugs). Splitting region
 // data across multiple files (e.g., regions_us_states.toml loads the
 // state tier first; regions_us.toml's leaves then parent under those
 // states) is the canonical use case.
