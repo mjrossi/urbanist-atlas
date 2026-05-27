@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getRegion } from '../lib/api.ts';
-import type { RegionDetail } from '../lib/api.ts';
+import type { LookupOrg, RegionDetail } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
-import { Entry } from '../components/Entry.tsx';
+import { EntryList } from '../components/EntryList.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 
@@ -38,8 +38,11 @@ export function Region() {
     ? [...query.data.ancestry].reverse()
     : [];
   const currentLabel = query.data ? query.data.region.name : 'Region';
+  const totalOrgs = query.data
+    ? query.data.local.length + query.data.regional.length
+    : 0;
   const metaRight = query.data
-    ? `${query.data.orgs.length} ${query.data.orgs.length === 1 ? 'org' : 'orgs'} indexed`
+    ? `${totalOrgs} ${totalOrgs === 1 ? 'org' : 'orgs'} indexed`
     : 'Region report';
 
   return (
@@ -92,8 +95,22 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
     );
   }
 
-  const { region, orgs } = query.data;
+  const { region, local, regional, ancestry } = query.data;
   const kindLabel = regionKindLabel(region.kind);
+  const totalOrgs = local.length + regional.length;
+
+  // Build a slug → display-name map so Entry can render "Matched
+  // via Brooklyn" instead of "Matched via brooklyn-ny" — names come
+  // from the focus region itself plus its ancestry walk. The leaf's
+  // own attachments (city/borough orgs) reference slugs from the
+  // descendant set; for v1 we surface the slugs raw when the name
+  // map doesn't carry them (only ancestor regions are fully named
+  // here). Good enough for the broadsheet "via X" subtitle.
+  const regionNameBySlug = new Map<string, string>();
+  regionNameBySlug.set(region.slug, region.name);
+  for (const r of ancestry) {
+    regionNameBySlug.set(r.slug, r.name);
+  }
 
   return (
     <>
@@ -107,9 +124,9 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
           <span className="accent">.</span>
         </h1>
         <p className="deck">
-          {orgs.length === 0
-            ? `The Atlas hasn’t indexed any organizations in ${region.name} yet — but the region is on the map.`
-            : `${orgs.length} indexed ${orgs.length === 1 ? 'group' : 'groups'} pushing for safer streets and better transit across ${region.name}.`}
+          {totalOrgs === 0
+            ? `The Atlas hasn’t indexed any organizations in scope for ${region.name} yet — but the region is on the map.`
+            : `${totalOrgs} indexed ${totalOrgs === 1 ? 'group' : 'groups'} working in or covering ${region.name}. Local entries are nearest; regional entries cover wider footprints that include this region.`}
         </p>
         <div className="byline">
           <span>{region.country}</span>
@@ -122,18 +139,19 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
 
       <div className="spread" style={{ marginTop: 32 }}>
         <main>
-          <header className="section-break" style={{ marginTop: 0 }}>
-            <span className="num">I.</span>
-            <h2 className="title">Groups working in {region.name}.</h2>
-            <span className="aside">From the directory</span>
-          </header>
-          {orgs.length === 0 ? (
-            <p className="results-state">
+          {totalOrgs === 0 ? (
+            <p className="results-state" style={{ marginTop: 24 }}>
               No organizations indexed yet for {region.name}.{' '}
               <Link to="/submit">File a tip.</Link>
             </p>
           ) : (
-            orgs.map((org) => <Entry key={org.id} org={org} />)
+            <div style={{ marginTop: 24 }}>
+              <EntryList
+                local={local}
+                regional={regional}
+                regionNameBySlug={regionNameBySlug}
+              />
+            </div>
           )}
           <div className="editors-note" style={{ marginTop: 32 }}>
             <div className="label">Know a group we&rsquo;re missing?</div>
@@ -153,35 +171,33 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               {region.parent_slugs.length > 0
                 ? `, sitting under ${region.parent_slugs.join(' · ')}.`
                 : '.'}{' '}
-              Orgs tagged to sub-regions (cities, boroughs, counties)
-              roll up here too.
+              Local orgs work directly on this region; regional orgs cover
+              wider footprints that include it.
             </p>
             <p style={{ marginBottom: 0 }}>
               Looking up by postal code?{' '}
               <Link to="/">Use the front-page lookup</Link>.
             </p>
           </div>
-          {orgs.length > 0 ? (
+          {totalOrgs > 0 ? (
             <div className="rail-block amber">
               <div className="rail-kicker">By the numbers</div>
               <ul>
                 <li>
-                  <strong>{orgs.length}</strong> indexed{' '}
-                  {orgs.length === 1 ? 'group' : 'groups'}
+                  <strong>{local.length}</strong> local{' '}
+                  {local.length === 1 ? 'entry' : 'entries'}
                 </li>
                 <li>
-                  <strong>{countTags(orgs)}</strong> distinct editorial tags
+                  <strong>{regional.length}</strong> regional{' '}
+                  {regional.length === 1 ? 'entry' : 'entries'}
+                </li>
+                <li>
+                  <strong>{countTags([...local, ...regional])}</strong> distinct editorial tags
                 </li>
                 <li>
                   Region kind{' '}
                   <strong>
                     <code>{region.kind}</code>
-                  </strong>
-                </li>
-                <li>
-                  Slug{' '}
-                  <strong>
-                    <code>{region.slug}</code>
                   </strong>
                 </li>
               </ul>
@@ -207,7 +223,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
   );
 }
 
-function countTags(orgs: ReadonlyArray<{ tags: ReadonlyArray<string> }>): number {
+function countTags(orgs: ReadonlyArray<LookupOrg>): number {
   const s = new Set<string>();
   for (const o of orgs) for (const t of o.tags) s.add(t);
   return s.size;

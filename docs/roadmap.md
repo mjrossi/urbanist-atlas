@@ -124,6 +124,29 @@ with a 30-day lifecycle), with the enablement steps documented at
   a Naperville ZIP still excludes Chicago-city-only orgs because
   they live in a sibling DAG subtree, not an ancestor.
 
+- **Region detail unifies with Lookup scope (2026-05-26):** The
+  remaining UX gap after the Browse nesting slice: clicking a city
+  from Browse returned only orgs literally tagged to that city's
+  slug, while a ZIP-lookup for the same area returned the city's
+  orgs PLUS the metro / state / multi-state ancestors' orgs. Users
+  hit a less-useful list on Browse than they did via Lookup. This
+  slice extracts a shared `pkg/atlas.BucketOrgsByScope` helper
+  used by both endpoints; `/lookup` keeps walking upward only
+  (its "I'm at this point" semantic) while `/regions/{slug}` now
+  walks both directions, builds an in-scope region set, and
+  buckets by attachment `scope_tier`. Result: `/regions/sf`
+  returns the same 3 local + 4 regional orgs `/lookup?postal_code=94110`
+  does. Wire-level: `RegionDetail` drops `orgs: Org[]`, adds
+  `local: LookupOrg[]` + `regional: LookupOrg[]` (each with
+  `matched_region_slugs`). New `DescendantRegions` SQL query
+  parallel to the existing `AncestorRegions`. SPA: `Region.tsx`
+  adopts `EntryList` (same component `Results.tsx` uses), so the
+  Browse → Region and Lookup → Region experiences render
+  identically below the kicker. The Browse list's `org_count`
+  stays at the downward-walk number — preserves the editorial
+  differentiation between cities and their parent metros on the
+  index.
+
 - **Browse nesting + region ancestry + Results/Region rendering
   consolidation (2026-05-26):** Three UX gaps in one slice. (1) The
   `/regions` list response now carries `browse_parent_slug` per row

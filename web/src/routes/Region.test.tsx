@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { RegionDetail } from '../lib/api.ts';
+import type { LookupOrg, Region as RegionT, RegionDetail } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 
 const { getRegionMock } = vi.hoisted(() => ({ getRegionMock: vi.fn() }));
@@ -32,36 +32,53 @@ function renderAt(path: string) {
   );
 }
 
+function makeOrg(overrides: Partial<LookupOrg> = {}): LookupOrg {
+  return {
+    id: 1001,
+    slug: 'transitcenter',
+    name: 'TransitCenter',
+    short_desc: 'Foundation pushing for better transit.',
+    website_url: 'https://transitcenter.org',
+    tags: ['transit', 'policy'],
+    regions: [],
+    matched_region_slugs: [],
+    ...overrides,
+  };
+}
+
+function makeRegion(overrides: Partial<RegionT> = {}): RegionT {
+  return {
+    id: 1,
+    kind: 'us:metro',
+    name: 'New York Metro',
+    slug: 'nyc-metro',
+    country: 'US',
+    scope_tier: 'regional',
+    parent_slugs: [],
+    ...overrides,
+  };
+}
+
 function makeDetail(overrides: Partial<RegionDetail> = {}): RegionDetail {
   return {
-    region: {
-      id: 1,
-      kind: 'us:metro',
-      name: 'New York Metro',
-      slug: 'nyc-metro',
-      country: 'US',
-      scope_tier: 'regional',
-      parent_slugs: [],
-    },
-    orgs: [
-      {
+    region: makeRegion(),
+    local: [],
+    regional: [
+      makeOrg({
         id: 1001,
         slug: 'transitcenter',
         name: 'TransitCenter',
-        short_desc: 'Foundation pushing for better transit.',
-        website_url: 'https://transitcenter.org',
-        tags: ['transit', 'policy'],
-        regions: [],
-      },
-      {
+        matched_region_slugs: ['nyc-metro'],
+      }),
+      makeOrg({
         id: 1002,
         slug: 'riders-alliance',
         name: 'Riders Alliance',
         short_desc: 'Grassroots NYC transit riders.',
         website_url: 'https://www.ridersny.org',
         tags: ['transit', 'grassroots'],
-        regions: [],
-      },
+        matched_region_slugs: ['nyc-metro'],
+      }),
     ],
     ancestry: [],
     ...overrides,
@@ -93,8 +110,8 @@ describe('Region', () => {
     const h1 = screen.getByRole('heading', { level: 1 });
     expect(h1.textContent).toMatch(/new york metro/i);
     expect(screen.getByRole('link', { name: 'Riders Alliance' })).toBeDefined();
-    // Section heading present, mirroring the classified layout.
-    expect(screen.getByText(/groups working in new york metro/i)).toBeDefined();
+    // Regional section label rendered (since regional bucket is non-empty).
+    expect(screen.getByText('Regional')).toBeDefined();
   });
 
   it('passes the URL slug through to getRegion', async () => {
@@ -106,21 +123,56 @@ describe('Region', () => {
     });
   });
 
-  // City-kind regions render via the same route; the kind label in
-  // the eyebrow + rail should read "City", not "Metropolitan area".
-  it('renders a city-kind region with a "City" kind label', async () => {
+  // Local/Regional bucketing surfaces the new scope semantics: a
+  // city-tagged org shows up in Local, a metro-tagged org in
+  // Regional. The kicker reads "City report" for a us:city.
+  it('renders Local + Regional sections from the bucketed scope', async () => {
     getRegionMock.mockResolvedValueOnce(
       makeDetail({
-        region: {
+        region: makeRegion({
           id: 50,
           kind: 'us:city',
           name: 'Chicago',
           slug: 'chicago',
-          country: 'US',
           scope_tier: 'local',
           parent_slugs: ['cook-county'],
-        },
-        orgs: [],
+        }),
+        local: [
+          makeOrg({
+            id: 10,
+            slug: 'better-streets-chicago',
+            name: 'Better Streets Chicago',
+            matched_region_slugs: ['chicago'],
+          }),
+        ],
+        regional: [
+          makeOrg({
+            id: 11,
+            slug: 'active-trans',
+            name: 'Active Transportation Alliance',
+            matched_region_slugs: ['chicago-metro'],
+          }),
+        ],
+        ancestry: [
+          {
+            id: 60,
+            kind: 'us:county',
+            name: 'Cook County',
+            slug: 'cook-county',
+            country: 'US',
+            scope_tier: 'local',
+            parent_slugs: ['chicago-metro'],
+          },
+          {
+            id: 61,
+            kind: 'us:metro',
+            name: 'Chicago Metro',
+            slug: 'chicago-metro',
+            country: 'US',
+            scope_tier: 'regional',
+            parent_slugs: ['chicagoland'],
+          },
+        ],
       }),
     );
     renderAt('/region/chicago');
@@ -129,25 +181,38 @@ describe('Region', () => {
       const h1 = screen.getByRole('heading', { level: 1 });
       expect(h1.textContent).toMatch(/chicago/i);
     });
-    // Eyebrow text includes "City report".
+
+    // Eyebrow + kicker reflect the kind label.
     expect(screen.getAllByText(/city report/i).length).toBeGreaterThan(0);
+
+    // Both section labels rendered (EntryList only renders a section
+    // when it has at least one entry).
+    expect(screen.getByText('Local')).toBeDefined();
+    expect(screen.getByText('Regional')).toBeDefined();
+
+    // The city-tagged org is in Local; the metro-tagged org is in
+    // Regional. We assert by role (both rendered as org-name links).
+    expect(
+      screen.getByRole('link', { name: 'Better Streets Chicago' }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole('link', { name: 'Active Transportation Alliance' }),
+    ).toBeDefined();
   });
 
-  // State-kind regions resolve too (the broadened detail endpoint).
-  // The eyebrow should read "State report".
   it('renders a state-kind region with a "State report" eyebrow', async () => {
     getRegionMock.mockResolvedValueOnce(
       makeDetail({
-        region: {
+        region: makeRegion({
           id: 60,
           kind: 'us:state',
           name: 'New York',
           slug: 'ny',
-          country: 'US',
-          scope_tier: 'regional',
           parent_slugs: [],
-        },
-        orgs: [],
+        }),
+        local: [],
+        regional: [],
+        ancestry: [],
       }),
     );
     renderAt('/region/ny');
@@ -165,15 +230,16 @@ describe('Region', () => {
   it('renders ancestry as clickable breadcrumb links in the kicker', async () => {
     getRegionMock.mockResolvedValueOnce(
       makeDetail({
-        region: {
+        region: makeRegion({
           id: 99,
           kind: 'us:city',
           name: 'Brooklyn',
           slug: 'brooklyn-ny',
-          country: 'US',
           scope_tier: 'local',
           parent_slugs: ['kings-county-ny'],
-        },
+        }),
+        local: [],
+        regional: [],
         // API order: closest-first (direct parent → grandparent → …).
         ancestry: [
           {
@@ -213,7 +279,6 @@ describe('Region', () => {
       expect(h1.textContent).toMatch(/brooklyn/i);
     });
 
-    // Each ancestor renders as a link to /region/<slug>.
     const kings = screen.getByRole('link', { name: 'Kings County, NY' });
     expect(kings.getAttribute('href')).toBe('/region/kings-county-ny');
     const metro = screen.getByRole('link', { name: 'New York Metro' });
@@ -236,16 +301,16 @@ describe('Region', () => {
     await waitFor(() => {
       expect(screen.getByText(/isn.t in the atlas yet/i)).toBeDefined();
     });
-    // Browse link is the suggested next step (one in breadcrumb, one in
-    // the empty-state copy — at least one points at /browse).
     const browseLinks = screen
       .getAllByRole('link', { name: /browse/i })
       .filter((a) => a.getAttribute('href') === '/browse');
     expect(browseLinks.length).toBeGreaterThan(0);
   });
 
-  it('renders a friendly empty state when orgs is an empty array', async () => {
-    getRegionMock.mockResolvedValueOnce(makeDetail({ orgs: [] }));
+  it('renders a friendly empty state when both buckets are empty', async () => {
+    getRegionMock.mockResolvedValueOnce(
+      makeDetail({ local: [], regional: [] }),
+    );
     renderAt('/region/nyc-metro');
 
     await waitFor(() => {

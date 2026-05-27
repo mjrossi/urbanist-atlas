@@ -90,12 +90,20 @@ func TestGetRegion_HappyPath_Metro(t *testing.T) {
 	if got.Region.Slug != "nyc-metro" {
 		t.Errorf("region.slug: want nyc-metro, got %s", got.Region.Slug)
 	}
-	if len(got.Orgs) == 0 {
-		t.Errorf("orgs: want >= 1, got 0")
+	// At least one bucket must populate (the dev fixture has orgs in
+	// nyc-metro's scope). Both being empty would be a regression.
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty; want >= 1 org in scope")
 	}
-	for _, o := range got.Orgs {
+	// Every returned LookupOrg has its regions populated and carries
+	// matched_region_slugs (the slugs that caused it to surface for
+	// this region's scope).
+	for _, o := range append(append([]oapi.LookupOrg{}, got.Local...), got.Regional...) {
 		if len(o.Regions) == 0 {
 			t.Errorf("org %s has no regions populated", o.Slug)
+		}
+		if len(o.MatchedRegionSlugs) == 0 {
+			t.Errorf("org %s has no matched_region_slugs", o.Slug)
 		}
 	}
 	// Ancestry must be present (non-nil) on every successful detail
@@ -133,9 +141,9 @@ func TestGetRegion_NonBrowseableKindResolves(t *testing.T) {
 	if got.Region.Kind != "us:state" {
 		t.Errorf("region.kind: want us:state, got %s", got.Region.Kind)
 	}
-	// Descendants include nyc-metro + Brooklyn + their tagged orgs.
-	if len(got.Orgs) == 0 {
-		t.Errorf("orgs: want >= 1 (descendant walk), got 0")
+	// Downward walk picks up nyc-metro + Brooklyn + their orgs.
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for /regions/ny")
 	}
 }
 

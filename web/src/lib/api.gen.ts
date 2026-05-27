@@ -463,19 +463,46 @@ export interface components {
             browse_parent_slug?: string | null;
         };
         /**
-         * @description A region (any non-national kind) with the approved
-         *     organizations that serve it. The `orgs` array includes
-         *     every org attached to this region directly or to any
-         *     region nested below it in the DAG (so a metro surfaces
-         *     its constituent cities' orgs, a county surfaces its
-         *     cities' orgs, etc.). The `ancestry` array is the upward
-         *     walk to the root, leaf-to-root (excluding the region
-         *     itself), with national-tier regions filtered out — clients
-         *     use it to render a breadcrumb.
+         * @description A region (any non-national kind) with the organizations
+         *     in scope for it, bucketed by attachment tier. "In scope"
+         *     means orgs attached to the region itself, any descendant
+         *     in the DAG (so a metro surfaces its constituent cities'
+         *     orgs), or any ancestor (so a city surfaces the orgs
+         *     covering its parent metro / state / multi-state region).
+         *
+         *     This makes `/regions/{slug}` answer the same question
+         *     `/lookup` answers for a postal code: "every advocate
+         *     someone navigating to this region might care about."
+         *     Orgs are bucketed by the `scope_tier` of the attachment
+         *     region they matched on — `local` for city/county-tier
+         *     attachments, `regional` for metro/state/multi-state. The
+         *     rule mirrors `/lookup`'s; `national`-tier attachments are
+         *     always filtered.
+         *
+         *     Each `LookupOrg.matched_region_slugs` names the
+         *     attachment regions in scope that caused the org to
+         *     surface — useful for "matched via X" affordances in
+         *     clients.
+         *
+         *     The `ancestry` array is the upward walk from this region
+         *     to the root (closest-first, excluding self and any
+         *     `scope_tier='national'` rows). Clients use it to render
+         *     breadcrumbs.
          */
         RegionDetail: {
             region: components["schemas"]["Region"];
-            orgs: components["schemas"]["Org"][];
+            /**
+             * @description Orgs in scope with at least one matched attachment
+             *     region of `scope_tier='local'` (cities, counties,
+             *     boroughs).
+             */
+            local: components["schemas"]["LookupOrg"][];
+            /**
+             * @description Orgs in scope whose only matched attachment regions
+             *     are `scope_tier='regional'` (metros, states,
+             *     provinces, multi-state coalitions).
+             */
+            regional: components["schemas"]["LookupOrg"][];
             /**
              * @description Ancestors of `region`, ordered closest-first (the
              *     region's direct parent at index 0, then the

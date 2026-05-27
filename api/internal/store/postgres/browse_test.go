@@ -116,22 +116,31 @@ func TestPostgresStore_GetRegion_HappyPath(t *testing.T) {
 
 	got, err := store.GetRegion(ctx, "nyc-metro")
 	if err != nil {
-		t.Fatalf("GetPlace: %v", err)
+		t.Fatalf("GetRegion: %v", err)
 	}
 	if got == nil {
-		t.Fatal("nil result for known place slug")
+		t.Fatal("nil result for known region slug")
 	}
 	if got.Region.Slug != "nyc-metro" {
 		t.Errorf("region slug: want nyc-metro, got %s", got.Region.Slug)
 	}
-	if len(got.Orgs) == 0 {
-		t.Errorf("nyc-metro has no orgs; expected at least one (TransitCenter / TransAlt via nyc descendant)")
+	// Lookup-style scope: orgs from descendants AND ancestors, bucketed
+	// by attachment scope_tier. Both buckets should populate for
+	// nyc-metro (Brooklyn-tagged orgs in Local; nyc-metro-/state-tagged
+	// orgs in Regional).
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for nyc-metro; want at least one bucket non-empty")
 	}
-	// At least one of the seeded orgs that attach to nyc-metro or its
-	// descendants should be present.
-	gotSlugs := make(map[string]bool, len(got.Orgs))
-	for _, o := range got.Orgs {
+	allOrgs := append(append([]atlas.Org{}, got.Local...), got.Regional...)
+	gotSlugs := make(map[string]bool, len(allOrgs))
+	for _, o := range allOrgs {
 		gotSlugs[o.Slug] = true
+		if len(o.Regions) == 0 {
+			t.Errorf("org %s has empty Regions; hydration failed", o.Slug)
+		}
+		if len(o.MatchedRegionSlugs) == 0 {
+			t.Errorf("org %s has empty MatchedRegionSlugs; bucketing didn't tag matches", o.Slug)
+		}
 	}
 	wantOneOf := []string{"transitcenter", "transportation-alternatives", "riders-alliance"}
 	found := false
@@ -142,40 +151,34 @@ func TestPostgresStore_GetRegion_HappyPath(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("none of %v in nyc-metro orgs; got %v", wantOneOf, sortedKeys(gotSlugs))
-	}
-	// Each org's Regions must be hydrated.
-	for _, o := range got.Orgs {
-		if len(o.Regions) == 0 {
-			t.Errorf("org %s has empty Regions; hydration failed", o.Slug)
-		}
+		t.Errorf("none of %v in nyc-metro scope; got %v", wantOneOf, sortedKeys(gotSlugs))
 	}
 }
 
-func TestPostgresStore_GetRegion_OrgsOrderedNewestFirst(t *testing.T) {
+// TestPostgresStore_GetRegion_City_IncludesAncestorOrgs pins the
+// behavioral change for cities: clicking a city in Browse now
+// surfaces orgs from its parent metro / state regions, matching
+// what /lookup would return for a postal code in that city.
+func TestPostgresStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetRegion(ctx, "nyc-metro")
+	got, err := store.GetRegion(ctx, "chicago")
 	if err != nil {
-		t.Fatalf("GetPlace: %v", err)
+		t.Fatalf("GetRegion(chicago): %v", err)
 	}
-	if got == nil || len(got.Orgs) < 2 {
-		t.Skipf("nyc-metro needs >=2 orgs to assert ordering; got %d", len(got.Orgs))
+	if got == nil {
+		t.Fatal("nil result for chicago")
 	}
-	// Postgres ORDER BY o.created_at DESC, o.id DESC. Assert it holds.
-	for i := 1; i < len(got.Orgs); i++ {
-		prev, cur := got.Orgs[i-1], got.Orgs[i]
-		if cur.CreatedAt.After(prev.CreatedAt) {
-			t.Errorf("not descending by created_at: [%d]=%v (%s), [%d]=%v (%s)",
-				i-1, prev.CreatedAt, prev.Slug, i, cur.CreatedAt, cur.Slug)
-		}
-		if cur.CreatedAt.Equal(prev.CreatedAt) && cur.ID > prev.ID {
-			t.Errorf("tied created_at not descending by id: [%d]=%d, [%d]=%d",
-				i-1, prev.ID, i, cur.ID)
-		}
+	// Both buckets should populate: Chicago city orgs in Local; orgs
+	// at chicago-metro / chicagoland / il (ancestors) in Regional.
+	if len(got.Local) == 0 {
+		t.Error("local: want >=1 Chicago-tagged org (Better Streets, Bike Grid, Commuters), got 0")
+	}
+	if len(got.Regional) == 0 {
+		t.Error("regional: want >=1 ancestor org (active-transportation-alliance from chicago-metro), got 0")
 	}
 }
 
@@ -215,8 +218,8 @@ func TestPostgresStore_GetRegion_StateSlugResolves(t *testing.T) {
 		t.Errorf("region: want slug=ny kind=us:state, got slug=%s kind=%s",
 			got.Region.Slug, got.Region.Kind)
 	}
-	if len(got.Orgs) == 0 {
-		t.Errorf("orgs: want >=1 (descendant walk; NY descendants include nyc-metro + nyc + boroughs), got 0")
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for ny (state); descendants include nyc-metro + nyc + boroughs")
 	}
 }
 
@@ -238,8 +241,8 @@ func TestPostgresStore_GetRegion_MultiStateSlugResolves(t *testing.T) {
 	if got.Region.Kind != "us:multi-state" {
 		t.Errorf("region.kind: want us:multi-state, got %s", got.Region.Kind)
 	}
-	if len(got.Orgs) == 0 {
-		t.Errorf("orgs: want >=1 via descendant walk into chicago-metro + Chicago, got 0")
+	if len(got.Local) == 0 && len(got.Regional) == 0 {
+		t.Error("local + regional both empty for chicagoland; descendants include chicago-metro + Chicago")
 	}
 }
 

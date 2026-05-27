@@ -23,8 +23,9 @@ SELECT id, slug FROM regions WHERE slug = ANY($1::text[]);
 -- name: GetOrgBySlug :one
 -- Returns the approved organization identified by slug, with every
 -- region it serves array_agg'd onto the row so the adapter can hydrate
--- Org.Regions in one round-trip. Mirrors the shape used by OrgsForRegion
--- (browse.sql) so the Postgres-side adapter (hydrateOrgRows) can
+-- Org.Regions in one round-trip. Mirrors the shape used by
+-- ListRecent and OrgsForRegionsAndAllRegionIDs so the Postgres-side
+-- adapter (hydrateOrgRows) can
 -- be reused without a new mapper.
 --
 -- Returns no row when the slug is unknown OR names an org whose status

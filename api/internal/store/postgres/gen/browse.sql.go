@@ -11,6 +11,75 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const descendantRegions = `-- name: DescendantRegions :many
+WITH RECURSIVE descendants(id, country, kind, name, slug, scope_tier, sort_priority, depth) AS (
+    SELECT r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, 0
+    FROM regions r
+    WHERE r.id = $1 AND r.scope_tier <> 'national'
+    UNION
+    SELECT r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority, d.depth + 1
+    FROM regions r
+    JOIN region_parents rp ON rp.region_id = r.id
+    JOIN descendants d     ON rp.parent_region_id = d.id
+    WHERE r.scope_tier <> 'national'
+),
+deduped AS (
+    SELECT DISTINCT ON (id) id, country, kind, name, slug, scope_tier, sort_priority, depth
+    FROM descendants
+    ORDER BY id, depth ASC
+)
+SELECT id, country, kind, name, slug, scope_tier, sort_priority
+FROM deduped
+ORDER BY depth ASC, sort_priority ASC, id ASC
+`
+
+type DescendantRegionsRow struct {
+	ID           int64
+	Country      string
+	Kind         string
+	Name         string
+	Slug         string
+	ScopeTier    string
+	SortPriority int32
+}
+
+// Returns the focus region followed by every descendant reachable by
+// walking region_parents in the parent->child direction. Ordered by
+// BFS depth (root first, then layer by layer). Excludes
+// scope_tier='national' rows from both the seed (defensive — the
+// focus is already gated by GetRegionBySlug) and the recursion.
+//
+// Used by GetRegion to build the in-scope region set for the
+// downward direction of the lookup-style scope walk. The upward
+// direction is covered by AncestorRegions in lookup.sql.
+func (q *Queries) DescendantRegions(ctx context.Context, id int64) ([]DescendantRegionsRow, error) {
+	rows, err := q.db.Query(ctx, descendantRegions, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DescendantRegionsRow
+	for rows.Next() {
+		var i DescendantRegionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Country,
+			&i.Kind,
+			&i.Name,
+			&i.Slug,
+			&i.ScopeTier,
+			&i.SortPriority,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRegionBySlug = `-- name: GetRegionBySlug :one
 SELECT id, country, kind, name, slug, scope_tier, sort_priority
 FROM regions
@@ -201,12 +270,13 @@ type ListRegionsRow struct {
 // parameter so a future filter slice can plumb a kinds arg through
 // without rewriting the query).
 //
-// All three queries walk the region DAG. ListRegions and OrgsForRegion
-// descend from each matched region (parent->child relation) so an org
-// tagged only to Brooklyn counts toward NYC metro, and an org tagged
-// to Chicago counts toward both Chicago (its own page) and Chicago
-// Metro. ListRecent doesn't walk — it filters orgs by whether ANY of
-// their region attachments is non-national.
+// ListRegions walks the region DAG downward from each matched root
+// (parent->child relation) for org counts, and a second pass
+// upward for `browse_parent_slug`. DescendantRegions does the same
+// downward walk but returns full region rows (GetRegion combines it
+// with AncestorRegions to build the lookup-style scope set).
+// ListRecent doesn't walk — it filters orgs by whether ANY of their
+// region attachments is non-national.
 // Returns every region whose kind is in the caller-supplied $1 list
 // and has at least one approved organization attached to it directly
 // OR via a descendant in the region DAG, with the org count. The $1
@@ -252,91 +322,6 @@ func (q *Queries) ListRegions(ctx context.Context, kinds []string) ([]ListRegion
 			&i.SortPriority,
 			&i.BrowseParentSlug,
 			&i.OrgCount,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const orgsForRegion = `-- name: OrgsForRegion :many
-WITH RECURSIVE descendants(region_id) AS (
-    SELECT $1::bigint
-    UNION
-    SELECT rp.region_id
-    FROM descendants d
-    JOIN region_parents rp ON rp.parent_region_id = d.region_id
-    JOIN regions r2        ON r2.id = rp.region_id
-    WHERE r2.scope_tier <> 'national'
-)
-SELECT
-    o.id, o.slug, o.name, o.short_desc, o.website_url, o.contact_url, o.tags,
-    o.created_at,
-    ARRAY(
-        SELECT orx.region_id
-        FROM organization_regions orx
-        WHERE orx.organization_id = o.id
-        ORDER BY orx.region_id
-    )::bigint[] AS region_ids
-FROM organizations o
-WHERE o.status = 'approved'
-  AND EXISTS (
-      SELECT 1 FROM organization_regions oj
-      WHERE oj.organization_id = o.id
-        AND oj.region_id IN (SELECT region_id FROM descendants)
-  )
-ORDER BY o.created_at DESC, o.id DESC
-`
-
-type OrgsForRegionRow struct {
-	ID         int64
-	Slug       string
-	Name       string
-	ShortDesc  string
-	WebsiteUrl string
-	ContactUrl pgtype.Text
-	Tags       []string
-	CreatedAt  pgtype.Timestamptz
-	RegionIds  []int64
-}
-
-// For a given region id, returns every approved org with at least
-// one attachment in the region's downward DAG closure (the region
-// itself + every descendant). For each org we also array_agg ALL its
-// region attachments so the adapter can hydrate Org.Regions in one
-// round-trip.
-//
-// The recursion prunes scope_tier='national' nodes defensively. The
-// caller (GetRegion) has already filtered the root to non-national,
-// and editorial policy keeps national tiers as graph roots, so the
-// prune is a no-op on the current seed. It guards against a future
-// edge that accidentally puts a national region under another region,
-// which would otherwise leak national-only orgs into a detail page.
-//
-// Ordered by o.created_at DESC, then o.id DESC for stability.
-func (q *Queries) OrgsForRegion(ctx context.Context, regionID int64) ([]OrgsForRegionRow, error) {
-	rows, err := q.db.Query(ctx, orgsForRegion, regionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []OrgsForRegionRow
-	for rows.Next() {
-		var i OrgsForRegionRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Slug,
-			&i.Name,
-			&i.ShortDesc,
-			&i.WebsiteUrl,
-			&i.ContactUrl,
-			&i.Tags,
-			&i.CreatedAt,
-			&i.RegionIds,
 		); err != nil {
 			return nil, err
 		}

@@ -85,9 +85,10 @@ func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 }
 
 // toOAPIRegionDetail converts a single domain region to the wire
-// shape. Orgs are mapped via toOAPIOrgs (shared with /recent; the
-// /lookup endpoint uses toOAPILookupOrgs which extends the same
-// base). See oapi_adapters.go.
+// shape. Orgs are bucketed by attachment scope_tier (the shared
+// pkg/atlas helper) and mapped via toOAPILookupOrgs so each row
+// carries its matched_region_slugs — same shape /lookup returns,
+// driving the same SPA components.
 //
 // Ancestry mirrors the closest-first walk pkg/atlas built (direct
 // parent at index 0, root at the end, national-tier rows filtered).
@@ -99,7 +100,8 @@ func toOAPIRegionDetail(in atlas.RegionDetail) oapi.RegionDetail {
 	}
 	return oapi.RegionDetail{
 		Region:   toOAPIRegion(in.Region),
-		Orgs:     toOAPIOrgs(in.Orgs),
+		Local:    toOAPILookupOrgs(in.Local),
+		Regional: toOAPILookupOrgs(in.Regional),
 		Ancestry: ancestry,
 	}
 }

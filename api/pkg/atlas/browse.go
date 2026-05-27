@@ -20,17 +20,23 @@ type RegionSummary struct {
 }
 
 // RegionDetail is the domain shape returned by Store.GetRegion: a
-// region plus the approved orgs that serve it (directly or via the
-// region DAG) and the upward ancestry walk used to render a
+// region plus the orgs in scope for it, bucketed by attachment
+// scope_tier, plus the upward ancestry walk used to render a
 // breadcrumb in the SPA.
+//
+// "In scope" means orgs attached to the region itself, any
+// descendant (so a metro surfaces its constituent cities' orgs), or
+// any ancestor (so a city surfaces orgs covering its parent metro /
+// state / multi-state region). Local + Regional buckets are decided
+// by the scope_tier of the org's matched attachment regions — same
+// rule Lookup uses. National-tier attachments are always filtered.
 //
 // Ancestry is ordered closest-first (direct parent at index 0, then
 // grandparent, …) and excludes the region itself plus any
-// scope_tier='national' rows. Orgs is newest-first when the
-// underlying store has a creation timestamp; the MemStore tolerates
-// the field being zero.
+// national-tier rows.
 type RegionDetail struct {
 	Region   Region
-	Orgs     []Org
+	Local    []Org
+	Regional []Org
 	Ancestry []Region
 }

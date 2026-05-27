@@ -210,19 +210,28 @@ func (s *MemStore) GetRegion(_ context.Context, slug string) (*RegionDetail, err
 	if region.ScopeTier == ScopeNational {
 		return nil, nil
 	}
+	// Build the in-scope region set: the focus + every descendant
+	// (downward walk) + every ancestor (upward walk). National-tier
+	// rows are excluded from both walks. The bucketing then runs
+	// against this combined set, so a city's Region page shows orgs
+	// from both its constituent neighborhoods AND its parent metro /
+	// state / multi-state — matching the Lookup result for any
+	// postal code in that city.
+	inScope := make(map[int64]Region)
+
+	// Downward walk + collect IDs along the way.
 	descendants := s.descendantRegionIDs(id)
-	orgs := s.orgsForRegionIDs(descendants)
-	// Match Postgres OrgsForRegion: created_at DESC, id DESC.
-	sort.Slice(orgs, func(i, j int) bool {
-		a, b := orgs[i], orgs[j]
-		if !a.CreatedAt.Equal(b.CreatedAt) {
-			return a.CreatedAt.After(b.CreatedAt)
+	for _, did := range descendants {
+		r, ok := s.regionsByID[did]
+		if !ok || r.ScopeTier == ScopeNational {
+			continue
 		}
-		return a.ID > b.ID
-	})
-	// Build ancestry closest-first, skipping self and national-tier.
-	// Reuses the same BFS pattern as AncestorRegions but filters
-	// national rows and drops the leaf.
+		inScope[did] = r
+	}
+
+	// Upward walk via BFS over parents map. Builds `ancestry`
+	// (closest-first, excluding self + national) for the SPA
+	// breadcrumb and folds the same rows into inScope.
 	ancestry := []Region{}
 	visited := map[int64]bool{id: true}
 	queue := append([]int64{}, s.parents[id]...)
@@ -241,9 +250,25 @@ func (s *MemStore) GetRegion(_ context.Context, slug string) (*RegionDetail, err
 			continue
 		}
 		ancestry = append(ancestry, ar)
+		inScope[ar.ID] = ar
 		queue = append(queue, s.parents[aid]...)
 	}
-	return &RegionDetail{Region: region, Orgs: orgs, Ancestry: ancestry}, nil
+
+	// Fetch every org with at least one attachment in the in-scope
+	// set, then bucket via the shared scope-tier helper.
+	ids := make([]int64, 0, len(inScope))
+	for k := range inScope {
+		ids = append(ids, k)
+	}
+	orgs := s.orgsForRegionIDs(ids)
+	local, regional := BucketOrgsByScope(inScope, orgs)
+
+	return &RegionDetail{
+		Region:   region,
+		Local:    local,
+		Regional: regional,
+		Ancestry: ancestry,
+	}, nil
 }
 
 // GetOrgBySlug implements Store. Scans the in-memory orgs by slug,

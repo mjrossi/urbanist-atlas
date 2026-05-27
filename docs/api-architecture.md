@@ -58,19 +58,30 @@ endpoint:
 | `AncestorRegions(leafID)` | `/lookup` | Walks the region DAG **upward**; dedupes diamonds. |
 | `OrgsForRegions(regionIDs)` | `/lookup` | Hydrates each org's full attachment list. |
 | `ListRegions()` | `/regions` | Regions in the default browse set (metros + cities, per `atlas.DefaultBrowseKinds`) with ≥1 attached org; walks the DAG **downward** from each match; excludes national-tier. Each summary also carries a `browse_parent_slug` — the SPA's grouping hook for nesting cities under their parent metro. The endpoint ships without filter parameters — the right axis (taxonomy via `kind`, DAG via `ancestor`, …) gets designed when a concrete browse UI use case appears. |
-| `GetRegion(slug)` | `/regions/{slug}` | Resolves any non-national region (metro, city, county, borough, state, multi-state coalition). Returns `(nil, nil)` for unknown or national-tier slugs. Detail responses include `ancestry: Region[]` — the upward walk from the leaf, closest-first, excluding self and national-tier rows. Drives the breadcrumb on the Region page. |
+| `GetRegion(slug)` | `/regions/{slug}` | Resolves any non-national region. Returns `(nil, nil)` for unknown or national-tier slugs. Builds a **lookup-style scope** by walking both ancestors (upward) and descendants (downward) from the focus, then bucketing orgs by attachment `scope_tier` via `atlas.BucketOrgsByScope` — same rule `/lookup` uses. Detail responses carry `local: LookupOrg[]`, `regional: LookupOrg[]`, and `ancestry: Region[]` (closest-first, excludes self + national). Net effect: clicking SF from Browse returns the same set of advocates `/lookup` returns for an SF ZIP. |
 | `GetOrgBySlug(slug)` | `/orgs/{slug}` | Returns `ErrOrgNotFound` for unknown or non-approved slugs. |
 | `ListRecent()` | `/recent` | Hardcoded cap of 10; excludes national-only orgs. |
 
-The asymmetry between `/lookup` (upward walk + `scope_tier`
-partitioning) and `/regions` (downward walk from a curated default
-set) is intentional: a ZIP lookup wants "what serves this *point*
-in the DAG"; the browse surface wants "what's nested under this
-region."
-A Naperville ZIP correctly excludes Chicago-city-only orgs because
-they live in a sibling subtree, not an ancestor. Browsing
-`/regions/chicago-metro` correctly *includes* them because they're
-descendants.
+`/lookup` and `/regions/{slug}` share rendering primitives (the
+Local/Regional bucketing) but walk the DAG differently:
+
+- **`/lookup`** is keyed by a postal code → leaf region. It walks
+  **upward** from the leaf (and only upward), so the result is
+  "orgs serving the resolved point." A Naperville ZIP correctly
+  excludes Chicago-city-only orgs because Chicago is a sibling
+  subtree, not an ancestor.
+- **`/regions/{slug}`** is keyed by a region slug. It walks
+  **both directions** from the focus, so the result is "orgs in
+  scope for this region as a unit." Browsing `/regions/chicago-metro`
+  pulls in Chicago city orgs (descendants), Chicagoland orgs
+  (ancestor), and orgs covering Illinois (ancestor too) — same set
+  Lookup would surface for any Chicago ZIP.
+
+The `/regions` list endpoint's `org_count` stays purely a
+downward-walk number — preserving the editorial differentiation
+between "Chicago Metro" (4) and "Chicago" (3) on the index. The
+expanded lookup-style scope only kicks in when a user lands on the
+detail page.
 
 Two implementations:
 
