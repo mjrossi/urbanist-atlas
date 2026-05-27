@@ -124,7 +124,12 @@ classify() {
   local slug name url status final bytes title
   IFS=$'\t' read -r slug name url status final bytes title <<<"$1"
 
-  if [[ "$status" == "000" ]]; then echo "dead"; return; fi
+  # status=000 = transport-layer failure (curl couldn't reach the origin):
+  # DNS, timeout, TLS handshake, connection refused, etc. Over a VPN these
+  # frequently fire on real, live sites — a single 000 is not a death
+  # signal. Bucketed separately from real HTTP 4xx/5xx so manual triage
+  # doesn't conflate the two.
+  if [[ "$status" == "000" ]]; then echo "unreachable"; return; fi
   if (( status == 403 || status == 429 )); then echo "blocked"; return; fi
   if (( status >= 400 )); then echo "dead"; return; fi
 
@@ -187,8 +192,8 @@ echo "  done. raw rows → $DETAILS" >&2
 # ── report ───────────────────────────────────────────────────────────
 echo "→ classifying + writing $REPORT" >&2
 
-declare -A BUCKETS=( [dead]="" [parked]="" [redirected]="" [blocked]="" [tiny]="" [ok]="" )
-declare -A COUNTS=(  [dead]=0  [parked]=0  [redirected]=0  [blocked]=0  [tiny]=0  [ok]=0  )
+declare -A BUCKETS=( [unreachable]="" [dead]="" [parked]="" [redirected]="" [blocked]="" [tiny]="" [ok]="" )
+declare -A COUNTS=(  [unreachable]=0  [dead]=0  [parked]=0  [redirected]=0  [blocked]=0  [tiny]=0  [ok]=0  )
 
 while IFS= read -r line; do
   sev="$(classify "$line")"
@@ -223,19 +228,21 @@ fmt_section() {
   printf '_Generated %s from `%s` (%d orgs)._\n\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${ORGS_TOML#$REPO_ROOT/}" "$TOTAL"
   printf '## Summary\n\n'
-  printf -- '- **dead**: %d (connection failed or 4xx/5xx)\n' "${COUNTS[dead]}"
-  printf -- '- **parked**: %d (title looks like a parking page)\n' "${COUNTS[parked]}"
+  printf -- '- **unreachable**: %d (curl couldn'\''t connect — DNS, timeout, TLS; often VPN-side noise, retry before acting)\n' "${COUNTS[unreachable]}"
+  printf -- '- **dead**: %d (origin returned 4xx/5xx)\n' "${COUNTS[dead]}"
+  printf -- '- **parked**: %d (title looks like a parking page or SEO-spam takeover)\n' "${COUNTS[parked]}"
   printf -- '- **redirected**: %d (final URL on a different registrable domain)\n' "${COUNTS[redirected]}"
   printf -- '- **blocked**: %d (403/429 — could be UA filtering, manual check)\n' "${COUNTS[blocked]}"
   printf -- '- **tiny**: %d (response body < 1 KB)\n' "${COUNTS[tiny]}"
   printf -- '- **ok**: %d\n' "${COUNTS[ok]}"
 
-  fmt_section dead       "Dead"
-  fmt_section parked     "Parked / suspicious"
-  fmt_section redirected "Redirected off-domain"
-  fmt_section blocked    "Blocked — manual review"
-  fmt_section tiny       "Tiny body"
-  fmt_section ok         "OK"
+  fmt_section unreachable "Unreachable — retry before acting"
+  fmt_section dead        "Dead"
+  fmt_section parked      "Parked / suspicious"
+  fmt_section redirected  "Redirected off-domain"
+  fmt_section blocked     "Blocked — manual review"
+  fmt_section tiny        "Tiny body"
+  fmt_section ok          "OK"
 } > "$REPORT"
 
 echo "✓ report → $REPORT" >&2
