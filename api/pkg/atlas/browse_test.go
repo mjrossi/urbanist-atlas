@@ -203,7 +203,7 @@ func TestMemStore_ListRegions_BrowseParentSlug(t *testing.T) {
 // (NY state, NYC Metro).
 func TestMemStore_GetRegion_Metro_BucketsBothDirections(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetRegion(context.Background(), "nyc-metro")
+	got, err := GetRegion(context.Background(), s, "nyc-metro")
 	if err != nil {
 		t.Fatalf("GetRegion: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestMemStore_GetRegion_Metro_BucketsBothDirections(t *testing.T) {
 // ZIP in that city (modulo descendant differences).
 func TestMemStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetRegion(context.Background(), "brooklyn-ny")
+	got, err := GetRegion(context.Background(), s, "brooklyn-ny")
 	if err != nil {
 		t.Fatalf("GetRegion: %v", err)
 	}
@@ -261,7 +261,7 @@ func TestMemStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
 // Region page kicker.
 func TestMemStore_GetRegion_Ancestry_LeafToRoot(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetRegion(context.Background(), "brooklyn-ny")
+	got, err := GetRegion(context.Background(), s, "brooklyn-ny")
 	if err != nil {
 		t.Fatalf("GetRegion: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestMemStore_GetRegion_Ancestry_LeafToRoot(t *testing.T) {
 func TestMemStore_GetRegion_Ancestry_EmptyForRoot(t *testing.T) {
 	s := newBrowseFixture()
 	// NY is a us:state, top-of-hierarchy (no parents in the fixture).
-	got, err := s.GetRegion(context.Background(), "ny")
+	got, err := GetRegion(context.Background(), s, "ny")
 	if err != nil {
 		t.Fatalf("GetRegion(ny): %v", err)
 	}
@@ -324,7 +324,7 @@ func TestMemStore_GetRegion_AnyNonNationalKind_Resolves(t *testing.T) {
 	s := newBrowseFixture()
 
 	// State slug — descendants include NYC Metro + Kings County + Brooklyn.
-	got, err := s.GetRegion(context.Background(), "ny")
+	got, err := GetRegion(context.Background(), s, "ny")
 	if err != nil {
 		t.Fatalf("GetRegion(ny): %v", err)
 	}
@@ -342,7 +342,7 @@ func TestMemStore_GetRegion_AnyNonNationalKind_Resolves(t *testing.T) {
 
 	// County slug — downward walk hits brooklyn; upward walk hits
 	// nyc-metro + ny.
-	got, err = s.GetRegion(context.Background(), "kings-county-ny")
+	got, err = GetRegion(context.Background(), s, "kings-county-ny")
 	if err != nil {
 		t.Fatalf("GetRegion(kings-county-ny): %v", err)
 	}
@@ -363,7 +363,7 @@ func TestMemStore_GetRegion_AnyNonNationalKind_Resolves(t *testing.T) {
 // these as "Matched via X · Y" subtitles.
 func TestMemStore_GetRegion_PopulatesMatchedRegionSlugs(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetRegion(context.Background(), "brooklyn-ny")
+	got, err := GetRegion(context.Background(), s, "brooklyn-ny")
 	if err != nil {
 		t.Fatalf("GetRegion: %v", err)
 	}
@@ -393,7 +393,7 @@ func TestMemStore_GetRegion_PopulatesMatchedRegionSlugs(t *testing.T) {
 
 func TestMemStore_GetRegion_NotFound(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetRegion(context.Background(), "does-not-exist")
+	got, err := GetRegion(context.Background(), s, "does-not-exist")
 	if err != nil {
 		t.Errorf("err: want nil, got %v", err)
 	}
@@ -408,7 +408,7 @@ func TestMemStore_GetRegion_NotFound(t *testing.T) {
 // browse contexts.
 func TestMemStore_GetRegion_NationalReturnsNil(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetRegion(context.Background(), "pt-nacional")
+	got, err := GetRegion(context.Background(), s, "pt-nacional")
 	if err != nil {
 		t.Errorf("err: want nil, got %v", err)
 	}

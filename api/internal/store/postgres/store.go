@@ -238,25 +238,17 @@ func (s *Store) ListRegions(ctx context.Context) ([]atlas.RegionSummary, error) 
 	return out, nil
 }
 
-// GetRegion implements atlas.Store. Returns (nil, nil) for unknown
-// slugs and for national-tier regions (the SQL gates on both).
-// Resolves any non-national region — metros, cities, counties,
-// boroughs, states, multi-state coalitions.
-//
-// Builds a "lookup-style scope" for the focus region: walks both
-// ancestors (upward) and descendants (downward), combines them into
-// an in-scope region set, fetches all orgs with at least one
-// attachment in scope, and buckets by scope_tier via the shared
-// pkg/atlas helper (same rule /lookup uses). Result: clicking a
-// region from Browse shows the same advocate list a postal-code
-// lookup in that region would show.
-func (s *Store) GetRegion(ctx context.Context, slug string) (*atlas.RegionDetail, error) {
+// ResolveRegionBySlug implements atlas.Store. Returns ErrRegionNotFound
+// for unknown slugs and for slugs that name a national-tier row
+// (GetRegionBySlug filters national in SQL — both shapes surface as
+// no-rows from pgx).
+func (s *Store) ResolveRegionBySlug(ctx context.Context, slug string) (atlas.Region, error) {
 	row, err := s.q.GetRegionBySlug(ctx, slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return atlas.Region{}, atlas.ErrRegionNotFound
 		}
-		return nil, fmt.Errorf("postgres: get region: %w", err)
+		return atlas.Region{}, fmt.Errorf("postgres: resolve region by slug: %w", err)
 	}
 	region := atlas.Region{
 		ID:           row.ID,
@@ -269,77 +261,46 @@ func (s *Store) GetRegion(ctx context.Context, slug string) (*atlas.RegionDetail
 	}
 	parents, err := s.parentSlugsByRegion(ctx, []int64{region.ID})
 	if err != nil {
-		return nil, err
+		return atlas.Region{}, err
 	}
 	region.ParentSlugs = parents[region.ID]
+	return region, nil
+}
 
-	// Upward walk (reuses the /lookup helper). AncestorRegions
-	// includes the focus at index 0 and filters national-tier.
-	ancestors, err := s.AncestorRegions(ctx, region.ID)
+// DescendantRegions implements atlas.Store. Walks region_parents in the
+// parent->child direction; includes the focus at index 0; excludes
+// scope_tier='national' rows from both seed and recursion (the SQL CTE
+// at browse.sql DescendantRegions enforces this).
+func (s *Store) DescendantRegions(ctx context.Context, focusRegionID int64) ([]atlas.Region, error) {
+	rows, err := s.q.DescendantRegions(ctx, focusRegionID)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: ancestors for region: %w", err)
+		return nil, fmt.Errorf("postgres: descendant regions: %w", err)
 	}
-
-	// Downward walk. DescendantRegions includes the focus at index 0
-	// (matches AncestorRegions' contract for symmetry).
-	descRows, err := s.q.DescendantRegions(ctx, region.ID)
-	if err != nil {
-		return nil, fmt.Errorf("postgres: descendants for region: %w", err)
+	if len(rows) == 0 {
+		return nil, nil
 	}
-
-	// Combine into an in-scope map keyed by region ID.
-	inScope := make(map[int64]atlas.Region, len(ancestors)+len(descRows))
-	for _, r := range ancestors {
-		inScope[r.ID] = r
-	}
-	for _, r := range descRows {
-		if r.ScopeTier == string(atlas.ScopeNational) {
-			continue
-		}
-		if _, ok := inScope[r.ID]; ok {
-			continue
-		}
-		inScope[r.ID] = atlas.Region{
-			ID:           r.ID,
-			Country:      atlas.Country(r.Country),
-			Kind:         atlas.RegionKind(r.Kind),
-			Name:         r.Name,
-			Slug:         r.Slug,
-			ScopeTier:    atlas.ScopeTier(r.ScopeTier),
-			SortPriority: int(r.SortPriority),
+	ids := make([]int64, len(rows))
+	regions := make([]atlas.Region, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+		regions[i] = atlas.Region{
+			ID:           row.ID,
+			Country:      atlas.Country(row.Country),
+			Kind:         atlas.RegionKind(row.Kind),
+			Name:         row.Name,
+			Slug:         row.Slug,
+			ScopeTier:    atlas.ScopeTier(row.ScopeTier),
+			SortPriority: int(row.SortPriority),
 		}
 	}
-
-	// Fetch every org with at least one attachment in scope, hydrate
-	// their Regions (the bucketing helper reads each org's full
-	// attachment list).
-	ids := make([]int64, 0, len(inScope))
-	for k := range inScope {
-		ids = append(ids, k)
-	}
-	orgs, err := s.OrgsForRegions(ctx, ids)
+	parents, err := s.parentSlugsByRegion(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	local, regional := atlas.BucketOrgsByScope(inScope, orgs)
-
-	// Build the breadcrumb-friendly ancestry slice: closest-first,
-	// excluding self and national-tier (the /lookup walk includes
-	// self at [0] and pre-filters national).
-	ancestry := make([]atlas.Region, 0, len(ancestors))
-	for i, r := range ancestors {
-		if i == 0 {
-			continue
-		}
-		ancestry = append(ancestry, r)
+	for i := range regions {
+		regions[i].ParentSlugs = parents[regions[i].ID]
 	}
-
-	return &atlas.RegionDetail{
-		Region:   region,
-		Local:    local,
-		Regional: regional,
-		Ancestry: ancestry,
-	}, nil
+	return regions, nil
 }
 
 // GetOrgBySlug implements atlas.Store. Returns atlas.ErrOrgNotFound for

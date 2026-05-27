@@ -40,13 +40,13 @@ func listRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc
 // getRegionHandler answers GET /api/v1/regions/{slug}. Resolves any
 // non-national region — metros, cities, counties, boroughs, states,
 // multi-state coalitions. Returns 404 with a problem+json document
-// for unknown slugs and for national-tier slugs (Store.GetRegion
+// for unknown slugs and for national-tier slugs (atlas.GetRegion
 // signals both with (nil, nil)).
 func getRegionHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		slug := strings.TrimSpace(chi.URLParam(r, "slug"))
-		detail, err := store.GetRegion(r.Context(), slug)
+		detail, err := atlas.GetRegion(r.Context(), store, slug)
 		if err != nil {
 			logger.ErrorContext(r.Context(), "get region failed", "err", err, "slug", slug, "rid", rid)
 			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)

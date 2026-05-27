@@ -114,7 +114,7 @@ func TestPostgresStore_GetRegion_HappyPath(t *testing.T) {
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetRegion(ctx, "nyc-metro")
+	got, err := atlas.GetRegion(ctx, store, "nyc-metro")
 	if err != nil {
 		t.Fatalf("GetRegion: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestPostgresStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetRegion(ctx, "chicago")
+	got, err := atlas.GetRegion(ctx, store, "chicago")
 	if err != nil {
 		t.Fatalf("GetRegion(chicago): %v", err)
 	}
@@ -188,7 +188,7 @@ func TestPostgresStore_GetRegion_UnknownSlug_ReturnsNil(t *testing.T) {
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetRegion(ctx, "does-not-exist")
+	got, err := atlas.GetRegion(ctx, store, "does-not-exist")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
@@ -207,7 +207,7 @@ func TestPostgresStore_GetRegion_StateSlugResolves(t *testing.T) {
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetRegion(ctx, "ny")
+	got, err := atlas.GetRegion(ctx, store, "ny")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
@@ -231,7 +231,7 @@ func TestPostgresStore_GetRegion_MultiStateSlugResolves(t *testing.T) {
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetRegion(ctx, "chicagoland")
+	got, err := atlas.GetRegion(ctx, store, "chicagoland")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
@@ -255,7 +255,7 @@ func TestPostgresStore_GetRegion_NationalReturnsNil(t *testing.T) {
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetRegion(ctx, "pt-nacional")
+	got, err := atlas.GetRegion(ctx, store, "pt-nacional")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
