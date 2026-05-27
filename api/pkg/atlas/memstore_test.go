@@ -3,6 +3,7 @@ package atlas
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -104,5 +105,51 @@ func TestMemStore_AncestorRegions_TopOfTree(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Slug != "ny" {
 		t.Errorf("got %v, want [{slug: ny}]", got)
+	}
+}
+
+// BenchmarkMemStore_ListRegions measures the steady-state cost of
+// ListRegions at a region count comparable to the v1 US seed (~600
+// regions with a state-tier root and city-tier leaves). The hoist of
+// buildChildrenOf out of the per-root descendantRegionIDs loop turns
+// this from O(R · P) into O(R + P) per call. A reversion that puts
+// the rebuild back in the inner loop will visibly regress.
+func BenchmarkMemStore_ListRegions(b *testing.B) {
+	const (
+		metros = 50  // each a us:metro at SortPriority 40
+		cities = 600 // each a us:city under one metro at SortPriority 10
+	)
+	s := NewMemStore()
+	s.AddRegion(Region{ID: 1, Slug: "us-state", Kind: "us:state", Name: "Synthetic State",
+		Country: "US", ScopeTier: ScopeRegional, SortPriority: 60})
+	for i := range metros {
+		slug := fmt.Sprintf("metro-%03d", i)
+		s.AddRegion(Region{
+			ID: int64(100 + i), Slug: slug, Kind: "us:metro",
+			Name: slug, Country: "US", ScopeTier: ScopeRegional, SortPriority: 40,
+			ParentSlugs: []string{"us-state"},
+		})
+	}
+	for i := range cities {
+		parent := fmt.Sprintf("metro-%03d", i%metros)
+		slug := fmt.Sprintf("city-%04d", i)
+		s.AddRegion(Region{
+			ID: int64(10000 + i), Slug: slug, Kind: "us:city",
+			Name: slug, Country: "US", ScopeTier: ScopeLocal, SortPriority: 10,
+			ParentSlugs: []string{parent},
+		})
+		// One org per city so every metro has at least one descendant
+		// org and ListRegions actually returns rows.
+		s.AddOrg(Org{
+			ID: int64(20000 + i), Slug: fmt.Sprintf("org-%04d", i),
+			Name: "Org", ShortDesc: "synthetic", WebsiteURL: "https://example.org",
+		}, []int64{int64(10000 + i)})
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := s.ListRegions(context.Background()); err != nil {
+			b.Fatalf("ListRegions: %v", err)
+		}
 	}
 }

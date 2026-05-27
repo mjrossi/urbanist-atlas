@@ -137,12 +137,18 @@ func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Reg
 func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	// Build the reverse-adjacency map once for the whole call instead
+	// of inside each descendantRegionIDs invocation. Without this hoist
+	// the cost was O(R · P) per ListRegions (R browseable regions, P
+	// parent edges) — at v1 scale (~5k of each) that's noticeable in
+	// tests that hammer the endpoint. Hoisted, the whole call is O(R + P).
+	childrenOf := s.buildChildrenOf()
 	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
 		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
 			continue
 		}
-		descendants := s.descendantRegionIDs(id)
+		descendants := s.descendantRegionIDsWith(id, childrenOf)
 		count := s.countOrgsForRegions(descendants)
 		if count == 0 {
 			continue
@@ -318,6 +324,22 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 	return candidates, nil
 }
 
+// buildChildrenOf returns a fresh reverse-adjacency map (parent → list
+// of children) derived from s.parents. O(P) in the parent-edge count.
+// Caller must hold s.mu (read or write). Allocate-and-return rather
+// than caching on the struct so the function is safe under RLock
+// without coordinating writes; the dominant caller (ListRegions)
+// builds it once per request and reuses across the loop.
+func (s *MemStore) buildChildrenOf() map[int64][]int64 {
+	out := map[int64][]int64{}
+	for childID, parents := range s.parents {
+		for _, p := range parents {
+			out[p] = append(out[p], childID)
+		}
+	}
+	return out
+}
+
 // descendantRegionIDs returns rootID followed by every non-national
 // region reachable by walking the parents map in reverse (child-of
 // relation). Excludes scope_tier='national' rows from both the seed
@@ -326,14 +348,23 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 // leak into GetRegion's in-scope set. Matches the Postgres
 // DescendantRegions CTE.
 //
+// Builds childrenOf inline — convenience wrapper for callers like
+// DescendantRegions that don't loop over multiple roots. Multi-root
+// callers (ListRegions) should hoist the buildChildrenOf call and
+// use descendantRegionIDsWith to avoid the O(P) rebuild per root.
+//
 // Must be called with s.mu held (read or write).
 func (s *MemStore) descendantRegionIDs(rootID int64) []int64 {
-	childrenOf := map[int64][]int64{}
-	for childID, parents := range s.parents {
-		for _, p := range parents {
-			childrenOf[p] = append(childrenOf[p], childID)
-		}
-	}
+	return s.descendantRegionIDsWith(rootID, s.buildChildrenOf())
+}
+
+// descendantRegionIDsWith is the BFS body of descendantRegionIDs,
+// parameterized on a precomputed parent → children map. Splits the
+// hot path so ListRegions can build childrenOf once for the whole
+// call instead of once per root.
+//
+// Must be called with s.mu held (read or write).
+func (s *MemStore) descendantRegionIDsWith(rootID int64, childrenOf map[int64][]int64) []int64 {
 	visited := map[int64]bool{}
 	out := []int64{}
 	queue := []int64{rootID}

@@ -82,12 +82,14 @@ func placeLabel(ancestry []Region) string {
 	}
 	leaf := ancestry[0]
 
+	// r := ancestry[i] inside each loop body is a fresh local each
+	// iteration — taking &r is safe and escapes to the heap, so callers
+	// keep a valid pointer after break.
 	var broad *Region
 	for i := 1; i < len(ancestry); i++ {
 		r := ancestry[i]
 		if IsMetroKind(r.Kind) {
-			cp := r
-			broad = &cp
+			broad = &r
 			break
 		}
 	}
@@ -95,8 +97,7 @@ func placeLabel(ancestry []Region) string {
 		for i := 1; i < len(ancestry); i++ {
 			r := ancestry[i]
 			if r.ScopeTier == ScopeRegional {
-				cp := r
-				broad = &cp
+				broad = &r
 				break
 			}
 		}
@@ -114,8 +115,7 @@ func placeLabel(ancestry []Region) string {
 		if r.SortPriority >= 60 { // state-tier or higher: excludes state/multi-state.
 			continue
 		}
-		cp := r
-		inner = &cp
+		inner = &r
 		break
 	}
 

@@ -306,3 +306,63 @@ func TestStatusRecorder_FirstWriteHeaderWins(t *testing.T) {
 		t.Errorf("status: got %d, want %d (first WriteHeader must win)", sw.status, http.StatusCreated)
 	}
 }
+
+// flushTrackingWriter wraps httptest.ResponseRecorder so the test can
+// confirm the statusRecorder.Flush() passthrough actually called the
+// underlying Flush.
+type flushTrackingWriter struct {
+	*httptest.ResponseRecorder
+	flushed int
+}
+
+func (f *flushTrackingWriter) Flush() {
+	f.flushed++
+	f.ResponseRecorder.Flush()
+}
+
+// TestStatusRecorder_FlushPassthrough confirms statusRecorder.Flush()
+// delegates to the wrapped writer's Flusher implementation when one
+// exists. Required so SSE / chunked-response handlers don't get a
+// silently no-op wrapper.
+func TestStatusRecorder_FlushPassthrough(t *testing.T) {
+	tracker := &flushTrackingWriter{ResponseRecorder: httptest.NewRecorder()}
+	sw := &statusRecorder{ResponseWriter: tracker, status: http.StatusOK}
+
+	sw.Flush()
+	sw.Flush()
+
+	if tracker.flushed != 2 {
+		t.Errorf("inner Flush called %d times, want 2", tracker.flushed)
+	}
+}
+
+// nonFlushWriter is the negative-path foil: a ResponseWriter that does
+// NOT implement http.Flusher. The recorder's Flush() must be a no-op
+// rather than panicking on a failed type assertion.
+type nonFlushWriter struct{ http.ResponseWriter }
+
+// TestStatusRecorder_FlushNoopWhenInnerNotFlusher: when the wrapped
+// writer doesn't implement http.Flusher, statusRecorder.Flush() is a
+// silent no-op (matches the conservative passthrough contract).
+func TestStatusRecorder_FlushNoopWhenInnerNotFlusher(t *testing.T) {
+	sw := &statusRecorder{ResponseWriter: nonFlushWriter{httptest.NewRecorder()}, status: http.StatusOK}
+
+	// Just must not panic — assertion-free.
+	sw.Flush()
+}
+
+// TestStatusRecorder_HijackPushReturnNotSupportedFallback covers the
+// negative path for both Hijack and Push: when the wrapped writer
+// doesn't implement the interface, the recorder returns
+// http.ErrNotSupported rather than panicking. (httptest.ResponseRecorder
+// implements neither, so it's the natural foil.)
+func TestStatusRecorder_HijackPushReturnNotSupportedFallback(t *testing.T) {
+	sw := &statusRecorder{ResponseWriter: httptest.NewRecorder(), status: http.StatusOK}
+
+	if _, _, err := sw.Hijack(); err != http.ErrNotSupported {
+		t.Errorf("Hijack: got err=%v, want http.ErrNotSupported", err)
+	}
+	if err := sw.Push("/some-resource", nil); err != http.ErrNotSupported {
+		t.Errorf("Push: got err=%v, want http.ErrNotSupported", err)
+	}
+}

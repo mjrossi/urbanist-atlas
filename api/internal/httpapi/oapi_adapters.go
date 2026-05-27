@@ -36,9 +36,9 @@ func toOAPIRegion(r atlas.Region) oapi.Region {
 // see toOAPILookupOrg in lookup.go — it calls this helper and then
 // attaches the lookup-specific field.
 func toOAPIOrg(o atlas.Org) oapi.Org {
-	tags := make([]string, len(o.Tags))
-	for i, t := range o.Tags {
-		tags[i] = string(t)
+	tags := make([]string, 0, len(o.Tags))
+	for _, t := range o.Tags {
+		tags = append(tags, string(t))
 	}
 	regions := make([]oapi.Region, 0, len(o.Regions))
 	for _, r := range o.Regions {

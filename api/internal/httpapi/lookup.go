@@ -10,6 +10,17 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
+// Upper bounds on the raw `postal_code` and `country` query parameters.
+// Generous relative to the longest validators in pkg/atlas/postal.go
+// (PT is 7 chars after hyphen-strip; every other supported country is
+// ≤ 7) — they exist to reject pathological inputs (multi-MB strings
+// the net/http header cap still allows) before NormalizePostalCode
+// allocates and the DB driver ferries the value as a bind parameter.
+const (
+	maxPostalCodeLen = 16
+	maxCountryLen    = 4
+)
+
 // lookupHandler answers GET /api/v1/lookup?postal_code=…&country=….
 //
 // The response body is the generated oapi.LookupResult (so the wire
@@ -22,8 +33,22 @@ import (
 func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
-		rawPostal := strings.TrimSpace(r.URL.Query().Get("postal_code"))
-		country := atlas.Country(strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("country"))))
+		rawPostalIn := r.URL.Query().Get("postal_code")
+		rawCountryIn := r.URL.Query().Get("country")
+
+		// Length-cap the raw input before TrimSpace so a multi-megabyte
+		// blob doesn't even reach the normalization pass.
+		if len(rawPostalIn) > maxPostalCodeLen {
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "postal_code too long", rid)
+			return
+		}
+		if len(rawCountryIn) > maxCountryLen {
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "country too long", rid)
+			return
+		}
+
+		rawPostal := strings.TrimSpace(rawPostalIn)
+		country := atlas.Country(strings.ToUpper(strings.TrimSpace(rawCountryIn)))
 
 		if rawPostal == "" {
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", "postal_code is required", rid)
