@@ -125,19 +125,24 @@ func LoadFile(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, path
 		if err != nil {
 			return Summary{}, fmt.Errorf("loadregions: batch upsert regions [%d:%d): %w", start, end, err)
 		}
-		for rows.Next() {
-			var id int64
-			var slug string
-			if err := rows.Scan(&id, &slug); err != nil {
-				rows.Close()
-				return Summary{}, fmt.Errorf("loadregions: scan returning: %w", err)
+		// Closure so a single `defer rows.Close()` covers every exit
+		// path — including the rows.Err() check, which otherwise
+		// returned without an explicit Close. pgx v5 auto-closes when
+		// Next() returns false so this is defensive, not a leak fix.
+		if err := func() error {
+			defer rows.Close()
+			for rows.Next() {
+				var id int64
+				var slug string
+				if err := rows.Scan(&id, &slug); err != nil {
+					return fmt.Errorf("scan returning: %w", err)
+				}
+				rid[slug] = id
 			}
-			rid[slug] = id
+			return rows.Err()
+		}(); err != nil {
+			return Summary{}, fmt.Errorf("loadregions: rows iter [%d:%d): %w", start, end, err)
 		}
-		if err := rows.Err(); err != nil {
-			return Summary{}, fmt.Errorf("loadregions: rows iter: %w", err)
-		}
-		rows.Close()
 
 		summary.Regions += len(chunk)
 		summary.Batches++
