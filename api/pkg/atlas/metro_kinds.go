@@ -3,10 +3,15 @@ package atlas
 import "sort"
 
 // metroKinds names the region kinds that count as "metro-equivalent"
-// for the purpose of /api/v1/metros and the homepage Browse panel. The
-// set is editorial, not derived from a suffix pattern, because the
-// administrative geographies that qualify don't share a stable lexical
-// suffix.
+// — administrative geographies at MSA / CMA / metropolitan-area
+// granularity. Used by /lookup's placeLabel to pick the "broad"
+// ancestor slot, so a Brooklyn ZIP renders as "Brooklyn, NYC — New
+// York Metro" rather than "Brooklyn, NYC — New York City".
+//
+// This is intentionally narrower than defaultBrowseKinds in
+// browse_kinds.go, which is the set surfaced on /api/v1/regions
+// (Browse). Cities are in the default browse set but are not
+// "metro-equivalent" for label-building.
 //
 // In:
 //   - us:metro              — MSA/CSA
@@ -15,12 +20,8 @@ import "sort"
 //     metro role (e.g. Metro Vancouver)
 //   - pt:area-metropolitana — AML, AMP
 //
-// Out: states/provinces, distritos, NUTS regions, autonomous communities,
-// national tier.
-//
-// Adding a new country's metro-equivalent kind is a one-line append
-// here; the predicate and the accessor stay unchanged. The
-// per-country editorial conventions live in docs/region-graph.md.
+// Out: cities, states/provinces, counties, boroughs, distritos, NUTS
+// regions, autonomous communities, national tier.
 var metroKinds = map[RegionKind]bool{
 	"us:metro":              true,
 	"ca:cma":                true,
@@ -28,15 +29,13 @@ var metroKinds = map[RegionKind]bool{
 	"pt:area-metropolitana": true,
 }
 
-// IsMetroKind reports whether k is one of the metro-equivalent kinds
-// recognized by /api/v1/metros. The unknown empty string returns false.
+// IsMetroKind reports whether k is one of the metro-equivalent kinds.
+// The unknown empty string returns false.
 func IsMetroKind(k RegionKind) bool { return metroKinds[k] }
 
 // MetroKinds returns the metro-equivalent kinds in deterministic
-// alphabetical order. The SQL layer passes this as a $1::text[]
-// parameter, so a stable order keeps query plans (and EXPLAINs)
-// readable. Callers must not mutate the returned slice — it's a fresh
-// copy each call, but treat it as immutable to keep the API obvious.
+// alphabetical order. Callers must not mutate the returned slice —
+// it's a fresh copy each call, but treat it as immutable.
 func MetroKinds() []RegionKind {
 	out := make([]RegionKind, 0, len(metroKinds))
 	for k := range metroKinds {
@@ -46,9 +45,8 @@ func MetroKinds() []RegionKind {
 	return out
 }
 
-// MetroKindStrings returns MetroKinds as []string for the sqlc-generated
-// queries that take text[] parameters. Same ordering and freshness
-// guarantees as MetroKinds.
+// MetroKindStrings returns MetroKinds as []string. Same ordering and
+// freshness guarantees as MetroKinds.
 func MetroKindStrings() []string {
 	kinds := MetroKinds()
 	out := make([]string, len(kinds))

@@ -15,7 +15,7 @@ import (
 // problem+json document for unknown or non-approved slugs. The handler
 // stays thin: parse → call store → encode. Hydration of Org.Regions
 // happens in the Store layer; the wire-shape adapter is the same
-// toOAPIOrg used by /metros/{slug} and /recent.
+// toOAPIOrg used by /regions/{slug} and /recent.
 func getOrgHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())

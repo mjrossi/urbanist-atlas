@@ -2363,6 +2363,43 @@ a.tag:hover::before {
   font-weight: 600;
 }
 
+/* Child rows nest beneath their anchor (a city under its parent
+   metro, e.g. "Chicago" under "Chicago Metro"). The corner glyph
+   is a thin amber rule + arm rendered with a single ::before, so
+   the markup stays a flat list and the indent renders even when
+   wrapped to mobile widths. */
+.index-row.child {
+  padding-left: 28px;
+  position: relative;
+}
+
+.index-row.child::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 50%;
+  width: 12px;
+  border-left: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.index-row.child .iname {
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--muted-strong, var(--muted));
+}
+
+.index-row.child:hover .iname {
+  color: var(--amber);
+}
+
+/* Anchor group keeps an anchor and its children visually connected
+   when the print-style border-bottom hits an anchor with kids. */
+.index-anchor-group {
+  break-inside: avoid;
+}
+
 /* ── Submit slip ───────────────────────────────────── */
 
 .slip {

@@ -27,7 +27,7 @@ export function Footer() {
               <Link to="/">Front page</Link>
             </li>
             <li>
-              <Link to="/browse">Browse by metro</Link>
+              <Link to="/browse">Browse the atlas</Link>
             </li>
             <li>
               <Link to="/submit">File a submission</Link>

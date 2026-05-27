@@ -4,8 +4,14 @@ import { Entry } from './Entry.tsx';
 /**
  * Classified-section list grouped into Local (city / county) and
  * Regional (metro / state / province / multi-state) blocks. Each
- * section renders its own small-caps label even when empty so the
- * reader sees which tier turned up nothing.
+ * section renders the broadsheet `.section-break` header (roman
+ * numeral + title + entry count) and an inline org-entry list
+ * driven by the shared `Entry` component.
+ *
+ * Empty sections render nothing — the section label only appears
+ * when there's at least one entry. The Results page's empty-state
+ * copy lives outside this component (the page renders an
+ * editors-note card when BOTH buckets are empty).
  */
 export function EntryList({
   local,
@@ -19,15 +25,15 @@ export function EntryList({
   return (
     <>
       <Section
-        label="Local"
+        roman="I."
+        title="Local"
         orgs={local}
-        emptyHint="No local groups indexed yet."
         regionNameBySlug={regionNameBySlug}
       />
       <Section
-        label="Regional"
+        roman="II."
+        title="Regional"
         orgs={regional}
-        emptyHint="No regional groups indexed yet."
         regionNameBySlug={regionNameBySlug}
       />
     </>
@@ -35,30 +41,39 @@ export function EntryList({
 }
 
 function Section({
-  label,
+  roman,
+  title,
   orgs,
-  emptyHint,
   regionNameBySlug,
 }: {
-  label: string;
+  roman: string;
+  title: string;
   orgs: LookupOrg[];
-  emptyHint: string;
   regionNameBySlug: Map<string, string>;
 }) {
+  if (orgs.length === 0) return null;
   return (
-    <section className="results-section" aria-labelledby={`section-${label.toLowerCase()}`}>
-      <h2 id={`section-${label.toLowerCase()}`} className="section-label">
-        {label}
-      </h2>
-      {orgs.length === 0 ? (
-        <p className="results-section-empty">{emptyHint}</p>
-      ) : (
-        <ul className="entry-list">
-          {orgs.map((org) => (
-            <Entry key={org.id} org={org} regionNameBySlug={regionNameBySlug} />
-          ))}
-        </ul>
-      )}
+    <section className="org-section" style={{ marginTop: 32 }}>
+      <header className="section-break" style={{ marginTop: 0 }}>
+        <span className="num">{roman}</span>
+        <h2 className="title">
+          {title}
+          <span className="accent" style={{ color: 'var(--amber)' }}>
+            .
+          </span>
+        </h2>
+        <span className="aside">
+          {orgs.length} {orgs.length === 1 ? 'entry' : 'entries'}
+        </span>
+      </header>
+      {orgs.map((org) => (
+        <Entry
+          key={org.id}
+          org={org}
+          matchedRegionSlugs={org.matched_region_slugs}
+          regionNameBySlug={regionNameBySlug}
+        />
+      ))}
     </section>
   );
 }

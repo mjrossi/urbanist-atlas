@@ -92,7 +92,7 @@ func TestGetOrg_404_UnknownSlug(t *testing.T) {
 func TestGetOrg_401_MissingClientSecret(t *testing.T) {
 	// A server configured with a non-empty ClientSecret rejects requests
 	// that omit the X-Atlas-Client header — same gate that protects
-	// /lookup and /metros. The exact problem-type URI is pinned so a
+	// /lookup and /regions. The exact problem-type URI is pinned so a
 	// future drift surfaces here.
 	store := atlas.NewMemStore()
 	atlas.LoadDevFixtures(store)

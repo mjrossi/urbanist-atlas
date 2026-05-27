@@ -65,7 +65,7 @@ func newMeta() oapi.Meta {
 // writeJSON; single-resource handlers continue to use writeJSON.
 //
 // T uses generics so the call site keeps its typed slice (e.g.
-// []oapi.MetroSummary) without an explicit any conversion. The
+// []oapi.RegionSummary) without an explicit any conversion. The
 // helper encodes whatever T is, so adding a new collection
 // endpoint is one call-site change plus a new *Envelope schema in
 // openapi.yaml.

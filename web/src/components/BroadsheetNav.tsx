@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router';
-import { listMetros } from '../lib/api.ts';
-import type { MetroSummary } from '../lib/api.ts';
+import { listRegions } from '../lib/api.ts';
+import type { RegionSummary } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 interface NavEntry {
@@ -23,7 +23,7 @@ function isActive(entry: NavEntry, pathname: string): boolean {
   if (entry.to === '/browse') {
     return (
       pathname.startsWith('/browse') ||
-      pathname.startsWith('/m/') ||
+      pathname.startsWith('/region/') ||
       pathname.startsWith('/orgs/') ||
       pathname.startsWith('/r/')
     );
@@ -45,13 +45,15 @@ export function BroadsheetNav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
-  const metros = useQuery<MetroSummary[]>({
-    queryKey: queryKeys.metros(),
-    queryFn: ({ signal }) => listMetros({ signal }),
+  const regions = useQuery<RegionSummary[]>({
+    queryKey: queryKeys.regions(),
+    queryFn: ({ signal }) => listRegions({ signal }),
   });
-  const metroCount = metros.data?.length ?? null;
-  const orgCount = metros.data
-    ? metros.data.reduce((sum, m) => sum + m.org_count, 0)
+  const regionCount = regions.data?.length ?? null;
+  // direct_org_count keeps the masthead tally from double-counting
+  // orgs that surface under both a metro and its child cities.
+  const orgCount = regions.data
+    ? regions.data.reduce((sum, p) => sum + p.direct_org_count, 0)
     : null;
 
   return (
@@ -97,9 +99,9 @@ export function BroadsheetNav() {
         <span className="live">
           <strong>Indexed &amp; current</strong>
         </span>
-        {metroCount !== null && orgCount !== null ? (
+        {regionCount !== null && orgCount !== null ? (
           <span>
-            {orgCount} orgs · {metroCount} metros
+            {orgCount} orgs · {regionCount} regions
           </span>
         ) : null}
       </div>

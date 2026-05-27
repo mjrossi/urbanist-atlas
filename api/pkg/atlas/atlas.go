@@ -72,9 +72,9 @@ type Region struct {
 // subset of Regions that caused the org to surface for that lookup.
 //
 // CreatedAt is server-side only (`json:"-"`) and powers newest-first
-// ordering in Store.ListRecent and Store.GetMetro. The wire contract
-// in api/openapi.yaml does not include it; a future spec addition can
-// expose it without changing the data model.
+// ordering in Store.ListRecent and Store.OrgsForRegions. The wire
+// contract in api/openapi.yaml does not include it; a future spec
+// addition can expose it without changing the data model.
 type Org struct {
 	ID                 int64     `json:"id"`
 	Slug               string    `json:"slug"`

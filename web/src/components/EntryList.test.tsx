@@ -4,9 +4,6 @@ import { MemoryRouter } from 'react-router';
 import { EntryList } from './EntryList.tsx';
 import type { LookupOrg } from '../lib/api.ts';
 
-// EntryList renders <Entry>, which now uses `<Link>` for the org
-// name. Wrap each render in a MemoryRouter so the router context
-// resolves; the asserted behavior is unchanged.
 function renderList(node: React.ReactNode) {
   return render(<MemoryRouter>{node}</MemoryRouter>);
 }
@@ -27,9 +24,27 @@ function makeOrg(id: number, name: string, tags: string[] = []): LookupOrg {
 const emptyMap = new Map<string, string>();
 
 describe('EntryList', () => {
-  it('renders both Local and Regional section labels', () => {
-    renderList(<EntryList local={[]} regional={[]} regionNameBySlug={emptyMap} />);
+  it('renders the Local section label only when local is non-empty', () => {
+    renderList(
+      <EntryList
+        local={[makeOrg(1, 'Local Org A')]}
+        regional={[]}
+        regionNameBySlug={emptyMap}
+      />,
+    );
     expect(screen.getByText('Local')).toBeDefined();
+    expect(screen.queryByText('Regional')).toBeNull();
+  });
+
+  it('renders the Regional section label only when regional is non-empty', () => {
+    renderList(
+      <EntryList
+        local={[]}
+        regional={[makeOrg(2, 'Only Regional')]}
+        regionNameBySlug={emptyMap}
+      />,
+    );
+    expect(screen.queryByText('Local')).toBeNull();
     expect(screen.getByText('Regional')).toBeDefined();
   });
 
@@ -46,11 +61,24 @@ describe('EntryList', () => {
     expect(screen.getByRole('link', { name: 'Regional Org C' })).toBeDefined();
   });
 
-  it('shows a per-section empty hint when a tier is empty', () => {
-    renderList(
-      <EntryList local={[]} regional={[makeOrg(1, 'Only Regional')]} regionNameBySlug={emptyMap} />,
+  it('renders nothing when both sections are empty', () => {
+    const { container } = renderList(
+      <EntryList local={[]} regional={[]} regionNameBySlug={emptyMap} />,
     );
-    expect(screen.getByText('No local groups indexed yet.')).toBeDefined();
-    expect(screen.queryByText('No regional groups indexed yet.')).toBeNull();
+    // No section headers, no entries.
+    expect(container.querySelector('.section-break')).toBeNull();
+    expect(container.querySelector('.org-entry')).toBeNull();
+  });
+
+  it('shows the entry count in the section header', () => {
+    renderList(
+      <EntryList
+        local={[makeOrg(1, 'A'), makeOrg(2, 'B'), makeOrg(3, 'C')]}
+        regional={[makeOrg(4, 'D')]}
+        regionNameBySlug={emptyMap}
+      />,
+    );
+    expect(screen.getByText('3 entries')).toBeDefined();
+    expect(screen.getByText('1 entry')).toBeDefined();
   });
 });

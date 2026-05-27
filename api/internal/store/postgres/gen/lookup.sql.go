@@ -128,6 +128,7 @@ func (q *Queries) GetRegionsByIDs(ctx context.Context, dollar_1 []int64) ([]Regi
 const orgsForRegionsAndAllRegionIDs = `-- name: OrgsForRegionsAndAllRegionIDs :many
 SELECT
     o.id, o.slug, o.name, o.short_desc, o.website_url, o.contact_url, o.tags,
+    o.created_at,
     ARRAY(
         SELECT orx.region_id
         FROM organization_regions orx
@@ -151,6 +152,7 @@ type OrgsForRegionsAndAllRegionIDsRow struct {
 	WebsiteUrl string
 	ContactUrl pgtype.Text
 	Tags       []string
+	CreatedAt  pgtype.Timestamptz
 	RegionIds  []int64
 }
 
@@ -158,6 +160,10 @@ type OrgsForRegionsAndAllRegionIDsRow struct {
 // returns the org row plus ALL the region IDs that org is attached
 // to (array_agg). The adapter then hydrates each ID into a Region via
 // GetRegionsByIDs in one round-trip.
+//
+// Includes o.created_at so the adapter can populate Org.CreatedAt —
+// atlas.Store's contract is that OrgsForRegions returns the same
+// shape ListRecent does (the storetest harness pins this).
 func (q *Queries) OrgsForRegionsAndAllRegionIDs(ctx context.Context, dollar_1 []int64) ([]OrgsForRegionsAndAllRegionIDsRow, error) {
 	rows, err := q.db.Query(ctx, orgsForRegionsAndAllRegionIDs, dollar_1)
 	if err != nil {
@@ -175,6 +181,7 @@ func (q *Queries) OrgsForRegionsAndAllRegionIDs(ctx context.Context, dollar_1 []
 			&i.WebsiteUrl,
 			&i.ContactUrl,
 			&i.Tags,
+			&i.CreatedAt,
 			&i.RegionIds,
 		); err != nil {
 			return nil, err

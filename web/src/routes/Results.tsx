@@ -3,10 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
-import type { Country, LookupOrg, LookupResult } from '../lib/api.ts';
+import type { Country, LookupResult } from '../lib/api.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { EntryList } from '../components/EntryList.tsx';
+import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
+import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 
 function parseCountry(raw: string | null): Country | null {
   if (raw === null) return 'US';
@@ -30,8 +33,8 @@ export function Results() {
   useDocumentTitle(
     postalCode ? `${postalCode} — Urbanist Atlas` : 'Lookup — Urbanist Atlas',
   );
-  // ~35k postal-code permutations; let crawlers follow the org links out but
-  // keep the thin per-ZIP pages out of the index.
+  // ~35k postal-code permutations; let crawlers follow the org links
+  // out but keep the thin per-ZIP pages out of the index.
   useEffect(() => {
     const meta = document.createElement('meta');
     meta.name = 'robots';
@@ -42,20 +45,32 @@ export function Results() {
     };
   }, []);
 
+  // Breadcrumb prefix: "Atlas / Lookup · <ZIP>". The ZIP renders as
+  // a non-clickable span (no `to`) so it shows context without
+  // implying a clickable lookup-only landing page.
+  const breadcrumbPrefix: ReadonlyArray<BreadcrumbItem> = [
+    { label: 'Atlas', to: '/' },
+    { label: `Lookup · ${postalCode || '—'}` },
+  ];
+
+  // Resolved-ancestry walk: API returns leaf-first; the breadcrumb
+  // wants root-first followed by the leaf as `current`. Reverse a
+  // copy and split off the (originally first, now last) leaf.
+  const ancestryRootFirst = query.data
+    ? [...query.data.resolved_ancestry].slice(1).reverse()
+    : [];
+  const leafName = query.data?.resolved_ancestry[0]?.name;
+  const currentLabel = leafName ?? (postalCode || '—');
+  const metaRight = country ? `${country} · postal-code lookup` : 'Postal-code lookup';
+
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">
-            Lookup · {postalCode || '—'}
-          </span>
-        </div>
-        <div>
-          {country ? `${country} · postal-code lookup` : 'Postal-code lookup'}
-        </div>
-      </div>
+      <RegionBreadcrumb
+        prefix={breadcrumbPrefix}
+        ancestors={ancestryRootFirst}
+        current={currentLabel}
+        metaRight={metaRight}
+      />
       <ResultsBody
         query={query}
         postalCode={postalCode}
@@ -113,9 +128,16 @@ function ResultsBody({
   }
 
   const placeLabel = query.data.resolved_place_label ?? postalCode;
-  const ancestry = query.data.resolved_ancestry;
-  const { local, regional } = query.data;
+  const { local, regional, resolved_ancestry } = query.data;
   const empty = local.length === 0 && regional.length === 0;
+
+  // EntryList needs a slug -> display name map for its "Matched
+  // via X" footer. Build it from the resolved-ancestry walk; this
+  // covers every slug an Org's matched_region_slugs can reference
+  // for this lookup.
+  const regionNameBySlug = new Map(
+    resolved_ancestry.map((r) => [r.slug, r.name]),
+  );
 
   return (
     <>
@@ -132,18 +154,6 @@ function ResultsBody({
             ? `Nothing indexed yet for ${placeLabel}. The Atlas grows one editorial decision at a time — file a tip if you know who's doing the work here.`
             : `Groups working in or around ${placeLabel}. Local entries are nearest; regional entries cover wider footprints that include this postal code.`}
         </p>
-        {ancestry.length > 0 ? (
-          <div className="byline">
-            <span>{country}</span>
-            <span className="crumb-sep">·</span>
-            <span>
-              Resolved to{' '}
-              <span className="em">
-                {ancestry.map((r) => r.name).join(' → ')}
-              </span>
-            </span>
-          </div>
-        ) : null}
       </div>
 
       {empty ? (
@@ -157,89 +167,9 @@ function ResultsBody({
         </div>
       ) : (
         <div style={{ marginTop: 24 }}>
-          <ResultSection title="Local" orgs={local} kind="local" />
-          <ResultSection title="Regional" orgs={regional} kind="regional" />
+          <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />
         </div>
       )}
     </>
   );
-}
-
-function ResultSection({
-  title,
-  orgs,
-  kind,
-}: {
-  title: string;
-  orgs: LookupOrg[];
-  kind: 'local' | 'regional';
-}) {
-  if (orgs.length === 0) return null;
-  return (
-    <section className="org-section" style={{ marginTop: 32 }}>
-      <header className="section-break" style={{ marginTop: 0 }}>
-        <span className="num">{kind === 'local' ? 'I.' : 'II.'}</span>
-        <h2 className="title">
-          {title}
-          <span className="accent" style={{ color: 'var(--amber)' }}>
-            .
-          </span>
-        </h2>
-        <span className="aside">
-          {orgs.length} {orgs.length === 1 ? 'entry' : 'entries'}
-        </span>
-      </header>
-      {orgs.map((org) => (
-        <ResultEntry key={org.id} org={org} />
-      ))}
-    </section>
-  );
-}
-
-function ResultEntry({ org }: { org: LookupOrg }) {
-  const domain = domainOf(org.website_url);
-  return (
-    <article className="org-entry">
-      <div>
-        <div className="head">
-          <h3 className="name">
-            <Link to={`/orgs/${encodeURIComponent(org.slug)}`}>{org.name}</Link>
-          </h3>
-        </div>
-        {org.website_url ? (
-          <div className="url">
-            <a href={org.website_url} target="_blank" rel="noopener noreferrer">
-              {domain ?? org.website_url}
-            </a>
-          </div>
-        ) : null}
-        <p className="desc">{org.short_desc}</p>
-        {org.tags.length > 0 ? (
-          <ul className="tag-list">
-            {org.tags.map((tag) => (
-              <li key={tag}>
-                <span className="tag">{tag.replace(/-/g, ' ')}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {org.matched_region_slugs.length > 0 ? (
-          <div className="foot">
-            <span className="via">
-              Matched via{' '}
-              <span className="em">{org.matched_region_slugs.join(' · ')}</span>
-            </span>
-          </div>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-function domainOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
 }

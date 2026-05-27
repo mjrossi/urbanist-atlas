@@ -28,38 +28,42 @@ slug = "chicago-metro"
 name = "Chicago Metro"
 parents = ["chicagoland"]
 
-# Single-state metros with curated leaves below carry no state parent
-# per region-graph.md §1 ("state edges live on the leaf, not on the
-# metro") — otherwise an SF/Boston/Miami/Seattle/LA ZIP would surface
-# the state region twice in resolved_ancestry (once via the leaf's
-# state edge, once via the metro→state edge).
+# Single-state metros parent to their state, matching the
+# auto-generated MSA convention for every other US metro. The
+# curated leaves below also carry a direct state edge
+# (region-graph.md §1); AncestorRegions' DISTINCT ON (id) dedup
+# handles the diamond, so resolved_ancestry shows the state
+# exactly once at its shallowest depth. Without these edges,
+# /regions/<metro-slug> wouldn't surface state-level orgs in its
+# Regional bucket — the slice that unified Region detail with
+# Lookup scope exposed the gap.
 
 [[override]]
 cbsa_code = "41860"
 slug = "sf-bay-area"
 name = "San Francisco Bay Area"
-parents = []
+parents = ["ca-state"]
 
 [[override]]
 cbsa_code = "14460"
 slug = "greater-boston"
 name = "Greater Boston"
-parents = []
+parents = ["ma"]
 
 [[override]]
 cbsa_code = "33100"
 slug = "greater-miami"
 name = "Greater Miami"
-parents = []
+parents = ["fl"]
 
 [[override]]
 cbsa_code = "42660"
 slug = "seattle-metro"
 name = "Seattle Metro"
-parents = []
+parents = ["wa"]
 
 [[override]]
 cbsa_code = "31080"
 slug = "greater-la"
 name = "Greater Los Angeles"
-parents = []
+parents = ["ca-state"]

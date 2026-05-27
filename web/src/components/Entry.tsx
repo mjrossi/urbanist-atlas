@@ -1,73 +1,91 @@
 import { Link } from 'react-router';
-import type { LookupOrg } from '../lib/api.ts';
-import { TagChip } from './TagChip.tsx';
+import type { Org } from '../lib/api.ts';
 
 /**
- * One row in the classified-section list: org name (linked internally
- * to the `/orgs/:slug` detail page), short description, the org's tags
- * as small pills, and a "via X" subtitle naming the matched region(s)
- * that caused this org to surface for the current lookup. The
- * `website_url` stays as a secondary affordance via the `.entry-domain`
- * external link next to the name — the link always renders when
- * website_url is non-empty, falling back to the raw URL when domainOf
- * can't extract a hostname (admin-curated data; a typo'd URL is more
- * useful as a visible broken link than as a missing affordance).
+ * One row in the classified-section list. Renders the broadsheet
+ * `.org-entry` treatment: org name (linked to its `/orgs/:slug`
+ * detail page), the website domain as a secondary external link,
+ * a short description, the org's tags as small pills, and — when
+ * the caller passed `matchedRegionSlugs` — a "Matched via X · Y"
+ * footer naming the regions that surfaced this org for the
+ * current lookup. The footer is only rendered by the postal-code
+ * Results page; Region pages omit it entirely.
+ *
+ * Why the props split: Results consumes `LookupOrg` (which carries
+ * `matched_region_slugs`) and a hydrated slug → display-name map
+ * built from the resolved-ancestry walk; Region consumes plain
+ * `Org` and has no lookup context. Keeping the via-rendering bits
+ * optional lets both pages share one component without lying
+ * about each one's data shape.
  */
+export function Entry({
+  org,
+  matchedRegionSlugs,
+  regionNameBySlug,
+}: {
+  org: Org;
+  /**
+   * Slugs whose membership caused `org` to surface for the current
+   * lookup. Omit on pages that aren't a postal-code lookup; the
+   * "Matched via X" footer is suppressed when this is undefined or
+   * empty.
+   */
+  matchedRegionSlugs?: ReadonlyArray<string>;
+  /**
+   * Slug → display-name map for the matched-via footer. When a slug
+   * is missing from the map, the raw slug renders.
+   */
+  regionNameBySlug?: Map<string, string>;
+}) {
+  const domain = domainOf(org.website_url);
+  const matchedNames =
+    matchedRegionSlugs && matchedRegionSlugs.length > 0
+      ? matchedRegionSlugs
+          .map((slug) => regionNameBySlug?.get(slug) ?? slug)
+          .join(' · ')
+      : null;
+
+  return (
+    <article className="org-entry">
+      <div>
+        <div className="head">
+          <h3 className="name">
+            <Link to={`/orgs/${encodeURIComponent(org.slug)}`}>{org.name}</Link>
+          </h3>
+        </div>
+        {org.website_url ? (
+          <div className="url">
+            <a href={org.website_url} target="_blank" rel="noopener noreferrer">
+              {domain ?? org.website_url}
+            </a>
+          </div>
+        ) : null}
+        <p className="desc">{org.short_desc}</p>
+        {org.tags.length > 0 ? (
+          <ul className="tag-list">
+            {org.tags.map((tag) => (
+              <li key={tag}>
+                <span className="tag">{tag.replace(/-/g, ' ')}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {matchedNames ? (
+          <div className="foot">
+            <span className="via">
+              Matched via <span className="em">{matchedNames}</span>
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 function domainOf(url: string): string | null {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
   } catch {
     return null;
   }
-}
-
-export function Entry({
-  org,
-  regionNameBySlug,
-}: {
-  org: LookupOrg;
-  /**
-   * Optional slug → display-name map. When omitted (e.g. the metro
-   * detail page, which isn't a postal-code lookup), slugs are shown
-   * as-is. Callers that don't have a hydrated map should leave this
-   * prop unset rather than pass an empty Map.
-   */
-  regionNameBySlug?: Map<string, string>;
-}) {
-  const domain = domainOf(org.website_url);
-
-  const viaNames = org.matched_region_slugs
-    .map((slug) => regionNameBySlug?.get(slug) ?? slug)
-    .join(', ');
-
-  return (
-    <li className="entry">
-      <div className="entry-header">
-        <h3 className="entry-name">
-          <Link to={`/orgs/${encodeURIComponent(org.slug)}`}>{org.name}</Link>
-        </h3>
-        {org.website_url ? (
-          <a
-            className="entry-domain"
-            href={org.website_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {domain ?? org.website_url}
-          </a>
-        ) : null}
-      </div>
-      {viaNames ? <p className="entry-via">via {viaNames}</p> : null}
-      <p className="entry-desc">{org.short_desc}</p>
-      {org.tags.length > 0 ? (
-        <ul className="entry-tags" aria-label="Tags">
-          {org.tags.map((tag) => (
-            <li key={tag}>
-              <TagChip label={tag} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </li>
-  );
 }

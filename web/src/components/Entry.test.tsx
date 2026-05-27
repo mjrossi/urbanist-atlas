@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { Entry } from './Entry.tsx';
-import type { LookupOrg } from '../lib/api.ts';
+import type { Org } from '../lib/api.ts';
 
-function makeOrg(overrides: Partial<LookupOrg> = {}): LookupOrg {
+function makeOrg(overrides: Partial<Org> = {}): Org {
   return {
     id: 1,
     slug: 'transalt',
@@ -13,39 +13,27 @@ function makeOrg(overrides: Partial<LookupOrg> = {}): LookupOrg {
     website_url: 'https://www.transalt.org',
     tags: ['transit', 'safe-streets'],
     regions: [],
-    matched_region_slugs: [],
     ...overrides,
   };
 }
 
 /**
- * `<Entry>` uses `<Link>` for the org name (internal `/orgs/:slug`
- * detail page), so every test renders inside a `MemoryRouter` so the
- * router context resolves.
+ * `<Entry>` uses `<Link>` for the org name, so every test renders
+ * inside a `MemoryRouter` so the router context resolves.
  */
 function renderEntry(node: React.ReactNode) {
   return render(<MemoryRouter>{node}</MemoryRouter>);
 }
 
-const emptyMap = new Map<string, string>();
-
 describe('Entry', () => {
   it('renders name as an internal link to /orgs/:slug', () => {
-    renderEntry(
-      <ul>
-        <Entry org={makeOrg()} regionNameBySlug={emptyMap} />
-      </ul>,
-    );
+    renderEntry(<Entry org={makeOrg()} />);
     const link = screen.getByRole('link', { name: 'Transportation Alternatives' });
     expect(link.getAttribute('href')).toBe('/orgs/transalt');
   });
 
   it('renders the website domain as a secondary external link', () => {
-    renderEntry(
-      <ul>
-        <Entry org={makeOrg()} regionNameBySlug={emptyMap} />
-      </ul>,
-    );
+    renderEntry(<Entry org={makeOrg()} />);
     const link = screen.getByRole('link', { name: 'transalt.org' });
     expect(link.getAttribute('href')).toBe('https://www.transalt.org');
     expect(link.getAttribute('target')).toBe('_blank');
@@ -54,22 +42,15 @@ describe('Entry', () => {
   });
 
   it('strips the leading www. when displaying the domain', () => {
-    renderEntry(
-      <ul>
-        <Entry org={makeOrg()} regionNameBySlug={emptyMap} />
-      </ul>,
-    );
+    renderEntry(<Entry org={makeOrg()} />);
     expect(screen.getByText('transalt.org')).toBeDefined();
   });
 
-  it('renders each tag as a TagChip', () => {
+  it('renders each tag in the .tag-list', () => {
     renderEntry(
-      <ul>
-        <Entry
-          org={makeOrg({ tags: ['cycling', 'policy', 'grassroots'] })}
-          regionNameBySlug={emptyMap}
-        />
-      </ul>,
+      <Entry
+        org={makeOrg({ tags: ['cycling', 'policy', 'grassroots'] })}
+      />,
     );
     expect(screen.getByText('cycling')).toBeDefined();
     expect(screen.getByText('policy')).toBeDefined();
@@ -77,56 +58,63 @@ describe('Entry', () => {
   });
 
   it('omits the tags list when the org has no tags', () => {
-    const { container } = renderEntry(
-      <ul>
-        <Entry org={makeOrg({ tags: [] })} regionNameBySlug={emptyMap} />
-      </ul>,
-    );
-    expect(container.querySelector('.entry-tags')).toBeNull();
+    const { container } = renderEntry(<Entry org={makeOrg({ tags: [] })} />);
+    expect(container.querySelector('.tag-list')).toBeNull();
   });
 
   it('falls back to the raw URL as link text when website_url is malformed', () => {
     // Admin-curated data: render the outbound affordance even if
-    // domainOf can't extract a hostname. A visibly-broken link is more
-    // useful to the user (and to us) than a silently-missing one.
-    renderEntry(
-      <ul>
-        <Entry org={makeOrg({ website_url: 'not a url' })} regionNameBySlug={emptyMap} />
-      </ul>,
-    );
+    // domainOf can't extract a hostname. A visibly-broken link is
+    // more useful to the user (and to us) than a silently-missing
+    // one.
+    renderEntry(<Entry org={makeOrg({ website_url: 'not a url' })} />);
     const link = screen.getByRole('link', { name: 'not a url' });
     expect(link.getAttribute('href')).toBe('not a url');
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toContain('noopener');
   });
 
-  it('renders "via X" subtitle when matched_region_slugs is non-empty', () => {
+  it('renders "Matched via X" footer when matchedRegionSlugs is non-empty', () => {
     const slugMap = new Map([['brooklyn', 'Brooklyn']]);
     renderEntry(
-      <ul>
-        <Entry org={makeOrg({ matched_region_slugs: ['brooklyn'] })} regionNameBySlug={slugMap} />
-      </ul>,
+      <Entry
+        org={makeOrg()}
+        matchedRegionSlugs={['brooklyn']}
+        regionNameBySlug={slugMap}
+      />,
     );
-    expect(screen.getByText('via Brooklyn')).toBeDefined();
+    expect(screen.getByText(/Matched via/)).toBeDefined();
+    expect(screen.getByText('Brooklyn')).toBeDefined();
   });
 
-  it('omits the "via" subtitle when matched_region_slugs is empty', () => {
-    const { container } = renderEntry(
-      <ul>
-        <Entry org={makeOrg({ matched_region_slugs: [] })} regionNameBySlug={emptyMap} />
-      </ul>,
+  it('falls back to the raw slug when no display name is mapped', () => {
+    renderEntry(
+      <Entry
+        org={makeOrg()}
+        matchedRegionSlugs={['some-unknown-slug']}
+        regionNameBySlug={new Map()}
+      />,
     );
-    expect(container.querySelector('.entry-via')).toBeNull();
+    expect(screen.getByText('some-unknown-slug')).toBeDefined();
+  });
+
+  it('omits the Matched-via footer when matchedRegionSlugs is undefined', () => {
+    const { container } = renderEntry(<Entry org={makeOrg()} />);
+    expect(container.querySelector('.foot')).toBeNull();
+  });
+
+  it('omits the Matched-via footer when matchedRegionSlugs is empty', () => {
+    const { container } = renderEntry(
+      <Entry org={makeOrg()} matchedRegionSlugs={[]} />,
+    );
+    expect(container.querySelector('.foot')).toBeNull();
   });
 
   it('percent-encodes the slug in the detail link', () => {
     renderEntry(
-      <ul>
-        <Entry
-          org={makeOrg({ slug: 'weird slug', name: 'Weird Org' })}
-          regionNameBySlug={emptyMap}
-        />
-      </ul>,
+      <Entry
+        org={makeOrg({ slug: 'weird slug', name: 'Weird Org' })}
+      />,
     );
     const link = screen.getByRole('link', { name: 'Weird Org' });
     expect(link.getAttribute('href')).toBe('/orgs/weird%20slug');

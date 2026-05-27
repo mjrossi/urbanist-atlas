@@ -11,24 +11,28 @@ import (
 
 // newBrowseFixture builds a small, deterministic MemStore for browse
 // tests. It deliberately mixes:
-//   - two metros (us:metro, ca:cma) so ordering can be observed,
-//   - a non-metro region (us:state) so we can confirm it doesn't leak
-//     into ListMetros,
-//   - an org tagged only to a descendant of a metro (NYC city), so the
-//     metro org count must include that org via the downward DAG walk,
-//   - a national-tier region + org so ListRecent's national filter can
-//     be exercised.
+//   - two metro-equivalent regions (us:metro, ca:cma) so ordering can be observed,
+//   - two city-kind regions (us:city, ca:city) so the default browse
+//     set is exercised — both surface as their own RegionSummary entries,
+//   - a us:state and a us:county so the broadened detail-endpoint
+//     behavior (any non-national slug resolves) is testable,
+//   - an org tagged only to a descendant of a metro (Brooklyn, a us:city
+//     under nyc-metro), so the metro's org count must include that org
+//     via the downward DAG walk while the city itself also shows up
+//     with its own direct count,
+//   - a national-tier region + org so ListRecent's national filter
+//     and GetRegion's national gate can be exercised.
 //
 // Timestamps are explicit so newest-first ordering is testable.
 func newBrowseFixture() *MemStore {
 	s := NewMemStore()
-	// NYC chain: brooklyn -> kings-county -> nyc-metro -> ny
+	// NYC chain: brooklyn-ny -> kings-county-ny -> nyc-metro -> ny
 	s.AddRegion(Region{ID: 4, Kind: "us:state", Name: "NY", Slug: "ny", Country: CountryUS, ScopeTier: ScopeRegional, SortPriority: 70})
 	s.AddRegion(Region{ID: 3, Kind: "us:metro", Name: "New York Metro", Slug: "nyc-metro", Country: CountryUS, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ny"}})
 	s.AddRegion(Region{ID: 2, Kind: "us:county", Name: "Kings County, NY", Slug: "kings-county-ny", Country: CountryUS, ScopeTier: ScopeLocal, SortPriority: 30, ParentSlugs: []string{"nyc-metro", "ny"}})
 	s.AddRegion(Region{ID: 1, Kind: "us:city", Name: "Brooklyn", Slug: "brooklyn-ny", Country: CountryUS, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"kings-county-ny"}})
 
-	// Toronto chain: toronto -> toronto-cma -> ontario
+	// Toronto chain: toronto-on -> toronto-cma -> ontario
 	s.AddRegion(Region{ID: 22, Kind: "ca:province", Name: "Ontario", Slug: "ontario", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 70})
 	s.AddRegion(Region{ID: 21, Kind: "ca:cma", Name: "Toronto CMA", Slug: "toronto-cma", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ontario"}})
 	s.AddRegion(Region{ID: 20, Kind: "ca:city", Name: "Toronto", Slug: "toronto-on", Country: CountryCA, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"toronto-cma"}})
@@ -44,53 +48,64 @@ func newBrowseFixture() *MemStore {
 	s.AddOrg(Org{ID: 3, Slug: "riders-alliance", Name: "Riders Alliance", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, CreatedAt: t0.AddDate(0, 0, 7)}, []int64{3})
 	s.AddOrg(Org{ID: 4, Slug: "ttcriders", Name: "TTCriders", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, CreatedAt: t0.AddDate(0, 0, 9)}, []int64{20})
 	// MUBi-like: ONLY a national-tier region attachment. Must NOT appear
-	// in ListRecent. We give it the most-recent timestamp so a forgotten
-	// filter would surface it at the top.
+	// in ListRecent or GetRegion. We give it the most-recent timestamp so
+	// a forgotten filter would surface it at the top.
 	s.AddOrg(Org{ID: 5, Slug: "mubi-nacional", Name: "MUBi Nacional", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"national"}, CreatedAt: t0.AddDate(0, 0, 10)}, []int64{99})
 
 	return s
 }
 
-func TestMemStore_ListMetros_OrderedByOrgCountThenName(t *testing.T) {
+func TestMemStore_ListRegions_OrderedByOrgCountThenName(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.ListMetros(context.Background())
+	got, err := s.ListRegions(context.Background())
 	if err != nil {
-		t.Fatalf("ListMetros: %v", err)
+		t.Fatalf("ListRegions: %v", err)
 	}
-	// Expect 2 entries: nyc-metro (count=2 — riders-alliance directly +
-	// transalt-brooklyn via Brooklyn descendant) and toronto-cma (count=1).
-	// Order: nyc-metro (2), toronto-cma (1).
-	if len(got) != 2 {
-		t.Fatalf("len: want 2, got %d (%+v)", len(got), got)
+	// Expect 4 entries against the default browse set:
+	//   - nyc-metro       (us:metro, count=2 via Brooklyn descendant + direct)
+	//   - brooklyn-ny     (us:city, count=1 — transalt-brooklyn direct)
+	//   - toronto-on      (ca:city, count=1 — ttcriders direct)
+	//   - toronto-cma     (ca:cma, count=1 via Toronto descendant)
+	// Order: count DESC, then name ASC.
+	if len(got) != 4 {
+		t.Fatalf("len: want 4, got %d (%+v)", len(got), got)
 	}
 	if got[0].Region.Slug != "nyc-metro" || got[0].OrgCount != 2 {
 		t.Errorf("[0]: want nyc-metro count=2, got slug=%s count=%d", got[0].Region.Slug, got[0].OrgCount)
 	}
-	if got[1].Region.Slug != "toronto-cma" || got[1].OrgCount != 1 {
-		t.Errorf("[1]: want toronto-cma count=1, got slug=%s count=%d", got[1].Region.Slug, got[1].OrgCount)
+	// Tiebreak among 1-count entries is alphabetical by Name:
+	// "Brooklyn" < "Toronto" < "Toronto CMA".
+	if got[1].Region.Slug != "brooklyn-ny" || got[1].OrgCount != 1 {
+		t.Errorf("[1]: want brooklyn-ny count=1, got slug=%s count=%d", got[1].Region.Slug, got[1].OrgCount)
+	}
+	if got[2].Region.Slug != "toronto-on" || got[2].OrgCount != 1 {
+		t.Errorf("[2]: want toronto-on count=1, got slug=%s count=%d", got[2].Region.Slug, got[2].OrgCount)
+	}
+	if got[3].Region.Slug != "toronto-cma" || got[3].OrgCount != 1 {
+		t.Errorf("[3]: want toronto-cma count=1, got slug=%s count=%d", got[3].Region.Slug, got[3].OrgCount)
 	}
 }
 
-func TestMemStore_ListMetros_ExcludesNonMetroKindsAndEmptyMetros(t *testing.T) {
+func TestMemStore_ListRegions_ExcludesOutsideKindsAndNational(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.ListMetros(context.Background())
+	got, err := s.ListRegions(context.Background())
 	if err != nil {
-		t.Fatalf("ListMetros: %v", err)
+		t.Fatalf("ListRegions: %v", err)
 	}
-	for _, m := range got {
-		if !IsMetroKind(m.Region.Kind) {
-			t.Errorf("non-metro kind leaked into result: %q (%s)", m.Region.Kind, m.Region.Slug)
+	for _, p := range got {
+		if !IsDefaultBrowseKind(p.Region.Kind) {
+			t.Errorf("kind outside the default browse set leaked into result: %q (%s)", p.Region.Kind, p.Region.Slug)
 		}
-		if m.OrgCount == 0 {
-			t.Errorf("zero-org metro leaked into result: %s", m.Region.Slug)
+		if p.OrgCount == 0 {
+			t.Errorf("zero-org region leaked into result: %s", p.Region.Slug)
 		}
-		if m.Region.ScopeTier == ScopeNational {
-			t.Errorf("national-tier region leaked into result: %s", m.Region.Slug)
+		if p.Region.ScopeTier == ScopeNational {
+			t.Errorf("national-tier region leaked into result: %s", p.Region.Slug)
 		}
 	}
 }
 
-func TestMemStore_ListMetros_OrgCount_AlphabeticalTiebreak(t *testing.T) {
+func TestMemStore_ListRegions_AlphabeticalTiebreak(t *testing.T) {
 	// Two metros with the same org count: order should be alphabetical
 	// by name.
 	s := NewMemStore()
@@ -99,13 +114,13 @@ func TestMemStore_ListMetros_OrgCount_AlphabeticalTiebreak(t *testing.T) {
 	s.AddOrg(Org{ID: 1, Slug: "a", Name: "A"}, []int64{1})
 	s.AddOrg(Org{ID: 2, Slug: "b", Name: "B"}, []int64{2})
 
-	got, err := s.ListMetros(context.Background())
+	got, err := s.ListRegions(context.Background())
 	if err != nil {
-		t.Fatalf("ListMetros: %v", err)
+		t.Fatalf("ListRegions: %v", err)
 	}
 	gotNames := make([]string, len(got))
-	for i, m := range got {
-		gotNames[i] = m.Region.Name
+	for i, p := range got {
+		gotNames[i] = p.Region.Name
 	}
 	want := []string{"Atlanta", "Boston"}
 	if diff := cmp.Diff(want, gotNames); diff != "" {
@@ -113,11 +128,84 @@ func TestMemStore_ListMetros_OrgCount_AlphabeticalTiebreak(t *testing.T) {
 	}
 }
 
-func TestMemStore_GetMetro_HappyPath(t *testing.T) {
+// TestMemStore_ListRegions_CitiesAppearAsTheirOwnEntries pins the
+// behavioral change introduced when the endpoint broadened beyond
+// metro-only: a us:city / ca:city region with direct org
+// attachments shows up as its own row in the default Browse list,
+// alongside (not under) its parent metro.
+func TestMemStore_ListRegions_CitiesAppearAsTheirOwnEntries(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetMetro(context.Background(), "nyc-metro")
+	got, err := s.ListRegions(context.Background())
 	if err != nil {
-		t.Fatalf("GetMetro: %v", err)
+		t.Fatalf("ListRegions: %v", err)
+	}
+	cityKinds := map[RegionKind]bool{"us:city": true, "ca:city": true}
+	var cities []string
+	for _, p := range got {
+		if cityKinds[p.Region.Kind] {
+			cities = append(cities, p.Region.Slug)
+		}
+	}
+	sort.Strings(cities)
+	want := []string{"brooklyn-ny", "toronto-on"}
+	if diff := cmp.Diff(want, cities); diff != "" {
+		t.Errorf("city entries on Browse (-want +got):\n%s", diff)
+	}
+}
+
+// TestMemStore_ListRegions_BrowseParentSlug pins the SPA grouping
+// hook: cities carry the slug of their nearest browseable-kind
+// ancestor; metros without a browseable ancestor carry "". The
+// walk traverses non-browseable intermediates (county, state) so a
+// city whose direct parent isn't in the default set still
+// resolves through.
+func TestMemStore_ListRegions_BrowseParentSlug(t *testing.T) {
+	s := newBrowseFixture()
+	got, err := s.ListRegions(context.Background())
+	if err != nil {
+		t.Fatalf("ListRegions: %v", err)
+	}
+	bySlug := map[string]string{}
+	for _, p := range got {
+		bySlug[p.Region.Slug] = p.BrowseParentSlug
+	}
+	cases := []struct {
+		slug, wantParent string
+	}{
+		// Brooklyn walks up: kings-county (not browseable) -> nyc-metro
+		// (browseable, us:metro). Skipped intermediate proves the walk
+		// passes through non-browseable nodes.
+		{"brooklyn-ny", "nyc-metro"},
+		// Toronto's direct parent IS browseable (toronto-cma).
+		{"toronto-on", "toronto-cma"},
+		// Metros have no browseable ancestor in the fixture
+		// (their parents are us:state / ca:province / us:multi-state).
+		{"nyc-metro", ""},
+		{"toronto-cma", ""},
+	}
+	for _, tc := range cases {
+		got, ok := bySlug[tc.slug]
+		if !ok {
+			t.Errorf("slug %s missing from ListRegions output", tc.slug)
+			continue
+		}
+		if got != tc.wantParent {
+			t.Errorf("%s: BrowseParentSlug want %q, got %q", tc.slug, tc.wantParent, got)
+		}
+	}
+}
+
+// TestMemStore_GetRegion_Metro_BucketsBothDirections pins the
+// lookup-style scope behavior: a metro region returns orgs from
+// descendants AND ancestors, bucketed by attachment scope_tier.
+// Local = orgs tagged to a scope_tier=local region in scope
+// (Brooklyn = local). Regional = orgs tagged to scope_tier=regional
+// (NY state, NYC Metro).
+func TestMemStore_GetRegion_Metro_BucketsBothDirections(t *testing.T) {
+	s := newBrowseFixture()
+	got, err := GetRegion(context.Background(), s, "nyc-metro")
+	if err != nil {
+		t.Fatalf("GetRegion: %v", err)
 	}
 	if got == nil {
 		t.Fatal("nil result for known metro slug")
@@ -125,42 +213,187 @@ func TestMemStore_GetMetro_HappyPath(t *testing.T) {
 	if got.Region.Slug != "nyc-metro" {
 		t.Errorf("region slug: want nyc-metro, got %s", got.Region.Slug)
 	}
-	gotSlugs := make([]string, 0, len(got.Orgs))
-	for _, o := range got.Orgs {
-		gotSlugs = append(gotSlugs, o.Slug)
+	// transalt-brooklyn is tagged to brooklyn-ny (scope_tier=local),
+	// in scope via the downward walk. -> Local.
+	wantLocal := []string{"transalt-brooklyn"}
+	if diff := cmp.Diff(wantLocal, sortedOrgSlugs(got.Local)); diff != "" {
+		t.Errorf("local (-want +got):\n%s", diff)
 	}
-	sort.Strings(gotSlugs)
-	want := []string{"riders-alliance", "transalt-brooklyn"}
-	if diff := cmp.Diff(want, gotSlugs); diff != "" {
-		t.Errorf("orgs (-want +got):\n%s", diff)
+	// riders-alliance is tagged to nyc-metro (regional); ny-state-org
+	// is tagged to ny (regional, ancestor of nyc-metro). Both Regional.
+	wantRegional := []string{"ny-state-org", "riders-alliance"}
+	if diff := cmp.Diff(wantRegional, sortedOrgSlugs(got.Regional)); diff != "" {
+		t.Errorf("regional (-want +got):\n%s", diff)
 	}
 }
 
-func TestMemStore_GetMetro_OrderNewestFirst(t *testing.T) {
+// TestMemStore_GetRegion_City_IncludesAncestorOrgs pins the
+// behavioral change of this slice: a city's Region page surfaces
+// orgs from its parent metro / state / multi-state regions, not
+// just orgs tagged directly to the city. Matches /lookup of any
+// ZIP in that city (modulo descendant differences).
+func TestMemStore_GetRegion_City_IncludesAncestorOrgs(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetMetro(context.Background(), "nyc-metro")
+	got, err := GetRegion(context.Background(), s, "brooklyn-ny")
 	if err != nil {
-		t.Fatalf("GetMetro: %v", err)
+		t.Fatalf("GetRegion: %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for known city slug")
+	}
+	// Local: transalt-brooklyn (brooklyn-tagged, scope_tier=local).
+	wantLocal := []string{"transalt-brooklyn"}
+	if diff := cmp.Diff(wantLocal, sortedOrgSlugs(got.Local)); diff != "" {
+		t.Errorf("local (-want +got):\n%s", diff)
+	}
+	// Regional: riders-alliance (nyc-metro, ancestor) + ny-state-org
+	// (ny, ancestor). Both surface from the upward walk now.
+	wantRegional := []string{"ny-state-org", "riders-alliance"}
+	if diff := cmp.Diff(wantRegional, sortedOrgSlugs(got.Regional)); diff != "" {
+		t.Errorf("regional (-want +got):\n%s", diff)
+	}
+}
+
+// TestMemStore_GetRegion_Ancestry_LeafToRoot pins the breadcrumb
+// data: ancestry comes back closest-first (direct parent at index 0,
+// root last), excludes the region itself, and filters national-tier
+// rows. The SPA renders this as a clickable breadcrumb in the
+// Region page kicker.
+func TestMemStore_GetRegion_Ancestry_LeafToRoot(t *testing.T) {
+	s := newBrowseFixture()
+	got, err := GetRegion(context.Background(), s, "brooklyn-ny")
+	if err != nil {
+		t.Fatalf("GetRegion: %v", err)
 	}
 	if got == nil {
 		t.Fatal("nil result")
 	}
-	// riders-alliance was created on day 7, transalt-brooklyn on day 5.
-	// Newest-first must put riders-alliance ahead of transalt-brooklyn.
-	if len(got.Orgs) < 2 {
-		t.Fatalf("want >= 2 orgs, got %d", len(got.Orgs))
+	var slugs []string
+	for _, r := range got.Ancestry {
+		slugs = append(slugs, r.Slug)
+		if r.Slug == "brooklyn-ny" {
+			t.Errorf("ancestry includes the region itself; want excluded")
+		}
+		if r.ScopeTier == ScopeNational {
+			t.Errorf("national-tier region leaked into ancestry: %s", r.Slug)
+		}
 	}
-	if got.Orgs[0].Slug != "riders-alliance" {
-		t.Errorf("[0] want riders-alliance (newest), got %s", got.Orgs[0].Slug)
-	}
-	if got.Orgs[1].Slug != "transalt-brooklyn" {
-		t.Errorf("[1] want transalt-brooklyn, got %s", got.Orgs[1].Slug)
+	// Brooklyn's parents map: brooklyn-ny -> kings-county-ny ->
+	// {nyc-metro, ny}; nyc-metro -> ny. BFS gives kings-county-ny
+	// first, then [nyc-metro, ny] in the order kings-county added
+	// them. The fixture's ParentSlugs is ["nyc-metro", "ny"] so
+	// nyc-metro precedes ny. Result is closest-first:
+	want := []string{"kings-county-ny", "nyc-metro", "ny"}
+	if diff := cmp.Diff(want, slugs); diff != "" {
+		t.Errorf("ancestry (-want +got):\n%s", diff)
 	}
 }
 
-func TestMemStore_GetMetro_NotFound(t *testing.T) {
+// TestMemStore_GetRegion_Ancestry_EmptyForRoot pins the
+// no-ancestors case: a top-level region (no parents) returns an
+// empty ancestry slice, not nil.
+func TestMemStore_GetRegion_Ancestry_EmptyForRoot(t *testing.T) {
 	s := newBrowseFixture()
-	got, err := s.GetMetro(context.Background(), "does-not-exist")
+	// NY is a us:state, top-of-hierarchy (no parents in the fixture).
+	got, err := GetRegion(context.Background(), s, "ny")
+	if err != nil {
+		t.Fatalf("GetRegion(ny): %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for ny")
+	}
+	if got.Ancestry == nil {
+		t.Errorf("ancestry: want non-nil empty slice, got nil")
+	}
+	if len(got.Ancestry) != 0 {
+		t.Errorf("ancestry: want empty for top-level region, got %v",
+			func() []string {
+				out := []string{}
+				for _, r := range got.Ancestry {
+					out = append(out, r.Slug)
+				}
+				return out
+			}())
+	}
+}
+
+// TestMemStore_GetRegion_AnyNonNationalKind_Resolves pins the
+// broadened detail-endpoint contract: states, counties, multi-state
+// regions all resolve, returning their full-scope orgs.
+func TestMemStore_GetRegion_AnyNonNationalKind_Resolves(t *testing.T) {
+	s := newBrowseFixture()
+
+	// State slug — descendants include NYC Metro + Kings County + Brooklyn.
+	got, err := GetRegion(context.Background(), s, "ny")
+	if err != nil {
+		t.Fatalf("GetRegion(ny): %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for ny (state)")
+	}
+	// transalt-brooklyn (brooklyn, local) -> Local.
+	// riders-alliance (nyc-metro, regional) + ny-state-org (ny, regional) -> Regional.
+	if diff := cmp.Diff([]string{"transalt-brooklyn"}, sortedOrgSlugs(got.Local)); diff != "" {
+		t.Errorf("ny local (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"ny-state-org", "riders-alliance"}, sortedOrgSlugs(got.Regional)); diff != "" {
+		t.Errorf("ny regional (-want +got):\n%s", diff)
+	}
+
+	// County slug — downward walk hits brooklyn; upward walk hits
+	// nyc-metro + ny.
+	got, err = GetRegion(context.Background(), s, "kings-county-ny")
+	if err != nil {
+		t.Fatalf("GetRegion(kings-county-ny): %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for kings-county-ny (county)")
+	}
+	if diff := cmp.Diff([]string{"transalt-brooklyn"}, sortedOrgSlugs(got.Local)); diff != "" {
+		t.Errorf("kings-county local (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"ny-state-org", "riders-alliance"}, sortedOrgSlugs(got.Regional)); diff != "" {
+		t.Errorf("kings-county regional (-want +got):\n%s", diff)
+	}
+}
+
+// TestMemStore_GetRegion_PopulatesMatchedRegionSlugs pins the
+// LookupOrg-style enrichment: each returned org carries the slugs
+// of its attachment regions that were in scope. The SPA renders
+// these as "Matched via X · Y" subtitles.
+func TestMemStore_GetRegion_PopulatesMatchedRegionSlugs(t *testing.T) {
+	s := newBrowseFixture()
+	got, err := GetRegion(context.Background(), s, "brooklyn-ny")
+	if err != nil {
+		t.Fatalf("GetRegion: %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result")
+	}
+	// transalt-brooklyn is tagged to brooklyn-ny only; that single
+	// slug is its matched_region_slugs for this region's scope.
+	for _, o := range got.Local {
+		if o.Slug == "transalt-brooklyn" {
+			if diff := cmp.Diff([]string{"brooklyn-ny"}, o.MatchedRegionSlugs); diff != "" {
+				t.Errorf("transalt-brooklyn matched (-want +got):\n%s", diff)
+			}
+		}
+	}
+	// riders-alliance is tagged to nyc-metro only; that's the matched
+	// slug when surfaced for /region/brooklyn (nyc-metro is an
+	// ancestor in scope).
+	for _, o := range got.Regional {
+		if o.Slug == "riders-alliance" {
+			if diff := cmp.Diff([]string{"nyc-metro"}, o.MatchedRegionSlugs); diff != "" {
+				t.Errorf("riders-alliance matched (-want +got):\n%s", diff)
+			}
+		}
+	}
+}
+
+func TestMemStore_GetRegion_NotFound(t *testing.T) {
+	s := newBrowseFixture()
+	got, err := GetRegion(context.Background(), s, "does-not-exist")
 	if err != nil {
 		t.Errorf("err: want nil, got %v", err)
 	}
@@ -169,15 +402,18 @@ func TestMemStore_GetMetro_NotFound(t *testing.T) {
 	}
 }
 
-func TestMemStore_GetMetro_NonMetroSlug_ReturnsNil(t *testing.T) {
+// TestMemStore_GetRegion_NationalReturnsNil pins the national-tier
+// gate: even though pt-nacional is a real slug in the fixture, the
+// handler must treat it as 404 to keep national-org content out of
+// browse contexts.
+func TestMemStore_GetRegion_NationalReturnsNil(t *testing.T) {
 	s := newBrowseFixture()
-	// "ny" is a us:state — exists as a region but is NOT a metro kind.
-	got, err := s.GetMetro(context.Background(), "ny")
+	got, err := GetRegion(context.Background(), s, "pt-nacional")
 	if err != nil {
 		t.Errorf("err: want nil, got %v", err)
 	}
 	if got != nil {
-		t.Errorf("result: want nil for non-metro slug, got %+v", got)
+		t.Errorf("result: want nil for national-tier slug, got %+v", got)
 	}
 }
 
@@ -242,10 +478,23 @@ func TestMemStore_ListRecent_CapAtTen(t *testing.T) {
 	}
 }
 
-func orgSlugSlice(orgs []Org) []string {
+func orgSlugs(orgs []Org) []string {
 	out := make([]string, len(orgs))
 	for i, o := range orgs {
 		out[i] = o.Slug
 	}
 	return out
+}
+
+// sortedOrgSlugs is the same as orgSlugs but alphabetically sorted —
+// the bucket sort produces deterministic (sortKey, name) order but
+// tests assert *set membership* per bucket, so sorting normalizes.
+func sortedOrgSlugs(orgs []Org) []string {
+	out := orgSlugs(orgs)
+	sort.Strings(out)
+	return out
+}
+
+func orgSlugSlice(orgs []Org) []string {
+	return orgSlugs(orgs)
 }

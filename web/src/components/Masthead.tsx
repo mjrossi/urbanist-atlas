@@ -6,7 +6,7 @@ const FOLIO_LABELS: ReadonlyArray<[RegExp, string]> = [
   [/^\/browse$/, 'The index'],
   [/^\/submit$/, 'The submissions desk'],
   [/^\/colophon$/, 'The colophon'],
-  [/^\/m\//, 'Metro report'],
+  [/^\/region\//, 'Region report'],
   [/^\/orgs\//, 'Organization file'],
   [/^\/r\//, 'Postal lookup'],
 ];

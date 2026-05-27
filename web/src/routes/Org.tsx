@@ -5,13 +5,7 @@ import { ApiError, getOrg } from '../lib/api.ts';
 import type { Org as OrgT } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
-
-const METRO_KINDS = new Set<string>([
-  'us:metro',
-  'ca:cma',
-  'ca:regional-district',
-  'pt:area-metropolitana',
-]);
+import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
 
 export function Org() {
   const params = useParams<{ slug: string }>();
@@ -93,7 +87,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 
   const org = query.data;
   const domain = domainOf(org.website_url);
-  const primaryMetro = org.regions.find((r) => METRO_KINDS.has(r.kind));
+  const primaryMetro = org.regions.find((r) => isMetroKind(r.kind));
   const tagsTopline = org.tags.slice(0, 3).map(prettyTag).join(' · ');
 
   const atAGlance = (
@@ -169,7 +163,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
             <div className="item">
               <div>Primary metro</div>
               <span className="val">
-                <Link to={`/m/${encodeURIComponent(primaryMetro.slug)}`}>
+                <Link to={`/region/${encodeURIComponent(primaryMetro.slug)}`}>
                   {primaryMetro.name}
                 </Link>
               </span>
@@ -254,9 +248,9 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
                           fontSize: 19,
                         }}
                       >
-                        {METRO_KINDS.has(region.kind) ? (
+                        {isBrowseableKind(region.kind) ? (
                           <Link
-                            to={`/m/${encodeURIComponent(region.slug)}`}
+                            to={`/region/${encodeURIComponent(region.slug)}`}
                             style={{
                               color: 'inherit',
                               textDecoration: 'none',
@@ -315,11 +309,11 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
             <div className="rail-kicker">Companion pages</div>
             <ul className="plain">
               <li>
-                <Link to="/browse">Browse all metros</Link>
+                <Link to="/browse">Browse the atlas</Link>
               </li>
               {primaryMetro ? (
                 <li>
-                  <Link to={`/m/${encodeURIComponent(primaryMetro.slug)}`}>
+                  <Link to={`/region/${encodeURIComponent(primaryMetro.slug)}`}>
                     Other groups in {primaryMetro.name}
                   </Link>
                 </li>

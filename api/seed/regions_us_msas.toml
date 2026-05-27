@@ -1275,7 +1275,7 @@ kind = "us:metro"
 name = "Greater Boston"
 scope_tier = "regional"
 sort_priority = 40
-parents = []
+parents = ["ma"]
 # Census CBSA 14460 — Boston-Cambridge-Newton, MA-NH
 
 [[region]]
@@ -1284,7 +1284,7 @@ kind = "us:metro"
 name = "Greater Los Angeles"
 scope_tier = "regional"
 sort_priority = 40
-parents = []
+parents = ["ca-state"]
 # Census CBSA 31080 — Los Angeles-Long Beach-Anaheim, CA
 
 [[region]]
@@ -1293,7 +1293,7 @@ kind = "us:metro"
 name = "Greater Miami"
 scope_tier = "regional"
 sort_priority = 40
-parents = []
+parents = ["fl"]
 # Census CBSA 33100 — Miami-Fort Lauderdale-West Palm Beach, FL
 
 [[region]]
@@ -2922,7 +2922,7 @@ kind = "us:metro"
 name = "Seattle Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = []
+parents = ["wa"]
 # Census CBSA 42660 — Seattle-Tacoma-Bellevue, WA
 
 [[region]]
@@ -2949,7 +2949,7 @@ kind = "us:metro"
 name = "San Francisco Bay Area"
 scope_tier = "regional"
 sort_priority = 40
-parents = []
+parents = ["ca-state"]
 # Census CBSA 41860 — San Francisco-Oakland-Fremont, CA
 
 [[region]]
