@@ -28,10 +28,17 @@
 #   - `run --rm` exits when the script exits and discards the container;
 #     gluetun stays running so re-runs are fast.
 #   - UID/GID default to your shell's; override via env if needed.
+#   - `docker compose -f … config` renders this file with environment
+#     interpolated — including WIREGUARD_PRIVATE_KEY. Don't paste the
+#     output into bug reports, gists, or PR descriptions.
+
+name: urbanist-atlas-verify
 
 services:
   gluetun:
-    image: qmcgaw/gluetun:latest
+    # Pinned to a tagged release so the recipe doesn't break between
+    # maintenance windows when `latest` rotates. Bump deliberately.
+    image: qmcgaw/gluetun:v3.41.1
     container_name: atlas-verify-gluetun
     cap_add:
       - NET_ADMIN

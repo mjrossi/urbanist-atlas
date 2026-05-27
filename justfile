@@ -184,11 +184,11 @@ etl-regenerate country:
 # container speaking Proton WireGuard. Set WIREGUARD_PRIVATE_KEY in
 # mise.local.toml [env] before first run (see mise.local.toml.example).
 
-# probe every website_url in api/seed/orgs.toml through the VPN;
-# writes tmp/org-url-report.{md,tsv}. Leaves gluetun running so
-# re-runs are fast — `just verify-org-urls-down` when you're done.
+# probe every website_url + contact_url in api/seed/orgs.toml through
+# the VPN; writes tmp/org-url-report.{md,tsv}. Leaves gluetun running
+# so re-runs are fast — `just verify-org-urls-down` when you're done.
 [group('verify')]
-[doc('probe every seed org website_url via VPN; writes tmp/org-url-report.{md,tsv}')]
+[doc('probe every seed org website_url + contact_url via VPN; writes tmp/org-url-report.{md,tsv}')]
 verify-org-urls:
     @mkdir -p tmp
     docker compose -f scripts/verify-org-urls.compose.yml --profile verify run --rm --build verify

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
-# Walk api/seed/orgs.toml and probe every website_url for liveness,
-# off-domain redirects, and parked-page signatures. Writes a Markdown
-# report grouped by severity plus a TSV with raw probe data.
+# Walk api/seed/orgs.toml and probe every website_url + contact_url
+# for liveness, off-domain redirects, and parked-page signatures.
+# Writes a Markdown report grouped by severity plus a TSV with raw
+# probe data. Contact-form rows are labelled `<slug> (contact)` in
+# the report so they don't get conflated with the main website check.
 #
 # Network-bound — hits ~200 third-party advocacy-org URLs. A handful
 # resolve to parked/squatted domains that log requester IPs, so this is
@@ -44,8 +46,31 @@
 # size in one shot; matching that with httpie would need --print=h plus
 # jq glue. If you'd rather drive httpie interactively for one-off
 # re-checks of a flagged row, the rows in the TSV are copy-pasteable.
+#
+# Future: there's overlap with `urbanist-atlas-server linkcheck` (see
+# api/internal/linkcheck/). The Go version uses the typed `seed`
+# package so schema typos can't silently drop orgs; this script adds
+# VPN egress, redirect-domain comparison, parked/SEO-spam title
+# detection, body-size threshold, and Markdown buckets on top. A
+# future slice should fold the classifier + Markdown report into the
+# Go subcommand (e.g. `linkcheck --out-format=md`) and shrink this
+# Dockerfile to a Go-binary wrapper, collapsing `just linkcheck` and
+# `just verify-org-urls` into one path.
 
 set -euo pipefail
+
+# `wait -n` needs bash 4.3+. macOS ships bash 3.2 at /bin/bash; if
+# /usr/bin/env picks it up, the parallel probe loop below dies with
+# `wait: -n: invalid option`. Inside the Alpine container we're on
+# bash 5.x, so this only bites bare-metal invocations on macOS without
+# homebrew bash on PATH.
+if ! { [[ "${BASH_VERSINFO[0]}" -gt 4 ]] \
+    || { [[ "${BASH_VERSINFO[0]}" -eq 4 ]] && [[ "${BASH_VERSINFO[1]}" -ge 3 ]]; }; }; then
+  echo "verify-org-urls: needs bash >= 4.3 for \`wait -n\` (current: ${BASH_VERSION})." >&2
+  echo "  macOS default is 3.2 — \`brew install bash\` and make sure it's first on PATH," >&2
+  echo "  or use the container path: \`just verify-org-urls\`." >&2
+  exit 1
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ORGS_TOML="${ORGS_TOML:-${REPO_ROOT}/api/seed/orgs.toml}"
@@ -58,26 +83,34 @@ UA="${UA:-urbanist-atlas-url-verifier/0.1 (+https://urbanistatlas.com)}"
 mkdir -p "$(dirname "$REPORT")"
 : > "$DETAILS"
 
-# ── parse: emit one TSV row per [[org]] block ─────────────────────────
-#   slug \t name \t website_url
+# ── parse: emit TSV rows for every probe-worthy URL per [[org]] ───────
+#   slug \t name \t kind \t url
+# kind ∈ {website, contact}. Both fields are probed because a stale
+# contact page (broken form, lapsed donate target) is just as
+# actionable as a dead website_url. Orgs with only one URL emit one
+# row; orgs with both emit two.
 parse_orgs() {
   awk '
+    function emit() {
+      if (slug == "") return
+      if (website != "") print slug "\t" name "\twebsite\t" website
+      if (contact != "") print slug "\t" name "\tcontact\t" contact
+    }
     /^\[\[org\]\]/ {
-      if (slug != "" && url != "") print slug "\t" name "\t" url
-      slug=""; name=""; url=""
+      emit()
+      slug=""; name=""; website=""; contact=""
     }
-    /^slug = "/        { match($0, /"[^"]*"/); slug = substr($0, RSTART+1, RLENGTH-2) }
-    /^name = "/        { match($0, /"[^"]*"/); name = substr($0, RSTART+1, RLENGTH-2) }
-    /^website_url = "/ { match($0, /"[^"]*"/); url  = substr($0, RSTART+1, RLENGTH-2) }
-    END {
-      if (slug != "" && url != "") print slug "\t" name "\t" url
-    }
+    /^slug = "/         { match($0, /"[^"]*"/); slug    = substr($0, RSTART+1, RLENGTH-2) }
+    /^name = "/         { match($0, /"[^"]*"/); name    = substr($0, RSTART+1, RLENGTH-2) }
+    /^website_url = "/  { match($0, /"[^"]*"/); website = substr($0, RSTART+1, RLENGTH-2) }
+    /^contact_url = "/  { match($0, /"[^"]*"/); contact = substr($0, RSTART+1, RLENGTH-2) }
+    END { emit() }
   ' "$1"
 }
 
 # ── probe: one URL → one TSV row in $DETAILS (atomic append) ─────────
 probe() {
-  local slug="$1" name="$2" url="$3"
+  local slug="$1" name="$2" kind="$3" url="$4"
   local body status final bytes title metrics rc
   body="$(mktemp)"
   trap 'rm -f "$body"' RETURN
@@ -115,14 +148,14 @@ probe() {
 
   # \t-safe: name is the only field that could realistically contain a
   # tab and the seed has none — verified by inspection.
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$slug" "$name" "$url" "$status" "$final" "$bytes" "$title" >> "$DETAILS"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$slug" "$name" "$kind" "$url" "$status" "$final" "$bytes" "$title" >> "$DETAILS"
 }
 
 # ── classify: stdin TSV row → one-word severity ──────────────────────
 classify() {
-  local slug name url status final bytes title
-  IFS=$'\t' read -r slug name url status final bytes title <<<"$1"
+  local slug name kind url status final bytes title
+  IFS=$'\t' read -r slug name kind url status final bytes title <<<"$1"
 
   # status=000 = transport-layer failure (curl couldn't reach the origin):
   # DNS, timeout, TLS handshake, connection refused, etc. Over a VPN these
@@ -174,8 +207,8 @@ echo "→ probing $TOTAL URLs at concurrency=$CONCURRENCY timeout=${TIMEOUT}s" >
 inflight=0
 done_count=0
 for row in "${ROWS[@]}"; do
-  IFS=$'\t' read -r slug name url <<<"$row"
-  probe "$slug" "$name" "$url" &
+  IFS=$'\t' read -r slug name kind url <<<"$row"
+  probe "$slug" "$name" "$kind" "$url" &
   (( inflight++ )) || true
   if (( inflight >= CONCURRENCY )); then
     wait -n
@@ -199,7 +232,7 @@ while IFS= read -r line; do
   sev="$(classify "$line")"
   BUCKETS[$sev]+="${line}"$'\n'
   COUNTS[$sev]=$(( COUNTS[$sev] + 1 ))
-done < <(sort -t$'\t' -k1,1 "$DETAILS")
+done < <(sort -t$'\t' -k1,1 -k3,3 "$DETAILS")
 
 fmt_section() {
   local sev="$1" heading="$2"
@@ -210,10 +243,14 @@ fmt_section() {
     printf '_None._\n'
     return
   fi
-  printf '%s' "$rows" | while IFS=$'\t' read -r slug name url status final bytes title; do
+  printf '%s' "$rows" | while IFS=$'\t' read -r slug name kind url status final bytes title; do
     [[ -z "$slug" ]] && continue
+    # Distinguish website vs contact in the slug tag so the report
+    # reads unambiguously when both fail for the same org.
+    local label="$slug"
+    [[ "$kind" == "contact" ]] && label="$slug (contact)"
     printf -- '- **%s** [`%s`] — `%s`\n  - status `%s`, %s bytes\n' \
-      "$name" "$slug" "$url" "$status" "$bytes"
+      "$name" "$label" "$url" "$status" "$bytes"
     if [[ "$final" != "$url" && "$final" != "-" ]]; then
       printf -- '  - final: `%s`\n' "$final"
     fi
@@ -225,7 +262,7 @@ fmt_section() {
 
 {
   printf '# Org URL verification report\n\n'
-  printf '_Generated %s from `%s` (%d orgs)._\n\n' \
+  printf '_Generated %s from `%s` (%d URLs across website_url + contact_url)._\n\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${ORGS_TOML#$REPO_ROOT/}" "$TOTAL"
   printf '## Summary\n\n'
   printf -- '- **unreachable**: %d (curl couldn'\''t connect — DNS, timeout, TLS; often VPN-side noise, retry before acting)\n' "${COUNTS[unreachable]}"
