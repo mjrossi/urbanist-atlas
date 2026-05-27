@@ -98,50 +98,25 @@ func toOAPILookupOrgs(orgs []atlas.Org) []oapi.LookupOrg {
 	return out
 }
 
+// toOAPILookupOrg builds the /lookup-specific wire shape on top of the
+// shared toOAPIOrg adapter (oapi_adapters.go). The only lookup-specific
+// field is MatchedRegionSlugs, which the lookup algorithm in pkg/atlas
+// computes per org.
 func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
-	tags := make([]string, len(o.Tags))
-	for i, t := range o.Tags {
-		tags[i] = string(t)
-	}
-	regions := make([]oapi.Region, 0, len(o.Regions))
-	for _, r := range o.Regions {
-		regions = append(regions, toOAPIRegion(r))
-	}
-
+	base := toOAPIOrg(o)
 	matched := o.MatchedRegionSlugs
 	if matched == nil {
 		matched = []string{}
 	}
-	out := oapi.LookupOrg{
-		Id:                 o.ID,
-		Slug:               o.Slug,
-		Name:               o.Name,
-		ShortDesc:          o.ShortDesc,
-		WebsiteUrl:         o.WebsiteURL,
-		Tags:               tags,
-		Regions:            regions,
+	return oapi.LookupOrg{
+		Id:                 base.Id,
+		Slug:               base.Slug,
+		Name:               base.Name,
+		ShortDesc:          base.ShortDesc,
+		WebsiteUrl:         base.WebsiteUrl,
+		Tags:               base.Tags,
+		Regions:            base.Regions,
+		ContactUrl:         base.ContactUrl,
 		MatchedRegionSlugs: matched,
 	}
-	if o.ContactURL != "" {
-		cu := o.ContactURL
-		out.ContactUrl = &cu
-	}
-	return out
 }
-
-func toOAPIRegion(r atlas.Region) oapi.Region {
-	parentSlugs := r.ParentSlugs
-	if parentSlugs == nil {
-		parentSlugs = []string{}
-	}
-	return oapi.Region{
-		Id:          r.ID,
-		Kind:        oapi.RegionKind(r.Kind),
-		Name:        r.Name,
-		Slug:        r.Slug,
-		Country:     oapi.Country(r.Country),
-		ScopeTier:   oapi.ScopeTier(r.ScopeTier),
-		ParentSlugs: parentSlugs,
-	}
-}
-

@@ -32,10 +32,10 @@ func LoadDevFixtures(s *MemStore) {
 
 	// ── Postal codes ───────────────────────────────────────────
 	// Each code maps to the leaf (most-specific) region.
-	s.AddPostalCode(CountryUS, "11217", 1) // Brooklyn
-	s.AddPostalCode(CountryUS, "11215", 1) // Brooklyn
+	s.AddPostalCode(CountryUS, "11217", 1)  // Brooklyn
+	s.AddPostalCode(CountryUS, "11215", 1)  // Brooklyn
 	s.AddPostalCode(CountryUS, "94110", 10) // San Francisco
-	s.AddPostalCode(CountryCA, "M5V", 20) // Toronto
+	s.AddPostalCode(CountryCA, "M5V", 20)   // Toronto
 
 	// ── Organizations ──────────────────────────────────────────
 	// NYC

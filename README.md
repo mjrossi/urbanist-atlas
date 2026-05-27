@@ -82,21 +82,46 @@ work). Nightly `pg_dump` backups land in Cloudflare R2 via the
 GitHub Actions workflow at
 [`.github/workflows/backup.yml`](./.github/workflows/backup.yml).
 
+Every push to `main` auto-deploys the API to Fly via the `deploy-api`
+job in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
+(release-command `migrate up` runs before traffic cuts over). The web
+SPA auto-deploys via Cloudflare's git integration. `just fly-deploy`
+remains as a manual fallback when Actions is degraded or a non-`main`
+branch needs a hot-fix. **Seed data does not reload on deploy** — run
+`just fly-loaddata` after merging a PR that edits `api/seed/**`. The
+operating contract (triggers, manual fallbacks, rollback) is the
+`## Deploys` section of [`docs/deploy.md`](./docs/deploy.md).
+
 The initial provisioning runbook (creating both Fly apps, attaching
 the volume, wiring DNS and certs, setting secrets, enabling backups,
 adding the Workers project custom domain) lives at
-[`docs/deploy.md`](./docs/deploy.md). Ongoing ops use the `fly-*` /
-`db-*` recipes (`just fly-deploy`, `just fly-logs`,
+[`docs/deploy.md`](./docs/deploy.md). Editorial workflows for adding
+or correcting orgs and regions are at
+[`docs/editorial.md`](./docs/editorial.md). Ongoing ops use the
+`fly-*` / `db-*` recipes (`just fly-deploy`, `just fly-logs`,
 `just fly-secrets`, `just fly-ssh`, `just fly-loaddata`,
 `just db-backup`, `just db-restore <file>`).
 
 The Fly + sibling Postgres design lives at
 [`docs/superpowers/specs/2026-05-21-fly-deploy-design.md`](./docs/superpowers/specs/2026-05-21-fly-deploy-design.md).
 
-## Contributing organizations
+## Contributing
 
-Once the site is live: visit `/submit` to propose an organization. All
-submissions are reviewed by a human before going live.
+Pull requests, bug reports, and organization suggestions are all
+welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) — it
+covers the scope guardrails (what's in, what's deliberately out),
+the dev-loop setup, and the PR / commit conventions.
+
+For organizations to add or correct: use the
+[org-correction issue template](./.github/ISSUE_TEMPLATE/org_correction_or_addition.md)
+until the public submission flow ships with Phase 2 (slices
+#5 + #13 in [`docs/roadmap.md`](./docs/roadmap.md)).
+
+This project follows the
+[Contributor Covenant](./CODE_OF_CONDUCT.md). Security issues go
+through GitHub's private vulnerability reporting per
+[`SECURITY.md`](./SECURITY.md) — please don't open a public issue
+for those.
 
 ## License
 

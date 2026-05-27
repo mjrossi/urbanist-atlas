@@ -1,8 +1,7 @@
 /* Urbanist Atlas — global styles.
  *
  * Ported from the Urbanist Lexicon family stylesheet at
- * mjrossi.com (see /Users/mrossi/dev/mjrossi-portfolio-website/src/
- * styles/global.css). This file is the layout-shell slice: it
+ * mjrossi.com. This file is the layout-shell slice: it
  * carries the design tokens, the reset, the masthead, the
  * broadsheet nav, the footer, and a minimal `.page` skeleton.
  *
@@ -356,16 +355,6 @@ main {
 .search-box-input:focus {
   border-color: var(--accent);
   outline: none;
-}
-
-.search-box-country {
-  font-family: var(--font-ui);
-  font-size: 0.9rem;
-  padding: 0.55rem 0.6rem;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 3px;
 }
 
 .search-box-submit {
@@ -886,6 +875,27 @@ em {
     align-items: flex-start;
     gap: 0.35rem;
   }
+}
+
+/* ── Accessibility utilities ────────────────────────── */
+
+/*
+ * Visually hides content while keeping it in the accessibility tree —
+ * screen readers still announce it, sighted users don't see it. Used
+ * by SearchBox to label the country <select> without showing the
+ * "Country" word twice.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ── Blog: index + tag listings ─────────────────────── */

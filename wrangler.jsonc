@@ -1,0 +1,40 @@
+// Cloudflare Workers + Pages config for the urbanist-atlas SPA.
+//
+// We deploy the Vite-built SPA as Workers Static Assets (no Worker
+// code — pure static serving with SPA fallback).
+//
+// SPA fallback comes from `assets.not_found_handling` below — any
+// path that doesn't match a real file under ./web/dist serves
+// /index.html with a 200 status; React Router then handles the
+// route client-side.
+//
+// Design doc: docs/superpowers/specs/2026-05-21-fly-deploy-design.md
+// Runbook:    docs/deploy.md § Cloudflare Workers + Pages + DNS
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "urbanist-atlas",
+  "compatibility_date": "2026-05-21",
+
+  "assets": {
+    // Points at the Vite output. Build runs `cd web && npm ci &&
+    // npm run build` (Cloudflare UI's "Build command"), producing
+    // web/dist relative to the repo root.
+    "directory": "./web/dist",
+
+    // SPA fallback: any path that doesn't match a real file in
+    // ./web/dist (e.g. /browse, /about, /r/10001) serves
+    // /index.html with a 200 status. React Router then handles the
+    // route client-side. This is the Workers Static Assets
+    // equivalent of the Pages `_redirects` rule
+    //   /*    /index.html   200
+    "not_found_handling": "single-page-application"
+  },
+
+  // Observability: cheap default. `head_sampling_rate` controls
+  // how many requests Cloudflare's analytics ingests; 1.0 = all.
+  // Drop later if traffic ever justifies a sampled view.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

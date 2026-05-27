@@ -1,0 +1,47 @@
+# fly.toml app configuration file generated for urbanist-atlas-db on 2026-05-21T16:26:14-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'urbanist-atlas-db'
+primary_region = 'iad'
+
+[build]
+  # Builds infra/postgres/Dockerfile (a thin wrapper over
+  # postgres:17-alpine; see that file's header for why). The build
+  # context defaults to the directory containing this fly.toml.
+  dockerfile = 'Dockerfile'
+
+[env]
+  POSTGRES_DB = 'urbanist_atlas'
+  POSTGRES_USER = 'urbanist'
+  # Fly's ext4 volumes auto-include a `lost+found` directory at the
+  # mount root, which trips initdb's "directory exists but is not
+  # empty" guard. Point PGDATA at a subdirectory of the mount so
+  # initdb has a clean target — the upstream postgres image honors
+  # PGDATA over its built-in default of /var/lib/postgresql/data.
+  PGDATA = '/var/lib/postgresql/data/pgdata'
+
+[[mounts]]
+  source = 'pgdata'
+  destination = '/var/lib/postgresql/data'
+
+# Fly's default restart policy for headless apps (no [[services]] /
+# [http_service]) is `on-failure` with max_retries=10. Hitting the
+# max once leaves the machine in `stopped` state until manually
+# restarted — fine during initial bring-up bugs, bad for ongoing
+# operations where any transient blip could take the DB offline
+# permanently. `always` keeps Fly restarting indefinitely; the data
+# lives on the `pgdata` volume so restarts are safe.
+#
+# Note: Fly's schema requires `restart` as an array of tables
+# (`[[restart]]`), not a single table (`[restart]`) — flyctl errors
+# with "cannot unmarshal object into Go struct field Config.restart
+# of type []appconfig.Restart" otherwise.
+[[restart]]
+  policy = 'always'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024

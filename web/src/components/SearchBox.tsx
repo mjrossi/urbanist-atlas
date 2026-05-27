@@ -11,18 +11,16 @@ import { normalizePostal } from '../lib/postal.ts';
  * `/r/:postalCode?country=US|CA`.
  *
  * Country is detected heuristically from the first character (digit
- * → US, letter → CA); the small `<select>` lets the user override
- * when the heuristic guesses wrong.
+ * → US, letter → CA). The override <select> was dropped — for US/CA
+ * the heuristic is unambiguous, and the dropdown was visual noise.
  */
 
 type DetectedCountry = Country | null;
 
-// TODO(third-country): the digit→US, letter→CA heuristic only works
-// while the UI exposes exactly two countries. Before adding a third
-// (e.g. PT/ES going user-facing), either retire the auto-detect and
-// require an explicit country pick, or replace this with a per-country
-// regex map. The `<select>` options below and lib/api.ts'
-// SUPPORTED_COUNTRIES need updating in lockstep.
+// TODO(third-country): the digit→US, letter→CA heuristic is fine for
+// the v1 US/CA shipping decision. When PT/ES/UK go user-facing, swap
+// this for a per-country regex map (or reintroduce an explicit country
+// pick); lib/api.ts' SUPPORTED_COUNTRIES needs updating in lockstep.
 function detectCountry(raw: string): DetectedCountry {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;
@@ -55,14 +53,10 @@ function validate(normalized: string, country: Country): string | null {
 export function SearchBox() {
   const navigate = useNavigate();
   const [raw, setRaw] = useState('');
-  const [countryOverride, setCountryOverride] = useState<Country | ''>('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const inputId = useId();
-  const countryId = useId();
 
-  const effectiveCountry: Country =
-    countryOverride !== '' ? countryOverride : (detectCountry(raw) ?? 'US');
-
+  const effectiveCountry: Country = detectCountry(raw) ?? 'US';
   const normalized = useMemo(() => normalizePostal(raw), [raw]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -88,7 +82,7 @@ export function SearchBox() {
           type="text"
           name="postalCode"
           className="search-box-input"
-          placeholder="11217 or M5V 2T6"
+          placeholder="94110 or M5V 1J1"
           autoComplete="postal-code"
           inputMode="text"
           spellCheck={false}
@@ -100,21 +94,6 @@ export function SearchBox() {
           aria-invalid={submitError !== null}
           aria-describedby={submitError ? `${inputId}-error` : `${inputId}-hint`}
         />
-        <label htmlFor={countryId} className="visually-hidden" hidden>
-          Country
-        </label>
-        <select
-          id={countryId}
-          name="country"
-          className="search-box-country"
-          value={countryOverride}
-          onChange={(event) => setCountryOverride(event.target.value as Country | '')}
-          aria-label="Country"
-        >
-          <option value="">Auto</option>
-          <option value="US">US</option>
-          <option value="CA">CA</option>
-        </select>
         <button type="submit" className="search-box-submit">
           Look up
         </button>

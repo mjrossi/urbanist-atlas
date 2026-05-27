@@ -267,7 +267,7 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 #   - Multi-state MSAs without an override parent under all their
 #     constituent states (so MSA-anchored ZCTAs surface state-tier
 #     orgs through the ancestor walk). Curated multi-state regions
-#     in regions_us.toml (nyc-tristate, chicagoland-multistate) are
+#     in regions_us.toml (nyc-tristate, chicagoland) are
 #     plumbed in via the override file.
 #
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:

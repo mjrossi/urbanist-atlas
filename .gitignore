@@ -52,7 +52,6 @@ api/.fly/
 # ── Brainstorming / Claude scratch ──────────────────
 .superpowers/
 .claude/
-.worktrees/
 
 # ── ETL: upstream source files (regenerated outputs live in api/seed/) ──
 etl/sources/

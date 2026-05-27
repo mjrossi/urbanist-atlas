@@ -24,12 +24,18 @@ export function Entry({
   regionNameBySlug,
 }: {
   org: LookupOrg;
-  regionNameBySlug: Map<string, string>;
+  /**
+   * Optional slug → display-name map. When omitted (e.g. the metro
+   * detail page, which isn't a postal-code lookup), slugs are shown
+   * as-is. Callers that don't have a hydrated map should leave this
+   * prop unset rather than pass an empty Map.
+   */
+  regionNameBySlug?: Map<string, string>;
 }) {
   const domain = domainOf(org.website_url);
 
   const viaNames = org.matched_region_slugs
-    .map((slug) => regionNameBySlug.get(slug) ?? slug)
+    .map((slug) => regionNameBySlug?.get(slug) ?? slug)
     .join(', ');
 
   return (

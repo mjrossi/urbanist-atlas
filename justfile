@@ -5,8 +5,8 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # sqlc, goose, oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, fly, smoke, ci. Each group
-# corresponds to a section comment below.
+# Groups: api, data, postgres, web, preview, fly, smoke, ci. Each
+# group corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -34,19 +34,41 @@ api-build:
 api-fmt:
     cd api && gofmt -w .
 
+# fail if any Go file would be rewritten by gofmt. `gofmt -l` prints
+# the offending paths and exits 0 even on drift, so the explicit
+# non-empty check turns that into a CI signal.
+[group('api')]
+[doc('fail if any Go file is not gofmt-clean')]
+api-fmt-check:
+    @cd api && \
+      drift="$(gofmt -l .)"; \
+      if [ -n "$drift" ]; then \
+        echo "gofmt drift in:"; echo "$drift"; \
+        echo "run \`just api-fmt\` and commit." >&2; \
+        exit 1; \
+      fi
+
 # go vet ./...
 [group('api')]
 api-vet:
     cd api && go vet ./...
+
+# staticcheck ./... — pinned in mise.toml. Catches bugs `go vet`
+# misses (unused fields, deprecated APIs, ineffective assignments).
+[group('api')]
+[doc('run staticcheck (mise-pinned) over the api module')]
+api-staticcheck:
+    cd api && mise exec -- staticcheck ./...
 
 # go test ./... with race detector, no cache (matches CI)
 [group('api')]
 api-test:
     cd api && go test ./... -race -count=1
 
-# vet + test + gen-no-diff — the CI gate for api/, run locally
+# fmt-check + vet + staticcheck + test + gen-no-diff — the CI gate for
+# api/, run locally before pushing.
 [group('api')]
-api-check: api-vet api-test api-gen-check
+api-check: api-fmt-check api-vet api-staticcheck api-test api-gen-check
 
 # go mod tidy
 [group('api')]
@@ -271,6 +293,47 @@ web-gen-check:
 [doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
 web-check: web-deps web-lint web-test web-build web-gen-check
 
+# ── preview: full-stack PR review against a local stack ─
+# Cloudflare Workers preview URLs target the *current* QA API at
+# qa-api.urbanistatlas.com — they don't see the API changes on a
+# PR's branch. For a PR that adds or changes an API endpoint, the
+# preview frontend will 404 against the not-yet-deployed backend.
+#
+# `just preview` is the local-stack alternative: brings up the dev
+# Postgres, applies any pending migrations, seeds the DB if empty,
+# and runs the API in the foreground. Reviewer is expected to be on
+# the PR branch already (e.g. via `gh pr checkout <PR#>`) and to run
+# `just web-dev` in a second terminal. See CONTRIBUTING.md
+# "Full-stack PR review" for the workflow.
+#
+# Idempotent: pg-up reuses an existing container, migrate-up is a
+# no-op when migrations are current, and loaddata is skipped when
+# the orgs table is already populated.
+[group('preview')]
+[doc('one-shot local stack for full-stack PR review (DB + migrate + seed-if-empty + api)')]
+preview:
+    @just pg-up
+    @just migrate-up
+    @# Fail fast if the dev DB container isn't reachable, instead of
+    @# letting `|| echo 0` silently fall through to a confusing
+    @# `just loaddata` failure one indirection later.
+    @if ! docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -c "SELECT 1" >/dev/null 2>&1; then \
+        echo "preview: postgres container 'urbanist-atlas-pg' is not reachable. Check 'docker ps' and 'just pg-up'." >&2; \
+        exit 1; \
+    fi
+    @count=$(docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -t -A -c "SELECT COUNT(*) FROM organizations" 2>/dev/null || echo 0); \
+    if [ "$count" = "0" ]; then \
+        echo "preview: empty DB — running loaddata"; \
+        just loaddata; \
+    else \
+        echo "preview: $count orgs already loaded — skipping loaddata"; \
+    fi
+    @echo ""
+    @echo "preview: API starting on http://localhost:8080"
+    @echo "preview: in another terminal, run \`just web-dev\` (http://localhost:5173)"
+    @echo ""
+    just api-run
+
 # ── fly: deploy + ops ─────────────────────────────────
 # Thin wrappers around `flyctl` so the deploy / logs / secrets /
 # ssh verbs are discoverable via `just --list`. App names
@@ -282,8 +345,16 @@ web-check: web-deps web-lint web-test web-build web-gen-check
 
 # deploy the API app from the current checkout. Release-command in
 # fly.toml runs `migrate up` before the new machine takes traffic.
+#
+# Manual fallback: every merge to main triggers a Fly deploy from the
+# `deploy-api` job in .github/workflows/ci.yml using
+# `flyctl deploy --remote-only`. Use this recipe when GitHub Actions
+# is degraded, when you need to deploy a non-main branch for a
+# hot-fix, or when you want to watch the build locally. For an
+# Actions-side re-deploy of current main without an empty commit,
+# `gh workflow run ci.yml --ref main`.
 [group('fly')]
-[doc('deploy the API to Fly (release_command runs migrations)')]
+[doc('deploy the API to Fly — manual fallback; primary path is GHA on merge to main')]
 fly-deploy:
     flyctl deploy -a urbanist-atlas
 
@@ -398,7 +469,22 @@ smoke secret='' host='qa-api.urbanistatlas.com':
     if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
     if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
     if ! grep -qi '^X-Data-Attribution: ' "$headers"; then echo "  FAIL: missing X-Data-Attribution header"; fail=1; else echo "  OK X-Data-Attribution"; fi
+    rm -f "$headers" "$body"
+
+    # /lookup is a single-resource endpoint; the {meta, data} envelope
+    # only wraps collection responses (per the slice #24 ODbL design,
+    # see docs/api-architecture.md § Response envelope). Check meta on
+    # /metros, which is a collection endpoint.
+    echo "→ GET $BASE/api/v1/metros (collection meta envelope)"
+    headers=$(mktemp)
+    body=$(mktemp)
+    code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
+        -H "X-Atlas-Client: $SECRET" \
+        "$BASE/api/v1/metros")
+    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
+    if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
     if ! jq -e '.meta.license and .meta.attribution_url and .meta.generated_at' "$body" >/dev/null; then echo "  FAIL: meta envelope missing license/attribution_url/generated_at"; fail=1; else echo "  OK meta envelope"; fi
+    if ! jq -e '.data | type == "array"' "$body" >/dev/null; then echo "  FAIL: data is not an array"; fail=1; else echo "  OK data array"; fi
     rm -f "$headers" "$body"
 
     echo "→ GET $BASE/api/v1/openapi.yaml"

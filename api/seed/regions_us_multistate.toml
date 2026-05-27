@@ -3,7 +3,7 @@
 # These sit between the state tier (regions_us_states.toml) and the
 # MSA tier (regions_us_msas.toml) in the load order so MSA overrides
 # (regions_us_msa_overrides.toml) can reference them as parents
-# (e.g., nyc-metro → nyc-tristate, chicago-metro → chicagoland-multistate).
+# (e.g., nyc-metro → nyc-tristate, chicago-metro → chicagoland).
 #
 # Modeling conventions: see docs/region-graph.md §2 (federations
 # parent metros/leaves, not states) and §3 (transit federations
@@ -21,7 +21,7 @@ sort_priority = 80
 parents = []
 
 [[region]]
-slug = "chicagoland-multistate"
+slug = "chicagoland"
 kind = "us:multi-state"
 name = "Chicagoland (IL/IN/WI)"
 scope_tier = "regional"

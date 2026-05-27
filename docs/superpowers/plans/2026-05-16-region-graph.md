@@ -17,7 +17,7 @@
    - `web/src/{routes/Results.tsx, components/{Dateline,EntryList,Entry,TagChip,SearchBox}.tsx, lib/api.ts}`
 2. **No Item 1 hotfix.** This slice supersedes the linkage model entirely; the per-block `scope` flag would be deleted in the rewrite. Skip it.
 3. Dev environment ready: `mise install`; `just pg-up && just migrate-up` succeeds.
-4. Working directory: repo root (`/Users/mrossi/dev/urbanist-atlas`).
+4. Working directory: repo root.
 
 ---
 

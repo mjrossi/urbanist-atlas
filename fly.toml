@@ -1,0 +1,48 @@
+# fly.toml app configuration file generated for urbanist-atlas on 2026-05-21T16:30:06-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'urbanist-atlas'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  # release_command is APPENDED to the Dockerfile ENTRYPOINT
+  # (["urbanist-atlas-server"]), so don't repeat the binary name here.
+  release_command = 'migrate up'
+
+[env]
+  # CORS allowlist for Phase 1.
+  # - https://qa.urbanistatlas.com — the QA SPA hostname (custom domain on the Workers project)
+  # - *.link00seven.workers.dev — Cloudflare Workers preview versions (account-scoped subdomain;
+  #   the Workers Static Assets analog of the old Pages `*.pages.dev` previews; Cloudflare's
+  #   Pages-into-Workers consolidation means previews now live under `<account>.workers.dev`)
+  # At prod launch, append https://urbanistatlas.com; once QA retires, drop the qa.* entry.
+  URBANIST_CORS_ORIGINS = 'https://qa.urbanistatlas.com,*.link00seven.workers.dev'
+  URBANIST_LOG_FORMAT = 'json'
+  URBANIST_PORT = '8080'
+  URBANIST_SEED_DIR = '/app/seed'
+  URBANIST_STORE = 'postgres'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/healthz'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256

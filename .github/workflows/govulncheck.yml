@@ -1,0 +1,45 @@
+name: govulncheck
+
+# Weekly scan of the Go module graph for known vulnerabilities. Runs
+# off the PR critical path so a fresh CVE doesn't block merges on a
+# fix we can't apply in five minutes — a failure here opens an Actions
+# notification, we triage, we ship a fix.
+#
+# Manual trigger via `gh workflow run govulncheck.yml` (or the Actions
+# tab) for ad-hoc scans, e.g. before cutting a release.
+
+on:
+  schedule:
+    # Mondays 12:00 UTC ≈ 08:00 ET, after coffee + after the nightly
+    # backup at 07:00 UTC has settled.
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: govulncheck
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: scan api/ for known CVEs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      # mise pins the Go toolchain (api/go.mod is the source of truth
+      # for the required minor); reusing the same action as ci.yml
+      # keeps the toolchain version unambiguous.
+      - uses: jdx/mise-action@v4
+      - name: Install govulncheck
+        # Pinned by major version. Not pinned in mise.toml (yet) — see
+        # the deploy-auto-deploy slice's open follow-ups in
+        # ~/.claude/plans/i-want-a-plan-cached-wadler.md. `go install`
+        # respects the toolchain mise just installed.
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run govulncheck
+        run: |
+          cd api
+          govulncheck ./...
