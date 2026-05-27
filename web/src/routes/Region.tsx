@@ -7,6 +7,7 @@ import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
 import { EntryList } from '../components/EntryList.tsx';
+import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 
@@ -59,43 +60,35 @@ export function Region() {
 }
 
 function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }) {
-  if (query.isPending) {
-    return (
-      <p className="results-state" role="status" style={{ marginTop: 48 }}>
-        Loading region…
-      </p>
-    );
-  }
-  if (query.isError) {
-    if (query.error.status === 404) {
-      return (
-        <div className="lede" style={{ marginTop: 48 }}>
-          <div className="eyebrow">
-            § Region report<span className="eyebrow-rule" />
+  return (
+    <QueryState
+      query={query}
+      loading="Loading region…"
+      marginTop={48}
+      error={(e) =>
+        e.status === 404 ? (
+          <div className="lede" style={{ marginTop: 48 }}>
+            <div className="eyebrow">
+              § Region report<span className="eyebrow-rule" />
+            </div>
+            <h1>
+              This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
+            </h1>
+            <p className="deck">
+              Try <Link to="/browse">browse</Link> for the regions we have indexed,
+              or <Link to="/submit">file a tip</Link> if you know advocates here.
+            </p>
           </div>
-          <h1>
-            This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
-          </h1>
-          <p className="deck">
-            Try <Link to="/browse">browse</Link> for the regions we have indexed,
-            or <Link to="/submit">file a tip</Link> if you know advocates here.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
-        {query.error.message}
-        {query.error.requestId ? (
-          <span className="results-state-detail">
-            request id: {query.error.requestId}
-          </span>
-        ) : null}
-      </p>
-    );
-  }
+        ) : undefined
+      }
+    >
+      {(data) => <RegionContent data={data} />}
+    </QueryState>
+  );
+}
 
-  const { region, local, regional, ancestry, descendant_region_names } = query.data;
+function RegionContent({ data }: { data: RegionDetail }) {
+  const { region, local, regional, ancestry, descendant_region_names } = data;
   const kindLabel = regionKindLabel(region.kind);
   const totalOrgs = local.length + regional.length;
 

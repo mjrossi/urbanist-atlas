@@ -6,6 +6,7 @@ import type { Org as OrgT } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
+import { QueryState } from '../components/QueryState.tsx';
 
 export function Org() {
   const params = useParams<{ slug: string }>();
@@ -47,45 +48,35 @@ function OrgKicker({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 }
 
 function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
-  if (query.isPending) {
-    return (
-      <p className="results-state" role="status" style={{ marginTop: 48 }}>
-        Loading organization…
-      </p>
-    );
-  }
-  if (query.isError) {
-    const apiErr = query.error instanceof ApiError ? query.error : null;
-    if (apiErr?.status === 404) {
-      return (
-        <div className="lede" style={{ marginTop: 48 }}>
-          <div className="eyebrow">
-            § Organization file<span className="eyebrow-rule" />
+  return (
+    <QueryState
+      query={query}
+      loading="Loading organization…"
+      marginTop={48}
+      error={(e) =>
+        e.status === 404 ? (
+          <div className="lede" style={{ marginTop: 48 }}>
+            <div className="eyebrow">
+              § Organization file<span className="eyebrow-rule" />
+            </div>
+            <h1>
+              This organization <span className="accent">isn&rsquo;t in the atlas yet.</span>
+            </h1>
+            <p className="deck">
+              Try <Link to="/browse">browse</Link> for the metros we have indexed,
+              or <Link to="/submit">file a tip</Link> if you know who&rsquo;s
+              doing the work here.
+            </p>
           </div>
-          <h1>
-            This organization <span className="accent">isn&rsquo;t in the atlas yet.</span>
-          </h1>
-          <p className="deck">
-            Try <Link to="/browse">browse</Link> for the metros we have indexed,
-            or <Link to="/submit">file a tip</Link> if you know who&rsquo;s
-            doing the work here.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
-        {apiErr?.message ?? 'Something went wrong loading this organization.'}
-        {apiErr?.requestId ? (
-          <span className="results-state-detail">
-            request id: {apiErr.requestId}
-          </span>
-        ) : null}
-      </p>
-    );
-  }
+        ) : undefined
+      }
+    >
+      {(org) => <OrgContent org={org} />}
+    </QueryState>
+  );
+}
 
-  const org = query.data;
+function OrgContent({ org }: { org: OrgT }) {
   const domain = domainOf(org.website_url);
   const primaryMetro = org.regions.find((r) => isMetroKind(r.kind));
   const tagsTopline = org.tags.slice(0, 3).map(prettyTag).join(' · ');
