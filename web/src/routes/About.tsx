@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 export function About() {
@@ -16,14 +17,11 @@ export function About() {
   );
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">About</span>
-        </div>
-        <div>Volume I · 2026 Edition</div>
-      </div>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="About"
+        meta="Volume I · 2026 Edition"
+      />
 
       <div className="lede mt-48">
         <div className="eyebrow">

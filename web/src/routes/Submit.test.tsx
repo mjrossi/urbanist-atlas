@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Submit } from './Submit.tsx';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
@@ -46,7 +46,6 @@ describe('Submit', () => {
 
   afterEach(() => {
     openSpy.mockRestore();
-    vi.useRealTimers();
   });
 
   it('renders all required field labels', () => {
@@ -55,6 +54,13 @@ describe('Submit', () => {
     expect(screen.getByLabelText(/primary website/i)).toBeDefined();
     expect(screen.getByLabelText(/region served/i)).toBeDefined();
     expect(screen.getByLabelText(/one-line description/i)).toBeDefined();
+  });
+
+  it('renders the page breadcrumb as a navigation landmark', () => {
+    renderSubmit();
+    const nav = screen.getByRole('navigation', { name: /breadcrumb/i });
+    const current = within(nav).getByText('Submissions');
+    expect(current.getAttribute('aria-current')).toBe('page');
   });
 
   it('submit button is disabled when required fields are empty', () => {
@@ -87,12 +93,16 @@ describe('Submit', () => {
     await user.click(button);
 
     expect(openSpy).toHaveBeenCalledTimes(1);
-    const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('github.com/mjrossi/urbanist-atlas/issues/new');
-    expect(url).toContain('title=%5BNew%20org%5D');
-    expect(url).toContain(encodeURIComponent('Sample Riders Alliance'));
+    // Parse the URL and inspect decoded values so the test doesn't
+    // care whether URLSearchParams encodes spaces as `+` or `%20`.
+    const url = new URL(openSpy.mock.calls[0][0] as string);
+    expect(url.origin + url.pathname).toBe(
+      'https://github.com/mjrossi/urbanist-atlas/issues/new',
+    );
+    expect(url.searchParams.get('title')).toBe('[New org] Sample Riders Alliance');
+    expect(url.searchParams.has('body')).toBe(true);
     // template= would silently override our pre-filled body.
-    expect(url).not.toContain('template=');
+    expect(url.searchParams.has('template')).toBe(false);
     expect(openSpy.mock.calls[0][1]).toBe('_blank');
     expect(openSpy.mock.calls[0][2]).toBe('noopener');
   });
@@ -109,8 +119,8 @@ describe('Submit', () => {
     });
     await user.click(button);
 
-    const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('title=%5BCorrection%5D');
+    const url = new URL(openSpy.mock.calls[0][0] as string);
+    expect(url.searchParams.get('title')).toMatch(/^\[Correction\]/);
   });
 
   it('removal type produces a [Removal] title prefix', async () => {
@@ -125,8 +135,8 @@ describe('Submit', () => {
     });
     await user.click(button);
 
-    const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('title=%5BRemoval%5D');
+    const url = new URL(openSpy.mock.calls[0][0] as string);
+    expect(url.searchParams.get('title')).toMatch(/^\[Removal\]/);
   });
 
   it('sets the browser tab title', async () => {

@@ -7,6 +7,7 @@ import { domainOf } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 
 export function Org() {
@@ -35,26 +36,14 @@ export function Org() {
 function OrgKicker({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
   const org = query.data;
   return (
-    <div className="kicker">
-      <nav aria-label="Breadcrumb">
-        <ol className="crumb-trail">
-          <li>
-            <Link to="/">Atlas</Link>
-            <span className="crumb-sep" aria-hidden="true">/</span>
-          </li>
-          <li>
-            <Link to="/browse">Browse</Link>
-            <span className="crumb-sep" aria-hidden="true">/</span>
-          </li>
-          <li>
-            <span className="crumb-here" aria-current="page">
-              {org ? org.name : 'Organization'}
-            </span>
-          </li>
-        </ol>
-      </nav>
-      <div>{org ? `Slug · ${org.slug}` : 'Organization file'}</div>
-    </div>
+    <PageBreadcrumb
+      prefix={[
+        { label: 'Atlas', to: '/' },
+        { label: 'Browse', to: '/browse' },
+      ]}
+      current={org ? org.name : 'Organization'}
+      meta={org ? `Slug · ${org.slug}` : 'Organization file'}
+    />
   );
 }
 
@@ -63,7 +52,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
     <QueryState
       query={query}
       loading="Loading organization…"
-      marginTop={48}
+      className="mt-48"
       error={(e) =>
         e.status === 404 ? (
           <div className="lede mt-48">
@@ -188,9 +177,7 @@ function OrgContent({ org }: { org: OrgT }) {
           <div className="item">
             <div>Slug</div>
             <span className="val">
-              <code style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>
-                {org.slug}
-              </code>
+              <code>{org.slug}</code>
             </span>
           </div>
           {org.contact_url ? (

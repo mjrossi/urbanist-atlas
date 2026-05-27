@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import {
   buildIssueBody,
@@ -36,6 +37,15 @@ export function Submit() {
   const [justOpened, setJustOpened] = useState(false);
   const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
 
+  // Lift the cooldown timer into an effect so unmounting mid-cooldown
+  // tears the setTimeout down via the cleanup, and so the timer
+  // doesn't leak across renders.
+  useEffect(() => {
+    if (!justOpened) return;
+    const id = setTimeout(() => setJustOpened(false), SUBMIT_COOLDOWN_MS);
+    return () => clearTimeout(id);
+  }, [justOpened]);
+
   const onValid = (form: SubmitForm) => {
     if (justOpened) return;
     const title = `${titlePrefix(form.type)} ${form.name}`;
@@ -43,12 +53,12 @@ export function Submit() {
     // GitHub silently drops `body=` when `template=` is also present,
     // so we deliberately omit the template param and ship the full
     // pre-filled body instead.
-    const url = `https://github.com/mjrossi/urbanist-atlas/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+    const params = new URLSearchParams({ title, body });
+    const url = `https://github.com/mjrossi/urbanist-atlas/issues/new?${params.toString()}`;
     const opened = window.open(url, '_blank', 'noopener');
     if (opened) {
       setBlockedUrl(null);
       setJustOpened(true);
-      setTimeout(() => setJustOpened(false), SUBMIT_COOLDOWN_MS);
     } else {
       // Pop-up blocked. Surface the URL inline so the user can copy /
       // open it themselves; don't lock the button so they can retry
@@ -59,20 +69,11 @@ export function Submit() {
 
   return (
     <>
-      <div className="kicker">
-        <nav aria-label="Breadcrumb">
-          <ol className="crumb-trail">
-            <li>
-              <Link to="/">Atlas</Link>
-              <span className="crumb-sep" aria-hidden="true">/</span>
-            </li>
-            <li>
-              <span className="crumb-here" aria-current="page">Submissions</span>
-            </li>
-          </ol>
-        </nav>
-        <div>Open year-round</div>
-      </div>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="Submissions"
+        meta="Open year-round"
+      />
 
       <div className="spread mt-48">
         <div>

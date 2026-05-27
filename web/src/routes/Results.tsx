@@ -114,7 +114,7 @@ function ResultsBody({
     <QueryState
       query={query}
       loading={<>Looking up groups near {postalCode}…</>}
-      marginTop={48}
+      className="mt-48"
     >
       {(data) => <ResultsContent data={data} postalCode={postalCode} />}
     </QueryState>

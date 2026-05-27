@@ -64,7 +64,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
     <QueryState
       query={query}
       loading="Loading region…"
-      marginTop={48}
+      className="mt-48"
       error={(e) =>
         e.status === 404 ? (
           <div className="lede mt-48">

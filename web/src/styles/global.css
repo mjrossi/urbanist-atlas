@@ -1758,6 +1758,14 @@ a.tag:hover::before {
   color: var(--amber);
 }
 
+/* Slugs and other identifier-shaped values render compact mono so
+   the serif metric doesn't visually inflate them next to the
+   adjacent .val rows. */
+.org-feature .meta-strip .item .val code {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
 .org-feature .dateline {
   font-family: var(--sans);
   font-size: 10.5px;
@@ -2950,13 +2958,18 @@ a.tag:hover::before {
   line-height: 1.5;
 }
 
-.dateline {
-  font-family: var(--sans);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--amber);
+/* Standalone code-block treatment for API examples and other
+   verbatim wire payloads rendered inside <pre>. Mono face, paper-2
+   ground, rule border, comfortable padding. */
+.codeblock {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 18px 22px;
+  overflow-x: auto;
+  color: var(--ink-2);
 }
 
 /* ── Misc helpers ──────────────────────────────────── */

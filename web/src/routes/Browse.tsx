@@ -6,6 +6,7 @@ import type { RegionSummary } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -121,18 +122,15 @@ export function Browse() {
 
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">The index</span>
-        </div>
-        <div>
-          {totalRegions !== null && totalOrgs !== null
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="The index"
+        meta={
+          totalRegions !== null && totalOrgs !== null
             ? `${totalRegions} regions · ${totalOrgs} org entries`
-            : 'The index'}
-        </div>
-      </div>
+            : 'The index'
+        }
+      />
 
       <div className="spread lede-first mt-48">
         <div className="lede mb-0">
