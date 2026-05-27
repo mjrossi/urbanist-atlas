@@ -1,21 +1,12 @@
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
-
-type SubmissionType = 'new' | 'correction' | 'removal';
-type Affiliation = 'none' | 'member' | 'other';
-
-interface SubmitForm {
-  type: SubmissionType;
-  name: string;
-  website: string;
-  region: string;
-  oneLineDesc: string;
-  why: string;
-  sources: string;
-  affiliation: Affiliation;
-  contact: string;
-}
+import {
+  buildIssueBody,
+  SUBMIT_FORM_DEFAULTS,
+  titlePrefix,
+  type SubmitForm,
+} from '../lib/submitForm.ts';
 
 /**
  * `/submit` — composes a pre-filled GitHub issue from the form values
@@ -34,17 +25,7 @@ export function Submit() {
     formState: { isValid, errors },
   } = useForm<SubmitForm>({
     mode: 'onBlur',
-    defaultValues: {
-      type: 'new',
-      name: '',
-      website: '',
-      region: '',
-      oneLineDesc: '',
-      why: '',
-      sources: '',
-      affiliation: 'none',
-      contact: '',
-    },
+    defaultValues: SUBMIT_FORM_DEFAULTS,
   });
 
   const onValid = (form: SubmitForm) => {
@@ -411,55 +392,3 @@ https://kuow.org/stories/..."
   );
 }
 
-function titlePrefix(type: SubmissionType): string {
-  switch (type) {
-    case 'new':
-      return '[New org]';
-    case 'correction':
-      return '[Correction]';
-    case 'removal':
-      return '[Removal]';
-  }
-}
-
-function check(condition: boolean): 'x' | ' ' {
-  return condition ? 'x' : ' ';
-}
-
-function buildIssueBody(form: SubmitForm): string {
-  const why = form.why.trim() || '_Not provided._';
-  const sources = form.sources.trim() || '_Not provided._';
-  const contact = form.contact.trim();
-  const submittedSuffix = contact ? ` by ${contact}` : '';
-  return `## Type
-
-- [${check(form.type === 'new')}] New organization to add
-- [${check(form.type === 'correction')}] Correction to an existing entry
-- [${check(form.type === 'removal')}] Removal request (e.g., org has shut down or rebranded)
-
-## Organization
-
-- **Name:** ${form.name}
-- **Primary website:** ${form.website}
-- **Region served:** ${form.region}
-- **One-line description of what they actually do:** ${form.oneLineDesc}
-
-## Why this org belongs
-
-${why}
-
-## Sources
-
-${sources}
-
-## Disclosure
-
-- [${check(form.affiliation === 'none')}] I have no affiliation with this organization.
-- [${check(form.affiliation === 'member')}] I am a member, volunteer, or staff of this organization.
-- [${check(form.affiliation === 'other')}] Other.
-
----
-
-_Submitted via the urbanistatlas.com submit form${submittedSuffix}._
-`;
-}
