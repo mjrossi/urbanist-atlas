@@ -124,6 +124,20 @@ func TestLookup_BadRequests(t *testing.T) {
 			query:      "postal_code=%20%20&country=US",
 			wantDetail: "postal_code is required",
 		},
+		{
+			// Length-cap the raw input before normalization. 17 chars
+			// is one over maxPostalCodeLen; chosen ASCII so the byte
+			// count matches the rune count.
+			name:       "postal_code over length cap",
+			query:      "postal_code=" + strings.Repeat("A", maxPostalCodeLen+1) + "&country=US",
+			wantDetail: "postal_code too long",
+		},
+		{
+			// 5 chars is one over maxCountryLen.
+			name:       "country over length cap",
+			query:      "postal_code=11217&country=" + strings.Repeat("A", maxCountryLen+1),
+			wantDetail: "country too long",
+		},
 	}
 
 	for _, tc := range cases {
