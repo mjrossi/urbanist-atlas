@@ -33,10 +33,13 @@ function renderBrowse() {
 }
 
 function makeRegion(
-  overrides: Partial<RegionSummary['region']> & { browse_parent_slug?: string } = {},
+  overrides: Partial<RegionSummary['region']> & {
+    browse_parent_slug?: string;
+    direct_org_count?: number;
+  } = {},
   org_count = 4,
 ): RegionSummary {
-  const { browse_parent_slug, ...regionOverrides } = overrides;
+  const { browse_parent_slug, direct_org_count, ...regionOverrides } = overrides;
   const summary: RegionSummary = {
     region: {
       id: 1,
@@ -49,6 +52,7 @@ function makeRegion(
       ...regionOverrides,
     },
     org_count,
+    direct_org_count: direct_org_count ?? org_count,
   };
   if (browse_parent_slug !== undefined) {
     summary.browse_parent_slug = browse_parent_slug;

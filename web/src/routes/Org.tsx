@@ -5,28 +5,7 @@ import { ApiError, getOrg } from '../lib/api.ts';
 import type { Org as OrgT } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
-
-// Narrower set used to pick the "primary metro" context for an org's
-// rail block — still semantically about metro-tier regions, not the
-// broader browseable-place set.
-const METRO_KINDS = new Set<string>([
-  'us:metro',
-  'ca:cma',
-  'ca:regional-district',
-  'pt:area-metropolitana',
-]);
-
-// Broader set used to decide whether a region in the org's region
-// list should render as a /region/<slug> link. Cities are browseable
-// post-slice so they get the link treatment alongside metros.
-const BROWSEABLE_REGION_KINDS = new Set<string>([
-  'us:metro',
-  'us:city',
-  'ca:cma',
-  'ca:regional-district',
-  'ca:city',
-  'pt:area-metropolitana',
-]);
+import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
 
 export function Org() {
   const params = useParams<{ slug: string }>();
@@ -108,7 +87,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 
   const org = query.data;
   const domain = domainOf(org.website_url);
-  const primaryMetro = org.regions.find((r) => METRO_KINDS.has(r.kind));
+  const primaryMetro = org.regions.find((r) => isMetroKind(r.kind));
   const tagsTopline = org.tags.slice(0, 3).map(prettyTag).join(' · ');
 
   const atAGlance = (
@@ -269,7 +248,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
                           fontSize: 19,
                         }}
                       >
-                        {BROWSEABLE_REGION_KINDS.has(region.kind) ? (
+                        {isBrowseableKind(region.kind) ? (
                           <Link
                             to={`/region/${encodeURIComponent(region.slug)}`}
                             style={{

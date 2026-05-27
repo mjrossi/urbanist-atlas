@@ -95,22 +95,31 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
     );
   }
 
-  const { region, local, regional, ancestry } = query.data;
+  const { region, local, regional, ancestry, descendant_region_names } = query.data;
   const kindLabel = regionKindLabel(region.kind);
   const totalOrgs = local.length + regional.length;
 
   // Build a slug → display-name map so Entry can render "Matched
-  // via Brooklyn" instead of "Matched via brooklyn-ny" — names come
-  // from the focus region itself plus its ancestry walk. The leaf's
-  // own attachments (city/borough orgs) reference slugs from the
-  // descendant set; for v1 we surface the slugs raw when the name
-  // map doesn't carry them (only ancestor regions are fully named
-  // here). Good enough for the broadsheet "via X" subtitle.
+  // via Brooklyn" instead of "Matched via brooklyn-ny". Seeded from
+  // the focus region, its ancestry walk, and the server-provided
+  // descendant_region_names map (which covers any descendant slug
+  // referenced by matched_region_slugs on the bucketed orgs).
   const regionNameBySlug = new Map<string, string>();
   regionNameBySlug.set(region.slug, region.name);
   for (const r of ancestry) {
     regionNameBySlug.set(r.slug, r.name);
   }
+  for (const [slug, name] of Object.entries(descendant_region_names)) {
+    regionNameBySlug.set(slug, name);
+  }
+
+  // Parent names for the rail copy. Pulled from ancestry (which
+  // carries resolved display names) by intersecting with the focus
+  // region's direct parents. Falls back to empty when there's no
+  // overlap (top-of-hierarchy regions).
+  const parentNames = ancestry
+    .filter((r) => region.parent_slugs.includes(r.slug))
+    .map((r) => r.name);
 
   return (
     <>
@@ -168,8 +177,8 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
             <div className="rail-kicker">About this {kindLabel.toLowerCase()}</div>
             <p>
               The Atlas indexes {region.name} as a {kindLabel.toLowerCase()}
-              {region.parent_slugs.length > 0
-                ? `, sitting under ${region.parent_slugs.join(' · ')}.`
+              {parentNames.length > 0
+                ? `, sitting under ${parentNames.join(' · ')}.`
                 : '.'}{' '}
               Local orgs work directly on this region; regional orgs cover
               wider footprints that include it.

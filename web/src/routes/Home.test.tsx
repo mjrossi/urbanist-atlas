@@ -34,7 +34,12 @@ function renderHome() {
   );
 }
 
-function makeRegion(slug: string, name: string, org_count: number): RegionSummary {
+function makeRegion(
+  slug: string,
+  name: string,
+  org_count: number,
+  direct_org_count: number = org_count,
+): RegionSummary {
   return {
     region: {
       id: parseInt(slug.replace(/\D/g, '') || '0', 10) || 1,
@@ -46,6 +51,7 @@ function makeRegion(slug: string, name: string, org_count: number): RegionSummar
       parent_slugs: [],
     },
     org_count,
+    direct_org_count,
   };
 }
 

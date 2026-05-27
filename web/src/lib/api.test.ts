@@ -87,6 +87,7 @@ describe('listRegions / getRegion / listRecent', () => {
               parent_slugs: [],
             },
             org_count: 7,
+            direct_org_count: 3,
           },
         ],
       }),
@@ -95,6 +96,7 @@ describe('listRegions / getRegion / listRecent', () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.region.slug).toBe('nyc-metro');
     expect(result[0]!.org_count).toBe(7);
+    expect(result[0]!.direct_org_count).toBe(3);
   });
 
   it('getRegion calls GET /api/v1/regions/{slug}', async () => {
@@ -109,11 +111,18 @@ describe('listRegions / getRegion / listRecent', () => {
           scope_tier: 'regional',
           parent_slugs: [],
         },
-        orgs: [],
+        local: [],
+        regional: [],
+        ancestry: [],
+        descendant_region_names: {},
       }),
     );
     const result = await getRegion('nyc-metro');
     expect(result.region.slug).toBe('nyc-metro');
+    expect(result.local).toEqual([]);
+    expect(result.regional).toEqual([]);
+    expect(result.ancestry).toEqual([]);
+    expect(result.descendant_region_names).toEqual({});
     const [url] = fetchMock.mock.calls[0]!;
     expect(String(url)).toMatch(/\/api\/v1\/regions\/nyc-metro($|\?)/);
   });
@@ -267,7 +276,10 @@ describe('listRegions / getRegion / listRecent', () => {
           scope_tier: 'regional',
           parent_slugs: [],
         },
-        orgs: [],
+        local: [],
+        regional: [],
+        ancestry: [],
+        descendant_region_names: {},
       }),
     );
     await getRegion('weird slug');

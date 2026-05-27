@@ -81,6 +81,7 @@ function makeDetail(overrides: Partial<RegionDetail> = {}): RegionDetail {
       }),
     ],
     ancestry: [],
+    descendant_region_names: {},
     ...overrides,
   };
 }

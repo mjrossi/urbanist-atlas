@@ -187,7 +187,13 @@ function ByTheNumbers({
   const placeCount = places.data?.length ?? null;
   const usCount = places.data?.filter((p) => p.region.country === 'US').length ?? null;
   const caCount = places.data?.filter((p) => p.region.country === 'CA').length ?? null;
-  const totalOrgCount = places.data?.reduce((sum, p) => sum + p.org_count, 0) ?? null;
+  // Total uses direct_org_count so summing across rows doesn't
+  // double-count orgs that surface under both a metro and its
+  // child cities. "Deepest coverage" below intentionally keeps
+  // org_count (descendant walk) — that's a single-row max showing
+  // how much advocacy depth one region's scope contains.
+  const totalOrgCount =
+    places.data?.reduce((sum, p) => sum + p.direct_org_count, 0) ?? null;
   const topRegion = places.data
     ? [...places.data].sort((a, b) => b.org_count - a.org_count)[0]
     : null;

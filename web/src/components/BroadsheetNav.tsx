@@ -50,8 +50,10 @@ export function BroadsheetNav() {
     queryFn: ({ signal }) => listRegions({ signal }),
   });
   const regionCount = regions.data?.length ?? null;
+  // direct_org_count keeps the masthead tally from double-counting
+  // orgs that surface under both a metro and its child cities.
   const orgCount = regions.data
-    ? regions.data.reduce((sum, p) => sum + p.org_count, 0)
+    ? regions.data.reduce((sum, p) => sum + p.direct_org_count, 0)
     : null;
 
   return (

@@ -103,9 +103,12 @@ describe('Org', () => {
       .getAllByRole('link', { name: 'New York Metro' })
       .filter((a) => a.getAttribute('href') === '/region/nyc-metro');
     expect(placeLinks.length).toBeGreaterThan(0);
-    // Non-place region (borough) renders as plain text, not a link.
-    expect(screen.queryByRole('link', { name: 'Brooklyn' })).toBeNull();
-    expect(screen.getByText('Brooklyn')).toBeDefined();
+    // Boroughs are browseable (server resolves /region/{slug} for
+    // any non-national kind) so they render as a clickable link too.
+    const boroughLinks = screen
+      .getAllByRole('link', { name: 'Brooklyn' })
+      .filter((a) => a.getAttribute('href') === '/region/brooklyn');
+    expect(boroughLinks.length).toBeGreaterThan(0);
   });
 
   it('renders the website domain as an external link', async () => {
@@ -129,9 +132,12 @@ describe('Org', () => {
     }
   });
 
-  // PLACE_KINDS in Org.tsx must stay in lockstep with the server's
-  // placeKinds map (api/pkg/atlas/place_kinds.go). These tests pin
-  // the currently-known set so a one-sided edit fails CI loudly.
+  // The isBrowseableKind helper in web/src/lib/regionKind.ts is the
+  // single source of truth for which kinds render as /region/<slug>
+  // links. The server resolves any non-national region by slug, so
+  // every kind in the labels map qualifies (metros, cities, states,
+  // counties, boroughs, multi-state coalitions, provinces, …).
+  // These tests pin the set so a one-sided edit fails CI loudly.
   it('links ca:regional-district regions to /region/:slug', async () => {
     getOrgMock.mockResolvedValueOnce(
       makeOrg({
@@ -158,7 +164,7 @@ describe('Org', () => {
     });
   });
 
-  it('does NOT link us:multi-state regions (server /places does not serve them)', async () => {
+  it('links us:multi-state regions to /region/:slug', async () => {
     getOrgMock.mockResolvedValueOnce(
       makeOrg({
         regions: [
@@ -177,9 +183,11 @@ describe('Org', () => {
     renderAt('/orgs/transalt');
 
     await waitFor(() => {
-      expect(screen.getByText('NYC Tri-State')).toBeDefined();
+      const links = screen
+        .getAllByRole('link', { name: 'NYC Tri-State' })
+        .filter((a) => a.getAttribute('href') === '/region/nyc-tristate');
+      expect(links.length).toBeGreaterThan(0);
     });
-    expect(screen.queryByRole('link', { name: 'NYC Tri-State' })).toBeNull();
   });
 
   it('renders a contact link when contact_url is present', async () => {

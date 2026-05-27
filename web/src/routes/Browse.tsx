@@ -111,7 +111,12 @@ export function Browse() {
   }, [grouped]);
 
   const totalRegions = query.data?.length ?? null;
-  const totalOrgs = query.data?.reduce((sum, p) => sum + p.org_count, 0) ?? null;
+  // Sum direct_org_count (orgs attached directly to each row, no
+  // descendant walk) so the header reads a deduped total. Summing
+  // org_count would double-count orgs that surface under both a
+  // metro and one of its child cities.
+  const totalOrgs =
+    query.data?.reduce((sum, p) => sum + p.direct_org_count, 0) ?? null;
 
   return (
     <>
@@ -221,7 +226,9 @@ function BrowseBody({
 
 function CountrySection({ country }: { country: ByCountry }) {
   const total = country.total.length;
-  const orgs = country.total.reduce((sum, p) => sum + p.org_count, 0);
+  // Same as the page total: direct_org_count avoids double-counting
+  // orgs that surface under both a metro and its child cities.
+  const orgs = country.total.reduce((sum, p) => sum + p.direct_org_count, 0);
   const name = COUNTRY_TITLES[country.country] ?? country.country;
   return (
     <section className="country-section">
