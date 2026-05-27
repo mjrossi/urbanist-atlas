@@ -127,10 +127,22 @@ export interface paths {
          * Get a single region and the organizations that serve it.
          * @description Resolves any non-national region in the graph by slug — metros,
          *     cities, counties, boroughs, states/provinces, multi-state
-         *     coalitions. The `orgs` array is the descendant walk: every
-         *     approved org attached to this region or any region nested
-         *     below it. `scope_tier='national'` slugs return 404 (same v1
-         *     editorial gate as `/lookup` and the list endpoint).
+         *     coalitions. Returns a `RegionDetail` with the focus region plus
+         *     the orgs in scope for it, bucketed into `local` and `regional`
+         *     by the `scope_tier` of each org's matched attachment region —
+         *     the same rule `/lookup` uses, extended to walk BOTH ancestors
+         *     AND descendants of the focus (a Brooklyn page surfaces orgs
+         *     tagged to Brooklyn, NYC Metro, NY, and the tri-state region,
+         *     all bucketed by tier). `scope_tier='national'` slugs return
+         *     404 (same v1 editorial gate as `/lookup` and the list
+         *     endpoint).
+         *
+         *     `ancestry` carries the upward walk for breadcrumbs.
+         *     `descendant_region_names` is a slug → display-name map
+         *     covering every descendant region referenced by an org's
+         *     `matched_region_slugs`, so clients can render
+         *     "Matched via Brooklyn" instead of "matched via brooklyn-ny"
+         *     without a second request.
          */
         get: operations["getRegion"];
         put?: never;
@@ -444,13 +456,37 @@ export interface components {
             regional: components["schemas"]["LookupOrg"][];
         };
         /**
-         * @description A region (any non-national kind) plus its approved-org count.
+         * @description A region (any non-national kind) plus its approved-org counts.
          *     Used by `GET /api/v1/regions` to populate the Browse index.
+         *
+         *     Two counts are exposed:
+         *
+         *     * `org_count` — distinct approved orgs attached to this region
+         *       OR any descendant in the DAG. Best for per-row "how much
+         *       coverage does this region have" displays (a metro's count
+         *       shows orgs from the metro + every city/borough/county
+         *       under it).
+         *     * `direct_org_count` — distinct approved orgs attached
+         *       DIRECTLY to this region (no descendant walk). Use this when
+         *       summing across rows in a country/page total: summing
+         *       `org_count` double-counts orgs that surface under both a
+         *       metro and one of its child cities.
          */
         RegionSummary: {
             region: components["schemas"]["Region"];
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Distinct approved orgs attached to this region OR any
+             *     descendant in the region DAG.
+             */
             org_count: number;
+            /**
+             * Format: int32
+             * @description Distinct approved orgs attached DIRECTLY to this region
+             *     (no descendant walk). Sums across rows yield a deduped
+             *     total.
+             */
+            direct_org_count: number;
             /**
              * @description For cities, the slug of the nearest ancestor in the
              *     default browse set (a metro / CMA / regional-district).
@@ -488,6 +524,16 @@ export interface components {
          *     to the root (closest-first, excluding self and any
          *     `scope_tier='national'` rows). Clients use it to render
          *     breadcrumbs.
+         *
+         *     `descendant_region_names` is a slug → display-name map for
+         *     every descendant region (city, borough, county, …) that an
+         *     org in `local` or `regional` references via
+         *     `matched_region_slugs`. Lets clients render
+         *     "Matched via Brooklyn" instead of the raw slug
+         *     "matched via brooklyn-ny" without a second request. The
+         *     focus region's own slug and ancestry slugs are NOT included
+         *     (clients seed those from `region` + `ancestry`). Empty
+         *     object (`{}`) when no descendants need resolving.
          */
         RegionDetail: {
             region: components["schemas"]["Region"];
@@ -510,6 +556,21 @@ export interface components {
              *     itself and any `scope_tier='national'` rows.
              */
             ancestry: components["schemas"]["Region"][];
+            /**
+             * @description Slug → display-name lookup for descendant regions
+             *     referenced by `matched_region_slugs` in `local` or
+             *     `regional`. Excludes the focus region and its
+             *     ancestors (clients seed those from `region` and
+             *     `ancestry`). Empty object when no descendants need
+             *     resolving.
+             * @example {
+             *       "brooklyn-ny": "Brooklyn",
+             *       "kings-county-ny": "Kings County, NY"
+             *     }
+             */
+            descendant_region_names: {
+                [key: string]: string;
+            };
         };
         /**
          * @description Collection envelope for `GET /api/v1/regions`. Wraps the

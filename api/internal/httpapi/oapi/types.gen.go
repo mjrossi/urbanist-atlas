@@ -306,12 +306,30 @@ type Region struct {
 // to the root (closest-first, excluding self and any
 // `scope_tier='national'` rows). Clients use it to render
 // breadcrumbs.
+//
+// `descendant_region_names` is a slug → display-name map for
+// every descendant region (city, borough, county, …) that an
+// org in `local` or `regional` references via
+// `matched_region_slugs`. Lets clients render
+// "Matched via Brooklyn" instead of the raw slug
+// "matched via brooklyn-ny" without a second request. The
+// focus region's own slug and ancestry slugs are NOT included
+// (clients seed those from `region` + `ancestry`). Empty
+// object (`{}`) when no descendants need resolving.
 type RegionDetail struct {
 	// Ancestry Ancestors of `region`, ordered closest-first (the
 	// region's direct parent at index 0, then the
 	// grandparent, … up to the root). Excludes the region
 	// itself and any `scope_tier='national'` rows.
 	Ancestry []Region `json:"ancestry"`
+
+	// DescendantRegionNames Slug → display-name lookup for descendant regions
+	// referenced by `matched_region_slugs` in `local` or
+	// `regional`. Excludes the focus region and its
+	// ancestors (clients seed those from `region` and
+	// `ancestry`). Empty object when no descendants need
+	// resolving.
+	DescendantRegionNames map[string]string `json:"descendant_region_names"`
 
 	// Local Orgs in scope with at least one matched attachment
 	// region of `scope_tier='local'` (cities, counties,
@@ -356,8 +374,21 @@ type RegionSummariesEnvelope struct {
 	Meta Meta `json:"meta"`
 }
 
-// RegionSummary A region (any non-national kind) plus its approved-org count.
+// RegionSummary A region (any non-national kind) plus its approved-org counts.
 // Used by `GET /api/v1/regions` to populate the Browse index.
+//
+// Two counts are exposed:
+//
+//   - `org_count` — distinct approved orgs attached to this region
+//     OR any descendant in the DAG. Best for per-row "how much
+//     coverage does this region have" displays (a metro's count
+//     shows orgs from the metro + every city/borough/county
+//     under it).
+//   - `direct_org_count` — distinct approved orgs attached
+//     DIRECTLY to this region (no descendant walk). Use this when
+//     summing across rows in a country/page total: summing
+//     `org_count` double-counts orgs that surface under both a
+//     metro and one of its child cities.
 type RegionSummary struct {
 	// BrowseParentSlug For cities, the slug of the nearest ancestor in the
 	// default browse set (a metro / CMA / regional-district).
@@ -366,7 +397,15 @@ type RegionSummary struct {
 	// standalone cities whose walk doesn't reach a browseable
 	// ancestor.
 	BrowseParentSlug *string `json:"browse_parent_slug,omitempty"`
-	OrgCount         int32   `json:"org_count"`
+
+	// DirectOrgCount Distinct approved orgs attached DIRECTLY to this region
+	// (no descendant walk). Sums across rows yield a deduped
+	// total.
+	DirectOrgCount int32 `json:"direct_org_count"`
+
+	// OrgCount Distinct approved orgs attached to this region OR any
+	// descendant in the region DAG.
+	OrgCount int32 `json:"org_count"`
 
 	// Region A geographic unit an organization can serve. Regions form a
 	// directed acyclic graph; `parent_slugs` lists the direct parents

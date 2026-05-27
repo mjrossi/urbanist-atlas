@@ -83,10 +83,28 @@ func GetRegion(ctx context.Context, store Store, slug string) (*RegionDetail, er
 		ancestry = append(ancestry, ancestors[1:]...)
 	}
 
+	// Descendant slug → display-name lookup. Excludes the focus and
+	// any ancestor (the SPA already has names for those via `region`
+	// and `ancestry`). Empty-but-non-nil so the JSON contract is `{}`
+	// not `null`.
+	skip := make(map[string]struct{}, len(ancestors))
+	skip[region.Slug] = struct{}{}
+	for _, r := range ancestors {
+		skip[r.Slug] = struct{}{}
+	}
+	descendantNames := make(map[string]string)
+	for _, r := range descendants {
+		if _, ok := skip[r.Slug]; ok {
+			continue
+		}
+		descendantNames[r.Slug] = r.Name
+	}
+
 	return &RegionDetail{
-		Region:   region,
-		Local:    local,
-		Regional: regional,
-		Ancestry: ancestry,
+		Region:                region,
+		Local:                 local,
+		Regional:              regional,
+		Ancestry:              ancestry,
+		DescendantRegionNames: descendantNames,
 	}, nil
 }

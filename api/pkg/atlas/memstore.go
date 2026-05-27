@@ -150,6 +150,7 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 		out = append(out, RegionSummary{
 			Region:           r,
 			OrgCount:         int64(count),
+			DirectOrgCount:   int64(s.countOrgsForRegions([]int64{id})),
 			BrowseParentSlug: s.nearestBrowseableAncestorSlug(id),
 		})
 	}

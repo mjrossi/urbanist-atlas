@@ -196,6 +196,7 @@ func (s *Store) ListRegions(ctx context.Context) ([]atlas.RegionSummary, error) 
 				ParentSlugs:  parents[r.ID],
 			},
 			OrgCount:         r.OrgCount,
+			DirectOrgCount:   r.DirectOrgCount,
 			BrowseParentSlug: browseParent,
 		}
 	}

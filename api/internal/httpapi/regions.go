@@ -72,8 +72,9 @@ func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 	out := make([]oapi.RegionSummary, 0, len(in))
 	for _, rs := range in {
 		summary := oapi.RegionSummary{
-			Region:   toOAPIRegion(rs.Region),
-			OrgCount: int32(rs.OrgCount),
+			Region:         toOAPIRegion(rs.Region),
+			OrgCount:       int32(rs.OrgCount),
+			DirectOrgCount: int32(rs.DirectOrgCount),
 		}
 		if rs.BrowseParentSlug != "" {
 			s := rs.BrowseParentSlug
@@ -98,10 +99,15 @@ func toOAPIRegionDetail(in atlas.RegionDetail) oapi.RegionDetail {
 	for _, r := range in.Ancestry {
 		ancestry = append(ancestry, toOAPIRegion(r))
 	}
+	names := in.DescendantRegionNames
+	if names == nil {
+		names = map[string]string{}
+	}
 	return oapi.RegionDetail{
-		Region:   toOAPIRegion(in.Region),
-		Local:    toOAPILookupOrgs(in.Local),
-		Regional: toOAPILookupOrgs(in.Regional),
-		Ancestry: ancestry,
+		Region:                toOAPIRegion(in.Region),
+		Local:                 toOAPILookupOrgs(in.Local),
+		Regional:              toOAPILookupOrgs(in.Regional),
+		Ancestry:              ancestry,
+		DescendantRegionNames: names,
 	}
 }

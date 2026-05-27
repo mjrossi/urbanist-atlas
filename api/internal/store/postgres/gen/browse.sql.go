@@ -241,7 +241,14 @@ SELECT
     r.scope_tier,
     r.sort_priority,
     nbp.slug AS browse_parent_slug,
-    COUNT(DISTINCT o.id)::bigint AS org_count
+    COUNT(DISTINCT o.id)::bigint AS org_count,
+    -- direct_org_count: only orgs attached DIRECTLY to the root (no
+    -- descendant walk). FILTER restricts the inner DISTINCT to rows
+    -- where the JOIN landed on the root itself (orx.region_id = r.id);
+    -- the outer GROUP BY then collapses to one int per root. Lets
+    -- SPA totals sum without double-counting orgs that surface under
+    -- a metro AND one of its child cities.
+    COUNT(DISTINCT o.id) FILTER (WHERE orx.region_id = r.id)::bigint AS direct_org_count
 FROM roots r
 LEFT JOIN nearest_browseable_parent nbp ON nbp.root_id = r.id
 JOIN descendants d            ON d.root_id = r.id
@@ -263,6 +270,7 @@ type ListRegionsRow struct {
 	SortPriority     int32
 	BrowseParentSlug pgtype.Text
 	OrgCount         int64
+	DirectOrgCount   int64
 }
 
 // Browse + recent queries — feed /api/v1/regions, /api/v1/regions/{slug},
@@ -328,6 +336,7 @@ func (q *Queries) ListRegions(ctx context.Context, kinds []string) ([]ListRegion
 			&i.SortPriority,
 			&i.BrowseParentSlug,
 			&i.OrgCount,
+			&i.DirectOrgCount,
 		); err != nil {
 			return nil, err
 		}
