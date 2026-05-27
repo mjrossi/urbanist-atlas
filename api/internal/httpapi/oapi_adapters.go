@@ -2,7 +2,7 @@ package httpapi
 
 // Shared adapters between atlas domain types and the oapi-codegen wire
 // shapes. Endpoint-specific adapters (toOAPILookupResult,
-// toOAPIMetroSummaries, toOAPIMetroDetail) stay in their handler files;
+// toOAPIRegionSummaries, toOAPIRegionDetail) stay in their handler files;
 // the helpers in this file are the ones that two or more endpoints
 // share, so they have one canonical home.
 
@@ -12,8 +12,8 @@ import (
 )
 
 // toOAPIRegion adapts a domain Region onto the oapi wire shape. Used
-// by /lookup (in resolved ancestry + each org's region list), /metros
-// (the metro region itself), and /metros/{slug} (same).
+// by /lookup (in resolved ancestry + each org's region list), /regions
+// (the region itself), and /regions/{slug} (same).
 func toOAPIRegion(r atlas.Region) oapi.Region {
 	parentSlugs := r.ParentSlugs
 	if parentSlugs == nil {
@@ -31,7 +31,7 @@ func toOAPIRegion(r atlas.Region) oapi.Region {
 }
 
 // toOAPIOrg adapts a domain Org onto the plain oapi.Org wire shape
-// (used by /metros/{slug} and /recent). The /lookup endpoint uses
+// (used by /regions/{slug} and /recent). The /lookup endpoint uses
 // oapi.LookupOrg, which extends this shape with MatchedRegionSlugs;
 // see toOAPILookupOrg in lookup.go — it calls this helper and then
 // attaches the lookup-specific field.

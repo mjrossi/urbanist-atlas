@@ -2,20 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { MetroDetail } from '../lib/api.ts';
+import type { RegionDetail } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 
-const { getMetroMock } = vi.hoisted(() => ({ getMetroMock: vi.fn() }));
+const { getRegionMock } = vi.hoisted(() => ({ getRegionMock: vi.fn() }));
 
 vi.mock('../lib/api.ts', async () => {
   const actual = await vi.importActual<typeof import('../lib/api.ts')>('../lib/api.ts');
   return {
     ...actual,
-    getMetro: getMetroMock,
+    getRegion: getRegionMock,
   };
 });
 
-const { Metro } = await import('./Metro.tsx');
+const { Region } = await import('./Region.tsx');
 
 function renderAt(path: string) {
   const client = new QueryClient({
@@ -25,14 +25,14 @@ function renderAt(path: string) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/m/:metroSlug" element={<Metro />} />
+          <Route path="/region/:regionSlug" element={<Region />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-function makeDetail(overrides: Partial<MetroDetail> = {}): MetroDetail {
+function makeDetail(overrides: Partial<RegionDetail> = {}): RegionDetail {
   return {
     region: {
       id: 1,
@@ -67,24 +67,24 @@ function makeDetail(overrides: Partial<MetroDetail> = {}): MetroDetail {
   };
 }
 
-describe('Metro', () => {
+describe('Region', () => {
   beforeEach(() => {
-    getMetroMock.mockReset();
+    getRegionMock.mockReset();
   });
 
   afterEach(() => {
-    getMetroMock.mockReset();
+    getRegionMock.mockReset();
   });
 
   it('renders the loading state while the query is pending', () => {
-    getMetroMock.mockReturnValue(new Promise(() => {}));
-    renderAt('/m/nyc-metro');
-    expect(screen.getByRole('status').textContent).toMatch(/loading metro/i);
+    getRegionMock.mockReturnValue(new Promise(() => {}));
+    renderAt('/region/nyc-metro');
+    expect(screen.getByRole('status').textContent).toMatch(/loading region/i);
   });
 
-  it('renders the metro name and its org list on success', async () => {
-    getMetroMock.mockResolvedValueOnce(makeDetail());
-    renderAt('/m/nyc-metro');
+  it('renders the region name and its org list on success', async () => {
+    getRegionMock.mockResolvedValueOnce(makeDetail());
+    renderAt('/region/nyc-metro');
 
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'TransitCenter' })).toBeDefined();
@@ -96,25 +96,78 @@ describe('Metro', () => {
     expect(screen.getByText(/groups working in new york metro/i)).toBeDefined();
   });
 
-  it('passes the URL slug through to getMetro', async () => {
-    getMetroMock.mockResolvedValueOnce(makeDetail());
-    renderAt('/m/nyc-metro');
+  it('passes the URL slug through to getRegion', async () => {
+    getRegionMock.mockResolvedValueOnce(makeDetail());
+    renderAt('/region/nyc-metro');
 
     await waitFor(() => {
-      expect(getMetroMock).toHaveBeenCalledWith('nyc-metro', expect.any(Object));
+      expect(getRegionMock).toHaveBeenCalledWith('nyc-metro', expect.any(Object));
     });
   });
 
+  // City-kind regions render via the same route; the kind label in
+  // the eyebrow + rail should read "City", not "Metropolitan area".
+  it('renders a city-kind region with a "City" kind label', async () => {
+    getRegionMock.mockResolvedValueOnce(
+      makeDetail({
+        region: {
+          id: 50,
+          kind: 'us:city',
+          name: 'Chicago',
+          slug: 'chicago',
+          country: 'US',
+          scope_tier: 'local',
+          parent_slugs: ['cook-county'],
+        },
+        orgs: [],
+      }),
+    );
+    renderAt('/region/chicago');
+
+    await waitFor(() => {
+      const h1 = screen.getByRole('heading', { level: 1 });
+      expect(h1.textContent).toMatch(/chicago/i);
+    });
+    // Eyebrow text includes "City report".
+    expect(screen.getAllByText(/city report/i).length).toBeGreaterThan(0);
+  });
+
+  // State-kind regions resolve too (the broadened detail endpoint).
+  // The eyebrow should read "State report".
+  it('renders a state-kind region with a "State report" eyebrow', async () => {
+    getRegionMock.mockResolvedValueOnce(
+      makeDetail({
+        region: {
+          id: 60,
+          kind: 'us:state',
+          name: 'New York',
+          slug: 'ny',
+          country: 'US',
+          scope_tier: 'regional',
+          parent_slugs: [],
+        },
+        orgs: [],
+      }),
+    );
+    renderAt('/region/ny');
+
+    await waitFor(() => {
+      const h1 = screen.getByRole('heading', { level: 1 });
+      expect(h1.textContent).toMatch(/new york/i);
+    });
+    expect(screen.getAllByText(/state report/i).length).toBeGreaterThan(0);
+  });
+
   it('renders the inline empty-state on 404 (not a crash)', async () => {
-    getMetroMock.mockRejectedValueOnce(
+    getRegionMock.mockRejectedValueOnce(
       new ApiError(
         404,
         'Not Found',
         { type: 'about:blank', title: 'Not Found', status: 404 },
-        'req-metro-1',
+        'req-region-1',
       ),
     );
-    renderAt('/m/totally-fake');
+    renderAt('/region/totally-fake');
 
     await waitFor(() => {
       expect(screen.getByText(/isn.t in the atlas yet/i)).toBeDefined();
@@ -128,17 +181,17 @@ describe('Metro', () => {
   });
 
   it('renders a friendly empty state when orgs is an empty array', async () => {
-    getMetroMock.mockResolvedValueOnce(makeDetail({ orgs: [] }));
-    renderAt('/m/nyc-metro');
+    getRegionMock.mockResolvedValueOnce(makeDetail({ orgs: [] }));
+    renderAt('/region/nyc-metro');
 
     await waitFor(() => {
       expect(screen.getByText(/no organizations indexed yet/i)).toBeDefined();
     });
   });
 
-  it('sets the browser tab title to the metro name on success', async () => {
-    getMetroMock.mockResolvedValueOnce(makeDetail());
-    renderAt('/m/nyc-metro');
+  it('sets the browser tab title to the region name on success', async () => {
+    getRegionMock.mockResolvedValueOnce(makeDetail());
+    renderAt('/region/nyc-metro');
 
     await waitFor(() => {
       expect(document.title).toMatch(/new york metro.*urbanist atlas/i);
@@ -146,20 +199,20 @@ describe('Metro', () => {
   });
 
   it('renders a non-404 ApiError as an error state, not the 404 empty-state', async () => {
-    getMetroMock.mockRejectedValueOnce(
+    getRegionMock.mockRejectedValueOnce(
       new ApiError(
         500,
         'Database is on fire',
         { type: 'about:blank', title: 'Database is on fire', status: 500 },
-        'req-metro-2',
+        'req-region-2',
       ),
     );
-    renderAt('/m/nyc-metro');
+    renderAt('/region/nyc-metro');
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');
       expect(alert.textContent).toContain('Database is on fire');
-      expect(alert.textContent).toContain('req-metro-2');
+      expect(alert.textContent).toContain('req-region-2');
     });
   });
 });

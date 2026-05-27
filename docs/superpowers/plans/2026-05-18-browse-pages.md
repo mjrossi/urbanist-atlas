@@ -1,5 +1,15 @@
 # Browse + metro pages — implementation plan (slice #14)
 
+> **Historical artifact.** This plan shipped as written, but the SPA
+> route was renamed twice afterward: `/m/:metroSlug` →
+> `/p/:placeSlug` → `/region/:regionSlug`; `Metro.tsx` →
+> `Place.tsx` → `Region.tsx`. The Browse index lists both metros
+> and cities by default. Wherever this plan says `/m/<slug>`,
+> `Metro`, `listMetros`, or `getMetro`, the current equivalents
+> are `/region/<slug>`, `Region`, `listRegions`, and `getRegion`.
+> See the "Browse goes generic" entry in
+> [`docs/roadmap.md`](../../roadmap.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Use `superpowers:test-driven-development` for every code-bearing step.
 
 **Goal:** Ship the `/browse` and `/m/:metroSlug` pages, plus wire the homepage `aside` cards to data, all against the existing OpenAPI contract. Develop against typed fixtures while the backend slice (#6) is in flight in a parallel worktree; delete fixtures in a cleanup commit after the backend lands.

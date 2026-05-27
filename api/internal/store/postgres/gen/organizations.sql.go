@@ -49,8 +49,8 @@ type GetOrgBySlugRow struct {
 
 // Returns the approved organization identified by slug, with every
 // region it serves array_agg'd onto the row so the adapter can hydrate
-// Org.Regions in one round-trip. Mirrors the shape used by OrgsForMetro
-// (browse.sql:73-113) so the Postgres-side adapter (hydrateOrgRows) can
+// Org.Regions in one round-trip. Mirrors the shape used by OrgsForRegion
+// (browse.sql) so the Postgres-side adapter (hydrateOrgRows) can
 // be reused without a new mapper.
 //
 // Returns no row when the slug is unknown OR names an org whose status

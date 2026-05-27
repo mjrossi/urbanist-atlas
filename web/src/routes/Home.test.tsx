@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { MetroSummary, Org } from '../lib/api.ts';
+import type { RegionSummary, Org } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 
-const { listMetrosMock, listRecentMock } = vi.hoisted(() => ({
-  listMetrosMock: vi.fn(),
+const { listRegionsMock, listRecentMock } = vi.hoisted(() => ({
+  listRegionsMock: vi.fn(),
   listRecentMock: vi.fn(),
 }));
 
@@ -14,7 +14,7 @@ vi.mock('../lib/api.ts', async () => {
   const actual = await vi.importActual<typeof import('../lib/api.ts')>('../lib/api.ts');
   return {
     ...actual,
-    listMetros: listMetrosMock,
+    listRegions: listRegionsMock,
     listRecent: listRecentMock,
   };
 });
@@ -34,7 +34,7 @@ function renderHome() {
   );
 }
 
-function makeMetro(slug: string, name: string, org_count: number): MetroSummary {
+function makeRegion(slug: string, name: string, org_count: number): RegionSummary {
   return {
     region: {
       id: parseInt(slug.replace(/\D/g, '') || '0', 10) || 1,
@@ -63,17 +63,17 @@ function makeOrg(id: number, slug: string, name: string): Org {
 
 describe('Home', () => {
   beforeEach(() => {
-    listMetrosMock.mockReset();
+    listRegionsMock.mockReset();
     listRecentMock.mockReset();
   });
 
   afterEach(() => {
-    listMetrosMock.mockReset();
+    listRegionsMock.mockReset();
     listRecentMock.mockReset();
   });
 
   it('renders the lede column unchanged with the search box', async () => {
-    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRegionsMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
     // The lede column still hosts the lookup card.
@@ -84,32 +84,32 @@ describe('Home', () => {
     });
   });
 
-  it('renders the top 7 metros in the metros rail', async () => {
-    const metros = [
-      makeMetro('nyc-metro', 'New York Metro', 12),
-      makeMetro('sf-bay-area', 'San Francisco Bay Area', 7),
-      makeMetro('m3', 'Metro 3', 5),
-      makeMetro('m4', 'Metro 4', 4),
-      makeMetro('m5', 'Metro 5', 3),
-      makeMetro('m6', 'Metro 6', 2),
-      makeMetro('m7', 'Metro 7', 1),
-      makeMetro('m8', 'Metro 8', 1),
+  it('renders the top 7 places in the places rail', async () => {
+    const places = [
+      makeRegion('nyc-metro', 'New York Metro', 12),
+      makeRegion('sf-bay-area', 'San Francisco Bay Area', 7),
+      makeRegion('m3', 'Metro 3', 5),
+      makeRegion('m4', 'Metro 4', 4),
+      makeRegion('m5', 'Metro 5', 3),
+      makeRegion('m6', 'Metro 6', 2),
+      makeRegion('m7', 'Metro 7', 1),
+      makeRegion('m8', 'Metro 8', 1),
     ];
-    listMetrosMock.mockResolvedValueOnce(metros);
+    listRegionsMock.mockResolvedValueOnce(places);
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
 
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
-    // 8 metros provided, 7 should render; metro 8 should not appear.
+    // 8 places provided, 7 should render; metro 8 should not appear.
     expect(screen.queryByRole('link', { name: /metro 8/i })).toBeNull();
     expect(screen.getByRole('link', { name: /metro 7/i })).toBeDefined();
   });
 
-  it('includes an "All metros" link to /browse', async () => {
-    listMetrosMock.mockResolvedValueOnce([
-      makeMetro('nyc-metro', 'New York Metro', 12),
+  it('includes an "All places" link to /browse', async () => {
+    listRegionsMock.mockResolvedValueOnce([
+      makeRegion('nyc-metro', 'New York Metro', 12),
     ]);
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
@@ -117,12 +117,12 @@ describe('Home', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
-    const browseLink = screen.getByRole('link', { name: /all metros/i });
+    const browseLink = screen.getByRole('link', { name: /all places/i });
     expect(browseLink.getAttribute('href')).toBe('/browse');
   });
 
   it('renders the top 4 recent orgs in the recent strip', async () => {
-    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRegionsMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockResolvedValueOnce([
       makeOrg(1, 'a', 'Org A'),
       makeOrg(2, 'b', 'Org B'),
@@ -141,7 +141,7 @@ describe('Home', () => {
   });
 
   it('links each recent org name to its /orgs/:slug detail page', async () => {
-    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRegionsMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockResolvedValueOnce([makeOrg(1, 'transalt', 'Transportation Alternatives')]);
     renderHome();
 
@@ -155,7 +155,7 @@ describe('Home', () => {
   });
 
   it('renders subdued loading copy in both asides while the queries pend', () => {
-    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRegionsMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
     // Two loading affordances, one per card.
@@ -163,12 +163,12 @@ describe('Home', () => {
     expect(loading.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows the metro-list temporarily-unavailable message on metros error', async () => {
-    listMetrosMock.mockRejectedValueOnce(
+  it('shows the region-list temporarily-unavailable message on regions error', async () => {
+    listRegionsMock.mockRejectedValueOnce(
       new ApiError(
         500,
-        'metros 500',
-        { type: 'about:blank', title: 'metros 500', status: 500 },
+        'places 500',
+        { type: 'about:blank', title: 'places 500', status: 500 },
         'req-x',
       ),
     );
@@ -177,13 +177,13 @@ describe('Home', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/metro list is temporarily unavailable/i),
+        screen.getByText(/region list is temporarily unavailable/i),
       ).toBeDefined();
     });
   });
 
   it('shows the recent-entries temporarily-unavailable message on recent error', async () => {
-    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRegionsMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockRejectedValueOnce(
       new ApiError(
         500,
@@ -201,19 +201,19 @@ describe('Home', () => {
     });
   });
 
-  it('links each metro in the aside to /m/:slug', async () => {
-    listMetrosMock.mockResolvedValueOnce([makeMetro('nyc-metro', 'New York Metro', 12)]);
+  it('links each region in the aside to /region/:slug', async () => {
+    listRegionsMock.mockResolvedValueOnce([makeRegion('nyc-metro', 'New York Metro', 12)]);
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
 
     await waitFor(() => {
       const nyc = screen.getByRole('link', { name: /new york metro/i });
-      expect(nyc.getAttribute('href')).toBe('/m/nyc-metro');
+      expect(nyc.getAttribute('href')).toBe('/region/nyc-metro');
     });
   });
 
   it('sets the browser tab title', async () => {
-    listMetrosMock.mockReturnValue(new Promise(() => {}));
+    listRegionsMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
     await waitFor(() => {

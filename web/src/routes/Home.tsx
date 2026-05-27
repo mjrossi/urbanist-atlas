@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { SearchBox } from '../components/SearchBox.tsx';
-import { ApiError, listMetros, listRecent } from '../lib/api.ts';
-import type { MetroSummary, Org } from '../lib/api.ts';
+import { ApiError, listRegions, listRecent } from '../lib/api.ts';
+import type { RegionSummary, Org } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
-const TOP_METROS_LIMIT = 7;
+const TOP_PLACES_LIMIT = 7;
 const RECENT_LIMIT = 4;
 
 const TOPIC_TAGS: ReadonlyArray<string> = [
@@ -25,9 +25,9 @@ const TOPIC_TAGS: ReadonlyArray<string> = [
 
 export function Home() {
   useDocumentTitle('Urbanist Atlas — Transit and safe-streets advocacy near you');
-  const metros = useQuery<MetroSummary[], ApiError>({
-    queryKey: queryKeys.metros(),
-    queryFn: ({ signal }) => listMetros({ signal }),
+  const places = useQuery<RegionSummary[], ApiError>({
+    queryKey: queryKeys.regions(),
+    queryFn: ({ signal }) => listRegions({ signal }),
   });
   const recent = useQuery<Org[], ApiError>({
     queryKey: queryKeys.recent(),
@@ -75,10 +75,10 @@ export function Home() {
 
         <aside className="rail">
           <div className="rail-block">
-            <div className="rail-kicker">Browse by metro</div>
-            <TopMetros query={metros} />
+            <div className="rail-kicker">Browse the atlas</div>
+            <TopPlaces query={places} />
             <Link to="/browse" className="read-on" style={{ marginTop: 14 }}>
-              All metros <span className="arrow">→</span>
+              All places <span className="arrow">→</span>
             </Link>
           </div>
           <div className="rail-block amber desktop-only">
@@ -92,38 +92,38 @@ export function Home() {
       </div>
 
       <RecentlyFiled query={recent} />
-      <ByTheNumbers metros={metros} recent={recent} />
+      <ByTheNumbers places={places} recent={recent} />
       <TopicIndex tags={TOPIC_TAGS} />
     </>
   );
 }
 
-function TopMetros({ query }: { query: UseQueryResult<MetroSummary[], ApiError> }) {
+function TopPlaces({ query }: { query: UseQueryResult<RegionSummary[], ApiError> }) {
   if (query.isPending) {
-    return <p className="results-state">Loading metros…</p>;
+    return <p className="results-state">Loading places…</p>;
   }
   if (query.isError) {
-    return <p className="results-state error">Metro list is temporarily unavailable.</p>;
+    return <p className="results-state error">Region list is temporarily unavailable.</p>;
   }
-  const items = query.data.slice(0, TOP_METROS_LIMIT);
+  const items = query.data.slice(0, TOP_PLACES_LIMIT);
   if (items.length === 0) {
-    return <p className="results-state">No metros indexed yet.</p>;
+    return <p className="results-state">No places indexed yet.</p>;
   }
   return (
     <ul className="metros compact">
-      {items.map((m) => (
-        <li key={m.region.slug}>
-          <Link className="metro" to={`/m/${m.region.slug}`}>
+      {items.map((p) => (
+        <li key={p.region.slug}>
+          <Link className="metro" to={`/region/${p.region.slug}`}>
             <div>
-              <p className="name">{m.region.name}</p>
+              <p className="name">{p.region.name}</p>
               <div className="meta">
-                {m.region.country}
-                {m.region.parent_slugs[0] ? ` · ${m.region.parent_slugs[0]}` : ''}
+                {p.region.country}
+                {p.region.parent_slugs[0] ? ` · ${p.region.parent_slugs[0]}` : ''}
               </div>
             </div>
             <div className="count">
-              <span className="n">{m.org_count}</span>
-              {m.org_count === 1 ? 'group' : 'groups'}
+              <span className="n">{p.org_count}</span>
+              {p.org_count === 1 ? 'group' : 'groups'}
             </div>
           </Link>
         </li>
@@ -178,18 +178,18 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
 }
 
 function ByTheNumbers({
-  metros,
+  places,
   recent,
 }: {
-  metros: UseQueryResult<MetroSummary[], ApiError>;
+  places: UseQueryResult<RegionSummary[], ApiError>;
   recent: UseQueryResult<Org[], ApiError>;
 }) {
-  const metroCount = metros.data?.length ?? null;
-  const usCount = metros.data?.filter((m) => m.region.country === 'US').length ?? null;
-  const caCount = metros.data?.filter((m) => m.region.country === 'CA').length ?? null;
-  const totalOrgCount = metros.data?.reduce((sum, m) => sum + m.org_count, 0) ?? null;
-  const topMetro = metros.data
-    ? [...metros.data].sort((a, b) => b.org_count - a.org_count)[0]
+  const placeCount = places.data?.length ?? null;
+  const usCount = places.data?.filter((p) => p.region.country === 'US').length ?? null;
+  const caCount = places.data?.filter((p) => p.region.country === 'CA').length ?? null;
+  const totalOrgCount = places.data?.reduce((sum, p) => sum + p.org_count, 0) ?? null;
+  const topRegion = places.data
+    ? [...places.data].sort((a, b) => b.org_count - a.org_count)[0]
     : null;
   const recentCount = recent.data?.length ?? null;
 
@@ -209,8 +209,8 @@ function ByTheNumbers({
           <div className="sub">Across the US and Canada</div>
         </div>
         <div className="stat">
-          <div className="n">{formatNumber(metroCount)}</div>
-          <div className="label">Metros indexed</div>
+          <div className="n">{formatNumber(placeCount)}</div>
+          <div className="label">Places indexed</div>
           <div className="sub">
             {usCount !== null && caCount !== null
               ? `${usCount} US · ${caCount} Canada`
@@ -224,11 +224,11 @@ function ByTheNumbers({
         </div>
         <div className="stat">
           <div className="n">
-            <span className="em">{topMetro ? topMetro.org_count : '—'}</span>
+            <span className="em">{topRegion ? topRegion.org_count : '—'}</span>
           </div>
           <div className="label">Deepest coverage</div>
           <div className="sub">
-            {topMetro ? `${topMetro.region.name}, today` : 'Loading…'}
+            {topRegion ? `${topRegion.region.name}, today` : 'Loading…'}
           </div>
         </div>
       </div>
@@ -256,7 +256,7 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
           <p className="fineprint" style={{ marginTop: 22 }}>
             Tags are editorial labels, applied by hand. An organization can
             carry up to five. Per-topic filtering ships with Phase 2; until
-            then, <Link to="/browse">the metro index</Link> is the wander
+            then, <Link to="/browse">the place index</Link> is the wander
             view.
           </p>
         </div>

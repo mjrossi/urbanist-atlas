@@ -7,10 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   apiFetch,
-  getMetro,
+  getRegion,
   getOrg,
   isSupportedCountry,
-  listMetros,
+  listRegions,
   listRecent,
   lookup,
 } from './api.ts';
@@ -36,7 +36,7 @@ function problemResponse(
   });
 }
 
-describe('listMetros / getMetro / listRecent', () => {
+describe('listRegions / getRegion / listRecent', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -48,7 +48,7 @@ describe('listMetros / getMetro / listRecent', () => {
     vi.unstubAllGlobals();
   });
 
-  it('listMetros calls GET /api/v1/metros and unwraps the envelope', async () => {
+  it('listRegions calls GET /api/v1/regions and unwraps the envelope', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         meta: {
@@ -59,15 +59,15 @@ describe('listMetros / getMetro / listRecent', () => {
         data: [],
       }),
     );
-    const result = await listMetros();
+    const result = await listRegions();
     expect(result).toEqual([]);
     const [url] = fetchMock.mock.calls[0]!;
-    // Tighter than `toContain('/api/v1/metros')` so it can't
-    // accidentally match a detail route like `/api/v1/metros/some-slug`.
-    expect(String(url)).toMatch(/\/api\/v1\/metros($|\?)/);
+    // Tighter than `toContain('/api/v1/regions')` so it can't
+    // accidentally match a detail route like `/api/v1/regions/some-slug`.
+    expect(String(url)).toMatch(/\/api\/v1\/regions($|\?)/);
   });
 
-  it('listMetros returns the unwrapped data array on a non-empty body', async () => {
+  it('listRegions returns the unwrapped data array on a non-empty body', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         meta: {
@@ -91,13 +91,13 @@ describe('listMetros / getMetro / listRecent', () => {
         ],
       }),
     );
-    const result = await listMetros();
+    const result = await listRegions();
     expect(result).toHaveLength(1);
     expect(result[0]!.region.slug).toBe('nyc-metro');
     expect(result[0]!.org_count).toBe(7);
   });
 
-  it('getMetro calls GET /api/v1/metros/{slug}', async () => {
+  it('getRegion calls GET /api/v1/regions/{slug}', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         region: {
@@ -112,13 +112,13 @@ describe('listMetros / getMetro / listRecent', () => {
         orgs: [],
       }),
     );
-    const result = await getMetro('nyc-metro');
+    const result = await getRegion('nyc-metro');
     expect(result.region.slug).toBe('nyc-metro');
     const [url] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toMatch(/\/api\/v1\/metros\/nyc-metro($|\?)/);
+    expect(String(url)).toMatch(/\/api\/v1\/regions\/nyc-metro($|\?)/);
   });
 
-  it('getMetro throws ApiError with status 404 when the API returns problem+json', async () => {
+  it('getRegion throws ApiError with status 404 when the API returns problem+json', async () => {
     fetchMock.mockResolvedValueOnce(
       problemResponse(404, {
         type: 'https://urbanistatlas.com/problems/not-found',
@@ -126,7 +126,7 @@ describe('listMetros / getMetro / listRecent', () => {
         status: 404,
       }),
     );
-    await expect(getMetro('totally-fake')).rejects.toBeInstanceOf(ApiError);
+    await expect(getRegion('totally-fake')).rejects.toBeInstanceOf(ApiError);
   });
 
   it('listRecent calls GET /api/v1/recent and unwraps the envelope', async () => {
@@ -255,7 +255,7 @@ describe('listMetros / getMetro / listRecent', () => {
     expect(String(url)).toMatch(/weird(%20|\+)slug/);
   });
 
-  it('getMetro percent-encodes the slug', async () => {
+  it('getRegion percent-encodes the slug', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         region: {
@@ -270,7 +270,7 @@ describe('listMetros / getMetro / listRecent', () => {
         orgs: [],
       }),
     );
-    await getMetro('weird slug');
+    await getRegion('weird slug');
     const [url] = fetchMock.mock.calls[0]!;
     // Either '+' or '%20' is acceptable; the point is the space isn't
     // literally embedded in the URL path.

@@ -97,13 +97,13 @@ describe('Org', () => {
     // the prettified label.
     expect(screen.getAllByText('transit').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/safe streets/i).length).toBeGreaterThan(0);
-    // Region with a metro kind links to /m/:slug (multiple links share
+    // Region with a place kind links to /region/:slug (multiple links share
     // the name — meta-strip + regions list + companion rail).
-    const metroLinks = screen
+    const placeLinks = screen
       .getAllByRole('link', { name: 'New York Metro' })
-      .filter((a) => a.getAttribute('href') === '/m/nyc-metro');
-    expect(metroLinks.length).toBeGreaterThan(0);
-    // Non-metro region (borough) renders as plain text, not a link.
+      .filter((a) => a.getAttribute('href') === '/region/nyc-metro');
+    expect(placeLinks.length).toBeGreaterThan(0);
+    // Non-place region (borough) renders as plain text, not a link.
     expect(screen.queryByRole('link', { name: 'Brooklyn' })).toBeNull();
     expect(screen.getByText('Brooklyn')).toBeDefined();
   });
@@ -129,10 +129,10 @@ describe('Org', () => {
     }
   });
 
-  // METRO_KINDS in Org.tsx must stay in lockstep with the server's
-  // metroKinds map (api/pkg/atlas/metro_kinds.go). These tests pin the
-  // currently-known set so a one-sided edit fails CI loudly.
-  it('links ca:regional-district regions to /m/:slug', async () => {
+  // PLACE_KINDS in Org.tsx must stay in lockstep with the server's
+  // placeKinds map (api/pkg/atlas/place_kinds.go). These tests pin
+  // the currently-known set so a one-sided edit fails CI loudly.
+  it('links ca:regional-district regions to /region/:slug', async () => {
     getOrgMock.mockResolvedValueOnce(
       makeOrg({
         regions: [
@@ -153,12 +153,12 @@ describe('Org', () => {
     await waitFor(() => {
       const links = screen
         .getAllByRole('link', { name: 'Metro Vancouver' })
-        .filter((a) => a.getAttribute('href') === '/m/metro-vancouver');
+        .filter((a) => a.getAttribute('href') === '/region/metro-vancouver');
       expect(links.length).toBeGreaterThan(0);
     });
   });
 
-  it('does NOT link us:multi-state regions (server /metros does not serve them)', async () => {
+  it('does NOT link us:multi-state regions (server /places does not serve them)', async () => {
     getOrgMock.mockResolvedValueOnce(
       makeOrg({
         regions: [

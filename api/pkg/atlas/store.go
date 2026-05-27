@@ -40,18 +40,26 @@ type Store interface {
 	// that matched). Order is unspecified — Lookup buckets and sorts.
 	OrgsForRegions(ctx context.Context, regionIDs []int64) ([]Org, error)
 
-	// ListMetros returns every metro-equivalent region that has at
-	// least one approved organization attached to it (directly or via
-	// the region DAG), with the org count. Ordered by OrgCount DESC,
-	// Region.Name ASC. Excludes national-tier regions. An empty result
-	// is a non-error empty slice, not an error.
-	ListMetros(ctx context.Context) ([]MetroSummary, error)
+	// ListRegions returns every region in the default browse set
+	// (see defaultBrowseKinds in browse_kinds.go — metros + cities)
+	// that has at least one approved organization attached to it
+	// (directly or via the region DAG), with the org count. Ordered
+	// by OrgCount DESC, Region.Name ASC. Excludes national-tier
+	// regions. An empty result is a non-error empty slice, not an
+	// error.
+	//
+	// The list endpoint deliberately ships without a kind filter;
+	// the right filter axis (taxonomy vs DAG-ancestor vs scope-tier)
+	// will be designed when a concrete browse UI use case appears.
+	ListRegions(ctx context.Context) ([]RegionSummary, error)
 
-	// GetMetro returns the metro region identified by slug, plus the
+	// GetRegion returns the region identified by slug, plus the
 	// approved orgs that serve it (directly or via the region DAG).
-	// Returns (nil, nil) when the slug is unknown or names a non-metro
-	// region — the handler maps the nil pointer to 404.
-	GetMetro(ctx context.Context, slug string) (*MetroDetail, error)
+	// Resolves any non-national region — metros, cities, counties,
+	// boroughs, states, multi-state coalitions. Returns (nil, nil)
+	// when the slug is unknown or names a national-tier region; the
+	// handler maps the nil pointer to 404.
+	GetRegion(ctx context.Context, slug string) (*RegionDetail, error)
 
 	// GetOrgBySlug returns the approved organization identified by slug,
 	// with every region it serves denormalized at Org.Regions. Returns

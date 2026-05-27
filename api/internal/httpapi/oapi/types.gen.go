@@ -124,41 +124,6 @@ type Meta struct {
 	License string `json:"license"`
 }
 
-// MetroDetail A metro region with the approved organizations that serve it.
-type MetroDetail struct {
-	Orgs []Org `json:"orgs"`
-
-	// Region A geographic unit an organization can serve. Regions form a
-	// directed acyclic graph; `parent_slugs` lists the direct parents
-	// (not transitive). Empty for top-of-hierarchy regions (states,
-	// multi-state regions, transit federations).
-	Region Region `json:"region"`
-}
-
-// MetroSummariesEnvelope Collection envelope for `GET /api/v1/metros`. Wraps the
-// metro list in a `meta` + `data` shape so every list
-// response carries the ODbL attribution alongside its
-// payload, even when transport-level headers are stripped.
-type MetroSummariesEnvelope struct {
-	Data []MetroSummary `json:"data"`
-
-	// Meta Attribution block included on every collection response.
-	// Carries the ODbL license obligation in-band so consumers
-	// that strip headers still see the share-alike requirement.
-	Meta Meta `json:"meta"`
-}
-
-// MetroSummary A metro region plus its approved-org count, for the browse-by-metro panel.
-type MetroSummary struct {
-	OrgCount int32 `json:"org_count"`
-
-	// Region A geographic unit an organization can serve. Regions form a
-	// directed acyclic graph; `parent_slugs` lists the direct parents
-	// (not transitive). Empty for top-of-hierarchy regions (states,
-	// multi-state regions, transit federations).
-	Region Region `json:"region"`
-}
-
 // NewSubmissionRequest Request body for `POST /api/v1/submissions`.
 type NewSubmissionRequest struct {
 	// Payload The proposed organization, as submitted by a member of the public.
@@ -256,7 +221,7 @@ type ProblemDetails struct {
 }
 
 // RecentEnvelope Collection envelope for `GET /api/v1/recent`. Same shape
-// contract as `MetroSummariesEnvelope`.
+// contract as `RegionSummariesEnvelope`.
 type RecentEnvelope struct {
 	Data []Org `json:"data"`
 
@@ -316,6 +281,22 @@ type Region struct {
 	Slug string `json:"slug"`
 }
 
+// RegionDetail A region (any non-national kind) with the approved
+// organizations that serve it. The `orgs` array includes
+// every org attached to this region directly or to any
+// region nested below it in the DAG (so a metro surfaces
+// its constituent cities' orgs, a county surfaces its
+// cities' orgs, etc.).
+type RegionDetail struct {
+	Orgs []Org `json:"orgs"`
+
+	// Region A geographic unit an organization can serve. Regions form a
+	// directed acyclic graph; `parent_slugs` lists the direct parents
+	// (not transitive). Empty for top-of-hierarchy regions (states,
+	// multi-state regions, transit federations).
+	Region Region `json:"region"`
+}
+
 // RegionKind Free-form taxonomy for region granularity. The recommended
 // vocabulary uses country-prefixed values: `us:city`, `us:borough`,
 // `us:county`, `us:metro`, `us:state`, `us:multi-state`,
@@ -328,6 +309,32 @@ type Region struct {
 // `fr:region`, `fr:metropole`. Clients should treat unknown kinds
 // gracefully (e.g. fall back to displaying `name`).
 type RegionKind = string
+
+// RegionSummariesEnvelope Collection envelope for `GET /api/v1/regions`. Wraps the
+// region list in a `meta` + `data` shape so every list
+// response carries the ODbL attribution alongside its
+// payload, even when transport-level headers are stripped.
+type RegionSummariesEnvelope struct {
+	Data []RegionSummary `json:"data"`
+
+	// Meta Attribution block included on every collection response.
+	// Carries the ODbL license obligation in-band so consumers
+	// that strip headers still see the share-alike requirement.
+	Meta Meta `json:"meta"`
+}
+
+// RegionSummary A region (any non-national kind) plus its approved-org count.
+// Used by `GET /api/v1/regions` to populate the Browse index
+// and any future kind-filtered region views.
+type RegionSummary struct {
+	OrgCount int32 `json:"org_count"`
+
+	// Region A geographic unit an organization can serve. Regions form a
+	// directed acyclic graph; `parent_slugs` lists the direct parents
+	// (not transitive). Empty for top-of-hierarchy regions (states,
+	// multi-state regions, transit federations).
+	Region Region `json:"region"`
+}
 
 // RejectSubmissionRequest Request body for `POST /api/v1/admin/submissions/{id}/reject`.
 type RejectSubmissionRequest struct {
@@ -399,11 +406,11 @@ type SubmissionStatus string
 // changes as data is loaded.
 type CountryQuery = Country
 
-// MetroSlug defines model for MetroSlug.
-type MetroSlug = string
-
 // PostalCodeQuery defines model for PostalCodeQuery.
 type PostalCodeQuery = string
+
+// RegionSlug defines model for RegionSlug.
+type RegionSlug = string
 
 // SubmissionID defines model for SubmissionID.
 type SubmissionID = int64

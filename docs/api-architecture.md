@@ -49,17 +49,28 @@ abstraction to stay clean.
 ## Store abstraction
 
 `atlas.Store` ([`api/pkg/atlas/store.go`](../api/pkg/atlas/store.go))
-is the persistence seam. Six methods compose to satisfy every
+is the persistence seam. Seven methods compose to satisfy every
 endpoint:
 
 | Method | Used by | Notes |
 |---|---|---|
 | `ResolveLeafRegion(country, postalCode)` | `/lookup` | Returns `ErrPostalCodeNotFound` for unknown codes. |
-| `AncestorRegions(leafID)` | `/lookup` | Walks the region DAG upward; dedupes diamonds. |
+| `AncestorRegions(leafID)` | `/lookup` | Walks the region DAG **upward**; dedupes diamonds. |
 | `OrgsForRegions(regionIDs)` | `/lookup` | Hydrates each org's full attachment list. |
-| `ListMetros()` | `/metros` | Metro-equivalent regions with ≥1 attached org; excludes national-tier. |
-| `GetMetro(slug)` | `/metros/{slug}` | Returns `(nil, nil)` for unknown or non-metro slugs. |
+| `ListRegions()` | `/regions` | Regions in the default browse set (metros + cities, per `atlas.DefaultBrowseKinds`) with ≥1 attached org; walks the DAG **downward** from each match; excludes national-tier. The endpoint ships without filter parameters — the right axis (taxonomy via `kind`, DAG via `ancestor`, …) gets designed when a concrete browse UI use case appears. |
+| `GetRegion(slug)` | `/regions/{slug}` | Resolves any non-national region (metro, city, county, borough, state, multi-state coalition). Returns `(nil, nil)` for unknown or national-tier slugs. |
+| `GetOrgBySlug(slug)` | `/orgs/{slug}` | Returns `ErrOrgNotFound` for unknown or non-approved slugs. |
 | `ListRecent()` | `/recent` | Hardcoded cap of 10; excludes national-only orgs. |
+
+The asymmetry between `/lookup` (upward walk + `scope_tier`
+partitioning) and `/regions` (downward walk from a curated default
+set) is intentional: a ZIP lookup wants "what serves this *point*
+in the DAG"; the browse surface wants "what's nested under this
+region."
+A Naperville ZIP correctly excludes Chicago-city-only orgs because
+they live in a sibling subtree, not an ancestor. Browsing
+`/regions/chicago-metro` correctly *includes* them because they're
+descendants.
 
 Two implementations:
 
@@ -144,7 +155,7 @@ Current catalog:
 | Constant | URI | Emitted by |
 |---|---|---|
 | `problemValidation` | `…/problems/validation` | `/lookup` parameter errors |
-| `problemNotFound` | `…/problems/not-found` | `/lookup`, `/metros/{slug}` unknown ids |
+| `problemNotFound` | `…/problems/not-found` | `/lookup`, `/regions/{slug}`, `/orgs/{slug}` unknown ids |
 | `problemInternal` | `…/problems/internal` | recoverer middleware + store errors |
 | `problemUnauthorized` | `…/problems/unauthorized` | Phase 1 client-secret gate |
 
@@ -190,8 +201,8 @@ Collection responses additionally wrap their payload in a
 ```
 
 The wrapper helper is `respondCollection[T any](w, items)`. Use it
-from any list handler (`/metros`, `/recent`, future `/orgs`).
-Single-resource handlers (`/lookup`, `/metros/{slug}`) keep using
+from any list handler (`/regions`, `/recent`). Single-resource
+handlers (`/lookup`, `/regions/{slug}`, `/orgs/{slug}`) keep using
 `writeJSON(...)` directly — there's no useful meta to attach to a
 scalar response, and the headers already carry attribution.
 

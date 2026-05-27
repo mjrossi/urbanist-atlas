@@ -1,5 +1,16 @@
 # Browse + recent endpoints — implementation plan (slice #6)
 
+> **Historical artifact.** This plan shipped as written, but the
+> endpoint surface was renamed twice afterward: `/api/v1/metros` →
+> `/api/v1/places` → `/api/v1/regions` (with the detail endpoint
+> broadened to resolve any non-national slug). Wherever this plan
+> says `/metros`, `MetroSummary`, `ListMetros`, or `IsMetroKind`,
+> the current names are `/regions`, `RegionSummary`, `ListRegions()`,
+> and `IsDefaultBrowseKind`. The narrower `MetroKinds` predicate
+> also survives in `metro_kinds.go` — `/lookup`'s `placeLabel`
+> still uses it. See the "Browse goes generic" entry in
+> [`docs/roadmap.md`](../../roadmap.md) for the rename rationale.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Use `superpowers:test-driven-development` for every code-bearing step.
 
 **Goal:** Ship the three backend endpoints `GET /api/v1/metros`, `GET /api/v1/metros/{slug}`, `GET /api/v1/recent` behind the existing OpenAPI contract, with full handler-test coverage including a regression for the national-tier filter.

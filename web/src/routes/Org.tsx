@@ -6,10 +6,25 @@ import type { Org as OrgT } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
+// Narrower set used to pick the "primary metro" context for an org's
+// rail block — still semantically about metro-tier regions, not the
+// broader browseable-place set.
 const METRO_KINDS = new Set<string>([
   'us:metro',
   'ca:cma',
   'ca:regional-district',
+  'pt:area-metropolitana',
+]);
+
+// Broader set used to decide whether a region in the org's region
+// list should render as a /region/<slug> link. Cities are browseable
+// post-slice so they get the link treatment alongside metros.
+const BROWSEABLE_REGION_KINDS = new Set<string>([
+  'us:metro',
+  'us:city',
+  'ca:cma',
+  'ca:regional-district',
+  'ca:city',
   'pt:area-metropolitana',
 ]);
 
@@ -169,7 +184,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
             <div className="item">
               <div>Primary metro</div>
               <span className="val">
-                <Link to={`/m/${encodeURIComponent(primaryMetro.slug)}`}>
+                <Link to={`/region/${encodeURIComponent(primaryMetro.slug)}`}>
                   {primaryMetro.name}
                 </Link>
               </span>
@@ -254,9 +269,9 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
                           fontSize: 19,
                         }}
                       >
-                        {METRO_KINDS.has(region.kind) ? (
+                        {BROWSEABLE_REGION_KINDS.has(region.kind) ? (
                           <Link
-                            to={`/m/${encodeURIComponent(region.slug)}`}
+                            to={`/region/${encodeURIComponent(region.slug)}`}
                             style={{
                               color: 'inherit',
                               textDecoration: 'none',
@@ -315,11 +330,11 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
             <div className="rail-kicker">Companion pages</div>
             <ul className="plain">
               <li>
-                <Link to="/browse">Browse all metros</Link>
+                <Link to="/browse">Browse the atlas</Link>
               </li>
               {primaryMetro ? (
                 <li>
-                  <Link to={`/m/${encodeURIComponent(primaryMetro.slug)}`}>
+                  <Link to={`/region/${encodeURIComponent(primaryMetro.slug)}`}>
                     Other groups in {primaryMetro.name}
                   </Link>
                 </li>

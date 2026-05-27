@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import { ApiError, listMetros } from '../lib/api.ts';
-import type { MetroSummary } from '../lib/api.ts';
+import { ApiError, listRegions } from '../lib/api.ts';
+import type { RegionSummary } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { regionKindLabel } from '../lib/regionKind.ts';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -15,12 +16,12 @@ const COUNTRY_TITLES: Record<string, string> = {
 
 interface ByLetter {
   letter: string;
-  metros: MetroSummary[];
+  regions: RegionSummary[];
 }
 
 interface ByCountry {
   country: string;
-  total: MetroSummary[];
+  total: RegionSummary[];
   letters: ByLetter[];
 }
 
@@ -29,35 +30,35 @@ function letterOf(name: string): string {
   return m ? m[0] : '#';
 }
 
-function groupForBrowse(all: ReadonlyArray<MetroSummary>): ByCountry[] {
-  const byCountry: Record<string, MetroSummary[]> = {};
-  for (const m of all) {
-    const c = m.region.country;
+function groupForBrowse(all: ReadonlyArray<RegionSummary>): ByCountry[] {
+  const byCountry: Record<string, RegionSummary[]> = {};
+  for (const p of all) {
+    const c = p.region.country;
     if (!byCountry[c]) byCountry[c] = [];
-    byCountry[c].push(m);
+    byCountry[c].push(p);
   }
   return Object.entries(byCountry)
     .sort(([a], [b]) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)))
-    .map(([country, metros]) => {
-      const sorted = [...metros].sort((a, b) => a.region.name.localeCompare(b.region.name));
-      const grouped: Record<string, MetroSummary[]> = {};
-      for (const m of sorted) {
-        const letter = letterOf(m.region.name);
+    .map(([country, regions]) => {
+      const sorted = [...regions].sort((a, b) => a.region.name.localeCompare(b.region.name));
+      const grouped: Record<string, RegionSummary[]> = {};
+      for (const r of sorted) {
+        const letter = letterOf(r.region.name);
         if (!grouped[letter]) grouped[letter] = [];
-        grouped[letter].push(m);
+        grouped[letter].push(r);
       }
       const letters = Object.entries(grouped)
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([letter, metros]) => ({ letter, metros }));
+        .map(([letter, regions]) => ({ letter, regions }));
       return { country, total: sorted, letters };
     });
 }
 
 export function Browse() {
-  useDocumentTitle('Browse metros — Urbanist Atlas');
-  const query = useQuery<MetroSummary[], ApiError>({
-    queryKey: queryKeys.metros(),
-    queryFn: ({ signal }) => listMetros({ signal }),
+  useDocumentTitle('Browse the atlas — Urbanist Atlas');
+  const query = useQuery<RegionSummary[], ApiError>({
+    queryKey: queryKeys.regions(),
+    queryFn: ({ signal }) => listRegions({ signal }),
   });
 
   const grouped = useMemo(() => groupForBrowse(query.data ?? []), [query.data]);
@@ -67,8 +68,8 @@ export function Browse() {
     return s;
   }, [grouped]);
 
-  const totalMetros = query.data?.length ?? null;
-  const totalOrgs = query.data?.reduce((sum, m) => sum + m.org_count, 0) ?? null;
+  const totalRegions = query.data?.length ?? null;
+  const totalOrgs = query.data?.reduce((sum, p) => sum + p.org_count, 0) ?? null;
 
   return (
     <>
@@ -79,8 +80,8 @@ export function Browse() {
           <span className="crumb-here">The index</span>
         </div>
         <div>
-          {totalMetros !== null && totalOrgs !== null
-            ? `${totalMetros} metros · ${totalOrgs} org entries`
+          {totalRegions !== null && totalOrgs !== null
+            ? `${totalRegions} regions · ${totalOrgs} org entries`
             : 'The index'}
         </div>
       </div>
@@ -91,20 +92,24 @@ export function Browse() {
             § The index<span className="eyebrow-rule" />
           </div>
           <h1>
-            Every metro <span className="accent">we&rsquo;ve indexed</span> —
+            Every metro and city <span className="accent">we&rsquo;ve indexed</span> —
             alphabetical.
           </h1>
           <p className="deck">
-            Useful when you want to wander rather than search. Open a metro for
-            the groups working there, or jump to a letter on the strip below.
+            Useful when you want to wander rather than search. Open a region
+            for the groups working there, or jump to a letter on the strip
+            below. Big cities appear alongside their parent metro — clicking
+            the city shows only its own groups, while clicking the metro
+            pulls in everything across the broader region.
           </p>
         </div>
         <div className="rail-block muted" style={{ marginTop: 12 }}>
           <div className="rail-kicker">Sorting</div>
           <p>
-            Metros are sorted alphabetically within each country. The number in
-            italic is the count of organizations the Atlas currently lists for
-            that region.
+            Regions are sorted alphabetically within each country. The number
+            in italic is the count of organizations the Atlas currently lists
+            for that region (the metro count includes orgs tagged to its
+            cities and counties via the region graph).
           </p>
           <p style={{ marginBottom: 0 }}>
             Searching by ZIP or postal code?{' '}
@@ -132,7 +137,7 @@ function BrowseBody({
   grouped,
   availableLetters,
 }: {
-  query: ReturnType<typeof useQuery<MetroSummary[], ApiError>>;
+  query: ReturnType<typeof useQuery<RegionSummary[], ApiError>>;
   grouped: ByCountry[];
   availableLetters: Set<string>;
 }) {
@@ -147,7 +152,7 @@ function BrowseBody({
     );
   }
   if (grouped.length === 0) {
-    return <p className="results-state">No metros indexed yet.</p>;
+    return <p className="results-state">No regions indexed yet.</p>;
   }
   return (
     <>
@@ -174,7 +179,7 @@ function BrowseBody({
 
 function CountrySection({ country }: { country: ByCountry }) {
   const total = country.total.length;
-  const orgs = country.total.reduce((sum, m) => sum + m.org_count, 0);
+  const orgs = country.total.reduce((sum, p) => sum + p.org_count, 0);
   const name = COUNTRY_TITLES[country.country] ?? country.country;
   return (
     <section className="country-section">
@@ -182,40 +187,44 @@ function CountrySection({ country }: { country: ByCountry }) {
         <h2 className="cname">{name}</h2>
         <div className="crule" />
         <div className="cnum">
-          <span className="em">{total}</span> metros ·{' '}
+          <span className="em">{total}</span> regions ·{' '}
           <span className="em">{orgs}</span> orgs
         </div>
       </header>
       {country.letters.map((group) => (
-        <LetterRow key={group.letter} letter={group.letter} metros={group.metros} />
+        <LetterRow key={group.letter} letter={group.letter} regions={group.regions} />
       ))}
     </section>
   );
 }
 
-function LetterRow({ letter, metros }: { letter: string; metros: MetroSummary[] }) {
+function LetterRow({ letter, regions }: { letter: string; regions: RegionSummary[] }) {
   return (
     <div className="index-letter-row" id={letter}>
       <div className="index-letter">
         {letter}
         <span className="meta">
-          {metros.length} {metros.length === 1 ? 'metro' : 'metros'}
+          {regions.length} {regions.length === 1 ? 'region' : 'regions'}
         </span>
       </div>
       <div className="index-rows">
-        {metros.map((m) => (
-          <IndexRow key={m.region.slug} metro={m} />
+        {regions.map((p) => (
+          <IndexRow key={p.region.slug} region={p} />
         ))}
       </div>
     </div>
   );
 }
 
-function IndexRow({ metro }: { metro: MetroSummary }) {
-  const { region, org_count } = metro;
-  const subtitle = region.parent_slugs[0] ?? region.country.toLowerCase();
+function IndexRow({ region: r }: { region: RegionSummary }) {
+  const { region, org_count } = r;
+  // Subtitle reads "<Country> · <Kind label>" so duplicate-looking
+  // pairs like "Chicago Metro" and "Chicago" — which both surface
+  // when a city has its own direct org attachments — read
+  // distinctly without needing badges or separate sections.
+  const subtitle = regionKindLabel(region.kind);
   return (
-    <Link className="index-row" to={`/m/${region.slug}`}>
+    <Link className="index-row" to={`/region/${region.slug}`}>
       <div>
         <span className="iname">{region.name}</span>
         <span className="imeta">

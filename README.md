@@ -28,15 +28,18 @@ reasoning behind tech choices.
 
 ## Status
 
-Most of v1.0 is wired. The API serves `/lookup`, `/metros`,
-`/metros/{slug}`, and `/recent` against a Postgres store with
-embedded migrations; the v1 wire contract is committed at
-[`api/openapi.yaml`](./api/openapi.yaml) and embedded into the
-binary at `GET /api/v1/openapi.yaml`. Every `/api/v1/**` success
-response carries ODbL attribution headers; collection responses
-wrap their payload in a `{ meta, data }` envelope. The SPA renders
-home (search) + results + browse + per-metro + about + 404
-against the live API. Errors on both halves use
+Most of v1.0 is wired. The API serves `/lookup`, `/regions`,
+`/regions/{slug}`, `/recent`, and `/orgs/{slug}` against a Postgres
+store with embedded migrations; the v1 wire contract is committed
+at [`api/openapi.yaml`](./api/openapi.yaml) and embedded into the
+binary at `GET /api/v1/openapi.yaml`. `/regions` returns the
+editorial default browse set (metros + cities); `/regions/{slug}`
+resolves any non-national region in the DAG — metros, cities,
+counties, boroughs, states, multi-state coalitions. Every
+`/api/v1/**` success response carries ODbL attribution headers;
+collection responses wrap their payload in a `{ meta, data }`
+envelope. The SPA renders home (search) + results + browse +
+per-region + per-org + about + 404 against the live API. Errors on both halves use
 [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 `application/problem+json`.
 

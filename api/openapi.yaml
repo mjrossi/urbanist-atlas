@@ -63,7 +63,7 @@ tags:
   - name: lookup
     description: Postal-code → organizations search.
   - name: browse
-    description: Metros and recently-added organizations.
+    description: Browseable regions (metros, cities, and any other graph node) and recently-added organizations.
   - name: submissions
     description: Public submissions of new organizations.
   - name: admin
@@ -144,23 +144,39 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/metros:
+  /api/v1/regions:
     get:
       tags: [browse]
-      summary: List metros with approved organization counts.
+      summary: List regions with approved organization counts.
       description: |
-        Feeds the "Browse by metro" panel on the home page. Returns
-        every region whose kind is metro-equivalent (`us:metro`,
-        `ca:cma`, `ca:regional-district`, `pt:area-metropolitana`, and
-        future country-prefixed equivalents) that has at least one
-        approved organization tagged to it, with a count.
-      operationId: listMetros
+        Feeds the "Browse" panel on the home page. Returns the
+        editorial default browse set — metros and cities — with at
+        least one approved organization tagged to them directly or
+        via the region DAG, plus an org count for each.
+
+        The region graph models global civic geography as a DAG —
+        cities under metros, metros under multi-state regions, all
+        of them with state/province edges where they apply. A
+        ZIP-level lookup walks the graph **upward** (and partitions
+        by scope_tier); this endpoint walks **downward** from each
+        included region, so a metro's count includes orgs tagged to
+        its constituent cities and boroughs. "Chicago Metro" and
+        "Chicago" both appear, with the metro count strictly ≥ the
+        city count.
+
+        `scope_tier='national'` regions are always excluded (the v1
+        editorial decision; revisit when a national browse experience
+        ships). The list endpoint deliberately ships without filter
+        parameters; the right filter axis (taxonomy via `kind`, DAG
+        via `ancestor`, etc.) will be designed when a concrete browse
+        UI use case appears.
+      operationId: listRegions
       responses:
         '200':
           description: |
-            Metros with counts, ordered by org count descending.
-            Wrapped in a `{ meta, data }` envelope; the
-            `MetroSummary[]` lives at `data`.
+            Regions with counts, ordered by org count descending then
+            name ascending. Wrapped in a `{ meta, data }` envelope;
+            the `RegionSummary[]` lives at `data`.
           headers:
             X-Data-License:
               $ref: '#/components/headers/XDataLicense'
@@ -169,22 +185,29 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MetroSummariesEnvelope'
+                $ref: '#/components/schemas/RegionSummariesEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/metros/{slug}:
+  /api/v1/regions/{slug}:
     get:
       tags: [browse]
-      summary: List approved organizations in a single metro.
-      operationId: getMetro
+      summary: Get a single region and the organizations that serve it.
+      description: |
+        Resolves any non-national region in the graph by slug — metros,
+        cities, counties, boroughs, states/provinces, multi-state
+        coalitions. The `orgs` array is the descendant walk: every
+        approved org attached to this region or any region nested
+        below it. `scope_tier='national'` slugs return 404 (same v1
+        editorial gate as `/lookup` and the list endpoint).
+      operationId: getRegion
       parameters:
-        - $ref: '#/components/parameters/MetroSlug'
+        - $ref: '#/components/parameters/RegionSlug'
       responses:
         '200':
-          description: The metro region and its organizations.
+          description: The region and its descendant organizations.
           headers:
             X-Data-License:
               $ref: '#/components/headers/XDataLicense'
@@ -193,7 +216,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MetroDetail'
+                $ref: '#/components/schemas/RegionDetail'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -433,13 +456,17 @@ components:
       schema:
         $ref: '#/components/schemas/Country'
       description: ISO-style country code. Case-insensitive.
-    MetroSlug:
+    RegionSlug:
       in: path
       name: slug
       required: true
       schema:
         type: string
-      description: The metro region's slug (e.g. `nyc-metro`).
+      description: |
+        Any non-national region's slug. Examples: `nyc-metro` (metro),
+        `chicago` (city), `cook-county` (county), `chicagoland`
+        (multi-state region), `ny` (state), `toronto-cma`
+        (Canadian CMA), `metro-vancouver` (regional district).
     SubmissionID:
       in: path
       name: id
@@ -725,9 +752,12 @@ components:
           type: array
           items: { $ref: '#/components/schemas/LookupOrg' }
 
-    MetroSummary:
+    RegionSummary:
       type: object
-      description: A metro region plus its approved-org count, for the browse-by-metro panel.
+      description: |
+        A region (any non-national kind) plus its approved-org count.
+        Used by `GET /api/v1/regions` to populate the Browse index
+        and any future kind-filtered region views.
       required: [region, org_count]
       properties:
         region:
@@ -737,9 +767,15 @@ components:
           format: int32
           minimum: 0
 
-    MetroDetail:
+    RegionDetail:
       type: object
-      description: A metro region with the approved organizations that serve it.
+      description: |
+        A region (any non-national kind) with the approved
+        organizations that serve it. The `orgs` array includes
+        every org attached to this region directly or to any
+        region nested below it in the DAG (so a metro surfaces
+        its constituent cities' orgs, a county surfaces its
+        cities' orgs, etc.).
       required: [region, orgs]
       properties:
         region:
@@ -749,11 +785,11 @@ components:
           items:
             $ref: '#/components/schemas/Org'
 
-    MetroSummariesEnvelope:
+    RegionSummariesEnvelope:
       type: object
       description: |
-        Collection envelope for `GET /api/v1/metros`. Wraps the
-        metro list in a `meta` + `data` shape so every list
+        Collection envelope for `GET /api/v1/regions`. Wraps the
+        region list in a `meta` + `data` shape so every list
         response carries the ODbL attribution alongside its
         payload, even when transport-level headers are stripped.
       required: [meta, data]
@@ -763,13 +799,13 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/MetroSummary'
+            $ref: '#/components/schemas/RegionSummary'
 
     RecentEnvelope:
       type: object
       description: |
         Collection envelope for `GET /api/v1/recent`. Same shape
-        contract as `MetroSummariesEnvelope`.
+        contract as `RegionSummariesEnvelope`.
       required: [meta, data]
       properties:
         meta:

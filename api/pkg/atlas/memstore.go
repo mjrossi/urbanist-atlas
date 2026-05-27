@@ -115,17 +115,20 @@ func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Reg
 	return out, nil
 }
 
-// ListMetros implements Store. Walks every registered region, filters
-// by IsMetroKind, and counts the orgs whose region attachments are in
-// the metro's downward DAG closure (so an org tagged only to Brooklyn
-// counts toward NYC metro). Excludes national-tier metros and metros
-// with zero approved orgs. Orders by org count DESC, then name ASC.
-func (s *MemStore) ListMetros(_ context.Context) ([]MetroSummary, error) {
+// ListRegions implements Store. Walks every registered region,
+// filters by membership in defaultBrowseKinds (metros + cities),
+// and counts the orgs whose region attachments are in each
+// region's downward DAG closure (so an org tagged only to Brooklyn
+// counts toward NYC metro, and an org tagged to Chicago counts
+// toward both Chicago and Chicago Metro). Excludes national-tier
+// regions and regions with zero approved orgs. Orders by org count
+// DESC, then name ASC.
+func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := []MetroSummary{}
+	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
-		if !IsMetroKind(r.Kind) || r.ScopeTier == ScopeNational {
+		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
 			continue
 		}
 		descendants := s.descendantRegionIDs(id)
@@ -133,7 +136,7 @@ func (s *MemStore) ListMetros(_ context.Context) ([]MetroSummary, error) {
 		if count == 0 {
 			continue
 		}
-		out = append(out, MetroSummary{Region: r, OrgCount: int64(count)})
+		out = append(out, RegionSummary{Region: r, OrgCount: int64(count)})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].OrgCount != out[j].OrgCount {
@@ -144,10 +147,13 @@ func (s *MemStore) ListMetros(_ context.Context) ([]MetroSummary, error) {
 	return out, nil
 }
 
-// GetMetro implements Store. Returns nil for unknown slugs and for
-// known slugs that don't name a metro-equivalent kind. Returned orgs
-// are newest-first by CreatedAt.
-func (s *MemStore) GetMetro(_ context.Context, slug string) (*MetroDetail, error) {
+// GetRegion implements Store. Resolves any non-national region by
+// slug — metros, cities, counties, boroughs, states, multi-state
+// coalitions. Returns nil for unknown slugs and for national-tier
+// regions (preserving the v1 editorial filter that keeps
+// national-org content out of browse contexts). Returned orgs are
+// newest-first by CreatedAt.
+func (s *MemStore) GetRegion(_ context.Context, slug string) (*RegionDetail, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	id, ok := s.regionsBySlug[slug]
@@ -158,12 +164,12 @@ func (s *MemStore) GetMetro(_ context.Context, slug string) (*MetroDetail, error
 	if !ok {
 		return nil, nil
 	}
-	if !IsMetroKind(region.Kind) || region.ScopeTier == ScopeNational {
+	if region.ScopeTier == ScopeNational {
 		return nil, nil
 	}
 	descendants := s.descendantRegionIDs(id)
 	orgs := s.orgsForRegionIDs(descendants)
-	// Match Postgres OrgsForMetro: created_at DESC, id DESC.
+	// Match Postgres OrgsForRegion: created_at DESC, id DESC.
 	sort.Slice(orgs, func(i, j int) bool {
 		a, b := orgs[i], orgs[j]
 		if !a.CreatedAt.Equal(b.CreatedAt) {
@@ -171,7 +177,7 @@ func (s *MemStore) GetMetro(_ context.Context, slug string) (*MetroDetail, error
 		}
 		return a.ID > b.ID
 	})
-	return &MetroDetail{Region: region, Orgs: orgs}, nil
+	return &RegionDetail{Region: region, Orgs: orgs}, nil
 }
 
 // GetOrgBySlug implements Store. Scans the in-memory orgs by slug,

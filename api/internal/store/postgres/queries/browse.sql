@@ -1,92 +1,103 @@
--- Browse + recent queries — feed /api/v1/metros, /api/v1/metros/{slug},
+-- Browse + recent queries — feed /api/v1/regions, /api/v1/regions/{slug},
 -- and /api/v1/recent. See
 -- docs/superpowers/specs/2026-05-18-browse-endpoints-design.md for the
--- design and editorial decisions (metro-kind set, national-tier filter,
--- 10-row cap).
+-- original design and editorial decisions (descendant-walk org counts,
+-- national-tier filter, 10-row cap). Endpoint went through two renames:
+-- /metros -> /places (broadened to include cities) -> /regions
+-- (broadened detail to any non-national slug; the list endpoint
+-- ships without filter parameters today, but the SQL keeps the @kinds
+-- parameter so a future filter slice can plumb a kinds arg through
+-- without rewriting the query).
 --
--- All three queries walk the region DAG. ListMetros and OrgsForMetro
--- descend from the metro region (child-of relation) so an org tagged
--- only to Brooklyn counts toward NYC metro. ListRecent doesn't walk —
--- it filters orgs by whether ANY of their region attachments is
--- non-national.
+-- All three queries walk the region DAG. ListRegions and OrgsForRegion
+-- descend from each matched region (parent->child relation) so an org
+-- tagged only to Brooklyn counts toward NYC metro, and an org tagged
+-- to Chicago counts toward both Chicago (its own page) and Chicago
+-- Metro. ListRecent doesn't walk — it filters orgs by whether ANY of
+-- their region attachments is non-national.
 
--- name: ListMetros :many
--- Returns every metro-equivalent region (kind = ANY($1::text[])) that
--- has at least one approved organization attached to it directly OR via
--- a descendant in the region DAG, with the org count.
+-- name: ListRegions :many
+-- Returns every region whose kind is in the caller-supplied $1 list
+-- and has at least one approved organization attached to it directly
+-- OR via a descendant in the region DAG, with the org count. The $1
+-- kind set comes from the Postgres adapter — today it always passes
+-- atlas.DefaultBrowseKindStrings() (metros + cities). The arg stays
+-- parameterized so a future filter slice can override.
 --
--- Excludes scope_tier='national' regions defensively even though no
--- known metro-kind currently has that tier. Excludes metros with zero
--- approved orgs (those would be a confusing UI element on the Browse
--- panel — a metro with no advocacy to browse).
+-- Always excludes scope_tier='national' regions (preserves the v1
+-- editorial decision to keep national-tier content out of browse
+-- contexts; same gate as /lookup). Always excludes regions with
+-- zero approved orgs.
 --
 -- The descendants CTE walks region_parents in the parent->child
--- direction (parent_region_id = current id) starting from each metro.
--- We materialize the (metro_id, descendant_id) pairs and aggregate.
--- Ordered by org_count DESC then name ASC (alphabetical tiebreak
--- keeps the response stable when counts collide).
+-- direction (parent_region_id = current id) starting from each
+-- matched root. We materialize the (root_id, descendant_id) pairs
+-- and aggregate. Ordered by org_count DESC then name ASC
+-- (alphabetical tiebreak keeps the response stable when counts
+-- collide).
 WITH RECURSIVE
-metros AS (
+roots AS (
     SELECT id, country, kind, name, slug, scope_tier, sort_priority
     FROM regions
     WHERE kind = ANY(@kinds::text[])
       AND scope_tier <> 'national'
 ),
-descendants(metro_id, region_id) AS (
-    -- Seed: each metro is its own descendant (an org tagged directly
-    -- to the metro must count).
-    SELECT m.id, m.id FROM metros m
+descendants(root_id, region_id) AS (
+    -- Seed: each root is its own descendant (an org tagged directly
+    -- to the root must count).
+    SELECT r.id, r.id FROM roots r
     UNION
     -- Recurse downward through region_parents.
-    SELECT d.metro_id, rp.region_id
+    SELECT d.root_id, rp.region_id
     FROM descendants d
     JOIN region_parents rp ON rp.parent_region_id = d.region_id
 )
 SELECT
-    m.id,
-    m.country,
-    m.kind,
-    m.name,
-    m.slug,
-    m.scope_tier,
-    m.sort_priority,
+    r.id,
+    r.country,
+    r.kind,
+    r.name,
+    r.slug,
+    r.scope_tier,
+    r.sort_priority,
     COUNT(DISTINCT o.id)::bigint AS org_count
-FROM metros m
-JOIN descendants d         ON d.metro_id = m.id
+FROM roots r
+JOIN descendants d            ON d.root_id = r.id
 JOIN organization_regions orx ON orx.region_id = d.region_id
-JOIN organizations o       ON o.id = orx.organization_id
+JOIN organizations o          ON o.id = orx.organization_id
 WHERE o.status = 'approved'
-GROUP BY m.id, m.country, m.kind, m.name, m.slug, m.scope_tier, m.sort_priority
+GROUP BY r.id, r.country, r.kind, r.name, r.slug, r.scope_tier, r.sort_priority
 HAVING COUNT(DISTINCT o.id) > 0
-ORDER BY org_count DESC, m.name ASC;
+ORDER BY org_count DESC, r.name ASC;
 
--- name: GetMetroBySlug :one
--- Returns the metro region identified by slug AND kind ∈ metro kinds.
--- Returns no row when the slug is unknown OR names a non-metro region;
--- the adapter maps the empty result to (nil, nil) → 404.
+-- name: GetRegionBySlug :one
+-- Returns the region identified by slug, with the only filter being
+-- the national-tier exclusion. Resolves any non-national region —
+-- metros, cities, counties, boroughs, states, multi-state coalitions.
+-- Returns no row when the slug is unknown OR names a national-tier
+-- region; the adapter maps the empty result to (nil, nil) → 404.
 SELECT id, country, kind, name, slug, scope_tier, sort_priority
 FROM regions
 WHERE slug = @slug
-  AND kind = ANY(@kinds::text[])
   AND scope_tier <> 'national';
 
--- name: OrgsForMetro :many
--- For a given metro region id, returns every approved org with at
--- least one attachment in the metro's downward DAG closure (the metro
--- itself + every descendant region). For each org we also array_agg
--- ALL its region attachments so the adapter can hydrate Org.Regions
--- in one round-trip.
+-- name: OrgsForRegion :many
+-- For a given region id, returns every approved org with at least
+-- one attachment in the region's downward DAG closure (the region
+-- itself + every descendant). For each org we also array_agg ALL its
+-- region attachments so the adapter can hydrate Org.Regions in one
+-- round-trip.
 --
--- The recursion prunes scope_tier='national' nodes defensively. Today
--- the metro is always non-national (GetMetroBySlug enforces it) and
--- editorial policy keeps national tiers as graph roots, so the prune
--- is a no-op on the current seed. It guards against a future edge
--- that accidentally puts a national region under a metro, which would
--- otherwise leak national-only orgs into a metro detail page.
+-- The recursion prunes scope_tier='national' nodes defensively. The
+-- caller (GetRegion) has already filtered the root to non-national,
+-- and editorial policy keeps national tiers as graph roots, so the
+-- prune is a no-op on the current seed. It guards against a future
+-- edge that accidentally puts a national region under another region,
+-- which would otherwise leak national-only orgs into a detail page.
 --
 -- Ordered by o.created_at DESC, then o.id DESC for stability.
 WITH RECURSIVE descendants(region_id) AS (
-    SELECT @metro_id::bigint
+    SELECT @region_id::bigint
     UNION
     SELECT rp.region_id
     FROM descendants d

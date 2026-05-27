@@ -1,25 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
-import { ApiError, getMetro } from '../lib/api.ts';
-import type { MetroDetail, Org } from '../lib/api.ts';
+import { ApiError, getRegion } from '../lib/api.ts';
+import type { RegionDetail, Org } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { regionKindLabel } from '../lib/regionKind.ts';
 
-export function Metro() {
-  const params = useParams<{ metroSlug: string }>();
-  const slug = params.metroSlug ?? '';
-  const query = useQuery<MetroDetail, ApiError>({
-    queryKey: queryKeys.metro(slug),
-    queryFn: ({ signal }) => getMetro(slug, { signal }),
+export function Region() {
+  const params = useParams<{ regionSlug: string }>();
+  const slug = params.regionSlug ?? '';
+  const query = useQuery<RegionDetail, ApiError>({
+    queryKey: queryKeys.region(slug),
+    queryFn: ({ signal }) => getRegion(slug, { signal }),
     enabled: slug.length > 0,
   });
 
   useDocumentTitle(
     query.data
       ? `${query.data.region.name} — Urbanist Atlas`
-      : 'Loading metro — Urbanist Atlas',
+      : 'Loading region — Urbanist Atlas',
   );
+
+  const regionReport = query.data
+    ? `${regionKindLabel(query.data.region.kind)} report`
+    : 'Region report';
 
   return (
     <>
@@ -30,25 +35,25 @@ export function Metro() {
           <Link to="/browse">Browse</Link>
           <span className="crumb-sep">/</span>
           <span className="crumb-here">
-            {query.data ? query.data.region.name : 'Metro'}
+            {query.data ? query.data.region.name : 'Region'}
           </span>
         </div>
         <div>
           {query.data
             ? `${query.data.orgs.length} ${query.data.orgs.length === 1 ? 'org' : 'orgs'} indexed`
-            : 'Metro report'}
+            : regionReport}
         </div>
       </div>
-      <MetroBody query={query} />
+      <RegionBody query={query} />
     </>
   );
 }
 
-function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) {
+function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }) {
   if (query.isPending) {
     return (
       <p className="results-state" role="status" style={{ marginTop: 48 }}>
-        Loading metro…
+        Loading region…
       </p>
     );
   }
@@ -57,13 +62,13 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
       return (
         <div className="lede" style={{ marginTop: 48 }}>
           <div className="eyebrow">
-            § Metro report<span className="eyebrow-rule" />
+            § Region report<span className="eyebrow-rule" />
           </div>
           <h1>
-            This metro <span className="accent">isn&rsquo;t in the atlas yet.</span>
+            This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
           </h1>
           <p className="deck">
-            Try <Link to="/browse">browse</Link> for the metros we have indexed,
+            Try <Link to="/browse">browse</Link> for the regions we have indexed,
             or <Link to="/submit">file a tip</Link> if you know advocates here.
           </p>
         </div>
@@ -82,12 +87,13 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
   }
 
   const { region, orgs } = query.data;
+  const kindLabel = regionKindLabel(region.kind);
 
   return (
     <>
       <div className="lede" style={{ marginTop: 48 }}>
         <div className="eyebrow">
-          § Metro report · {region.country}
+          § {kindLabel} report · {region.country}
           <span className="eyebrow-rule" />
         </div>
         <h1>
@@ -141,15 +147,14 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
 
         <aside className="rail">
           <div className="rail-block">
-            <div className="rail-kicker">About this metro</div>
+            <div className="rail-kicker">About this {kindLabel.toLowerCase()}</div>
             <p>
-              The Atlas indexes {region.name} as a{' '}
-              {region.country === 'US' ? 'US metro' : 'Canadian metro'}
+              The Atlas indexes {region.name} as a {kindLabel.toLowerCase()}
               {region.parent_slugs.length > 0
                 ? `, sitting under ${region.parent_slugs.join(' · ')}.`
                 : '.'}{' '}
-              Sub-regions inside it — boroughs, counties, sibling cities —
-              show up on each org&rsquo;s detail page.
+              Orgs tagged to sub-regions (cities, boroughs, counties)
+              roll up here too.
             </p>
             <p style={{ marginBottom: 0 }}>
               Looking up by postal code?{' '}
@@ -186,7 +191,7 @@ function MetroBody({ query }: { query: UseQueryResult<MetroDetail, ApiError> }) 
             <div className="rail-kicker">Companion pages</div>
             <ul className="plain">
               <li>
-                <Link to="/browse">Browse all metros</Link>
+                <Link to="/browse">Browse the atlas</Link>
               </li>
               <li>
                 <Link to="/about">About the Atlas</Link>

@@ -68,30 +68,30 @@ func loadAllSeeds(ctx context.Context, t *testing.T, store *Store) {
 	}
 }
 
-func TestPostgresStore_ListMetros_ShapeAndOrdering(t *testing.T) {
+func TestPostgresStore_ListRegions_ShapeAndOrdering(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.ListMetros(ctx)
+	got, err := store.ListRegions(ctx)
 	if err != nil {
-		t.Fatalf("ListMetros: %v", err)
+		t.Fatalf("ListPlaces: %v", err)
 	}
 	if len(got) == 0 {
-		t.Fatal("want >=1 metro, got 0")
+		t.Fatal("want >=1 place, got 0")
 	}
-	// Every entry should be a metro-equivalent kind, non-national, and
-	// have at least one org.
+	// Every entry should be in the default-browse set, non-national,
+	// and have at least one org.
 	for _, m := range got {
-		if !atlas.IsMetroKind(m.Region.Kind) {
-			t.Errorf("non-metro kind in result: %q (%s)", m.Region.Kind, m.Region.Slug)
+		if !atlas.IsDefaultBrowseKind(m.Region.Kind) {
+			t.Errorf("kind outside default-browse set in result: %q (%s)", m.Region.Kind, m.Region.Slug)
 		}
 		if m.Region.ScopeTier == atlas.ScopeNational {
 			t.Errorf("national-tier region in result: %s", m.Region.Slug)
 		}
 		if m.OrgCount == 0 {
-			t.Errorf("zero-org metro in result: %s", m.Region.Slug)
+			t.Errorf("zero-org region in result: %s", m.Region.Slug)
 		}
 	}
 	// Ordering: org_count DESC, then name ASC for ties.
@@ -108,18 +108,18 @@ func TestPostgresStore_ListMetros_ShapeAndOrdering(t *testing.T) {
 	}
 }
 
-func TestPostgresStore_GetMetro_HappyPath(t *testing.T) {
+func TestPostgresStore_GetRegion_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetMetro(ctx, "nyc-metro")
+	got, err := store.GetRegion(ctx, "nyc-metro")
 	if err != nil {
-		t.Fatalf("GetMetro: %v", err)
+		t.Fatalf("GetPlace: %v", err)
 	}
 	if got == nil {
-		t.Fatal("nil result for known metro slug")
+		t.Fatal("nil result for known place slug")
 	}
 	if got.Region.Slug != "nyc-metro" {
 		t.Errorf("region slug: want nyc-metro, got %s", got.Region.Slug)
@@ -152,15 +152,15 @@ func TestPostgresStore_GetMetro_HappyPath(t *testing.T) {
 	}
 }
 
-func TestPostgresStore_GetMetro_OrgsOrderedNewestFirst(t *testing.T) {
+func TestPostgresStore_GetRegion_OrgsOrderedNewestFirst(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetMetro(ctx, "nyc-metro")
+	got, err := store.GetRegion(ctx, "nyc-metro")
 	if err != nil {
-		t.Fatalf("GetMetro: %v", err)
+		t.Fatalf("GetPlace: %v", err)
 	}
 	if got == nil || len(got.Orgs) < 2 {
 		t.Skipf("nyc-metro needs >=2 orgs to assert ordering; got %d", len(got.Orgs))
@@ -179,13 +179,13 @@ func TestPostgresStore_GetMetro_OrgsOrderedNewestFirst(t *testing.T) {
 	}
 }
 
-func TestPostgresStore_GetMetro_UnknownSlug_ReturnsNil(t *testing.T) {
+func TestPostgresStore_GetRegion_UnknownSlug_ReturnsNil(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	got, err := store.GetMetro(ctx, "does-not-exist")
+	got, err := store.GetRegion(ctx, "does-not-exist")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
@@ -194,19 +194,70 @@ func TestPostgresStore_GetMetro_UnknownSlug_ReturnsNil(t *testing.T) {
 	}
 }
 
-func TestPostgresStore_GetMetro_NonMetroSlug_ReturnsNil(t *testing.T) {
+// TestPostgresStore_GetRegion_StateSlugResolves pins the broadened
+// detail-endpoint contract: a us:state slug (outside the default
+// browse set) now resolves and returns its descendant orgs. Replaces
+// the prior "non-place slug returns nil" test.
+func TestPostgresStore_GetRegion_StateSlugResolves(t *testing.T) {
 	ctx := context.Background()
 	store, closeFn := startPostgres(t)
 	defer closeFn()
 	loadAllSeeds(ctx, t, store)
 
-	// "ny" is a us:state slug — exists but is not a metro kind.
-	got, err := store.GetMetro(ctx, "ny")
+	got, err := store.GetRegion(ctx, "ny")
+	if err != nil {
+		t.Fatalf("err: want nil, got %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for ny (us:state) — expected the broadened detail endpoint to resolve it")
+	}
+	if got.Region.Slug != "ny" || got.Region.Kind != "us:state" {
+		t.Errorf("region: want slug=ny kind=us:state, got slug=%s kind=%s",
+			got.Region.Slug, got.Region.Kind)
+	}
+	if len(got.Orgs) == 0 {
+		t.Errorf("orgs: want >=1 (descendant walk; NY descendants include nyc-metro + nyc + boroughs), got 0")
+	}
+}
+
+// TestPostgresStore_GetRegion_MultiStateSlugResolves pins resolution
+// for us:multi-state regions (Chicagoland, NYC tri-state, DMV).
+func TestPostgresStore_GetRegion_MultiStateSlugResolves(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.GetRegion(ctx, "chicagoland")
+	if err != nil {
+		t.Fatalf("err: want nil, got %v", err)
+	}
+	if got == nil {
+		t.Fatal("nil result for chicagoland (us:multi-state)")
+	}
+	if got.Region.Kind != "us:multi-state" {
+		t.Errorf("region.kind: want us:multi-state, got %s", got.Region.Kind)
+	}
+	if len(got.Orgs) == 0 {
+		t.Errorf("orgs: want >=1 via descendant walk into chicago-metro + Chicago, got 0")
+	}
+}
+
+// TestPostgresStore_GetRegion_NationalReturnsNil pins the v1
+// editorial gate: national-tier slugs (pt-nacional, future MUBi-
+// equivalents) still 404 even though the kind gate is gone.
+func TestPostgresStore_GetRegion_NationalReturnsNil(t *testing.T) {
+	ctx := context.Background()
+	store, closeFn := startPostgres(t)
+	defer closeFn()
+	loadAllSeeds(ctx, t, store)
+
+	got, err := store.GetRegion(ctx, "pt-nacional")
 	if err != nil {
 		t.Fatalf("err: want nil, got %v", err)
 	}
 	if got != nil {
-		t.Errorf("result: want nil for non-metro slug, got %+v", got)
+		t.Errorf("result: want nil for national-tier slug, got %+v", got)
 	}
 }
 

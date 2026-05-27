@@ -1,11 +1,34 @@
 # Browse + recent endpoints (slice #6)
 
-**Status:** Active — implementation of slice #6 (backend half of the browse/metros pair).
+**Status:** Shipped — the load-bearing pieces (downward DAG walk,
+national-tier filter, `{meta, data}` envelope, hardcoded 10-row cap
+on `/recent`) are still in production. Endpoint surface was renamed
+twice after this spec landed:
+
+- `/api/v1/metros` (this spec) → `/api/v1/places` (broadened to
+  include city-kind regions) → `/api/v1/regions` (final, with the
+  detail endpoint broadened to resolve any non-national slug).
+
+Wherever this doc says `/metros`, `MetroSummary`, `MetroDetail`,
+`ListMetros`, `GetMetro`, or `IsMetroKind`, the current names are
+`/regions`, `RegionSummary`, `RegionDetail`, `ListRegions()`,
+`GetRegion`, and `IsDefaultBrowseKind`. The `MetroKinds` predicate
+*also* survives in `metro_kinds.go` but is narrower than
+`DefaultBrowseKinds` — `/lookup`'s `placeLabel` keeps using it so a
+Brooklyn ZIP still labels as "Brooklyn, NYC — New York Metro"
+rather than picking the city as the broad ancestor.
+
+The descendant-walk SQL, the `HAVING COUNT > 0` empties filter, and
+the `scope_tier='national'` defensive prune in `OrgsForRegion`
+(formerly `OrgsForMetro`) are unchanged.
+
 **Supersedes:** none.
+**Superseded-by (for endpoint naming + broadening):** the "Browse
+goes generic" entry in [`docs/roadmap.md`](../../roadmap.md).
 **Related:**
 - [`2026-05-18-browse-pages-design.md`](./2026-05-18-browse-pages-design.md) (frontend half — slice #14, runs in parallel)
-- [`docs/roadmap.md:91`](../../roadmap.md) (slice text)
-- [`api/openapi.yaml:132-193`](../../../api/openapi.yaml) (contract — already complete)
+- [`docs/roadmap.md`](../../roadmap.md) (slice text)
+- [`api/openapi.yaml`](../../../api/openapi.yaml) (current contract — `/api/v1/regions`)
 
 ## Why this exists
 

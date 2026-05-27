@@ -1,11 +1,31 @@
 # Browse + metro pages (slice #14)
 
-**Status:** Active — implementation of slice #14 (frontend half of the browse/metros pair).
+**Status:** Shipped — the broadsheet layout, country + letter
+grouping, classified-section pattern on the detail page, and the
+homepage rail wiring are all in production. The SPA surface was
+renamed after this spec landed:
+
+- The detail route went `/m/:metroSlug` → `/p/:placeSlug` →
+  `/region/:regionSlug`; `Metro.tsx` → `Place.tsx` → `Region.tsx`.
+  The kind-label helper expanded to cover non-metro kinds so the
+  detail page reads naturally for cities, states, counties,
+  boroughs, and multi-state coalitions.
+- The Browse index lists both metros and cities by default.
+
+Wherever this doc says `/m/<slug>`, `Metro.tsx`, "metro report",
+"Browse by metro", `listMetros`, or `MetroSummary`, the current
+equivalents are `/region/<slug>`, `Region.tsx`, "{kindLabel}
+report", "Browse the atlas", `listRegions(init?)`, and
+`RegionSummary`. The two-column lede + classified-section render
+patterns and the country + letter grouping are unchanged.
+
 **Supersedes:** none.
+**Superseded-by (for the rename + broadening):** the "Browse goes
+generic" entry in [`docs/roadmap.md`](../../roadmap.md).
 **Related:**
 - [`2026-05-18-browse-endpoints-design.md`](./2026-05-18-browse-endpoints-design.md) (backend half — slice #6, runs in parallel)
-- [`docs/roadmap.md:101`](../../roadmap.md) (slice text)
-- [`api/openapi.yaml:132-193`](../../../api/openapi.yaml) (contract)
+- [`docs/roadmap.md`](../../roadmap.md) (slice text)
+- [`api/openapi.yaml`](../../../api/openapi.yaml) (current contract — `/api/v1/regions`)
 
 ## Why this exists
 
