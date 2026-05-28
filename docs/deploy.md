@@ -191,10 +191,14 @@ Required Actions secrets:
 
 | Secret | Source |
 |---|---|
-| `R2_S3_ENDPOINT` | Cloudflare R2 settings → API tokens → endpoint URL |
-| `R2_S3_ACCESS_KEY_ID` | R2 API token (Object R/W on the backups bucket) |
-| `R2_S3_SECRET_ACCESS_KEY` | same R2 API token |
+| `CF_ACCOUNT_ID` | Cloudflare dashboard → account ID (expanded into `https://<id>.r2.cloudflarestorage.com` by the workflow) |
+| `R2_ACCESS_KEY_ID` | R2 API token (Object R/W on the backups bucket) |
+| `R2_SECRET_ACCESS_KEY` | same R2 API token |
 | `R2_BACKUP_BUCKET` | `urbanist-atlas-backups` |
+
+These names match the secrets already provisioned for the prior
+Postgres-era backup workflow, so the new workflow reuses them
+without duplication.
 
 `FLY_API_TOKEN_DEPLOY` (already configured for `ci.yml`) is reused
 for the `flyctl ssh` step.
