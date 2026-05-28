@@ -11,7 +11,8 @@ self-explanatory.
 A directory of transit + safe-streets advocacy organizations, searchable
 by US ZIP or Canadian postal code. Two halves:
 
-- `api/` — Go service on Fly.io, Postgres-backed, exposes `/api/v1`.
+- `api/` — Go service on Fly.io, stateless (file-backed FileStore reads
+  the TOML/CSV bundle at boot), exposes `/api/v1`.
 - `web/` — React + Vite SPA on Cloudflare Workers + Pages (Static Assets).
 
 Companion to the maintainer's publication, *Urbanist Lexicon*
@@ -46,7 +47,7 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
 Language runtimes and project tools are managed by
 [mise](https://mise.jdx.dev). Install mise once, then `mise install` at
 the repo root provisions everything pinned in `mise.toml`: Go, Node,
-sqlc, goose, staticcheck, oapi-codegen.
+staticcheck, oapi-codegen.
 
 - **`mise.toml`** — base: tool versions + production-default env.
 - **`mise.development.toml`** — local dev overrides; activate with
@@ -60,11 +61,9 @@ contributors to `brew install` things. The goal: a contributor with mise
 and a clone of the repo has everything they need to run tests and the dev
 server.
 
-Postgres for the dev loop runs in a docker container, lifecycled by
-`just pg-up` / `pg-down` / `pg-reset` / `pg-shell` / `pg-logs` on port
-`55432`. Same `postgres:17-alpine` image as the testcontainers-based
-integration suite, so the wire is identical. Docker is the only dev
-dependency that isn't installed by mise.
+The dev loop has no external dependencies: `mise install`, then
+`just api-run` (which is `urbanist-atlas-server serve` against
+`api/seed/`) is the entire local setup. No Postgres, no Docker.
 
 ## Tech conventions
 
@@ -74,23 +73,16 @@ dependency that isn't installed by mise.
   can't do it. Approved exceptions:
   - `github.com/go-chi/chi/v5` — HTTP router
   - `github.com/urfave/cli/v3` — CLI / startup
-  - `github.com/jackc/pgx/v5` — Postgres driver (used via sqlc)
-  - `github.com/sqlc-dev/sqlc` — type-safe SQL codegen
-  - `github.com/pressly/goose/v3` — migrations, embedded as a library
   - `github.com/oapi-codegen/oapi-codegen/v2` — Go types generated from `api/openapi.yaml` (types-only; no chi-server stubs)
   - `github.com/pelletier/go-toml/v2` — TOML loading for hand-curated seed data (regions + orgs)
   - `github.com/google/go-cmp/cmp` — diff-friendly test assertions
-  - `github.com/testcontainers/testcontainers-go` — Postgres integration tests (test-only, under `//go:build integration`)
 - **Logging:** `log/slog` (stdlib). JSON in prod, text in dev.
 - **Errors:** stdlib `errors` + `fmt.Errorf("...: %w", err)`. No third-party
   errors libraries.
 - **Config:** all via urfave/cli flags with env-var fallbacks
   (`URBANIST_ADMIN_TOKEN`, `URBANIST_PORT`, `URBANIST_LOG_FORMAT`,
   `URBANIST_CORS_ORIGINS`, `URBANIST_STORE`, `URBANIST_SEED_DIR`,
-  etc.). The Postgres connection string is the one exception:
-  follows the universal `DATABASE_URL` convention (every managed-
-  Postgres host — Fly MPG, Render, Neon, Railway — sets this name
-  automatically). No `viper`.
+  `URBANIST_CLIENT_SECRET`, etc.). No `viper`.
 - **Layout:** standard. `cmd/` for binaries, `pkg/` for the public library,
   `internal/` for non-exported.
 - **Style:** `gofmt`, `go vet`, `staticcheck`. No custom linter config.
@@ -103,9 +95,11 @@ support it. Handlers in `internal/httpapi/` should be ~10 lines each:
 parse request → call a `pkg/atlas` function → encode response. No
 business logic in handlers.
 
-`serve` accepts `--store=memory|postgres` (postgres default) and
-`--db-url` (with `DATABASE_URL` env fallback). The memory store
-stays available for tests and offline CLI use.
+`serve` accepts `--store=file|memory` (file default) and `--seed-dir`
+(default `./seed`; env `URBANIST_SEED_DIR`). The file store reads
+the bundled TOML/CSV at boot into an in-memory `atlas.MemStore`; the
+memory store loads the small `LoadDevFixtures` set and exists for
+demos and ad-hoc CLI testing without a seed directory on disk.
 
 ### React (`web/`)
 
@@ -177,26 +171,29 @@ See the plan for the full schema, but at a glance:
       `regions_us_msa_overrides.toml` (US) and
       `api/internal/etl/ca/mappings.go` (CA).
     - `regions_<cc>.toml` — hand-curated city/borough/county leaves.
-- `postal_codes` map postal codes to whatever the smallest curated
-  region for that area is — a city leaf where one exists, an NYC
-  borough leaf via county lookup, an MSA/CMA region, or finally the
-  state/province. Anchor distribution is a *data* decision baked into
-  `postal_codes_<cc>.csv` by the ETL pipeline; the lookup SQL is
-  unchanged across tiers (the recursive CTE in
-  `api/internal/store/postgres/queries/lookup.sql` walks ancestors of
-  whatever region the postal code points at). The **US pipeline runs
-  two sources**: Census ZCTA crosswalks (primary, ~33,700 ZIPs with
-  city-leaf precision where curated) and HUD's quarterly USPS
-  ZIP-County crosswalk (additive backfill for the ~9k operational
-  ZIPs Census omits — P.O. Box-only, single-building, APO/FPO).
-  See
+- Postal codes map to whatever the smallest curated region for that
+  area is — a city leaf where one exists, an NYC borough leaf via
+  county lookup, an MSA/CMA region, or finally the state/province.
+  Anchor distribution is a *data* decision baked into
+  `postal_codes_<cc>.csv` by the ETL pipeline; the in-memory ancestor
+  walk in `MemStore.AncestorRegions` is unchanged across tiers — it
+  walks ancestors of whatever region the postal code points at. The
+  **US pipeline runs two sources**: Census ZCTA crosswalks (primary,
+  ~33,700 ZIPs with city-leaf precision where curated) and HUD's
+  quarterly USPS ZIP-County crosswalk (additive backfill for the ~9k
+  operational ZIPs Census omits — P.O. Box-only, single-building,
+  APO/FPO). See
   [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./docs/superpowers/specs/2026-05-19-postal-coverage-design.md)
   for the smallest-anchor design rationale, two-source merge, and
   editorial conventions.
-- `organizations` join many-to-many to `regions` via
-  `organization_regions`; an org can attach to any node in the graph.
-- `submissions` for the public submission queue, with bearer-token-
-  gated admin endpoints.
+- Organizations attach to any node in the region graph (many-to-many
+  via the `region_slugs` array in each `[[org]]` entry of
+  `orgs.toml`). At boot the FileStore resolves those slugs to the
+  in-memory region IDs.
+- **Submissions:** the public submission queue is not yet implemented
+  at the storage layer; the next phase introduces it on a small
+  SQLite store sitting on a Fly volume (no Postgres). Approved
+  submissions land in `orgs.toml` via an auto-generated GitHub PR.
 
 ### ETL pipeline (operator-side)
 
@@ -214,14 +211,14 @@ pip install -r etl/scripts/requirements.txt      # one time, for the xlsx→csv 
 urbanist-atlas-server etl regenerate --country=US
 urbanist-atlas-server etl regenerate --country=CA
 
-# Reload the dev DB.
-just pg-reset && just pg-up && just loaddata
+# Restart the dev server — there is no DB to reload.
+just api-run
 ```
 
 Source files live under `etl/sources/<cc>/` (gitignored). Generated
 outputs live under `api/seed/` and are committed. ETL is deterministic:
 the same upstream vintage produces byte-identical output, so git diffs
-are signal-rich and `loaddata` stays idempotent.
+are signal-rich.
 
 ## Wire contract
 
@@ -257,22 +254,14 @@ endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 
 ## Hosting
 
-- **API:** Fly.io, region `iad` (Virginia, US East). A multi-stage
-  `Dockerfile` at the repo root builds the Go binary; the root
-  `fly.toml`'s `[deploy] release_command` runs `migrate up` on every
-  deploy.
-- **Database:** A sibling Fly app `urbanist-atlas-db` runs
-  `postgres:17-alpine` with a 1 GB volume mounted at
-  `/var/lib/postgresql/data` (config at `infra/postgres/fly.toml`).
-  The API reaches it over Fly's internal 6PN at
-  `urbanist-atlas-db.internal:5432`; no public exposure. Same image
-  as the testcontainers integration suite, so the wire is identical
-  from local CI to production.
-- **Backups:** Nightly GitHub Actions cron at
-  `.github/workflows/backup.yml` does `pg_dump | gzip` via
-  `flyctl ssh console`, uploads to Cloudflare R2 bucket
-  `urbanist-atlas-backups` with a 30-day retention policy
-  configured at the bucket level.
+- **API:** Fly.io, region `iad` (Virginia, US East). A single Fly app
+  (`urbanist-atlas`); a multi-stage `Dockerfile` at the repo root
+  builds the Go binary and bakes `api/seed/` into the image. The
+  process is stateless: at boot it loads the bundled TOML/CSV into
+  an in-memory `atlas.MemStore` and serves all reads from memory.
+  No release command, no database. The previous sibling
+  `urbanist-atlas-db` Postgres app and its nightly backup workflow
+  were retired when this changed.
 - **Web:** Cloudflare Workers + Pages (Static Assets) configured by
   `wrangler.jsonc` at the repo root. The Vite build at `web/dist/`
   is uploaded as static assets; SPA fallback is handled by
@@ -283,7 +272,8 @@ endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
   `<version>-urbanist-atlas.<account>.workers.dev`.
 
 See [`docs/superpowers/specs/2026-05-21-fly-deploy-design.md`](./docs/superpowers/specs/2026-05-21-fly-deploy-design.md)
-for the design and [`docs/deploy.md`](./docs/deploy.md) for the runbook.
+for the original (Postgres-backed) design and
+[`docs/deploy.md`](./docs/deploy.md) for the current runbook.
 
 ## Launch strategy
 

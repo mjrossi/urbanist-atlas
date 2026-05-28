@@ -15,14 +15,12 @@ import (
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
 	"github.com/mjrossi/urbanist-atlas/api/internal/loaddata"
-	"github.com/mjrossi/urbanist-atlas/api/internal/store/postgres"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 const (
-	storeKindPostgres = "postgres"
-	storeKindMemory   = "memory"
-	storeKindFile     = "file"
+	storeKindFile   = "file"
+	storeKindMemory = "memory"
 )
 
 func serveCommand() *cli.Command {
@@ -50,18 +48,13 @@ func serveCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "store",
-				Usage:   "store backing: file (default), postgres, or memory",
+				Usage:   "store backing: file (default; reads from --seed-dir) or memory (built-in dev fixtures)",
 				Value:   storeKindFile,
 				Sources: cli.EnvVars("URBANIST_STORE"),
 			},
 			&cli.StringFlag{
-				Name:    "db-url",
-				Usage:   "Postgres connection string (required when --store=postgres)",
-				Sources: cli.EnvVars("DATABASE_URL"),
-			},
-			&cli.StringFlag{
 				Name:    "seed-dir",
-				Usage:   "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml (required when --store=file)",
+				Usage:   "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml",
 				Value:   "./seed",
 				Sources: cli.EnvVars("URBANIST_SEED_DIR"),
 			},
@@ -132,12 +125,12 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	}
 }
 
-// buildStore returns an atlas.Store backed by either Postgres or the
-// in-memory MemStore, depending on --store. Memory is opt-in (for
-// tests and offline use); the default is Postgres so production
-// configurations are accidentally-correct rather than accidentally-
-// fixture-backed.
-func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas.Store, func(), error) {
+// buildStore returns an atlas.Store backed by the file-loaded
+// MemStore (default) or the built-in dev fixtures (--store=memory).
+// The dev-fixture path stays available so the binary can boot and
+// serve a few sample orgs without a seed directory on disk — useful
+// for demos and ad-hoc CLI testing.
+func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.Store, func(), error) {
 	kind := strings.ToLower(strings.TrimSpace(c.String("store")))
 	switch kind {
 	case storeKindMemory:
@@ -145,7 +138,7 @@ func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas
 		atlas.LoadDevFixtures(s)
 		logger.Info("store initialized", "kind", storeKindMemory, "fixtures", "dev")
 		return s, func() {}, nil
-	case storeKindFile:
+	case storeKindFile, "":
 		seedDir := c.String("seed-dir")
 		if seedDir == "" {
 			return nil, nil, errors.New("serve: --seed-dir or URBANIST_SEED_DIR is required when --store=file")
@@ -156,19 +149,8 @@ func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas
 		}
 		logger.Info("store initialized", "kind", storeKindFile, "seed_dir", seedDir)
 		return s, func() {}, nil
-	case storeKindPostgres, "":
-		dbURL := c.String("db-url")
-		if dbURL == "" {
-			return nil, nil, errors.New("serve: --db-url or DATABASE_URL is required when --store=postgres")
-		}
-		s, closeFn, err := postgres.Open(ctx, dbURL)
-		if err != nil {
-			return nil, nil, err
-		}
-		logger.Info("store initialized", "kind", storeKindPostgres)
-		return s, closeFn, nil
 	default:
-		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q, %q, or %q)", kind, storeKindFile, storeKindPostgres, storeKindMemory)
+		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindFile, storeKindMemory)
 	}
 }
 

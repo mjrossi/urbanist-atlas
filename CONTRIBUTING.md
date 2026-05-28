@@ -90,24 +90,22 @@ The repo is monorepo (`api/` Go + `web/` React) and uses
 
 ```sh
 # one time
-mise install                  # provisions Go, Node, sqlc, goose, etc.
+mise install                  # provisions Go, Node, oapi-codegen, etc.
 # add MISE_ENV=development to your shell rc per mise.development.toml
 
 # the dev loop
-just pg-up                    # docker postgres on :55432
-just migrate-up               # apply migrations
-just loaddata                 # load seed data
-just api-run                  # API on :8080
+just api-run                  # API on :8080 (loads api/seed/ into memory)
 # in another shell:
 cd web && npm install && npm run dev    # SPA on :5173
 ```
+
+No database to start: the API reads the `api/seed/` TOML/CSV bundle
+into an in-memory FileStore at boot.
 
 Common verbs (run `just` with no args for the full list):
 
 - `just api-check` — vet + race-enabled tests + oapi gen-no-diff
 - `just web-check` — lint + vitest + build + TS gen-no-diff
-- `just api-test-integration` — testcontainers Postgres suite
-  (needs Docker; not in CI)
 - `just ci` — what CI runs (`api-check` + `web-check`)
 
 ## Full-stack PR review
@@ -123,13 +121,12 @@ not-yet-deployed backend. Two workflows handle this:
 
    ```sh
    gh pr checkout <PR#>
-   just preview         # one terminal: DB + migrate + seed-if-empty + api
+   just preview         # one terminal: API on :8080 (file store)
    just web-dev         # another terminal: SPA on http://localhost:5173
    ```
 
-   `just preview` is idempotent: it reuses the existing dev Postgres
-   container, no-ops if migrations are current, and skips `loaddata`
-   if the DB is already seeded.
+   `just preview` boots the file-backed API in the foreground; there's
+   no DB to manage.
 
 2. **Merge backend first** — if the work can be split, land + deploy
    the API change first; then open the frontend PR. The Cloudflare

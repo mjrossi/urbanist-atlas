@@ -1,3 +1,14 @@
+// Package loaddata builds an atlas.MemStore from the bundled seed
+// files (regions_*.toml, postal_codes_*.csv, orgs.toml) under a
+// seed directory. The runtime server uses this to populate its
+// in-memory FileStore at boot.
+//
+// Adding a new country: drop seed/regions_<cc>.toml and
+// seed/postal_codes_<cc>.csv into api/seed/, then append a
+// {code, regionFiles, postal} entry to countries below. If the new
+// country has a state-tier file (e.g., regions_<cc>_states.toml),
+// list it before the main file in regionFiles so the main file's
+// leaves can parent under the states.
 package loaddata
 
 import (
@@ -14,6 +25,42 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
+
+// countries lists every country whose bundled seed (regions + postal
+// codes) gets loaded by BuildMemStore.
+//
+//   - code:        canonical upper-case country code stamped on every region.
+//   - regionFiles: file suffixes for regions_<suffix>.toml, in load
+//     order. Earlier files load first; later files may reference
+//     earlier-loaded regions as parents. For US/CA the convention is
+//     to load the state/province tier before the main file so leaves
+//     can parent under them.
+//   - postal:      file suffix for postal_codes_<suffix>.csv.
+var countries = []struct {
+	code        string
+	regionFiles []string
+	postal      string
+}{
+	{"US", []string{"us_states", "us_multistate", "us_msas", "us"}, "us"},
+	{"CA", []string{"ca_provinces", "ca_cmas", "ca"}, "ca"},
+	// PT was loaded through slice #4.6 as a region-graph validation
+	// fixture and dropped from the user-facing pipeline by slice #25.
+	// The seed files (regions_pt.toml, postal_codes_pt.csv) stay in
+	// api/seed/ for tests that load them explicitly via the parser
+	// packages; a future v1.1+ slice can reintroduce PT here when the
+	// editorial coverage is ready to ship.
+}
+
+// Countries returns the country codes BuildMemStore loads, in
+// dependency order. Exposed so tests and tooling can stay in sync
+// with the source of truth above.
+func Countries() []string {
+	out := make([]string, 0, len(countries))
+	for _, c := range countries {
+		out = append(out, c.code)
+	}
+	return out
+}
 
 // BuildMemStore parses every bundled seed file under seedDir and
 // returns a populated atlas.MemStore. The load order matches LoadAll:

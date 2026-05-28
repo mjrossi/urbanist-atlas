@@ -7,8 +7,8 @@
 #
 # Stage 2 is a barebones Alpine runtime with ca-certificates and a
 # non-root user; it ships only the binary plus the seed data directory
-# (which loadregions/loadpostal/seed read off disk — embedded
-# migrations are baked into the binary itself).
+# (api/seed/, the runtime source of truth for orgs/regions/postal
+# loaded into an in-memory FileStore at boot).
 #
 # Design doc: docs/superpowers/specs/2026-05-21-fly-deploy-design.md
 

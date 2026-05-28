@@ -64,8 +64,7 @@ jobs:
       # the restore-key fallback means a go.sum change still hydrates
       # most of the build cache from the previous run, avoiding a
       # cold rebuild. On a cache hit this saves ~30-60s on every
-      # PR push (typical: ~100MB of modules + the cgo-free pgx/
-      # testcontainers/chi compile tree).
+      # PR push.
       - name: Cache Go modules + build cache
         uses: actions/cache@v5
         with:
@@ -92,20 +91,13 @@ jobs:
         # expects — avoids a fragile sed regex over `mise env`'s
         # bash output.
         run: mise env --dotenv >> "$GITHUB_ENV"
-      # `just api-check` = vet + test + go-generate/sqlc drift check.
+      # `just api-check` = vet + test + go-generate drift check.
       # Single source of truth for "what CI runs"; same recipe a
-      # contributor runs locally before pushing.
+      # contributor runs locally before pushing. With the file-backed
+      # FileStore as the runtime store, the previous Postgres-only
+      # integration tests are gone; the FileStore is exercised against
+      # the real bundled seed inside `just api-test`.
       - run: just api-check
-      # Integration tests (build tag `integration`) spin a Postgres
-      # container per-test via testcontainers-go and exercise the
-      # loadregions → loadpostal → seed → /lookup pipeline end-to-end
-      # against real SQL. Catches FK-resolution, recursive-CTE, and
-      # seed-load regressions the unit suite can't see — e.g., the
-      # diamond-dedup bug (commit 47db5b7) and the suffixed-slug bug
-      # (commit 86a70a5) from slice #7.6 would both have failed this
-      # step immediately. ubuntu-latest runners have Docker installed
-      # and running, so testcontainers Just Works with no extra setup.
-      - run: just api-test-integration
 
   web:
     name: web (vite)
@@ -152,16 +144,13 @@ jobs:
       - name: Deploy
         env:
           # Repo secret FLY_API_TOKEN_DEPLOY is a deploy-scoped Fly
-          # token (`flyctl tokens create deploy -a urbanist-atlas`),
-          # narrower than the personal access token in FLY_API_TOKEN
-          # that backup.yml uses (which needs ssh console for pg_dump).
-          # flyctl itself reads the env var FLY_API_TOKEN, hence the
-          # rename at injection time.
+          # token (`flyctl tokens create deploy -a urbanist-atlas`).
+          # flyctl reads the env var FLY_API_TOKEN, hence the rename
+          # at injection time.
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_DEPLOY }}
         # --remote-only builds on Fly's builders, so the runner doesn't
-        # need a working Docker. release_command="migrate up" in fly.toml
-        # runs against the new image before traffic cuts over; a
-        # migration failure blocks the deploy.
+        # need a working Docker. The image bundles api/seed/ and the
+        # FileStore loads it at boot — no release_command, no DB.
         run: flyctl deploy -a urbanist-atlas --remote-only
       - name: Smoke-test /healthz
         # /healthz is exempt from the X-Atlas-Client shared-secret
