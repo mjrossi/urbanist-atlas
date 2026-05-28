@@ -616,6 +616,163 @@ describe('ApiError — rich shape from problem+json', () => {
     expect(apiErr.problem).toBeUndefined();
     expect(apiErr.message).toBe('HTTP 422');
   });
+
+  it('parses Retry-After (delta-seconds) on 429 into ApiError.retryAfterSeconds', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          type: 'https://urbanistatlas.com/problems/rate-limited',
+          title: 'Too Many Requests',
+          status: 429,
+          detail: 'rate limited',
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/problem+json',
+            'Retry-After': '42',
+          },
+        },
+      ),
+    );
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/submissions', { method: 'POST', body: '{}' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    const apiErr = caught as ApiError;
+    expect(apiErr.status).toBe(429);
+    expect(apiErr.retryAfterSeconds).toBe(42);
+  });
+
+  it('leaves retryAfterSeconds undefined when Retry-After is missing on a 429', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ title: 'Too Many Requests', status: 429 }),
+        {
+          status: 429,
+          headers: { 'Content-Type': 'application/problem+json' },
+        },
+      ),
+    );
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/submissions', { method: 'POST', body: '{}' });
+    } catch (err) {
+      caught = err;
+    }
+    const apiErr = caught as ApiError;
+    expect(apiErr.retryAfterSeconds).toBeUndefined();
+  });
+
+  it('extracts a per-field errors map from the problem+json envelope', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          type: 'https://urbanistatlas.com/problems/validation',
+          title: 'Bad Request',
+          status: 400,
+          detail: 'one or more fields are invalid',
+          errors: {
+            name: 'required',
+            website_url: 'must be a valid URL',
+          },
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/problem+json' },
+        },
+      ),
+    );
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/submissions', { method: 'POST', body: '{}' });
+    } catch (err) {
+      caught = err;
+    }
+    const apiErr = caught as ApiError;
+    expect(apiErr.fieldErrors).toEqual({
+      name: 'required',
+      website_url: 'must be a valid URL',
+    });
+  });
+
+  it('leaves fieldErrors undefined when the envelope has no errors extension', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ title: 'Bad Request', status: 400, detail: 'bad' }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/problem+json' },
+        },
+      ),
+    );
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/submissions', { method: 'POST', body: '{}' });
+    } catch (err) {
+      caught = err;
+    }
+    const apiErr = caught as ApiError;
+    expect(apiErr.fieldErrors).toBeUndefined();
+  });
+
+  it('ignores malformed errors extensions (array, non-string values) and falls back', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          title: 'Bad Request',
+          status: 400,
+          errors: ['name is required'], // arrays aren't supported
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/problem+json' },
+        },
+      ),
+    );
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/submissions', { method: 'POST', body: '{}' });
+    } catch (err) {
+      caught = err;
+    }
+    const apiErr = caught as ApiError;
+    expect(apiErr.fieldErrors).toBeUndefined();
+  });
+});
+
+describe('parseRetryAfter', () => {
+  it('parses an integer seconds value', async () => {
+    const { parseRetryAfter } = await import('./api.ts');
+    expect(parseRetryAfter('120')).toBe(120);
+    expect(parseRetryAfter('0')).toBe(0);
+  });
+
+  it('returns undefined for null, empty, or garbage input', async () => {
+    const { parseRetryAfter } = await import('./api.ts');
+    expect(parseRetryAfter(null)).toBeUndefined();
+    expect(parseRetryAfter('')).toBeUndefined();
+    expect(parseRetryAfter('   ')).toBeUndefined();
+    expect(parseRetryAfter('not a number')).toBeUndefined();
+  });
+
+  it('parses an HTTP-date relative to the provided clock', async () => {
+    const { parseRetryAfter } = await import('./api.ts');
+    const now = Date.parse('2026-05-28T12:00:00Z');
+    // 90 seconds in the future.
+    const future = new Date(now + 90_000).toUTCString();
+    expect(parseRetryAfter(future, () => now)).toBe(90);
+  });
+
+  it('returns 0 (not negative) for a past HTTP-date', async () => {
+    const { parseRetryAfter } = await import('./api.ts');
+    const now = Date.parse('2026-05-28T12:00:00Z');
+    const past = new Date(now - 5_000).toUTCString();
+    expect(parseRetryAfter(past, () => now)).toBe(0);
+  });
 });
 
 describe('X-Atlas-Client header injection (env-gated)', () => {

@@ -143,7 +143,7 @@ describe('Submit', () => {
     expect(body.submitter_note).toMatch(/new organization/i);
   });
 
-  it('shows the rate-limit message when the API returns 429', async () => {
+  it('shows the rate-limit message with a Retry-After countdown when the API returns 429', async () => {
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -160,9 +160,67 @@ describe('Submit', () => {
     await user.tab();
     await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
 
+    // Server-provided Retry-After: countdown drives the copy.
+    await waitFor(() => {
+      expect(screen.getByText(/try again in 600 seconds/i)).toBeDefined();
+    });
+    // Submit button is disabled and reflects the same countdown.
+    expect(
+      screen.getByRole('button', { name: /retry in 600s/i }),
+    ).toHaveProperty('disabled', true);
+  });
+
+  it('falls back to the static "breather" copy when Retry-After is missing on a 429', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/rate-limited',
+          title: 'Too Many Requests',
+          status: 429,
+        },
+        { status: 429, problem: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user);
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
     await waitFor(() => {
       expect(screen.getByText(/breather/i)).toBeDefined();
     });
+  });
+
+  it('routes per-field validation errors to the matching form fields', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/validation',
+          title: 'Bad Request',
+          detail: 'one or more fields failed validation',
+          status: 400,
+          errors: {
+            name: 'required',
+            website_url: 'must be a valid URL',
+          },
+        },
+        { status: 400, problem: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user);
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    await waitFor(() => {
+      // Per-field errors render at the field, not as a top-level banner.
+      expect(screen.getByText(/must be a valid URL/i)).toBeDefined();
+    });
+    expect(screen.getByText(/^required$/i)).toBeDefined();
+    // The top-level `detail` banner is suppressed when field errors handled it.
+    expect(screen.queryByText(/one or more fields failed validation/i)).toBeNull();
   });
 
   it('shows the validation message when the API returns 400', async () => {

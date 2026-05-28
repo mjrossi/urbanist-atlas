@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldPath } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
@@ -15,6 +15,22 @@ import {
 // Brief lockout after a successful submit so a triple-click can't
 // trigger duplicate POSTs.
 const SUBMIT_COOLDOWN_MS = 1500;
+
+// Map from API field names (snake-case wire shape, see
+// SubmissionPayload in openapi.yaml) to the matching react-hook-form
+// field names in SubmitForm. Only fields that exist on the form are
+// listed — unknown server fields fall through to the top-level
+// `detail` message.
+const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
+  name: 'name',
+  website_url: 'website',
+  region_slugs: 'region',
+  short_desc: 'oneLineDesc',
+  contact_url: 'contact',
+  submitter_email: 'contact',
+  submitter_name: 'contact',
+  submitter_note: 'why',
+};
 
 /**
  * `/submit` — accepts an org tip, POSTs it to `/api/v1/submissions`,
@@ -34,12 +50,17 @@ export function Submit() {
     handleSubmit,
     formState: { isValid, errors },
     getValues,
+    setError,
   } = useForm<SubmitForm>({
     mode: 'onBlur',
     defaultValues: SUBMIT_FORM_DEFAULTS,
   });
 
   const [cooldown, setCooldown] = useState(false);
+  // Seconds remaining on a 429 lockout. Initialized from
+  // ApiError.retryAfterSeconds when the mutation fails; ticks down
+  // in a useEffect; the submit button stays disabled until zero.
+  const [retryAfter, setRetryAfter] = useState<number>(0);
 
   useEffect(() => {
     if (!cooldown) return;
@@ -47,13 +68,40 @@ export function Submit() {
     return () => clearTimeout(id);
   }, [cooldown]);
 
+  useEffect(() => {
+    if (retryAfter <= 0) return;
+    const id = setInterval(() => {
+      setRetryAfter((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [retryAfter]);
+
   const mutation = useMutation<Submission, ApiError, SubmitForm>({
     mutationFn: (form) => createSubmission(buildNewSubmissionRequest(form)),
     onSuccess: () => setCooldown(true),
+    onError: (err) => {
+      // Per-field validation errors (W1.4): hand each known field
+      // to react-hook-form so the input shows its own error. The
+      // top-level fallback below renders when no field map matched.
+      if (err.fieldErrors) {
+        for (const [apiField, message] of Object.entries(err.fieldErrors)) {
+          const formField = FIELD_NAME_MAP[apiField];
+          if (formField) {
+            setError(formField, { type: 'server', message }, { shouldFocus: false });
+          }
+        }
+      }
+      // Rate-limit countdown (W1.3): start the per-second timer
+      // from the server-provided Retry-After. Static copy still
+      // renders when the header is missing.
+      if (err.status === 429 && err.retryAfterSeconds && err.retryAfterSeconds > 0) {
+        setRetryAfter(err.retryAfterSeconds);
+      }
+    },
   });
 
   const onValid = (form: SubmitForm) => {
-    if (cooldown || mutation.isPending) return;
+    if (cooldown || mutation.isPending || retryAfter > 0) return;
     mutation.mutate(form);
   };
 
@@ -70,6 +118,12 @@ export function Submit() {
   const isRateLimited = submitErr?.status === 429;
   const isValidationErr = submitErr?.status === 400 || submitErr?.status === 422;
   const isServerErr = submitErr?.status !== undefined && submitErr.status >= 500;
+  // When the API returned a per-field errors map, the individual
+  // fields render their own messages — the top-level banner would
+  // duplicate the same complaint. Only show the banner when the
+  // server didn't break it down.
+  const showTopLevelValidationErr =
+    isValidationErr && (!submitErr?.fieldErrors || Object.keys(submitErr.fieldErrors).length === 0);
 
   return (
     <>
@@ -349,11 +403,12 @@ https://kuow.org/stories/..."
               </p>
               {isRateLimited ? (
                 <p className="field-error" role="alert">
-                  You&rsquo;ve sent a few in a short window. Take a breather and
-                  retry in a few minutes.
+                  {retryAfter > 0
+                    ? `You've sent a few in a short window. Try again in ${retryAfter} ${retryAfter === 1 ? 'second' : 'seconds'}.`
+                    : "You've sent a few in a short window. Take a breather and retry in a few minutes."}
                 </p>
               ) : null}
-              {isValidationErr ? (
+              {showTopLevelValidationErr ? (
                 <p className="field-error" role="alert">
                   {submitErr?.problem?.detail ?? submitErr?.message ?? 'Validation failed.'}
                 </p>
@@ -374,10 +429,12 @@ https://kuow.org/stories/..."
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={!isValid || cooldown || mutation.isPending}
+                disabled={!isValid || cooldown || mutation.isPending || retryAfter > 0}
               >
                 {mutation.isPending ? (
                   'Sending…'
+                ) : retryAfter > 0 ? (
+                  <>Retry in {retryAfter}s</>
                 ) : (
                   <>
                     Send to editorial queue <span className="arrow">→</span>
