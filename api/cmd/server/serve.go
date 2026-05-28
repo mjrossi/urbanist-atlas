@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
+	"github.com/mjrossi/urbanist-atlas/api/internal/loaddata"
 	"github.com/mjrossi/urbanist-atlas/api/internal/store/postgres"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
@@ -21,6 +22,7 @@ import (
 const (
 	storeKindPostgres = "postgres"
 	storeKindMemory   = "memory"
+	storeKindFile     = "file"
 )
 
 func serveCommand() *cli.Command {
@@ -48,7 +50,7 @@ func serveCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "store",
-				Usage:   "store backing: postgres or memory",
+				Usage:   "store backing: file, postgres, or memory",
 				Value:   storeKindPostgres,
 				Sources: cli.EnvVars("URBANIST_STORE"),
 			},
@@ -56,6 +58,12 @@ func serveCommand() *cli.Command {
 				Name:    "db-url",
 				Usage:   "Postgres connection string (required when --store=postgres)",
 				Sources: cli.EnvVars("DATABASE_URL"),
+			},
+			&cli.StringFlag{
+				Name:    "seed-dir",
+				Usage:   "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml (required when --store=file)",
+				Value:   "./seed",
+				Sources: cli.EnvVars("URBANIST_SEED_DIR"),
 			},
 			&cli.StringFlag{
 				Name:    "client-secret",
@@ -137,6 +145,17 @@ func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas
 		atlas.LoadDevFixtures(s)
 		logger.Info("store initialized", "kind", storeKindMemory, "fixtures", "dev")
 		return s, func() {}, nil
+	case storeKindFile:
+		seedDir := c.String("seed-dir")
+		if seedDir == "" {
+			return nil, nil, errors.New("serve: --seed-dir or URBANIST_SEED_DIR is required when --store=file")
+		}
+		s, err := loaddata.BuildMemStore(logger, seedDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		logger.Info("store initialized", "kind", storeKindFile, "seed_dir", seedDir)
+		return s, func() {}, nil
 	case storeKindPostgres, "":
 		dbURL := c.String("db-url")
 		if dbURL == "" {
@@ -149,7 +168,7 @@ func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas
 		logger.Info("store initialized", "kind", storeKindPostgres)
 		return s, closeFn, nil
 	default:
-		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindPostgres, storeKindMemory)
+		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q, %q, or %q)", kind, storeKindFile, storeKindPostgres, storeKindMemory)
 	}
 }
 
