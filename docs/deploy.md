@@ -167,5 +167,6 @@ There is no live data store, so a deploy *is* the data refresh.
 The public submission queue is not yet wired at the storage layer.
 The next phase introduces a small SQLite store on a Fly volume for
 submissions + future API keys; approval will open a GitHub PR
-appending the org to `orgs.toml`. See the design plan in
-`.claude/plans/i-want-to-consider-proud-beacon.md`.
+appending the org to `orgs.toml`. See the in-tree design spec at
+[`superpowers/specs/2026-05-27-submissions-sqlite-design.md`](./superpowers/specs/2026-05-27-submissions-sqlite-design.md)
+for the schema, wire contract, approval flow, and bring-up steps.

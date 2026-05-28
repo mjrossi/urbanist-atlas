@@ -194,6 +194,8 @@ See the plan for the full schema, but at a glance:
   at the storage layer; the next phase introduces it on a small
   SQLite store sitting on a Fly volume (no Postgres). Approved
   submissions land in `orgs.toml` via an auto-generated GitHub PR.
+  See [`docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md`](./docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md)
+  for the full design.
 
 ### ETL pipeline (operator-side)
 
