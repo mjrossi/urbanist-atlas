@@ -64,12 +64,14 @@ export function Colophon() {
           <div className="h2-rule" />
           <p>
             The API is a small Go service — standard-library-first, with chi for
-            HTTP routing, sqlc for type-safe SQL, pgx for the Postgres driver,
-            and goose for migrations. It runs on{' '}
-            <a href="https://fly.io">Fly.io</a> in Virginia, with a sibling
-            Postgres 17 app reached over Fly&rsquo;s private network. Nightly
-            <code> pg_dump </code> backups land in Cloudflare R2 with thirty-day
-            retention.
+            HTTP routing. The read path is stateless: at boot it loads the
+            bundled seed data (TOML for the region graph and organizations, CSV
+            for the postal-code crosswalks) into an in-memory FileStore and
+            serves every lookup from memory. The write path — public
+            submissions — lands in a small SQLite database on a Fly volume.
+            It runs on <a href="https://fly.io">Fly.io</a> in Virginia, with
+            nightly backups of the SQLite store to Cloudflare R2 on a
+            thirty-day retention window.
           </p>
           <p>
             The web app is a React + Vite SPA, with TanStack Query for server
