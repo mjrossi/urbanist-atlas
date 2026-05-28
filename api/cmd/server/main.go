@@ -1,14 +1,15 @@
-// Command server is the urbanist-atlas API binary. It owns every
-// operational entry point — running the HTTP API, applying database
-// migrations, loading postal-code datasets, seeding orgs — as
-// subcommands of a single urfave/cli command tree.
+// Command server is the urbanist-atlas API binary. It owns the
+// runtime HTTP API and the operator-side ETL tooling that regenerates
+// the bundled seed data:
 //
 //	urbanist-atlas-server serve
-//	urbanist-atlas-server migrate up
-//	urbanist-atlas-server loadpostal --src ./data/postal_us.csv
-//	urbanist-atlas-server seed
-//	urbanist-atlas-server loaddata
+//	urbanist-atlas-server linkcheck
 //	urbanist-atlas-server etl regenerate --country US
+//
+// There is no longer a database-seeding workflow: the TOML/CSV files
+// under api/seed/ are the runtime source of truth (loaded into an
+// in-memory FileStore at boot), so the loaddata / loadregions /
+// loadpostal / seed / migrate subcommands have been retired.
 package main
 
 import (
@@ -48,12 +49,7 @@ func newRootCommand() *cli.Command {
 		Usage: "API server and operational tools for urbanistatlas.com",
 		Commands: []*cli.Command{
 			serveCommand(),
-			migrateCommand(),
-			loadregionsCommand(),
-			loadpostalCommand(),
 			linkcheckCommand(),
-			seedCommand(),
-			loaddataCommand(),
 			etlCommand(),
 		},
 	}

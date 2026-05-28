@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
+	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
 )
 
 // Result is the per-org outcome of a single Check pass.
@@ -39,7 +39,7 @@ const (
 
 // Check probes each org's website_url and returns results in input
 // order so the report diffs cleanly against the source TOML.
-func Check(ctx context.Context, orgs []seed.Org, opts Options) []Result {
+func Check(ctx context.Context, orgs []seedfiles.OrgEntry, opts Options) []Result {
 	timeout := opts.Timeout
 	if timeout == 0 {
 		timeout = defaultTimeout
@@ -55,7 +55,7 @@ func Check(ctx context.Context, orgs []seed.Org, opts Options) []Result {
 	for i, o := range orgs {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(i int, o seed.Org) {
+		go func(i int, o seedfiles.OrgEntry) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			results[i] = probe(ctx, o, timeout)
@@ -65,7 +65,7 @@ func Check(ctx context.Context, orgs []seed.Org, opts Options) []Result {
 	return results
 }
 
-func probe(ctx context.Context, o seed.Org, timeout time.Duration) Result {
+func probe(ctx context.Context, o seedfiles.OrgEntry, timeout time.Duration) Result {
 	r := Result{Slug: o.Slug, Name: o.Name, URL: o.WebsiteURL}
 	start := time.Now()
 	defer func() { r.ElapsedMs = time.Since(start).Milliseconds() }()

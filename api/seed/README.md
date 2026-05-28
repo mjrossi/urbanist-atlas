@@ -5,13 +5,11 @@ formats below describe the *shape*; the **operator workflow** for
 adding or correcting orgs / regions / MSA overrides is at
 [`docs/editorial.md`](../../docs/editorial.md).
 
-> ⚠️ **Seed data does not reload on deploy.** Merging a PR that edits
-> any file in this directory ships the *code* automatically (via the
-> `deploy-api` GHA job), but the database is reloaded only when a
-> maintainer runs `just fly-loaddata` after the merge. Loaders are
-> idempotent (upsert-by-stable-key) so re-running is safe. See
-> [`docs/deploy.md`](../../docs/deploy.md) § Deploys for the full
-> contract.
+> **Seed data is embedded in the API image.** Every file in this
+> directory is bundled into the binary at build time via
+> `//go:embed` in [`embed.go`](./embed.go); editing a seed file and
+> merging ships both code *and* data on the next deploy. There is
+> no separate loader step.
 
 
 
@@ -35,33 +33,21 @@ See the canonical designs at
 
 ## Load order
 
-The schema enforces ordering via foreign keys. Within a single
-country, the state/province-tier file loads first so its slugs are
-available as parents for the main file's leaves (resolved via
-cross-file lookup in `internal/loadregions/write.go`):
+`internal/seedfiles.BuildMemStore` parses the files in a fixed
+dependency order (state/province tiers first so the main file's
+leaves can parent under them). The list lives in the `countries`
+slice in [`internal/seedfiles/build.go`](../internal/seedfiles/build.go):
 
-```sh
-just loaddata    # runs all loaders in dependency order; the canonical path
+```
+US: regions_us_states.toml → regions_us_multistate.toml → regions_us_msas.toml → regions_us.toml → postal_codes_us.csv
+CA: regions_ca_provinces.toml → regions_ca_cmas.toml → regions_ca.toml → postal_codes_ca.csv
+then: orgs.toml
 ```
 
-Or step-by-step (mirrors what `loaddata` does):
-
-```sh
-just loadregions seed/regions_us_states.toml      US   # 52 states + DC + PR
-just loadregions seed/regions_us_multistate.toml  US   # nyc-tristate, chicagoland, rta
-just loadregions seed/regions_us_msas.toml        US   # 393 MSAs (generated)
-just loadregions seed/regions_us.toml             US   # curated city/borough/county leaves
-just loadregions seed/regions_ca_provinces.toml   CA   # 10 provinces + 3 territories
-just loadregions seed/regions_ca_cmas.toml        CA   # 41 CMAs (generated)
-just loadregions seed/regions_ca.toml             CA   # curated city leaves
-just loadregions seed/regions_pt.toml             PT   # PT validation fixture
-just loadpostal  seed/postal_codes_us.csv         US
-just loadpostal  seed/postal_codes_ca.csv         CA
-just loadpostal  seed/postal_codes_pt.csv         PT
-just seed                                              # orgs.toml
-```
-
-A different order will fail loudly (FK errors or "slug not found" hints).
+Adding a new country = appending one entry to that slice (and
+dropping the matching files into this directory). A missing parent
+slug, duplicate slug, or unknown leaf region produces a clear error
+at server boot.
 
 ## CSV schema (postal_codes_*.csv)
 
@@ -71,8 +57,8 @@ postal_code,country,leaf_region_slug
 ```
 
 - `postal_code`: per-country format (5-digit US ZIP, 3-char CA FSA, 5-digit DE/FR/MX, outward UK code, 4-digit AU, 7-digit PT). Whitespace trimmed; CA truncated to FSA; UK to outward; PT stripped of the hyphen (so `1100-001` and `1100001` resolve identically); everything uppercased.
-- `country`: redundant with `--country` but kept so cross-country rows are caught at parse time.
-- `leaf_region_slug`: must exist in `regions` already (run `loadregions` first).
+- `country`: redundant with the caller-supplied country code but kept so cross-country rows are caught at parse time.
+- `leaf_region_slug`: must be defined in one of the region TOML files loaded earlier in the pipeline.
 
 ## TOML schema (regions_*.toml, orgs.toml)
 
@@ -92,17 +78,16 @@ Portuguese directory. See
 [`docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md`](../../docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md)
 for what each region in the PT set is meant to prove about the model.
 
-Slice #25 (hygiene) **dropped PT from the user-facing
-[`loaddata`](../internal/loaddata/loaddata.go) pipeline** once the
-validation had served its purpose. The PT seed files stay here as a
-reference and continue to be loaded explicitly by the integration
-suite (`api/internal/store/postgres/pipeline_test.go` uses
-`loadregions.LoadFile` + `loadpostal.LoadFile` against these files).
-The four PT orgs that used to live in `orgs.toml` were removed in
-the same slice; migration `0005_drop_pt_user_facing_seed.sql`
-cleans up existing PT rows on deploy. A future v1.1+ slice can
-re-add PT (or ES, MX, NL, UK) to `loaddata.countries` when the
-editorial coverage is ready to ship.
+Slice #25 (hygiene) **dropped PT from the user-facing runtime
+pipeline** once the validation had served its purpose. The PT seed
+files stay here as a reference and are still embedded in the binary
+(via the `regions_*.toml` / `postal_codes_*.csv` / `orgs*.toml`
+patterns in [`embed.go`](./embed.go)) so a test or future
+reactivation can load them via `seedfiles.ParseRegions` /
+`seedfiles.ParsePostal`. They're never read by the runtime because
+`seedfiles.countries` only iterates US + CA. A future v1.1+ slice
+can re-add PT (or ES, MX, NL, UK) by appending one entry to that
+slice when the editorial coverage is ready to ship.
 
 ## Real-world data sources
 

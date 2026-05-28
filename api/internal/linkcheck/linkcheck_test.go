@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
+	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 func TestCheck(t *testing.T) {
@@ -21,7 +22,7 @@ func TestCheck(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		got := Check(context.Background(), []seed.Org{{Slug: "ok", Name: "OK", WebsiteURL: srv.URL}}, Options{})
+		got := Check(context.Background(), []seedfiles.OrgEntry{{Org: atlas.Org{Slug: "ok", Name: "OK", WebsiteURL: srv.URL}}}, Options{})
 		if len(got) != 1 {
 			t.Fatalf("want 1 result, got %d", len(got))
 		}
@@ -49,7 +50,7 @@ func TestCheck(t *testing.T) {
 		}))
 		t.Cleanup(redir.Close)
 
-		got := Check(context.Background(), []seed.Org{{Slug: "r", Name: "R", WebsiteURL: redir.URL}}, Options{})
+		got := Check(context.Background(), []seedfiles.OrgEntry{{Org: atlas.Org{Slug: "r", Name: "R", WebsiteURL: redir.URL}}}, Options{})
 		r := got[0]
 		if r.Status != 200 {
 			t.Errorf("status: want 200, got %d", r.Status)
@@ -68,7 +69,7 @@ func TestCheck(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		got := Check(context.Background(), []seed.Org{{Slug: "gone", Name: "Gone", WebsiteURL: srv.URL}}, Options{})
+		got := Check(context.Background(), []seedfiles.OrgEntry{{Org: atlas.Org{Slug: "gone", Name: "Gone", WebsiteURL: srv.URL}}}, Options{})
 		r := got[0]
 		if r.Status != 404 {
 			t.Errorf("status: want 404, got %d", r.Status)
@@ -97,7 +98,7 @@ func TestCheck(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		got := Check(context.Background(), []seed.Org{{Slug: "fb", Name: "FB", WebsiteURL: srv.URL}}, Options{})
+		got := Check(context.Background(), []seedfiles.OrgEntry{{Org: atlas.Org{Slug: "fb", Name: "FB", WebsiteURL: srv.URL}}}, Options{})
 		r := got[0]
 		if r.Status != 200 {
 			t.Errorf("status: want 200 after GET fallback, got %d", r.Status)
@@ -121,7 +122,7 @@ func TestCheck(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		got := Check(context.Background(), []seed.Org{{Slug: "slow", Name: "Slow", WebsiteURL: srv.URL}}, Options{Timeout: 50 * time.Millisecond})
+		got := Check(context.Background(), []seedfiles.OrgEntry{{Org: atlas.Org{Slug: "slow", Name: "Slow", WebsiteURL: srv.URL}}}, Options{Timeout: 50 * time.Millisecond})
 		r := got[0]
 		if r.Status != 0 {
 			t.Errorf("status: want 0 on timeout, got %d", r.Status)
@@ -137,10 +138,10 @@ func TestCheck(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		orgs := []seed.Org{
-			{Slug: "a", Name: "A", WebsiteURL: srv.URL},
-			{Slug: "b", Name: "B", WebsiteURL: srv.URL},
-			{Slug: "c", Name: "C", WebsiteURL: srv.URL},
+		orgs := []seedfiles.OrgEntry{
+			{Org: atlas.Org{Slug: "a", Name: "A", WebsiteURL: srv.URL}},
+			{Org: atlas.Org{Slug: "b", Name: "B", WebsiteURL: srv.URL}},
+			{Org: atlas.Org{Slug: "c", Name: "C", WebsiteURL: srv.URL}},
 		}
 		got := Check(context.Background(), orgs, Options{Concurrency: 3})
 		for i, want := range []string{"a", "b", "c"} {

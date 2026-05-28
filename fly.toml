@@ -9,11 +9,6 @@ primary_region = 'iad'
 [build]
   dockerfile = 'Dockerfile'
 
-[deploy]
-  # release_command is APPENDED to the Dockerfile ENTRYPOINT
-  # (["urbanist-atlas-server"]), so don't repeat the binary name here.
-  release_command = 'migrate up'
-
 [env]
   # CORS allowlist for Phase 1.
   # - https://qa.urbanistatlas.com — the QA SPA hostname (custom domain on the Workers project)
@@ -24,8 +19,10 @@ primary_region = 'iad'
   URBANIST_CORS_ORIGINS = 'https://qa.urbanistatlas.com,*.link00seven.workers.dev'
   URBANIST_LOG_FORMAT = 'json'
   URBANIST_PORT = '8080'
-  URBANIST_SEED_DIR = '/app/seed'
-  URBANIST_STORE = 'postgres'
+  # URBANIST_SEED_DIR is intentionally unset — the binary falls back
+  # to the seed bundle embedded at build time via //go:embed. To pin
+  # a deployed instance to an on-disk override, set this to the
+  # directory path here (and add a matching COPY to the Dockerfile).
 
 [http_service]
   internal_port = 8080
@@ -44,10 +41,10 @@ primary_region = 'iad'
     method = 'GET'
     path = '/healthz'
 
-  # Readiness: traffic-gating. Pings the sibling Postgres app; if the
-  # DB is unreachable, Fly pulls the machine out of rotation but keeps
-  # the process running (liveness still passes), so it can rejoin
-  # cleanly once the DB recovers.
+  # Readiness: traffic-gating. The file-backed store has no external
+  # dependency, so /readyz collapses to a process-up check. Kept
+  # separate from /healthz so it stays a meaningful traffic gate if
+  # a write surface (SQLite) is added later.
   [[http_service.checks]]
     interval = '15s'
     timeout = '5s'

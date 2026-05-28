@@ -3,9 +3,9 @@
 #
 # `just` itself is pinned in mise.toml (`aqua:casey/just`); a single
 # `mise install` at the repo root provisions it alongside go, node,
-# sqlc, goose, oapi-codegen, and staticcheck.
+# oapi-codegen, and staticcheck.
 #
-# Groups: api, data, verify, postgres, web, preview, fly, smoke, ci.
+# Groups: api, data, verify, web, preview, fly, smoke, ci.
 # Each group corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
@@ -86,20 +86,11 @@ linkcheck:
     cd api && go run ./cmd/server linkcheck --src ./seed/orgs.toml --out /tmp/links.tsv
     @echo "report: /tmp/links.tsv"
 
-# run the postgres-backed integration tests under the `integration`
-# build tag (requires Docker). Cheap default test suite stays
-# tag-free so `just api-test` keeps running on machines without
-# Docker.
-[group('api')]
-[doc('run postgres integration tests (Docker; build tag: integration)')]
-api-test-integration:
-    cd api && go test -tags=integration -race -count=1 ./internal/store/postgres/...
-
 # fail if any generated file would change after a fresh regen. One
-# `go generate ./...` covers all three artifacts via the
-# //go:generate directives in oapi/doc.go, httpapi/openapi_handler.go,
-# and postgres/gen.go. Used inside api-check so `just ci` rejects
-# commits that forgot to regenerate.
+# `go generate ./...` covers both artifacts via the //go:generate
+# directives in oapi/doc.go and httpapi/openapi_handler.go. Used
+# inside api-check so `just ci` rejects commits that forgot to
+# regenerate.
 [group('api')]
 [doc('fail if any generated file would drift after a regen')]
 api-gen-check:
@@ -107,58 +98,14 @@ api-gen-check:
     @cd api && git diff --exit-code -- \
         internal/httpapi/oapi/types.gen.go \
         internal/httpapi/openapi.yaml \
-        internal/store/postgres/gen/ \
         || (echo "generated files drifted; run \`just api-gen\` and commit." && exit 1)
 
 # ── data: operational subcommands ─────────────────────
-# These wrap the server binary's urfave/cli subcommands for the
-# data-loading flow (migrations + seed fixtures).
-
-# apply pending DB migrations
-[group('data')]
-migrate-up:
-    cd api && go run ./cmd/server migrate up
-
-# roll back the most recent migration
-[group('data')]
-migrate-down:
-    cd api && go run ./cmd/server migrate down
-
-# show migration status
-[group('data')]
-migrate-status:
-    cd api && go run ./cmd/server migrate status
-
-# load curated org seed data (api/seed/orgs.toml) into the DB
-[group('data')]
-seed:
-    cd api && go run ./cmd/server seed
-
-# load region taxonomy (toml -> regions + region_parents)
-# usage: just loadregions seed/regions_us.toml US
-[group('data')]
-[doc('load region taxonomy; e.g. `just loadregions seed/regions_us.toml US`')]
-loadregions src country='US':
-    cd api && go run ./cmd/server loadregions --src {{src}} --country {{country}}
-
-# map postal codes to leaf regions (csv -> postal_codes)
-# usage: just loadpostal seed/postal_codes_us.csv US
-[group('data')]
-[doc('map postal codes to leaf regions; e.g. `just loadpostal seed/postal_codes_us.csv US`')]
-loadpostal src country='US':
-    cd api && go run ./cmd/server loadpostal --src {{src}} --country {{country}}
-
-# load all bundled fixtures in the right order:
-# regions first (so leaf slugs resolve), then postal codes, then orgs.
-# Wraps the `loaddata` binary subcommand so dev runs go through the
-# exact same orchestration the Fly deploy uses
-# (flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata").
-# The country list lives in api/internal/loaddata/loaddata.go — add
-# new countries there, not here.
-[group('data')]
-[doc('load every bundled fixture in dependency order (regions → postal → orgs)')]
-loaddata:
-    cd api && go run ./cmd/server loaddata
+# The TOML/CSV files under api/seed/ are the runtime source of truth
+# for orgs/regions/postal — the server loads them into an in-memory
+# FileStore at boot, so editing a seed file + redeploying is the
+# whole data-update workflow. The historical loaddata/migrate/seed
+# recipes are gone with the Postgres read-path retirement.
 
 # fetch upstream Census/StatsCan source files into etl/sources/<country>/
 # and validate checksums against etl/SOURCES.md. Foundation slice
@@ -200,68 +147,6 @@ verify-org-urls:
 [doc('stop the gluetun VPN container used by verify-org-urls')]
 verify-org-urls-down:
     docker compose -f scripts/verify-org-urls.compose.yml down
-
-# ── postgres: dev container lifecycle ─────────────────
-# Local dev Postgres runs in a named docker container with a
-# persistent volume on port 55432 (non-default to avoid clashing
-# with any system Postgres on :5432). Same image
-# (postgres:17-alpine) as the integration test suite, so the wire
-# is identical.
-#
-# Credentials and DB name are dev-only and match what
-# mise.development.toml hands to DATABASE_URL:
-#   user: urbanist  pass: urbanist  db: urbanist_atlas_dev
-
-# start the dev postgres container (creates on first run, starts on subsequent), then wait for it to accept connections
-[group('postgres')]
-[doc('start the dev postgres container and wait for readiness')]
-pg-up:
-    @if ! docker container inspect urbanist-atlas-pg >/dev/null 2>&1; then \
-        docker run -d --name urbanist-atlas-pg \
-            -p 55432:5432 \
-            -e POSTGRES_USER=urbanist \
-            -e POSTGRES_PASSWORD=urbanist \
-            -e POSTGRES_DB=urbanist_atlas_dev \
-            -v urbanist-atlas-pg-data:/var/lib/postgresql/data \
-            postgres:17-alpine >/dev/null; \
-    else \
-        docker start urbanist-atlas-pg >/dev/null; \
-    fi
-    @i=0; until docker exec urbanist-atlas-pg pg_isready -U urbanist -d urbanist_atlas_dev >/dev/null 2>&1; do \
-        i=$((i+1)); \
-        if [ "$i" -ge 120 ]; then \
-            echo "pg-up: postgres still not ready after ~60s; check 'docker logs urbanist-atlas-pg'" >&2; \
-            exit 1; \
-        fi; \
-        sleep 0.5; \
-    done
-    @echo "dev postgres ready on :55432 (db: urbanist_atlas_dev)"
-
-# stop the dev postgres container (keeps the data volume so a later pg-up is instant)
-[group('postgres')]
-[doc('stop the dev postgres container (data volume kept)')]
-pg-down:
-    @docker stop urbanist-atlas-pg >/dev/null 2>&1 || true
-    @echo "dev postgres stopped (data volume kept; pg-reset to nuke)"
-
-# nuke the container AND the data volume — start completely fresh
-[group('postgres')]
-pg-reset:
-    @docker rm -f urbanist-atlas-pg >/dev/null 2>&1 || true
-    @docker volume rm urbanist-atlas-pg-data >/dev/null 2>&1 || true
-    @echo "dev postgres container + data volume removed; run 'just pg-up' to recreate"
-
-# open a psql shell into the dev database (via TCP — the alpine
-# image puts its socket at /var/run/postgresql, not psql's default /tmp)
-[group('postgres')]
-[doc('open a psql shell into the dev database (via TCP)')]
-pg-shell:
-    docker exec -it urbanist-atlas-pg psql -h localhost -U urbanist urbanist_atlas_dev
-
-# tail the dev postgres container logs (Ctrl-C to detach)
-[group('postgres')]
-pg-logs:
-    docker logs -f urbanist-atlas-pg
 
 # ── web: build & verify ───────────────────────────────
 
@@ -317,82 +202,43 @@ web-check: web-deps web-lint web-test web-build web-gen-check
 # PR's branch. For a PR that adds or changes an API endpoint, the
 # preview frontend will 404 against the not-yet-deployed backend.
 #
-# `just preview` is the local-stack alternative: brings up the dev
-# Postgres, applies any pending migrations, seeds the DB if empty,
-# and runs the API in the foreground. Reviewer is expected to be on
+# `just preview` is the local-stack alternative: runs the API in the
+# foreground against the file-backed store (api/seed/ is the runtime
+# source of truth, no DB to start). Reviewer is expected to be on
 # the PR branch already (e.g. via `gh pr checkout <PR#>`) and to run
-# `just web-dev` in a second terminal. See CONTRIBUTING.md
-# "Full-stack PR review" for the workflow.
-#
-# Idempotent: pg-up reuses an existing container, migrate-up is a
-# no-op when migrations are current, and loaddata is skipped when
-# the orgs table is already populated.
+# `just web-dev` in a second terminal.
 [group('preview')]
-[doc('one-shot local stack for full-stack PR review (DB + migrate + seed-if-empty + api)')]
+[doc('one-shot local stack for full-stack PR review (file store + api)')]
 preview:
-    @just pg-up
-    @just migrate-up
-    @# Fail fast if the dev DB container isn't reachable, instead of
-    @# letting `|| echo 0` silently fall through to a confusing
-    @# `just loaddata` failure one indirection later.
-    @if ! docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -c "SELECT 1" >/dev/null 2>&1; then \
-        echo "preview: postgres container 'urbanist-atlas-pg' is not reachable. Check 'docker ps' and 'just pg-up'." >&2; \
-        exit 1; \
-    fi
-    @count=$(docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -t -A -c "SELECT COUNT(*) FROM organizations" 2>/dev/null || echo 0); \
-    if [ "$count" = "0" ]; then \
-        echo "preview: empty DB — running loaddata"; \
-        just loaddata; \
-    else \
-        echo "preview: $count orgs already loaded — skipping loaddata"; \
-    fi
-    @echo ""
-    @echo "preview: API starting on http://localhost:8080"
+    @echo "preview: API starting on http://localhost:8080 (file store)"
     @echo "preview: in another terminal, run \`just web-dev\` (http://localhost:5173)"
     @echo ""
     just api-run
 
 # ── fly: deploy + ops ─────────────────────────────────
 # Thin wrappers around `flyctl` so the deploy / logs / secrets /
-# ssh verbs are discoverable via `just --list`. App names
-# (urbanist-atlas for the API, urbanist-atlas-db for the sibling
-# Postgres) are pinned via -a so these work from any branch
-# without flyctl config. Initial provisioning (app creation, volume,
-# secrets, DNS, certs) lives in docs/deploy.md — these recipes
-# are for ongoing ops once both apps exist.
+# ssh verbs are discoverable via `just --list`. The API runs as a
+# single Fly app (urbanist-atlas) backed by an in-memory FileStore
+# built from the api/seed/ bundle baked into the image — no
+# database, no sibling app. Initial provisioning lives in
+# docs/deploy.md; these recipes are for ongoing ops.
 
-# deploy the API app from the current checkout. Release-command in
-# fly.toml runs `migrate up` before the new machine takes traffic.
+# deploy the API app from the current checkout.
 #
 # Manual fallback: every merge to main triggers a Fly deploy from the
 # `deploy-api` job in .github/workflows/ci.yml using
 # `flyctl deploy --remote-only`. Use this recipe when GitHub Actions
 # is degraded, when you need to deploy a non-main branch for a
-# hot-fix, or when you want to watch the build locally. For an
-# Actions-side re-deploy of current main without an empty commit,
-# `gh workflow run ci.yml --ref main`.
+# hot-fix, or when you want to watch the build locally.
 [group('fly')]
 [doc('deploy the API to Fly — manual fallback; primary path is GHA on merge to main')]
 fly-deploy:
     flyctl deploy -a urbanist-atlas
 
-# deploy the sibling Postgres app. Rarely needed after first launch;
-# the image rolls forward when we bump postgres:17-alpine to a newer
-# patch, which is an explicit maintenance decision.
-[group('fly')]
-[doc('deploy the sibling Postgres app (rare; only on image bumps)')]
-fly-deploy-db:
-    flyctl deploy -a urbanist-atlas-db -c infra/postgres/fly.toml
-
-# tail live Fly logs (API)
+# tail live Fly logs
 [group('fly')]
 fly-logs:
     flyctl logs -a urbanist-atlas
-
-# tail live Fly logs (DB)
-[group('fly')]
-fly-logs-db:
-    flyctl logs -a urbanist-atlas-db
 
 # list app secrets (names + digests; values are write-only)
 [group('fly')]
@@ -403,38 +249,6 @@ fly-secrets:
 [group('fly')]
 fly-ssh:
     flyctl ssh console -a urbanist-atlas
-
-# Runs against PROD data in a one-off ssh session. Idempotent —
-# every loader upserts by stable key, so re-runs converge rather than
-# duplicate. Use after a seed-data edit lands on main.
-[group('fly')]
-[doc('re-seed the LIVE database (flyctl ssh; idempotent upserts)')]
-fly-loaddata:
-    flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata"
-
-# capture an on-demand Postgres backup to a local file. Same pipeline
-# as the nightly GHA cron workflow at .github/workflows/backup.yml,
-# but writes locally rather than uploading to R2 — for ad-hoc
-# snapshots the maintainer wants in hand before a risky change.
-[group('fly')]
-[doc('on-demand local pg_dump via flyctl ssh (writes ./urbanist-atlas-YYYY-MM-DD.sql.gz)')]
-db-backup:
-    @out="urbanist-atlas-$(date -u +%Y-%m-%d).sql.gz"; \
-    flyctl ssh console -a urbanist-atlas-db \
-        -C "sh -c 'pg_dump -U urbanist urbanist_atlas | gzip -c'" \
-        > "$out" && \
-    test -s "$out" && \
-    ls -lh "$out"
-
-# Restore a previously captured backup into the LIVE Postgres. Destructive;
-# the operator confirms by passing the dump path explicitly.
-# usage: just db-restore ./urbanist-atlas-2026-05-21.sql.gz
-[group('fly')]
-[doc('restore a .sql.gz dump into the LIVE Postgres (destructive)')]
-db-restore dump:
-    @echo "→ Restoring {{dump}} into urbanist-atlas-db (DESTRUCTIVE)"
-    @gunzip -c {{dump}} | flyctl ssh console -a urbanist-atlas-db \
-        -C "psql -U urbanist -d urbanist_atlas"
 
 # ── smoke: live curl helpers (server must be running) ─
 

@@ -16,9 +16,10 @@ A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
 This is a monorepo with two halves:
 
-- **[`api/`](./api)** — Go service (chi + sqlc + goose +
-  `postgres:17-alpine` on a sibling Fly app), deployed to Fly.io.
-  Hosts the public JSON API at `/api/v1`.
+- **[`api/`](./api)** — Go service (chi router), deployed to Fly.io.
+  Stateless: the `api/seed/` TOML/CSV bundle is baked into the image
+  and loaded into an in-memory FileStore at boot. Hosts the public
+  JSON API at `/api/v1`.
 - **[`web/`](./web)** — React + Vite SPA, deployed to Cloudflare
   Workers + Pages (Static Assets). Consumes the JSON API.
 
@@ -29,10 +30,10 @@ reasoning behind tech choices.
 ## Status
 
 Most of v1.0 is wired. The API serves `/lookup`, `/regions`,
-`/regions/{slug}`, `/recent`, and `/orgs/{slug}` against a Postgres
-store with embedded migrations; the v1 wire contract is committed
-at [`api/openapi.yaml`](./api/openapi.yaml) and embedded into the
-binary at `GET /api/v1/openapi.yaml`. `/regions` returns the
+`/regions/{slug}`, `/recent`, and `/orgs/{slug}` from an in-memory
+FileStore populated at boot from `api/seed/`; the v1 wire contract
+is committed at [`api/openapi.yaml`](./api/openapi.yaml) and embedded
+into the binary at `GET /api/v1/openapi.yaml`. `/regions` returns the
 editorial default browse set (metros + cities); `/regions/{slug}`
 resolves any non-national region in the DAG — metros, cities,
 counties, boroughs, states, multi-state coalitions. Every
@@ -59,54 +60,43 @@ One-time setup: install [mise](https://mise.jdx.dev) and add
 [`mise.development.toml`](./mise.development.toml) for the exact line).
 
 ```sh
-mise install                  # provision Go, Node, sqlc, goose, staticcheck, oapi-codegen
-just pg-up                    # start the dev Postgres in a docker container on :55432
-just migrate-up               # apply migrations against the dev DB
-just loaddata                 # load regions + postal codes + seed orgs from api/seed/
+mise install                  # provision Go, Node, staticcheck, oapi-codegen
 just api-run                  # API on :8080 (text logs); also serves /healthz + /readyz
 
 # in another shell:
 cd web && npm install && npm run dev    # SPA on :5173
 ```
 
+No database is required — the API loads the bundled seed (TOML/CSV
+under `api/seed/`) into memory at boot.
+
 ### Deploy
 
-The API ships to Fly.io (region `iad`, Virginia) via a multi-stage
-`Dockerfile` at the repo root; the API's `fly.toml` declares the
-build, runtime config, and `release_command` for migrations. The
-database runs on a sibling Fly app `urbanist-atlas-db` (config at
-`infra/postgres/fly.toml` + `Dockerfile` wrapping
-`postgres:17-alpine`) with a 1 GB volume — same image as the
-integration test suite. The web SPA deploys to Cloudflare Workers +
-Pages (Static Assets) configured via `wrangler.jsonc` at the repo
-root, which sets `assets.directory = "./web/dist"` and
+The API ships to Fly.io (region `iad`, Virginia) as a single
+stateless app via a multi-stage `Dockerfile` at the repo root; the
+image bakes `api/seed/` so a deploy is a code+data ship in one step.
+The web SPA deploys to Cloudflare Workers + Pages (Static Assets)
+configured via `wrangler.jsonc` at the repo root, which sets
+`assets.directory = "./web/dist"` and
 `not_found_handling = "single-page-application"` (the SPA fallback
 that lets direct navigation to `/about`, `/browse`, `/r/:postalCode`
-work). Nightly `pg_dump` backups land in Cloudflare R2 via the
-GitHub Actions workflow at
-[`.github/workflows/backup.yml`](./.github/workflows/backup.yml).
+work).
 
 Every push to `main` auto-deploys the API to Fly via the `deploy-api`
-job in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
-(release-command `migrate up` runs before traffic cuts over). The web
-SPA auto-deploys via Cloudflare's git integration. `just fly-deploy`
+job in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml). The
+web SPA auto-deploys via Cloudflare's git integration. `just fly-deploy`
 remains as a manual fallback when Actions is degraded or a non-`main`
-branch needs a hot-fix. **Seed data does not reload on deploy** — run
-`just fly-loaddata` after merging a PR that edits `api/seed/**`. The
-operating contract (triggers, manual fallbacks, rollback) is the
-`## Deploys` section of [`docs/deploy.md`](./docs/deploy.md).
+branch needs a hot-fix. Seed-data edits go through the same code
+deploy: edit `api/seed/**`, open a PR, merge — the next API image
+carries the new bundle.
 
-The initial provisioning runbook (creating both Fly apps, attaching
-the volume, wiring DNS and certs, setting secrets, enabling backups,
-adding the Workers project custom domain) lives at
+The runbook for ongoing ops + first-time bring-up lives at
 [`docs/deploy.md`](./docs/deploy.md). Editorial workflows for adding
 or correcting orgs and regions are at
-[`docs/editorial.md`](./docs/editorial.md). Ongoing ops use the
-`fly-*` / `db-*` recipes (`just fly-deploy`, `just fly-logs`,
-`just fly-secrets`, `just fly-ssh`, `just fly-loaddata`,
-`just db-backup`, `just db-restore <file>`).
+[`docs/editorial.md`](./docs/editorial.md).
 
-The Fly + sibling Postgres design lives at
+The original Postgres-backed deploy design (since superseded by the
+file-store cutover) lives at
 [`docs/superpowers/specs/2026-05-21-fly-deploy-design.md`](./docs/superpowers/specs/2026-05-21-fly-deploy-design.md).
 
 ## Contributing
