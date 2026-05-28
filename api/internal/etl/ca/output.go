@@ -219,7 +219,7 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 #
 # Loaded by just loaddata BETWEEN regions_ca_provinces.toml (parents:
 # provinces) and regions_ca.toml (children: curated cities). Cross-file
-# parent resolution lives in internal/loadregions/write.go.
+# parent resolution lives in internal/seedfiles/regions.go.
 `
 
 // WritePostalCodesCSV emits postal_codes_ca.csv deterministically:

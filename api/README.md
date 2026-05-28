@@ -12,11 +12,11 @@ api/
 │                       # Org/Region/LookupResult types, the lookup
 │                       # algorithm, the Store interface, and the
 │                       # in-memory MemStore that backs the runtime.
-├── internal/loaddata/  # Builds a populated MemStore by parsing
-│                       # the bundled TOML/CSV files at boot.
-├── internal/loadregions, loadpostal, seed/
-│                       # Pure parsers for the region taxonomy,
-│                       # postal-code crosswalks, and org TOML.
+├── internal/seedfiles/ # Parses the bundled TOML/CSV files into
+│                       # atlas.Region / atlas.Org (with toml tags)
+│                       # and builds the in-memory MemStore at boot.
+│                       # Works against either an fs.FS embed or a
+│                       # disk path via os.DirFS.
 ├── internal/httpapi/   # chi handlers. Thin wrappers over pkg/atlas.
 └── seed/               # Human-reviewed seed data (the runtime source of truth):
                         #   regions_<cc>*.toml (taxonomy + DAG edges)

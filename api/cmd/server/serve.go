@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -14,8 +15,9 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
-	"github.com/mjrossi/urbanist-atlas/api/internal/loaddata"
+	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
+	seedfs "github.com/mjrossi/urbanist-atlas/api/seed"
 )
 
 const (
@@ -54,8 +56,7 @@ func serveCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "seed-dir",
-				Usage:   "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml",
-				Value:   "./seed",
+				Usage:   "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml; empty (default) uses the bundle embedded in the binary",
 				Sources: cli.EnvVars("URBANIST_SEED_DIR"),
 			},
 			&cli.StringFlag{
@@ -128,8 +129,13 @@ func runServe(ctx context.Context, c *cli.Command) error {
 // buildStore returns an atlas.Store backed by the file-loaded
 // MemStore (default) or the built-in dev fixtures (--store=memory).
 // The dev-fixture path stays available so the binary can boot and
-// serve a few sample orgs without a seed directory on disk — useful
-// for demos and ad-hoc CLI testing.
+// serve a few sample orgs without a seed bundle — useful for demos.
+//
+// When --seed-dir is empty (production default) the loader reads
+// from the seedfs.FS embed baked into the binary; when non-empty
+// it reads from os.DirFS(seedDir). The latter is what mise.development
+// activates (URBANIST_SEED_DIR=api/seed) so dev iterates against
+// the on-disk files without rebuilds.
 func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.Store, func(), error) {
 	kind := strings.ToLower(strings.TrimSpace(c.String("store")))
 	switch kind {
@@ -140,14 +146,22 @@ func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.S
 		return s, func() {}, nil
 	case storeKindFile, "":
 		seedDir := c.String("seed-dir")
+		var (
+			source string
+			seedFS fs.FS
+		)
 		if seedDir == "" {
-			return nil, nil, errors.New("serve: --seed-dir or URBANIST_SEED_DIR is required when --store=file")
+			source = "embed"
+			seedFS = seedfs.FS
+		} else {
+			source = seedDir
+			seedFS = os.DirFS(seedDir)
 		}
-		s, err := loaddata.BuildMemStore(logger, seedDir)
+		s, err := seedfiles.BuildMemStore(logger, seedFS)
 		if err != nil {
 			return nil, nil, err
 		}
-		logger.Info("store initialized", "kind", storeKindFile, "seed_dir", seedDir)
+		logger.Info("store initialized", "kind", storeKindFile, "source", source)
 		return s, func() {}, nil
 	default:
 		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindFile, storeKindMemory)
