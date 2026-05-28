@@ -7,6 +7,7 @@ import type { Country, LookupResult } from '../lib/api.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
@@ -158,14 +159,17 @@ function ResultsContent({
       </div>
 
       {empty ? (
-        <div className="editors-note mt-24">
-          <div className="label">No entries here yet</div>
-          <p>
-            Know an organization that should be in the Atlas for {placeLabel}?{' '}
-            <Link to="/submit">File a tip at the submissions desk</Link> and
-            we&rsquo;ll go look.
-          </p>
-        </div>
+        <EmptyState
+          className="mt-24"
+          title="No entries here yet"
+          body={
+            <>
+              Know an organization that should be in the Atlas for {placeLabel}?{' '}
+              <Link to="/submit">File a tip at the submissions desk</Link> and
+              we&rsquo;ll go look.
+            </>
+          }
+        />
       ) : (
         <div className="mt-24">
           <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { SearchBox } from '../components/SearchBox.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import { ApiError, listRegions, listRecent } from '../lib/api.ts';
@@ -163,7 +164,13 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
       )}
       empty={{
         when: (data) => data.length === 0,
-        render: <p className="results-state">Nothing filed yet.</p>,
+        render: (
+          <EmptyState
+            title="Nothing filed yet"
+            body="The editor hasn't published an entry recently — the indexing pipeline is quiet."
+            cta={<Link to="/submit">File the first tip.</Link>}
+          />
+        ),
       }}
     >
       {(data) => (

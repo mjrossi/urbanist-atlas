@@ -6,6 +6,7 @@ import type { LookupOrg, RegionDetail } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
@@ -142,10 +143,12 @@ function RegionContent({ data }: { data: RegionDetail }) {
       <div className="spread mt-32">
         <main>
           {totalOrgs === 0 ? (
-            <p className="results-state mt-24">
-              No organizations indexed yet for {region.name}.{' '}
-              <Link to="/submit">File a tip.</Link>
-            </p>
+            <EmptyState
+              className="mt-24"
+              title="No entries here yet"
+              body={<>No organizations indexed yet for {region.name}.</>}
+              cta={<Link to="/submit">File a tip at the submissions desk.</Link>}
+            />
           ) : (
             <div className="mt-24">
               <EntryList
