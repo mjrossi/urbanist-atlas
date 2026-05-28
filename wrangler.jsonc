@@ -28,6 +28,11 @@
     // equivalent of the Pages `_redirects` rule
     //   /*    /index.html   200
     "not_found_handling": "single-page-application"
+    // Response-header policy (CSP, Referrer-Policy, etc.) lives in
+    // `web/public/_headers`, which Vite copies to `web/dist/_headers`
+    // and Workers Static Assets serves. Wrangler doesn't expose a
+    // headers field in this config; the `_headers` file is the
+    // documented surface. See docs/deploy.md for the policy notes.
   },
 
   // Observability: cheap default. `head_sampling_rate` controls
