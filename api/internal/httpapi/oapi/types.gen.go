@@ -674,6 +674,14 @@ type bearerAuthContextKey string
 type ListSubmissionsParams struct {
 	// Status Filter by submission status. Defaults to `pending`.
 	Status *SubmissionStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Limit Maximum number of submissions to return. Capped at 200.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque pagination token. Pass the value of the previous
+	// response's `X-Next-Cursor` header to fetch the next page.
+	// Omit to start at the newest submission.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // LookupParams defines parameters for Lookup.

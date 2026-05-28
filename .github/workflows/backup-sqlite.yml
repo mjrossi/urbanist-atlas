@@ -3,7 +3,10 @@ name: SQLite nightly backup
 # Nightly snapshot of the submissions DB on Fly to Cloudflare R2.
 # The bundle is small (KB-to-MB), so the dump is fast and the
 # uploaded artifact is a single .sql.gz per day. Retention is enforced
-# on the R2 bucket itself (30 days lifecycle rule, set out of band).
+# on the R2 bucket itself: 30-day lifecycle rule, set out of band in
+# the Cloudflare dashboard at R2 → urbanist-atlas-backups → Settings →
+# Lifecycle. If the rule is ever removed, snapshots accumulate
+# indefinitely; check docs/deploy.md §Backups and re-add it.
 #
 # Requires the following GitHub Actions secrets:
 #   - FLY_API_TOKEN_DEPLOY      (already configured for ci.yml)
@@ -36,16 +39,25 @@ jobs:
         run: |
           set -euo pipefail
           stamp="$(date -u +%Y-%m-%d-%H%M)"
+          remote="/tmp/atlas-${stamp}.sql.gz"
           out="atlas-${stamp}.sql.gz"
-          # `.dump` over ssh writes the SQL to stdout; gzip on the
-          # remote side so we ship bytes over the wire.
+          # Two-step capture to avoid PTY corruption:
+          # `flyctl ssh console -C` historically allocates a PTY, which
+          # injects CR characters / color codes into stdout and silently
+          # corrupts a piped gzip stream. We write the compressed dump to
+          # a remote file first, then `sftp get` it back as raw bytes.
           flyctl ssh console -a urbanist-atlas \
-            -C "sh -c 'sqlite3 /data/atlas.db .dump | gzip -c'" \
-            > "${out}"
+            -C "sh -c 'sqlite3 /data/atlas.db .dump | gzip -c > ${remote}'"
+          flyctl ssh sftp get -a urbanist-atlas "${remote}" "${out}"
+          flyctl ssh console -a urbanist-atlas \
+            -C "rm -f ${remote}"
           # Sanity: refuse to upload an empty backup. SQLite .dump on a
           # fresh DB still emits PRAGMA + BEGIN/COMMIT, so anything
           # well under 100 bytes means the ssh command itself failed.
           test "$(wc -c < "${out}")" -ge 100
+          # Integrity: gunzip -t verifies the gzip stream end-to-end so
+          # a corrupted upload is caught here, not at restore time.
+          gunzip -t "${out}"
           echo "BACKUP_FILE=${out}" >> "${GITHUB_ENV}"
 
       - name: Set up rclone

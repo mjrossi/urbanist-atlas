@@ -205,9 +205,10 @@ func TestWorker_HappyPath_OpensPR(t *testing.T) {
 		t.Fatalf("PersistResult Err = %q, want empty on happy path", calls[0].Err)
 	}
 
-	// Branch name uses the short id (first 8 hex chars of the
-	// dash-stripped UUIDv7).
-	if got := gh.createRefBody["ref"]; got != "refs/heads/submission/01928200" {
+	// Branch name uses the keyset suffix (first 16 hex chars of the
+	// dash-stripped UUIDv7) — long enough that two submissions in the
+	// same millisecond still get distinct branches.
+	if got := gh.createRefBody["ref"]; got != "refs/heads/submission/0192820033447000" {
 		t.Fatalf("create-ref body ref = %q", got)
 	}
 	if gh.createRefBody["sha"] != gh.branchSHA {
@@ -216,7 +217,7 @@ func TestWorker_HappyPath_OpensPR(t *testing.T) {
 
 	// PUT contents must reuse the existing file SHA and target the
 	// new branch.
-	if gh.putContentsBody["branch"] != "submission/01928200" {
+	if gh.putContentsBody["branch"] != "submission/0192820033447000" {
 		t.Fatalf("put contents branch = %q", gh.putContentsBody["branch"])
 	}
 	if gh.putContentsBody["sha"] != gh.fileSHA {

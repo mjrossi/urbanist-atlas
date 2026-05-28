@@ -11,6 +11,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,6 +28,11 @@ import (
 
 	sqlitegen "github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite/gen"
 )
+
+// ErrInvalidCursor is returned by List/ListPage when the supplied
+// cursor isn't a value previously emitted by ListPage. The HTTP layer
+// surfaces this as a 400 problem document.
+var ErrInvalidCursor = errors.New("sqlite.List: invalid cursor")
 
 // SQLite stores timestamps as TEXT in this format so they round-trip
 // cleanly through strftime() defaults from the migration.
@@ -69,6 +75,17 @@ func Open(path string) (*Store, error) {
 	// pile up SQLITE_BUSY waits on lock contention.
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
+
+	// sql.Open is lazy — the first query is what reveals a bad path or
+	// a corrupted file. Ping eagerly so the boot-time error is clean
+	// ("path does not exist") instead of leaking into the first
+	// Migrate or Create call. 2s is generous for a local file open.
+	pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := db.PingContext(pingCtx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("sqlite.Open: ping: %w", err)
+	}
 
 	return &Store{
 		db:      db,
@@ -152,8 +169,19 @@ func (s *Store) Get(ctx context.Context, publicID string) (atlas.Submission, err
 	return rowToSubmission(row)
 }
 
-// List implements atlas.SubmissionStore.
+// List implements atlas.SubmissionStore. It's a thin wrapper around
+// ListPage that drops the cursor — preserved for callers (tests,
+// internal code) that don't paginate.
 func (s *Store) List(ctx context.Context, q atlas.ListSubmissionsQuery) ([]atlas.Submission, error) {
+	page, err := s.ListPage(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	return page.Items, nil
+}
+
+// ListPage implements atlas.SubmissionStore.
+func (s *Store) ListPage(ctx context.Context, q atlas.ListSubmissionsQuery) (atlas.ListSubmissionsPage, error) {
 	limit := q.Limit
 	if limit <= 0 {
 		limit = 50
@@ -161,30 +189,82 @@ func (s *Store) List(ctx context.Context, q atlas.ListSubmissionsQuery) ([]atlas
 	if limit > 200 {
 		limit = 200
 	}
-	var (
-		rows []sqlitegen.Submission
-		err  error
-	)
-	if q.Status == "" {
-		rows, err = s.q.ListSubmissionsAll(ctx, int64(limit))
-	} else {
+	// Fetch one extra row to decide whether there's a next page.
+	fetch := limit + 1
+
+	cursorTS, cursorID, hasCursor, err := decodeCursor(q.Cursor)
+	if err != nil {
+		return atlas.ListSubmissionsPage{}, err
+	}
+
+	var rows []sqlitegen.Submission
+	switch {
+	case q.Status == "" && !hasCursor:
+		rows, err = s.q.ListSubmissionsAll(ctx, int64(fetch))
+	case q.Status == "" && hasCursor:
+		rows, err = s.q.ListSubmissionsAllAfter(ctx, sqlitegen.ListSubmissionsAllAfterParams{
+			CursorCreatedAt: cursorTS,
+			CursorPublicID:  cursorID,
+			RowLimit:        int64(fetch),
+		})
+	case q.Status != "" && !hasCursor:
 		rows, err = s.q.ListSubmissionsByStatus(ctx, sqlitegen.ListSubmissionsByStatusParams{
 			Status: string(q.Status),
-			Limit:  int64(limit),
+			Limit:  int64(fetch),
+		})
+	default:
+		rows, err = s.q.ListSubmissionsByStatusAfter(ctx, sqlitegen.ListSubmissionsByStatusAfterParams{
+			Status:          string(q.Status),
+			CursorCreatedAt: cursorTS,
+			CursorPublicID:  cursorID,
+			RowLimit:        int64(fetch),
 		})
 	}
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.List: %w", err)
+		return atlas.ListSubmissionsPage{}, fmt.Errorf("sqlite.ListPage: %w", err)
 	}
+
+	var next string
+	if len(rows) > limit {
+		last := rows[limit-1]
+		next = encodeCursor(last.CreatedAt, last.PublicID)
+		rows = rows[:limit]
+	}
+
 	out := make([]atlas.Submission, 0, len(rows))
 	for _, r := range rows {
 		sub, err := rowToSubmission(r)
 		if err != nil {
-			return nil, err
+			return atlas.ListSubmissionsPage{}, err
 		}
 		out = append(out, sub)
 	}
-	return out, nil
+	return atlas.ListSubmissionsPage{Items: out, NextCursor: next}, nil
+}
+
+// encodeCursor packs (created_at, public_id) into an opaque base64url
+// string. The format is deliberately stable but undocumented — callers
+// must treat it as opaque and only pass back what ListPage emitted.
+func encodeCursor(createdAt, publicID string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(createdAt + "|" + publicID))
+}
+
+// decodeCursor returns the components of a cursor previously produced
+// by encodeCursor, or ErrInvalidCursor on malformed input. Empty
+// cursor means "no cursor" — returns hasCursor=false with no error.
+func decodeCursor(cursor string) (createdAt, publicID string, hasCursor bool, err error) {
+	if cursor == "" {
+		return "", "", false, nil
+	}
+	raw, derr := base64.RawURLEncoding.DecodeString(cursor)
+	if derr != nil {
+		return "", "", false, ErrInvalidCursor
+	}
+	sep := strings.IndexByte(string(raw), '|')
+	if sep <= 0 || sep == len(raw)-1 {
+		return "", "", false, ErrInvalidCursor
+	}
+	return string(raw[:sep]), string(raw[sep+1:]), true, nil
 }
 
 // Approve implements atlas.SubmissionStore.

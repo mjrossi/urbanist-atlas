@@ -261,7 +261,14 @@ export interface paths {
          * List pending submissions.
          * @description Returns submissions in the moderation queue. By default returns
          *     only `pending` submissions; pass `status=approved` or
-         *     `status=rejected` to view history.
+         *     `status=rejected` to view history. Results are newest-first
+         *     with stable keyset pagination on `(created_at, id)`.
+         *
+         *     Pagination uses an opaque cursor. When more rows exist beyond
+         *     the current page, the response carries an `X-Next-Cursor`
+         *     header; pass that value back as `?cursor=` to fetch the next
+         *     page. The cursor format is undocumented and may change without
+         *     notice — treat it as opaque.
          */
         get: operations["listSubmissions"];
         put?: never;
@@ -1148,6 +1155,14 @@ export interface operations {
             query?: {
                 /** @description Filter by submission status. Defaults to `pending`. */
                 status?: components["schemas"]["SubmissionStatus"];
+                /** @description Maximum number of submissions to return. Capped at 200. */
+                limit?: number;
+                /**
+                 * @description Opaque pagination token. Pass the value of the previous
+                 *     response's `X-Next-Cursor` header to fetch the next page.
+                 *     Omit to start at the newest submission.
+                 */
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -1158,12 +1173,18 @@ export interface operations {
             /** @description Submissions matching the filter, newest first. */
             200: {
                 headers: {
+                    /**
+                     * @description Opaque cursor for the next page. Present only when more
+                     *     rows exist beyond the current page.
+                     */
+                    "X-Next-Cursor"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Submission"][];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };

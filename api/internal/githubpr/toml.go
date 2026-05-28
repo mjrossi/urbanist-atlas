@@ -45,9 +45,14 @@ func RenderOrgBlock(sub atlas.Submission, slug string) (string, error) {
 }
 
 // DeriveSlug returns a default slug from the submission's name.
-// Lowercased, ASCII-letters/digits only, hyphen-joined. Moderators
-// are free to rewrite it in the PR; this just produces a reasonable
-// starting point.
+// Lowercased, ASCII-letters/digits only, hyphen-joined. Non-ASCII
+// runes (accented letters, ideographs) drop out — so "Café Réforme"
+// → "caf-r-forme". Moderators are expected to rewrite the slug
+// during PR review for any name that doesn't survive this filter
+// (transliterating "Café" → "cafe" by hand), so the rough output is
+// fine; the slug isn't part of the submission payload by design.
+// Bringing transliteration in-process would mean a heavy Unicode
+// dep on the API binary just for a starting-point string — punted.
 func DeriveSlug(name string) string {
 	var b strings.Builder
 	prevHyphen := true

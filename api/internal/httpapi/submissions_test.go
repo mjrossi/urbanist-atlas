@@ -276,6 +276,125 @@ func TestAdminList_ReturnsPendingByDefault(t *testing.T) {
 	}
 }
 
+func TestAdminList_PaginatesWithCursor(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	rig.limiter = newIPRateLimiter(100, time.Hour) // unused — limiter is wired at handler-build time
+
+	// Seed 5 pending submissions directly via the store so we sidestep
+	// the per-IP limiter and get deterministic created_at ordering.
+	for i := range 5 {
+		payload := atlas.SubmissionPayload{
+			Name:        "Org " + strconv.Itoa(i),
+			ShortDesc:   "desc",
+			WebsiteURL:  "https://example.org/" + strconv.Itoa(i),
+			Tags:        []string{"cycling"},
+			RegionSlugs: []string{"brooklyn-ny"},
+		}
+		if _, err := rig.subs.Create(context.Background(), atlas.NewSubmissionInput{Payload: payload}); err != nil {
+			t.Fatalf("seed Create %d: %v", i, err)
+		}
+		time.Sleep(2 * time.Millisecond) // distinct created_at per row
+	}
+
+	// First page: limit=2.
+	req, _ := http.NewRequest(http.MethodGet, rig.srv.URL+"/api/v1/admin/submissions?limit=2", nil)
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("page 1: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("page 1 status: %d", resp.StatusCode)
+	}
+	var page1 []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&page1); err != nil {
+		t.Fatalf("decode page 1: %v", err)
+	}
+	if len(page1) != 2 {
+		t.Fatalf("page 1 length: want 2, got %d", len(page1))
+	}
+	cursor := resp.Header.Get("X-Next-Cursor")
+	if cursor == "" {
+		t.Fatal("page 1: X-Next-Cursor header missing with 5 rows and limit=2")
+	}
+
+	// Second page: feed back the cursor.
+	req2, _ := http.NewRequest(http.MethodGet, rig.srv.URL+"/api/v1/admin/submissions?limit=2&cursor="+cursor, nil)
+	req2.Header.Set("Authorization", "Bearer "+testAdminToken)
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatalf("page 2: %v", err)
+	}
+	defer resp2.Body.Close()
+	var page2 []map[string]any
+	if err := json.NewDecoder(resp2.Body).Decode(&page2); err != nil {
+		t.Fatalf("decode page 2: %v", err)
+	}
+	if len(page2) != 2 {
+		t.Fatalf("page 2 length: want 2, got %d", len(page2))
+	}
+	// Pages must not overlap.
+	if page1[0]["id"] == page2[0]["id"] || page1[1]["id"] == page2[0]["id"] {
+		t.Fatalf("pages overlap: page1 ids %v %v, page2[0] id %v", page1[0]["id"], page1[1]["id"], page2[0]["id"])
+	}
+}
+
+func TestAdminList_RejectsBadCursor(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	req, _ := http.NewRequest(http.MethodGet, rig.srv.URL+"/api/v1/admin/submissions?cursor=not-a-cursor", nil)
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminList_RejectsBadLimit(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	for _, raw := range []string{"0", "201", "-1", "abc"} {
+		req, _ := http.NewRequest(http.MethodGet, rig.srv.URL+"/api/v1/admin/submissions?limit="+raw, nil)
+		req.Header.Set("Authorization", "Bearer "+testAdminToken)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("do %q: %v", raw, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("limit=%q: status want 400, got %d", raw, resp.StatusCode)
+		}
+	}
+}
+
+func TestCreateSubmission_RejectsNonHTTPWebsiteURL(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	body["payload"].(map[string]any)["website_url"] = "javascript:alert(1)"
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateSubmission_RejectsMalformedEmail(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	body["submitter_email"] = "not-an-email"
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+	// oapi's openapi_types.Email is a string alias — Go's JSON
+	// decoder accepts any string. Server-side validateSubmitterFields
+	// is what catches this.
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", resp.StatusCode)
+	}
+}
+
 func TestApprove_EnqueuesAndReturnsWorkerDisabledWhenNil(t *testing.T) {
 	rig := newSubmissionsTestServer(t)
 

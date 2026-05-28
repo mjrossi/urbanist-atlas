@@ -159,12 +159,71 @@ SELECT
     created_at, processed_at,
     promotion_pr_url, promotion_error
 FROM submissions
-ORDER BY created_at DESC, id DESC
+ORDER BY created_at DESC, public_id DESC
 LIMIT ?
 `
 
 func (q *Queries) ListSubmissionsAll(ctx context.Context, limit int64) ([]Submission, error) {
 	rows, err := q.db.QueryContext(ctx, listSubmissionsAll, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Submission
+	for rows.Next() {
+		var i Submission
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.PayloadJson,
+			&i.SubmitterName,
+			&i.SubmitterEmail,
+			&i.SubmitterNote,
+			&i.Status,
+			&i.RejectionReason,
+			&i.CreatedAt,
+			&i.ProcessedAt,
+			&i.PromotionPrUrl,
+			&i.PromotionError,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSubmissionsAllAfter = `-- name: ListSubmissionsAllAfter :many
+SELECT
+    id, public_id, payload_json,
+    submitter_name, submitter_email, submitter_note,
+    status, rejection_reason,
+    created_at, processed_at,
+    promotion_pr_url, promotion_error
+FROM submissions
+WHERE created_at < ?1
+   OR (created_at = ?1
+       AND public_id < ?2)
+ORDER BY created_at DESC, public_id DESC
+LIMIT ?3
+`
+
+type ListSubmissionsAllAfterParams struct {
+	CursorCreatedAt string
+	CursorPublicID  string
+	RowLimit        int64
+}
+
+// Keyset pagination after (created_at, public_id). The composite
+// predicate gives a stable cursor even when multiple rows share a ms.
+func (q *Queries) ListSubmissionsAllAfter(ctx context.Context, arg ListSubmissionsAllAfterParams) ([]Submission, error) {
+	rows, err := q.db.QueryContext(ctx, listSubmissionsAllAfter, arg.CursorCreatedAt, arg.CursorPublicID, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +267,7 @@ SELECT
     promotion_pr_url, promotion_error
 FROM submissions
 WHERE status = ?
-ORDER BY created_at DESC, id DESC
+ORDER BY created_at DESC, public_id DESC
 LIMIT ?
 `
 
@@ -219,6 +278,70 @@ type ListSubmissionsByStatusParams struct {
 
 func (q *Queries) ListSubmissionsByStatus(ctx context.Context, arg ListSubmissionsByStatusParams) ([]Submission, error) {
 	rows, err := q.db.QueryContext(ctx, listSubmissionsByStatus, arg.Status, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Submission
+	for rows.Next() {
+		var i Submission
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.PayloadJson,
+			&i.SubmitterName,
+			&i.SubmitterEmail,
+			&i.SubmitterNote,
+			&i.Status,
+			&i.RejectionReason,
+			&i.CreatedAt,
+			&i.ProcessedAt,
+			&i.PromotionPrUrl,
+			&i.PromotionError,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSubmissionsByStatusAfter = `-- name: ListSubmissionsByStatusAfter :many
+SELECT
+    id, public_id, payload_json,
+    submitter_name, submitter_email, submitter_note,
+    status, rejection_reason,
+    created_at, processed_at,
+    promotion_pr_url, promotion_error
+FROM submissions
+WHERE status = ?1
+  AND (created_at < ?2
+       OR (created_at = ?2
+           AND public_id < ?3))
+ORDER BY created_at DESC, public_id DESC
+LIMIT ?4
+`
+
+type ListSubmissionsByStatusAfterParams struct {
+	Status          string
+	CursorCreatedAt string
+	CursorPublicID  string
+	RowLimit        int64
+}
+
+func (q *Queries) ListSubmissionsByStatusAfter(ctx context.Context, arg ListSubmissionsByStatusAfterParams) ([]Submission, error) {
+	rows, err := q.db.QueryContext(ctx, listSubmissionsByStatusAfter,
+		arg.Status,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

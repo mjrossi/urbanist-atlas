@@ -68,9 +68,23 @@ type NewSubmissionInput struct {
 // ListSubmissionsQuery filters and paginates SubmissionStore.List.
 // Status="" means "all". Limit<=0 falls back to a sensible default
 // (50); the store caps it at 200.
+//
+// Cursor is opaque to callers — pass the previous page's NextCursor
+// to fetch the next page. Empty means "start at the newest row".
+// The encoding is keyset on (created_at, public_id) so pagination is
+// stable even when multiple rows share a millisecond timestamp.
 type ListSubmissionsQuery struct {
 	Status SubmissionStatus
 	Limit  int
+	Cursor string
+}
+
+// ListSubmissionsPage is a paginated slice of submissions plus the
+// cursor a caller should pass to fetch the next page. NextCursor is
+// empty when there are no more rows.
+type ListSubmissionsPage struct {
+	Items      []Submission
+	NextCursor string
 }
 
 // SubmissionStore is the persistence seam for the public submission
@@ -85,8 +99,14 @@ type SubmissionStore interface {
 	// ErrSubmissionNotFound.
 	Get(ctx context.Context, publicID string) (Submission, error)
 
-	// List returns submissions newest-first matching q.
+	// List returns submissions newest-first matching q. The bare slice
+	// shape is preserved for callers that don't need pagination; use
+	// ListPage when you need a follow-up cursor.
 	List(ctx context.Context, q ListSubmissionsQuery) ([]Submission, error)
+
+	// ListPage is List + the keyset cursor for the next page. Empty
+	// NextCursor means no more rows.
+	ListPage(ctx context.Context, q ListSubmissionsQuery) (ListSubmissionsPage, error)
 
 	// Approve flips status pending→approved and stamps ProcessedAt.
 	// Returns ErrSubmissionNotPending if the row has already been

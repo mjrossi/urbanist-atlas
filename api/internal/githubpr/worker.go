@@ -155,11 +155,18 @@ func (w *Worker) ProcessNow(ctx context.Context, sub atlas.Submission) (string, 
 
 func (w *Worker) process(ctx context.Context, sub atlas.Submission) {
 	prURL, err := w.openPR(ctx, sub)
+	// PersistResult runs against a detached context so a shutdown that
+	// cancels ctx mid-flight doesn't also cancel the SQLite write that
+	// records the PR URL or the promotion_error. Without this, an
+	// approval immediately before shutdown can vanish (no PR, no
+	// recorded error — operator sees nothing).
+	persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 	if err != nil {
 		w.cfg.Logger.ErrorContext(ctx, "githubpr: PR creation failed",
 			"submission_id", sub.PublicID, "err", err)
 		if w.cfg.PersistResult != nil {
-			if perr := w.cfg.PersistResult(ctx, sub.PublicID, "", err.Error()); perr != nil {
+			if perr := w.cfg.PersistResult(persistCtx, sub.PublicID, "", err.Error()); perr != nil {
 				w.cfg.Logger.ErrorContext(ctx, "githubpr: persist error result failed",
 					"submission_id", sub.PublicID, "err", perr)
 			}
@@ -167,7 +174,7 @@ func (w *Worker) process(ctx context.Context, sub atlas.Submission) {
 		return
 	}
 	if w.cfg.PersistResult != nil {
-		if perr := w.cfg.PersistResult(ctx, sub.PublicID, prURL, ""); perr != nil {
+		if perr := w.cfg.PersistResult(persistCtx, sub.PublicID, prURL, ""); perr != nil {
 			w.cfg.Logger.ErrorContext(ctx, "githubpr: persist success result failed",
 				"submission_id", sub.PublicID, "err", perr)
 		}
@@ -216,19 +223,32 @@ func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, erro
 }
 
 func submissionBranchName(publicID string) string {
-	return "submission/" + shortID(publicID)
+	return "submission/" + branchSuffix(publicID)
 }
 
-// shortID returns the first 8 characters of the UUIDv7 (i.e. the
-// most-significant time bits). UUIDv7 starts with a millisecond
-// timestamp so the prefix is unique enough for branch-name use over
-// the project's foreseeable submission volume.
+// shortID returns the first 8 hex characters of the UUIDv7. UUIDv7's
+// leading bits are a millisecond timestamp, so this is human-readable
+// at a glance — useful in commit messages and PR titles.
 func shortID(publicID string) string {
 	clean := strings.ReplaceAll(publicID, "-", "")
 	if len(clean) < 8 {
 		return clean
 	}
 	return clean[:8]
+}
+
+// branchSuffix returns 16 hex characters of the UUIDv7. The first 12
+// are the millisecond timestamp + the first random bits, so two
+// approvals in the same millisecond still get distinct branch names;
+// the extra 4 keep the suffix long enough that a future jump back to
+// 8-char shortID-style names won't collide with anything already in
+// the remote.
+func branchSuffix(publicID string) string {
+	clean := strings.ReplaceAll(publicID, "-", "")
+	if len(clean) < 16 {
+		return clean
+	}
+	return clean[:16]
 }
 
 func ensureTrailingNewline(s string) string {

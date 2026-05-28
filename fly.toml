@@ -12,8 +12,17 @@ primary_region = 'iad'
 # Persistent volume for the SQLite submissions DB. The Fly volume
 # survives machine recycles; the binary opens /data/atlas.db at boot
 # and runs goose migrations on the embedded FS in api/migrations-sqlite.
-# Single-writer is fine — fly.toml keeps min_machines_running=1, and
-# the submission volume here is bytes-to-KB. Provision once:
+#
+# SQLite is single-writer. Fly volumes are single-attach, so a second
+# machine would silently start its own empty DB on a fresh volume. The
+# app is therefore pinned to one machine: do NOT add `max_machines > 1`
+# or any auto-scaling config below without first moving the write path
+# off SQLite. min_machines_running=1 + auto_stop_machines=false (below)
+# also keep the in-process rate limiter and the GitHub PR worker queue
+# alive between requests — both live in RAM and would silently reset on
+# a suspend/resume cycle.
+#
+# Provision once:
 #   flyctl volumes create atlas_data --size 1 --region iad -a urbanist-atlas
 # See docs/deploy.md §Bring-up.
 [[mounts]]
@@ -49,8 +58,14 @@ primary_region = 'iad'
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'suspend'
-  auto_start_machines = true
+  # auto_stop_machines=false (and auto_start_machines=false) is
+  # load-bearing: see the [[mounts]] comment above. The in-process
+  # rate limiter (internal/httpapi/ratelimit.go) and the GitHub PR
+  # worker's job channel (internal/githubpr/worker.go) both keep state
+  # in RAM, so any suspend/resume cycle drops queued PR jobs and resets
+  # the per-IP submission window.
+  auto_stop_machines = false
+  auto_start_machines = false
   min_machines_running = 1
   processes = ['app']
 

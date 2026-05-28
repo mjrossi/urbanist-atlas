@@ -202,19 +202,33 @@ for the `flyctl ssh` step.
 ### Restore
 
 ```sh
-# 1. Pull the snapshot locally.
+# 1. Pull the snapshot locally and confirm the gzip stream is intact
+#    (the nightly workflow already gunzip -t's before upload, but the
+#    restore path is rare enough to double-check).
 rclone copy r2:urbanist-atlas-backups/atlas-2026-05-28-0917.sql.gz .
+gunzip -t atlas-2026-05-28-0917.sql.gz
 
 # 2. Reconstruct a fresh DB.
 gunzip -c atlas-2026-05-28-0917.sql.gz | sqlite3 /tmp/atlas.db.new
 
-# 3. Push it onto the Fly volume.
+# 3. Stop the app machine so its open SQLite handle releases the file.
+#    Skipping this and just mv'ing the file under a running binary
+#    leaves the kernel holding the old inode open until the next
+#    restart — submissions written in between will land in the OLD
+#    file and disappear when the mv eventually takes effect.
+flyctl machines list -a urbanist-atlas    # note the machine id
+flyctl machines stop <machine-id> -a urbanist-atlas
+
+# 4. Push the new DB onto the Fly volume.
 flyctl ssh sftp shell -a urbanist-atlas
   put /tmp/atlas.db.new /data/atlas.db.new
   bye
 flyctl ssh console -a urbanist-atlas -C \
   "sh -c 'mv /data/atlas.db /data/atlas.db.bak && mv /data/atlas.db.new /data/atlas.db'"
-flyctl machines restart -a urbanist-atlas
+
+# 5. Restart and smoke-test.
+flyctl machines start <machine-id> -a urbanist-atlas
+curl -fsS https://qa-api.urbanistatlas.com/readyz
 ```
 
 ### Re-running a failed promotion PR
