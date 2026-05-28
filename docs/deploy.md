@@ -143,7 +143,10 @@ Provision `urbanist-atlas` in the Cloudflare dashboard (Workers &
 Pages → Create application → Connect to git). Production branch =
 `main`, build command = `cd web && npm ci && npm run build`,
 output directory = `web/dist`. The `wrangler.jsonc` at the repo root
-carries everything else (asset handling, SPA fallback, headers).
+carries asset handling and SPA fallback. Response headers — including
+the Content-Security-Policy — live in `web/public/_headers`, which
+Vite copies to `dist/_headers` at build time (the same `_headers`
+convention Cloudflare Pages uses; Workers Static Assets honors it).
 
 Set the SPA's API base + client secret as Workers environment
 variables:
@@ -155,6 +158,46 @@ variables:
 
 CNAME `qa.urbanistatlas.com` → the Workers project hostname; add it
 in the Workers project's custom-domain settings.
+
+#### Response headers (Content-Security-Policy)
+
+`web/public/_headers` declares the response-header policy applied to
+every static asset Cloudflare serves. The Content-Security-Policy is:
+
+```
+default-src 'self';
+script-src  'self';
+style-src   'self' 'unsafe-inline';
+font-src    'self';
+img-src     'self' data:;
+connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com;
+frame-ancestors 'none';
+base-uri    'self';
+form-action 'self';
+```
+
+Notes on the directives:
+
+- `script-src 'self'` — the SPA has no inline `<script>`; everything
+  goes through Vite's bundled module graph.
+- `style-src 'self' 'unsafe-inline'` — Vite injects critical CSS as
+  inline `<style>` tags during HMR (dev) and for above-the-fold
+  styling in production. Removing `'unsafe-inline'` would break the
+  broadsheet render on first paint. Risk is bounded — no
+  third-party scripts run, so an injected style tag is the worst
+  case, not an injected script.
+- `font-src 'self'` — all four families ship via
+  `@fontsource-variable/*` and are bundled with the build.
+- `connect-src` — the only outbound fetches are to the Atlas API.
+  The QA host stays in the list until Phase 2 cutover collapses
+  qa/prod onto a single origin; drop the QA entry then.
+- `frame-ancestors 'none'` — the Atlas is never embedded in an
+  iframe.
+
+The same file also sets `Referrer-Policy: strict-origin-when-cross-origin`
+and `X-Content-Type-Options: nosniff`. When you add a new outbound
+origin (e.g. a future analytics endpoint), edit the `connect-src`
+list in `web/public/_headers` and update this section.
 
 ### 4. Smoke test
 
