@@ -50,8 +50,8 @@ func serveCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "store",
-				Usage:   "store backing: file, postgres, or memory",
-				Value:   storeKindPostgres,
+				Usage:   "store backing: file (default), postgres, or memory",
+				Value:   storeKindFile,
 				Sources: cli.EnvVars("URBANIST_STORE"),
 			},
 			&cli.StringFlag{
