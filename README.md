@@ -46,9 +46,13 @@ per-region + per-org + about + 404 against the live API. Errors on both halves u
 
 Remaining work to v1.0 — editorial drip of orgs, then the Phase 2
 public launch (slices #26–#28: API keys, rate limiting, prod-hostname
-cutover) — is tracked in [`docs/roadmap.md`](./docs/roadmap.md). Public submissions are
-deferred to Phase 2 alongside the API-key + email-verified account
-system. The full architectural plan lives at
+cutover) — is tracked in [`docs/roadmap.md`](./docs/roadmap.md).
+Public submissions are live: `POST /api/v1/submissions` lands new
+orgs in a small SQLite queue on the Fly volume, and approving a
+submission opens a GitHub PR appending it to `api/seed/orgs.toml`.
+The Phase 2 work is the API-key + email-verified account system that
+opens the read API beyond the shared-secret gate. The full
+architectural plan lives at
 `~/.claude/plans/we-are-planning-a-smooth-candy.md` (local to the
 maintainer); the load-bearing pieces are mirrored into
 [`CLAUDE.md`](./CLAUDE.md).
@@ -106,10 +110,12 @@ welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md) — it
 covers the scope guardrails (what's in, what's deliberately out),
 the dev-loop setup, and the PR / commit conventions.
 
-For organizations to add or correct: use the
-[org-correction issue template](./.github/ISSUE_TEMPLATE/org_correction_or_addition.md)
-until the public submission flow ships with Phase 2 (slices
-#5 + #13 in [`docs/roadmap.md`](./docs/roadmap.md)).
+For organizations to add or correct: file a tip through the
+submission form on the site, or open an
+[org-correction issue](./.github/ISSUE_TEMPLATE/org_correction_or_addition.md)
+if the change needs a written trail. The editorial voice the
+directory aims for is documented in
+[`docs/editorial-style.md`](./docs/editorial-style.md).
 
 This project follows the
 [Contributor Covenant](./CODE_OF_CONDUCT.md). Security issues go
