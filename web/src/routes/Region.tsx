@@ -3,6 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getRegion } from '../lib/api.ts';
 import type { LookupOrg, RegionDetail } from '../lib/api.ts';
+import { reverseAncestry } from '../lib/ancestry.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
@@ -34,10 +35,10 @@ export function Region() {
 
   // Breadcrumb wants ancestors broad-first (left-to-right reads
   // root → leaf), but the API hands them back closest-first.
-  // Reverse a copy so the API contract stays leaf-centric and the
+  // `reverseAncestry` keeps the API contract leaf-centric and the
   // SPA owns its display ordering.
   const ancestorsRootFirst = query.data
-    ? [...query.data.ancestry].reverse()
+    ? reverseAncestry(query.data.ancestry)
     : [];
   const currentLabel = query.data ? query.data.region.name : 'Region';
   const totalOrgs = query.data

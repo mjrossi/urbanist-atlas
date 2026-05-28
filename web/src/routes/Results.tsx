@@ -4,6 +4,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
 import type { Country, LookupResult } from '../lib/api.ts';
+import { reverseAncestry } from '../lib/ancestry.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -56,10 +57,11 @@ export function Results() {
   ];
 
   // Resolved-ancestry walk: API returns leaf-first; the breadcrumb
-  // wants root-first followed by the leaf as `current`. Reverse a
-  // copy and split off the (originally first, now last) leaf.
+  // wants root-first followed by the leaf as `current`. Reverse
+  // the ancestry and drop the (now-last) leaf, which the breadcrumb
+  // renders separately via `currentLabel`.
   const ancestryRootFirst = query.data
-    ? [...query.data.resolved_ancestry].slice(1).reverse()
+    ? reverseAncestry(query.data.resolved_ancestry).slice(0, -1)
     : [];
   const leafName = query.data?.resolved_ancestry[0]?.name;
   const currentLabel = leafName ?? (postalCode || '—');
