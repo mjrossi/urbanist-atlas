@@ -1,5 +1,15 @@
 # Fly deploy design — Phase 1 dogfood host
 
+> **Historical snapshot.** This is the bring-up design as it stood
+> on 2026-05-21, capturing the original Postgres-included topology
+> and the `qa.urbanistatlas.com` / `qa-api.urbanistatlas.com`
+> hostnames. The runtime has since (a) dropped Postgres in favour
+> of a file-backed FileStore + a SQLite submissions store on a Fly
+> volume, and (b) cut over to apex hostnames on 2026-05-27. The
+> authoritative current playbook is [`docs/deploy.md`](../../deploy.md);
+> this document is preserved unchanged below as a reference for
+> how the stack was first stood up.
+
 **Status:** Shipped and live (2026-05-21). Both Fly apps
 (`urbanist-atlas`, `urbanist-atlas-db`), the Cloudflare Workers +
 Pages project, and the `qa.urbanistatlas.com` /

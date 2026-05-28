@@ -6,24 +6,29 @@ design lives at
 the runtime has since moved to a stateless, file-backed shape — this
 file is the current playbook.
 
-> **Status: live since 2026-05-21.** Phase 1 QA stack (Fly API +
-> Cloudflare Workers + DNS + shared-secret gate) is up on
-> `qa-api.urbanistatlas.com` + `qa.urbanistatlas.com`. The sibling
+> **Status: live on apex since 2026-05-27.** Fly API + Cloudflare
+> Workers + DNS + the Phase 1 `X-Atlas-Client` shared-secret gate
+> serve `urbanistatlas.com` + `api.urbanistatlas.com`. The sibling
 > Postgres app and its nightly backup workflow were retired with the
 > file-store cutover; reads come straight from the `api/seed/`
-> bundle baked into the API image.
+> bundle baked into the API image. The shared-secret gate is a
+> Phase 1 holdover; it comes off with slices #26–#28 (API keys +
+> rate limiting + secret removal). The `qa.urbanistatlas.com` /
+> `qa-api.urbanistatlas.com` hostnames were the pre-launch
+> dogfooding origins; their retirement is documented at the bottom
+> of this file (§ QA hostname retirement).
 
 ## Hosting topology
 
-| Component | Resource | Initial hostname |
+| Component | Resource | Hostname |
 |---|---|---|
-| API | Fly app `urbanist-atlas`, region `iad` (Virginia, US East), shared-cpu-1x / 256 MB. Read path is stateless: `api/seed/` is baked into the image and loaded into an in-memory FileStore at boot. Writes (submissions only) land in a SQLite DB at `/data/atlas.db` on the `atlas_data` Fly volume (1 GiB, ~$0.15/mo). | `qa-api.urbanistatlas.com` |
-| Web | Cloudflare Workers + Pages project `urbanist-atlas` (Static Assets), prod branch `main`, configured by `wrangler.jsonc` at repo root | `qa.urbanistatlas.com` |
+| API | Fly app `urbanist-atlas`, region `iad` (Virginia, US East), shared-cpu-1x / 256 MB. Read path is stateless: `api/seed/` is baked into the image and loaded into an in-memory FileStore at boot. Writes (submissions only) land in a SQLite DB at `/data/atlas.db` on the `atlas_data` Fly volume (1 GiB, ~$0.15/mo). | `api.urbanistatlas.com` |
+| Web | Cloudflare Workers + Pages project `urbanist-atlas` (Static Assets), prod branch `main`, configured by `wrangler.jsonc` at repo root | `urbanistatlas.com` |
 | Web previews | `<version>-urbanist-atlas.<account>.workers.dev` | Auto-provisioned per non-`main` deploy via `wrangler versions upload` |
 
-None of the resources carry a `-qa` suffix. When prod launches, prod
-hostnames attach to the same apps/project and QA hostnames retire —
-no rebuilds, no data migration.
+The apex hostnames attach directly to the same apps/project; nothing
+carries a `-qa` or `-prod` suffix, so future hostname moves are pure
+DNS + Workers custom-domain swaps with no rebuilds or data migration.
 
 ## Deploys
 
@@ -124,16 +129,17 @@ on the very first boot against a fresh volume.
 
 ### 2. DNS
 
-Create the CNAME records in Cloudflare's `urbanistatlas.com` zone:
+Create the A/AAAA records in Cloudflare's `urbanistatlas.com` zone
+(Cloudflare proxy **off** so Fly's edge handles TLS termination):
 
 | Host | Target |
 |---|---|
-| `qa-api.urbanistatlas.com` | `urbanist-atlas.fly.dev` |
+| `api.urbanistatlas.com` | `urbanist-atlas.fly.dev` (A + AAAA from `flyctl ips list`) |
 
 Then issue a Fly cert:
 
 ```sh
-flyctl certs create qa-api.urbanistatlas.com -a urbanist-atlas
+flyctl certs create api.urbanistatlas.com -a urbanist-atlas
 flyctl certs list -a urbanist-atlas   # wait for "ready"
 ```
 
@@ -153,11 +159,12 @@ variables:
 
 | Variable | Value |
 |---|---|
-| `VITE_API_BASE` | `https://qa-api.urbanistatlas.com` |
+| `VITE_API_BASE` | `https://api.urbanistatlas.com` |
 | `VITE_API_CLIENT_SECRET` | the same value set on Fly as `URBANIST_CLIENT_SECRET` |
 
-CNAME `qa.urbanistatlas.com` → the Workers project hostname; add it
-in the Workers project's custom-domain settings.
+Attach `urbanistatlas.com` to the Workers project under custom
+domains; Cloudflare provisions the cert and DNS automatically since
+the zone lives in the same account.
 
 #### Response headers (Content-Security-Policy)
 
@@ -189,8 +196,10 @@ Notes on the directives:
 - `font-src 'self'` — all four families ship via
   `@fontsource-variable/*` and are bundled with the build.
 - `connect-src` — the only outbound fetches are to the Atlas API.
-  The QA host stays in the list until Phase 2 cutover collapses
-  qa/prod onto a single origin; drop the QA entry then.
+  `qa-api.urbanistatlas.com` stays in the list through the apex
+  verification window; it comes out alongside the qa cert, Workers
+  custom domain, and CORS origin in the qa-teardown follow-up
+  (see § QA hostname retirement).
 - `frame-ancestors 'none'` — the Atlas is never embedded in an
   iframe.
 
@@ -211,9 +220,9 @@ section.
 ### 4. Smoke test
 
 ```sh
-curl -fsS https://qa-api.urbanistatlas.com/healthz
+curl -fsS https://api.urbanistatlas.com/healthz
 curl -fsS -H "X-Atlas-Client: <secret>" \
-  'https://qa-api.urbanistatlas.com/api/v1/lookup?postal_code=11217&country=US' \
+  'https://api.urbanistatlas.com/api/v1/lookup?postal_code=11217&country=US' \
   | jq '.local | length, .regional | length'
 ```
 
@@ -284,7 +293,7 @@ flyctl ssh console -a urbanist-atlas -C \
 
 # 5. Restart and smoke-test.
 flyctl machines start <machine-id> -a urbanist-atlas
-curl -fsS https://qa-api.urbanistatlas.com/readyz
+curl -fsS https://api.urbanistatlas.com/readyz
 ```
 
 ### Re-running a failed promotion PR
@@ -300,3 +309,31 @@ flyctl ssh console -a urbanist-atlas -C \
 
 The retry uses the current `URBANIST_GITHUB_TOKEN` Fly secret and
 overwrites `promotion_pr_url` / `promotion_error` on the row.
+
+## QA hostname retirement (historical, 2026-05-27)
+
+`qa.urbanistatlas.com` + `qa-api.urbanistatlas.com` were the
+pre-launch dogfooding origins while the Phase 1 stack was shaking
+out. On 2026-05-27 the apex hostnames attached to the same Fly app
+and Cloudflare Workers project; no rebuilds, no data migration —
+purely a DNS + Workers custom-domain + Fly cert swap.
+
+Cutover steps, kept here as a reference for any future hostname
+move on this stack:
+
+1. Add A/AAAA records for the new apex host pointing at
+   `urbanist-atlas.fly.dev` (Cloudflare proxy off).
+2. `flyctl certs add api.urbanistatlas.com -a urbanist-atlas` and
+   wait for `Status: Issued`.
+3. Attach the apex SPA host to the Workers project under custom
+   domains.
+4. Flip the Workers build env `VITE_API_BASE` to the new API host,
+   trigger a rebuild.
+5. Prepend the new apex SPA host to `URBANIST_CORS_ORIGINS` in
+   `fly.toml` and deploy; retain the old origin for a verification
+   window.
+6. Smoke against the new hosts (`just smoke`), watch logs for a
+   day, then in a single follow-up commit: drop the old origin
+   from `URBANIST_CORS_ORIGINS`, drop the old API host from the
+   `connect-src` list in `web/public/_headers`, remove the old Fly
+   cert, the old Workers custom domain, and the old DNS records.

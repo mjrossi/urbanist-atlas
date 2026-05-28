@@ -162,7 +162,7 @@ jobs:
         run: |
           set -euo pipefail
           for i in 1 2 3 4 5; do
-            if curl -fsS --max-time 10 https://qa-api.urbanistatlas.com/healthz; then
+            if curl -fsS --max-time 10 https://api.urbanistatlas.com/healthz; then
               echo
               echo "healthz OK on attempt $i"
               exit 0

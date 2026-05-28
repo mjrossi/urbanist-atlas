@@ -31,12 +31,14 @@ primary_region = 'iad'
 
 [env]
   # CORS allowlist for Phase 1.
-  # - https://qa.urbanistatlas.com — the QA SPA hostname (custom domain on the Workers project)
+  # - https://urbanistatlas.com — the apex SPA hostname (custom domain on the Workers project)
+  # - https://qa.urbanistatlas.com — retained for the apex cutover window so the existing QA
+  #   SPA keeps working until DNS + the Workers custom-domain swap fully to apex. Dropped in
+  #   a one-line follow-up commit after the cutover is verified.
   # - *.link00seven.workers.dev — Cloudflare Workers preview versions (account-scoped subdomain;
   #   the Workers Static Assets analog of the old Pages `*.pages.dev` previews; Cloudflare's
   #   Pages-into-Workers consolidation means previews now live under `<account>.workers.dev`)
-  # At prod launch, append https://urbanistatlas.com; once QA retires, drop the qa.* entry.
-  URBANIST_CORS_ORIGINS = 'https://qa.urbanistatlas.com,*.link00seven.workers.dev'
+  URBANIST_CORS_ORIGINS = 'https://urbanistatlas.com,https://qa.urbanistatlas.com,*.link00seven.workers.dev'
   URBANIST_LOG_FORMAT = 'json'
   URBANIST_PORT = '8080'
   # URBANIST_SEED_DIR is intentionally unset — the binary falls back
