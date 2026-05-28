@@ -7,7 +7,6 @@ package httpapi
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -63,10 +62,13 @@ func New(cfg Config) http.Handler {
 	r := chi.NewRouter()
 
 	// Order matters: requestID first so every later layer (logger,
-	// recoverer, handlers) sees a consistent rid; recoverer next so
-	// panics in business logic don't escape; logger last so the access
-	// log records the final status (including 500s from recoverer).
+	// recoverer, handlers) sees a consistent rid; timeoutMiddleware
+	// next so every handler runs with a per-request deadline ctx;
+	// recoverer next so panics in business logic don't escape;
+	// logger last so the access log records the final status
+	// (including 500s from recoverer).
 	r.Use(requestIDMiddleware)
+	r.Use(timeoutMiddleware(requestTimeout))
 	r.Use(recovererMiddleware(logger))
 	r.Use(loggingMiddleware(logger))
 	if len(cfg.CORSOrigins) > 0 {
@@ -91,7 +93,7 @@ func New(cfg Config) http.Handler {
 			r.Get("/recent", recentHandler(cfg.Store, logger))
 
 			if cfg.Submissions != nil {
-				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, time.Hour)
+				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
 				r.Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger))
 				r.Route("/admin", func(r chi.Router) {
 					r.Use(bearerAuthMiddleware(cfg.AdminToken))

@@ -11,6 +11,32 @@ import (
 	"time"
 )
 
+// timeoutMiddleware bounds a single request's total processing time
+// by attaching a context deadline. Handlers (and the pkg/atlas /
+// SQLite calls they forward into) receive a cancellable ctx; when the
+// deadline expires the downstream sees ctx.Done() and can abort
+// cleanly. Coarser ReadTimeout/WriteTimeout on http.Server still
+// apply at the transport layer; this is the per-request budget the
+// application code can react to.
+//
+// We do NOT use http.TimeoutHandler. That helper races the handler
+// against a timer and writes a 503 from a separate goroutine, which
+// (a) doesn't propagate cancellation to the original handler — it
+// keeps running until it notices — and (b) interferes with the
+// problem+json response shape this API standardizes on. Cancelling
+// the request context is the cleaner contract: handlers that already
+// forward ctx into pkg/atlas naturally inherit the deadline, and
+// nothing has to know the timeout exists.
+func timeoutMiddleware(d time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), d)
+			defer cancel()
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 type ctxKey string
 
 const requestIDKey ctxKey = "rid"
