@@ -443,7 +443,10 @@ type ScopeTier string
 // Submission A queued or processed public submission.
 type Submission struct {
 	CreatedAt time.Time `json:"created_at"`
-	Id        int64     `json:"id"`
+
+	// Id UUIDv7 string generated server-side when the submission was
+	// accepted. This is the only ID exposed on the wire.
+	Id openapi_types.UUID `json:"id"`
 
 	// Payload The proposed organization, as submitted by a member of the public.
 	Payload SubmissionPayload `json:"payload"`
@@ -451,8 +454,16 @@ type Submission struct {
 	// ProcessedAt Set when status moves from `pending` to a terminal state.
 	ProcessedAt *time.Time `json:"processed_at,omitempty"`
 
-	// PromotedOrgId Set on approval to the ID of the created organization.
-	PromotedOrgId *int64 `json:"promoted_org_id,omitempty"`
+	// PromotionError Set on approval when the GitHub PR worker failed (network,
+	// auth, etc.). The submission stays `approved`; the PR is
+	// re-queued via `urbanist-atlas-server submissions retry-pr`.
+	PromotionError *string `json:"promotion_error,omitempty"`
+
+	// PromotionPrUrl Set on approval when the GitHub PR worker successfully opens a
+	// pull request appending the approved org to `api/seed/orgs.toml`.
+	// The PR is the editorial-review surface; the org becomes visible
+	// after a maintainer merges it and the API redeploys.
+	PromotionPrUrl *string `json:"promotion_pr_url,omitempty"`
 
 	// RejectionReason Set on rejection.
 	RejectionReason *string `json:"rejection_reason,omitempty"`
@@ -494,7 +505,7 @@ type PostalCodeQuery = string
 type RegionSlug = string
 
 // SubmissionID defines model for SubmissionID.
-type SubmissionID = int64
+type SubmissionID = openapi_types.UUID
 
 // BadRequest Standard [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 // Problem Details object. Returned on every non-2xx response with

@@ -66,18 +66,30 @@ func validateOrgs(os []OrgEntry) error {
 			return fmt.Errorf("%s: duplicate slug", ctx)
 		}
 		seen[o.Slug] = true
-		if o.Name == "" {
-			return fmt.Errorf("%s: name required", ctx)
+		if err := ValidateOrgFields(o.Name, o.ShortDesc, o.WebsiteURL, o.RegionSlugs); err != nil {
+			return fmt.Errorf("%s: %w", ctx, err)
 		}
-		if o.ShortDesc == "" {
-			return fmt.Errorf("%s: short_desc required", ctx)
-		}
-		if o.WebsiteURL == "" {
-			return fmt.Errorf("%s: website_url required", ctx)
-		}
-		if len(o.RegionSlugs) == 0 {
-			return fmt.Errorf("%s: region_slugs must have at least one entry", ctx)
-		}
+	}
+	return nil
+}
+
+// ValidateOrgFields runs the per-entry field-required checks shared
+// between the seed-file loader and the public submissions handler.
+// The slug/uniqueness checks live in validateOrgs because they're
+// only meaningful in a multi-row context; submissions don't carry a
+// slug at all (moderators assign one when approving).
+func ValidateOrgFields(name, shortDesc, websiteURL string, regionSlugs []string) error {
+	if name == "" {
+		return errors.New("name required")
+	}
+	if shortDesc == "" {
+		return errors.New("short_desc required")
+	}
+	if websiteURL == "" {
+		return errors.New("website_url required")
+	}
+	if len(regionSlugs) == 0 {
+		return errors.New("region_slugs must have at least one entry")
 	}
 	return nil
 }

@@ -14,8 +14,10 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/githubpr"
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
 	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
+	"github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 	seedfs "github.com/mjrossi/urbanist-atlas/api/seed"
 )
@@ -64,6 +66,28 @@ func serveCommand() *cli.Command {
 				Usage:   "shared secret expected in the X-Atlas-Client header; empty disables the gate",
 				Sources: cli.EnvVars("URBANIST_CLIENT_SECRET"),
 			},
+			&cli.StringFlag{
+				Name:    "db-path",
+				Usage:   "SQLite database path for the submission queue; empty disables /submissions endpoints",
+				Value:   "/data/atlas.db",
+				Sources: cli.EnvVars("URBANIST_DB_PATH"),
+			},
+			&cli.StringFlag{
+				Name:    "admin-token",
+				Usage:   "bearer token guarding /api/v1/admin/*; empty disables admin endpoints (they 503)",
+				Sources: cli.EnvVars("URBANIST_ADMIN_TOKEN"),
+			},
+			&cli.StringFlag{
+				Name:    "github-token",
+				Usage:   "fine-grained GitHub PAT for the promotion PR worker; empty disables the worker",
+				Sources: cli.EnvVars("URBANIST_GITHUB_TOKEN"),
+			},
+			&cli.IntFlag{
+				Name:    "submissions-rate-per-hour",
+				Usage:   "per-IP cap on POST /api/v1/submissions",
+				Value:   5,
+				Sources: cli.EnvVars("URBANIST_SUBMISSIONS_RATE_PER_HOUR"),
+			},
 		},
 		Action: runServe,
 	}
@@ -78,13 +102,34 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	}
 	defer closeStore()
 
+	subs, closeSubs, err := buildSubmissionStore(ctx, c, logger)
+	if err != nil {
+		return err
+	}
+	defer closeSubs()
+
+	var enqueuer httpapi.PromotionEnqueuer
+	if subs != nil {
+		worker := githubpr.New(githubpr.Config{
+			Token:         c.String("github-token"),
+			Logger:        logger,
+			PersistResult: subs.AttachPromotionResult,
+		})
+		go worker.Run(ctx)
+		enqueuer = worker
+	}
+
 	origins := splitCSV(c.String("cors-origins"))
 	handler := httpapi.New(httpapi.Config{
-		Store:        store,
-		Logger:       logger,
-		CORSOrigins:  origins,
-		APIVersion:   "v1",
-		ClientSecret: c.String("client-secret"),
+		Store:                  store,
+		Logger:                 logger,
+		CORSOrigins:            origins,
+		APIVersion:             "v1",
+		ClientSecret:           c.String("client-secret"),
+		Submissions:            submissionsOrNil(subs),
+		PromotionEnqueuer:      enqueuer,
+		AdminToken:             c.String("admin-token"),
+		SubmissionsRatePerHour: c.Int("submissions-rate-per-hour"),
 	})
 
 	addr := net.JoinHostPort("", c.String("port"))
@@ -166,6 +211,39 @@ func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.S
 	default:
 		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindFile, storeKindMemory)
 	}
+}
+
+// buildSubmissionStore opens the SQLite submission database and runs
+// migrations. An empty --db-path is treated as "no submissions" — the
+// returned store is nil and the /submissions endpoints stay
+// unregistered.
+func buildSubmissionStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (*sqlite.Store, func(), error) {
+	path := strings.TrimSpace(c.String("db-path"))
+	if path == "" {
+		logger.Info("submission store disabled (empty --db-path)")
+		return nil, func() {}, nil
+	}
+	s, err := sqlite.Open(path)
+	if err != nil {
+		return nil, func() {}, fmt.Errorf("submission store: %w", err)
+	}
+	if err := s.Migrate(ctx); err != nil {
+		_ = s.Close()
+		return nil, func() {}, fmt.Errorf("submission store migrate: %w", err)
+	}
+	logger.Info("submission store initialized", "path", path)
+	return s, func() { _ = s.Close() }, nil
+}
+
+// submissionsOrNil converts the concrete *sqlite.Store into the
+// atlas.SubmissionStore interface, preserving nil-ness so the router
+// can detect the "disabled" case (a typed nil would route to handlers
+// that then segfault on store calls).
+func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
+	if s == nil {
+		return nil
+	}
+	return s
 }
 
 // buildLogger returns an slog.Logger writing JSON or text to stderr.

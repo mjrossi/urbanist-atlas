@@ -1,0 +1,65 @@
+name: SQLite nightly backup
+
+# Nightly snapshot of the submissions DB on Fly to Cloudflare R2.
+# The bundle is small (KB-to-MB), so the dump is fast and the
+# uploaded artifact is a single .sql.gz per day. Retention is enforced
+# on the R2 bucket itself (30 days lifecycle rule, set out of band).
+#
+# Requires the following GitHub Actions secrets:
+#   - FLY_API_TOKEN_DEPLOY      (already configured for ci.yml)
+#   - R2_S3_ENDPOINT            (e.g. https://<account>.r2.cloudflarestorage.com)
+#   - R2_S3_ACCESS_KEY_ID
+#   - R2_S3_SECRET_ACCESS_KEY
+#   - R2_BACKUP_BUCKET          (e.g. urbanist-atlas-backups)
+#
+# Restore: `gunzip -c <file>.sql.gz | sqlite3 /data/atlas.db.new`,
+# then `flyctl ssh sftp shell -a urbanist-atlas` to push it into place.
+
+on:
+  schedule:
+    # 09:17 UTC — off-peak for iad, off the 0/15/30/45 cron herd.
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Snapshot SQLite via flyctl ssh
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_DEPLOY }}
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y-%m-%d-%H%M)"
+          out="atlas-${stamp}.sql.gz"
+          # `.dump` over ssh writes the SQL to stdout; gzip on the
+          # remote side so we ship bytes over the wire.
+          flyctl ssh console -a urbanist-atlas \
+            -C "sh -c 'sqlite3 /data/atlas.db .dump | gzip -c'" \
+            > "${out}"
+          # Sanity: refuse to upload an empty backup. SQLite .dump on a
+          # fresh DB still emits PRAGMA + BEGIN/COMMIT, so anything
+          # well under 100 bytes means the ssh command itself failed.
+          test "$(wc -c < "${out}")" -ge 100
+          echo "BACKUP_FILE=${out}" >> "${GITHUB_ENV}"
+
+      - name: Set up rclone
+        uses: AnimMouse/setup-rclone@v1
+
+      - name: Upload to R2
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_S3_ENDPOINT }}
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_S3_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+        run: |
+          set -euo pipefail
+          rclone copy "${BACKUP_FILE}" "r2:${R2_BUCKET}/" --no-traverse
+          rclone ls "r2:${R2_BUCKET}/" | tail -n 5

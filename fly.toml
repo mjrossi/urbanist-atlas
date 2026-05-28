@@ -9,6 +9,17 @@ primary_region = 'iad'
 [build]
   dockerfile = 'Dockerfile'
 
+# Persistent volume for the SQLite submissions DB. The Fly volume
+# survives machine recycles; the binary opens /data/atlas.db at boot
+# and runs goose migrations on the embedded FS in api/migrations-sqlite.
+# Single-writer is fine — fly.toml keeps min_machines_running=1, and
+# the submission volume here is bytes-to-KB. Provision once:
+#   flyctl volumes create atlas_data --size 1 --region iad -a urbanist-atlas
+# See docs/deploy.md §Bring-up.
+[[mounts]]
+  source = 'atlas_data'
+  destination = '/data'
+
 [env]
   # CORS allowlist for Phase 1.
   # - https://qa.urbanistatlas.com — the QA SPA hostname (custom domain on the Workers project)
@@ -23,6 +34,17 @@ primary_region = 'iad'
   # to the seed bundle embedded at build time via //go:embed. To pin
   # a deployed instance to an on-disk override, set this to the
   # directory path here (and add a matching COPY to the Dockerfile).
+  #
+  # The submission write path lives on the mounted volume:
+  URBANIST_DB_PATH = '/data/atlas.db'
+  # Submissions per IP per hour (in-process limiter; the WAF rule at
+  # the edge is the first defense).
+  URBANIST_SUBMISSIONS_RATE_PER_HOUR = '5'
+  # URBANIST_ADMIN_TOKEN and URBANIST_GITHUB_TOKEN are Fly secrets, set
+  # via:  flyctl secrets set URBANIST_ADMIN_TOKEN=… URBANIST_GITHUB_TOKEN=…
+  # Without ADMIN_TOKEN, admin endpoints return 503; without
+  # GITHUB_TOKEN, approval still flips status but the PR worker
+  # records promotion_error="worker disabled (no token configured)".
 
 [http_service]
   internal_port = 8080

@@ -395,13 +395,14 @@ paths:
   /api/v1/admin/submissions/{id}/approve:
     post:
       tags: [admin]
-      summary: Approve a submission and promote it to a real organization.
+      summary: Approve a submission and queue a promotion PR.
       description: |
-        Atomically: creates an `organizations` row (status `approved`)
-        from the submission payload, links it to the submitted region
-        slugs via `organization_regions`, sets
-        `submissions.promoted_org_id`, and marks the submission
-        `approved`.
+        Marks the submission `approved` and enqueues an async GitHub PR
+        that appends the new organization to `api/seed/orgs.toml`. The
+        approval call returns as soon as the row is updated; the PR URL
+        (or a `promotion_error`) is attached to the row when the worker
+        finishes. If the worker failed, `urbanist-atlas-server
+        submissions retry-pr --id=<uuid>` re-queues the job.
       operationId: approveSubmission
       security:
         - BearerAuth: []
@@ -409,7 +410,10 @@ paths:
         - $ref: '#/components/parameters/SubmissionID'
       responses:
         '200':
-          description: Submission approved; returns the updated submission with `promoted_org_id` set.
+          description: |
+            Submission approved. The returned record may already include
+            `promotion_pr_url` or `promotion_error` if the worker
+            finished synchronously.
           content:
             application/json:
               schema:
@@ -515,9 +519,11 @@ components:
       name: id
       required: true
       schema:
-        type: integer
-        format: int64
-      description: The submission's numeric ID.
+        type: string
+        format: uuid
+      description: |
+        The submission's public ID — a UUIDv7 string generated when the
+        row was created. The numeric storage ID is never exposed.
 
   headers:
     XDataLicense:
@@ -1012,8 +1018,11 @@ components:
       required: [id, payload, status, created_at]
       properties:
         id:
-          type: integer
-          format: int64
+          type: string
+          format: uuid
+          description: |
+            UUIDv7 string generated server-side when the submission was
+            accepted. This is the only ID exposed on the wire.
         payload:
           $ref: '#/components/schemas/SubmissionPayload'
         submitter_name:
@@ -1032,10 +1041,20 @@ components:
           type: string
           format: date-time
           description: Set when status moves from `pending` to a terminal state.
-        promoted_org_id:
-          type: integer
-          format: int64
-          description: Set on approval to the ID of the created organization.
+        promotion_pr_url:
+          type: string
+          format: uri
+          description: |
+            Set on approval when the GitHub PR worker successfully opens a
+            pull request appending the approved org to `api/seed/orgs.toml`.
+            The PR is the editorial-review surface; the org becomes visible
+            after a maintainer merges it and the API redeploys.
+        promotion_error:
+          type: string
+          description: |
+            Set on approval when the GitHub PR worker failed (network,
+            auth, etc.). The submission stays `approved`; the PR is
+            re-queued via `urbanist-atlas-server submissions retry-pr`.
         rejection_reason:
           type: string
           description: Set on rejection.

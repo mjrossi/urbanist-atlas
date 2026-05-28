@@ -190,11 +190,16 @@ See the plan for the full schema, but at a glance:
   via the `region_slugs` array in each `[[org]]` entry of
   `orgs.toml`). At boot the FileStore resolves those slugs to the
   in-memory region IDs.
-- **Submissions:** the public submission queue is not yet implemented
-  at the storage layer; the next phase introduces it on a small
-  SQLite store sitting on a Fly volume (no Postgres). Approved
-  submissions land in `orgs.toml` via an auto-generated GitHub PR.
-  See [`docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md`](./docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md)
+- **Submissions:** the public submission queue lives in a small
+  SQLite store at `/data/atlas.db` on a 1 GiB Fly volume (no
+  Postgres). Public `POST /api/v1/submissions` is rate-limited per
+  IP; admin `GET/POST /api/v1/admin/submissions/...` is bearer-gated
+  (`URBANIST_ADMIN_TOKEN`). Approving a submission queues an async
+  GitHub PR worker (`internal/githubpr/`) that appends the new
+  `[[org]]` block to `api/seed/orgs.toml`. The PR is the
+  editorial-review surface; on merge, the next API deploy ships
+  the new bundle. See
+  [`docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md`](./docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md)
   for the full design.
 
 ### ETL pipeline (operator-side)
@@ -259,11 +264,19 @@ endpoints use a bearer token from `URBANIST_ADMIN_TOKEN`.
 - **API:** Fly.io, region `iad` (Virginia, US East). A single Fly app
   (`urbanist-atlas`); a multi-stage `Dockerfile` at the repo root
   builds the Go binary and bakes `api/seed/` into the image. The
-  process is stateless: at boot it loads the bundled TOML/CSV into
-  an in-memory `atlas.MemStore` and serves all reads from memory.
-  No release command, no database. The previous sibling
-  `urbanist-atlas-db` Postgres app and its nightly backup workflow
-  were retired when this changed.
+  **read path** is stateless: at boot the binary loads the bundled
+  TOML/CSV into an in-memory `atlas.MemStore` and serves all reads
+  from memory. The **write path** (public submissions) lands in a
+  small SQLite database at `/data/atlas.db` on a 1 GiB Fly volume
+  (`atlas_data`) — see slice β design at
+  [`docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md`](./docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md).
+  Approved submissions open a GitHub PR appending the new org to
+  `api/seed/orgs.toml`; the next deploy ships the merged bundle.
+  The previous sibling `urbanist-atlas-db` Postgres app and its
+  Postgres-era nightly backup workflow were retired when this
+  changed; SQLite gets its own
+  [`backup-sqlite.yml`](./.github/workflows/backup-sqlite.yml)
+  nightly cron to R2.
 - **Web:** Cloudflare Workers + Pages (Static Assets) configured by
   `wrangler.jsonc` at the repo root. The Vite build at `web/dist/`
   is uploaded as static assets; SPA fallback is handled by
