@@ -173,8 +173,8 @@ export function About() {
             licensing picture.
           </p>
           <p>
-            During the Phase 1 dogfood window the API sits behind a
-            shared-secret gate while we shake out schema and query bugs. The
+            During Phase 1 the API sits behind a shared-secret gate while we
+            shake out schema and query bugs. The
             Phase 2 program will open self-serve free keys. If you&rsquo;d like
             an early key before Phase 2 — to build a directory widget, a
             regional dashboard, anything — write to{' '}

@@ -77,7 +77,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
             </h1>
             <p className="deck">
-              Try <Link to="/browse">browse</Link> for the regions we have indexed,
+              Try <Link to="/browse">Browse</Link> for the regions we have indexed,
               or <Link to="/submit">file a tip</Link> if you know advocates here.
             </p>
           </div>

@@ -258,7 +258,8 @@ export function Submit() {
                   <span className="required">*</span>
                   <span className="hint">
                     City or metro slug, e.g. <code>nyc</code> or{' '}
-                    <code>chicago</code>. We&rsquo;ll finalize it in review.
+                    <code>chicago</code>. Editors finalize the region in PR
+                    review.
                   </span>
                 </label>
               </div>

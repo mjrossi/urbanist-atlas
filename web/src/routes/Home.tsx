@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link } from 'react-router';
@@ -52,10 +53,10 @@ export function Home() {
 
           <div className="prose mt-48">
             <p className="lead drop">
-              The Urbanist Atlas catalogues the people in your city, your county,
-              your region who are organizing — patiently, stubbornly, sometimes
-              gloriously — for safer streets and better transit. Type a US ZIP or
-              a Canadian postal code and we will name them for you.
+              The Urbanist Atlas catalogues the people in your city, county,
+              and region who are organizing — patiently, stubbornly, sometimes
+              gloriously — for safer streets and better transit. Type a US ZIP
+              or a Canadian postal code and we&rsquo;ll name them.
             </p>
             <p>
               We index local and regional advocates only. National outfits do
@@ -146,7 +147,7 @@ function RecentlyFiled({ query }: { query: UseQueryResult<Org[], ApiError> }) {
     <>
       <section className="section-break">
         <span className="num">II.</span>
-        <h2 className="title">Recently filed.</h2>
+        <h2 className="title">Recently indexed.</h2>
         <span className="aside">From the editor&rsquo;s desk</span>
       </section>
       <RecentBody query={query} />
@@ -203,19 +204,44 @@ function ByTheNumbers({
   places: UseQueryResult<RegionSummary[], ApiError>;
   recent: UseQueryResult<Org[], ApiError>;
 }) {
-  const placeCount = places.data?.length ?? null;
-  const usCount = places.data?.filter((p) => p.region.country === 'US').length ?? null;
-  const caCount = places.data?.filter((p) => p.region.country === 'CA').length ?? null;
-  // Total uses direct_org_count so summing across rows doesn't
-  // double-count orgs that surface under both a metro and its
-  // child cities. "Deepest coverage" below intentionally keeps
-  // org_count (descendant walk) — that's a single-row max showing
-  // how much advocacy depth one region's scope contains.
-  const totalOrgCount =
-    places.data?.reduce((sum, p) => sum + p.direct_org_count, 0) ?? null;
-  const topRegion = places.data
-    ? [...places.data].sort((a, b) => b.org_count - a.org_count)[0]
-    : null;
+  // Stat aggregates over the (potentially large) regions list.
+  // The cost is negligible today, but useMemo declares the intent
+  // and stops the work from re-running when an unrelated parent
+  // state change re-renders this section.
+  const { placeCount, usCount, caCount, totalOrgCount, topRegion } = useMemo(() => {
+    const data = places.data;
+    if (!data) {
+      return {
+        placeCount: null,
+        usCount: null,
+        caCount: null,
+        totalOrgCount: null,
+        topRegion: null,
+      };
+    }
+    let us = 0;
+    let ca = 0;
+    let total = 0;
+    let top: RegionSummary | null = null;
+    for (const p of data) {
+      if (p.region.country === 'US') us += 1;
+      else if (p.region.country === 'CA') ca += 1;
+      // direct_org_count avoids double-counting orgs that surface
+      // under both a metro and its child cities.
+      total += p.direct_org_count;
+      // "Deepest coverage" intentionally tracks org_count (descendant
+      // walk) — single-row max showing how much advocacy depth one
+      // region's scope contains.
+      if (!top || p.org_count > top.org_count) top = p;
+    }
+    return {
+      placeCount: data.length,
+      usCount: us,
+      caCount: ca,
+      totalOrgCount: total,
+      topRegion: top,
+    };
+  }, [places.data]);
   const recentCount = recent.data?.length ?? null;
 
   return (
@@ -280,7 +306,7 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
           </ul>
           <p className="fineprint mt-22">
             Tags are editorial labels, applied by hand. An organization can
-            carry up to five. Per-topic filtering ships with Phase 2; until
+            carry up to five. Per-topic filtering launches with Phase 2; until
             then, <Link to="/browse">the place index</Link> is the wander
             view.
           </p>

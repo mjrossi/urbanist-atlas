@@ -63,7 +63,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
               This organization <span className="accent">isn&rsquo;t in the atlas yet.</span>
             </h1>
             <p className="deck">
-              Try <Link to="/browse">browse</Link> for the metros we have indexed,
+              Try <Link to="/browse">Browse</Link> for the metros we have indexed,
               or <Link to="/submit">file a tip</Link> if you know who&rsquo;s
               doing the work here.
             </p>
@@ -205,11 +205,14 @@ function OrgContent({ org }: { org: OrgT }) {
             <a href={org.website_url} target="_blank" rel="noopener noreferrer">
               {domain ?? org.website_url}
             </a>
-            .{' '}
-            {org.regions.length > 0
-              ? `Below: the regions the Atlas files ${org.name} under.`
-              : `${org.name} doesn’t have a region attached yet — file a tip if you can place them.`}
+            .
           </p>
+          {org.regions.length === 0 ? (
+            <p>
+              {org.name} doesn&rsquo;t have a region attached yet —{' '}
+              <Link to="/submit">file a tip</Link> if you can place them.
+            </p>
+          ) : null}
 
           {org.regions.length > 0 ? (
             <>
