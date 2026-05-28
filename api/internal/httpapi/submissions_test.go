@@ -198,8 +198,12 @@ func TestCreateSubmission_UnknownRegionSlug_Returns400(t *testing.T) {
 	}
 	var problem map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&problem)
-	if got, _ := problem["detail"].(string); !strings.Contains(got, "no-such-region") {
-		t.Fatalf("detail does not mention bad slug: %v", problem)
+	// Bad region slugs now surface via the per-field `errors` map
+	// rather than the top-level `detail`. Mirrors the wire shape the
+	// SPA's Submit page consumes for per-input validator dispatch.
+	errs, _ := problem["errors"].(map[string]any)
+	if got, _ := errs["region_slugs"].(string); !strings.Contains(got, "no-such-region") {
+		t.Fatalf("errors.region_slugs does not mention bad slug: %v", problem)
 	}
 }
 

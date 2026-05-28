@@ -195,6 +195,15 @@ type ProblemDetails struct {
 	// Safe to display to end users.
 	Detail *string `json:"detail,omitempty"`
 
+	// Errors Extension field. Per-field validation messages keyed by
+	// JSON field name (e.g. `name`, `short_desc`,
+	// `submitter_email`). Present only on validation failures
+	// where multiple fields may be at fault — currently
+	// `POST /api/v1/submissions`. Each value is a sentence safe
+	// to render to end users; clients can dispatch them into
+	// per-field form validators.
+	Errors *map[string]string `json:"errors,omitempty"`
+
 	// Instance URI reference that identifies the specific occurrence of
 	// the problem — typically the request path.
 	Instance *string `json:"instance,omitempty"`
