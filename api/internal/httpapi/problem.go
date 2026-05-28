@@ -10,16 +10,13 @@ import (
 // Stable problem-type URIs. The catalog and its meanings are
 // documented in api/openapi.yaml's ProblemDetails schema; mirror
 // changes here when the spec changes.
-//
-// Only the URIs that the handlers in this slice emit are listed.
-// `conflict` and `rate-limited` will be added by the slices that need
-// them (submissions / admin endpoints, slice #5; rate limiting, slice
-// #27) to keep this file lint-clean in the interim.
 const (
 	problemValidation   = "https://urbanistatlas.com/problems/validation"
 	problemNotFound     = "https://urbanistatlas.com/problems/not-found"
 	problemInternal     = "https://urbanistatlas.com/problems/internal"
 	problemUnauthorized = "https://urbanistatlas.com/problems/unauthorized"
+	problemConflict     = "https://urbanistatlas.com/problems/conflict"
+	problemRateLimited  = "https://urbanistatlas.com/problems/rate-limited"
 )
 
 // writeJSON emits an arbitrary value as application/json. Used for

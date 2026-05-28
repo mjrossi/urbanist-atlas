@@ -1,0 +1,87 @@
+name: SQLite nightly backup
+
+# Nightly snapshot of the submissions DB on Fly to Cloudflare R2.
+# The bundle is small (KB-to-MB), so the dump is fast and the
+# uploaded artifact is a single .sql.gz per day. Retention is enforced
+# on the R2 bucket itself: 30-day lifecycle rule, set out of band in
+# the Cloudflare dashboard at R2 → urbanist-atlas-backups → Settings →
+# Lifecycle. If the rule is ever removed, snapshots accumulate
+# indefinitely; check docs/deploy.md §Backups and re-add it.
+#
+# Requires the following GitHub Actions secrets:
+#   - FLY_API_TOKEN_DEPLOY      (already configured for ci.yml)
+#   - CF_ACCOUNT_ID             Cloudflare account ID; expanded into the R2 S3 endpoint
+#   - R2_ACCESS_KEY_ID          R2 API token — Object Read & Write on R2_BACKUP_BUCKET
+#   - R2_SECRET_ACCESS_KEY
+#   - R2_BACKUP_BUCKET          (e.g. urbanist-atlas-backups)
+#
+# Restore: `gunzip -c <file>.sql.gz | sqlite3 /data/atlas.db.new`,
+# then `flyctl ssh sftp shell -a urbanist-atlas` to push it into place.
+
+on:
+  schedule:
+    # 09:17 UTC — off-peak for iad, off the 0/15/30/45 cron herd.
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Snapshot SQLite via flyctl ssh
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_DEPLOY }}
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y-%m-%d-%H%M)"
+          remote="/tmp/atlas-${stamp}.sql.gz"
+          out="atlas-${stamp}.sql.gz"
+          # Two-step capture to avoid PTY corruption:
+          # `flyctl ssh console -C` historically allocates a PTY, which
+          # injects CR characters / color codes into stdout and silently
+          # corrupts a piped gzip stream. We write the compressed dump to
+          # a remote file first, then `sftp get` it back as raw bytes.
+          # `sh -eu -o pipefail` ensures a missing binary or a failed
+          # sqlite3 step propagates a non-zero exit through the pipe
+          # instead of leaving us with an empty (but well-formed) gzip
+          # stream. `flyctl ssh console -C` is unreliable about
+          # propagating remote exit codes, so this inner-shell
+          # discipline is the load-bearing safety net.
+          flyctl ssh console -a urbanist-atlas \
+            -C "sh -eu -o pipefail -c 'sqlite3 /data/atlas.db .dump | gzip -c > ${remote}'"
+          flyctl ssh sftp get -a urbanist-atlas "${remote}" "${out}"
+          flyctl ssh console -a urbanist-atlas \
+            -C "rm -f ${remote}"
+          # Sanity: refuse to upload an empty backup. SQLite .dump on a
+          # fresh DB still emits PRAGMA + BEGIN/COMMIT, so anything
+          # well under 100 bytes means the ssh command itself failed.
+          test "$(wc -c < "${out}")" -ge 100
+          # Integrity: gunzip -t verifies the gzip stream end-to-end so
+          # a corrupted upload is caught here, not at restore time.
+          gunzip -t "${out}"
+          echo "BACKUP_FILE=${out}" >> "${GITHUB_ENV}"
+
+      - name: Set up rclone
+        uses: AnimMouse/setup-rclone@v1
+
+      - name: Upload to R2
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          # R2 tokens scoped to Object Read & Write cannot CreateBucket
+          # or HeadBucket, so rclone's default existence probe returns
+          # 403. Skip it — the bucket is provisioned out of band.
+          RCLONE_CONFIG_R2_NO_CHECK_BUCKET: 'true'
+          R2_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+        run: |
+          set -euo pipefail
+          rclone copy "${BACKUP_FILE}" "r2:${R2_BUCKET}/" --no-traverse
+          rclone ls "r2:${R2_BUCKET}/" | tail -n 5

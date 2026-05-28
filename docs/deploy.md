@@ -17,7 +17,7 @@ file is the current playbook.
 
 | Component | Resource | Initial hostname |
 |---|---|---|
-| API | Fly app `urbanist-atlas`, region `iad` (Virginia, US East), shared-cpu-1x / 256 MB. Stateless: `api/seed/` is baked into the image and loaded into an in-memory FileStore at boot. | `qa-api.urbanistatlas.com` |
+| API | Fly app `urbanist-atlas`, region `iad` (Virginia, US East), shared-cpu-1x / 256 MB. Read path is stateless: `api/seed/` is baked into the image and loaded into an in-memory FileStore at boot. Writes (submissions only) land in a SQLite DB at `/data/atlas.db` on the `atlas_data` Fly volume (1 GiB, ~$0.15/mo). | `qa-api.urbanistatlas.com` |
 | Web | Cloudflare Workers + Pages project `urbanist-atlas` (Static Assets), prod branch `main`, configured by `wrangler.jsonc` at repo root | `qa.urbanistatlas.com` |
 | Web previews | `<version>-urbanist-atlas.<account>.workers.dev` | Auto-provisioned per non-`main` deploy via `wrangler versions upload` |
 
@@ -71,11 +71,21 @@ run.
 
 | Secret | Purpose | How to set |
 |---|---|---|
-| `URBANIST_ADMIN_TOKEN` | bearer token for admin endpoints | `flyctl secrets set URBANIST_ADMIN_TOKEN=<value> -a urbanist-atlas` |
+| `URBANIST_ADMIN_TOKEN` | bearer token for `/api/v1/admin/*` endpoints (submission moderation). Empty → admin endpoints return 503. | `flyctl secrets set URBANIST_ADMIN_TOKEN=<value> -a urbanist-atlas` |
 | `URBANIST_CLIENT_SECRET` | Phase 1 shared-secret `X-Atlas-Client` gate; mirrored to the SPA build as `VITE_API_CLIENT_SECRET` | `flyctl secrets set URBANIST_CLIENT_SECRET=<value> -a urbanist-atlas` |
+| `URBANIST_GITHUB_TOKEN` | Fine-grained PAT scoped to this repo only (Contents R/W + Pull requests R/W). Drives the promotion-PR worker on submission approval. Empty → approval still flips status but `promotion_error="worker disabled (no token configured)"`. | `flyctl secrets set URBANIST_GITHUB_TOKEN=<pat> -a urbanist-atlas` |
 
-Generate fresh values with `openssl rand -hex 32`. The client secret
-must match the value built into the SPA bundle for the gate to pass.
+Generate the two random secrets with `openssl rand -hex 32` (pipe
+directly into `flyctl secrets set`, don't capture into a variable
+first — fewer places the value sits in shell history). The client
+secret must match the value built into the SPA bundle.
+
+The GitHub PAT is issued at
+[`github.com/settings/personal-access-tokens/new`](https://github.com/settings/personal-access-tokens/new):
+"Only select repositories" → `mjrossi/urbanist-atlas`; "Repository
+permissions" → Contents (Read and write) + Pull requests (Read and
+write); leave everything else at "No access". A 1-year expiry is
+the default; rotate on schedule.
 
 ## Prerequisites
 
@@ -91,20 +101,26 @@ These steps assume the repo's current state (single Fly app, no DB).
 The original Postgres-included bring-up procedure is preserved in the
 git history of this file if it ever needs to be replayed.
 
-### 1. Create the Fly app
+### 1. Create the Fly app + volume + secrets
 
 ```sh
 flyctl apps create urbanist-atlas --org <your-org>
+flyctl volumes create atlas_data --size 1 --region iad -a urbanist-atlas
 flyctl secrets set \
   URBANIST_ADMIN_TOKEN="$(openssl rand -hex 32)" \
   URBANIST_CLIENT_SECRET="$(openssl rand -hex 32)" \
+  URBANIST_GITHUB_TOKEN="<paste fine-grained PAT here>" \
   -a urbanist-atlas
 flyctl deploy --remote-only -a urbanist-atlas
 ```
 
-The `[env]` section of `fly.toml` pins `URBANIST_SEED_DIR=/app/seed`,
-matching the Dockerfile's `COPY api/seed/ ./seed/`. Boot should log
-`store initialized kind=file regions=<n> orgs=<n>` within ~1s.
+The Dockerfile bakes `api/seed/` into the binary via `//go:embed`,
+so reads are served from memory; writes (submissions) land in the
+SQLite DB on the mounted volume at `/data/atlas.db`. Boot should log
+`store initialized kind=file regions=<n> orgs=<n>` and
+`submission store initialized path=/data/atlas.db` within ~1s, plus
+a one-time `goose: successfully migrated database to version: 1`
+on the very first boot against a fresh volume.
 
 ### 2. DNS
 
@@ -162,11 +178,73 @@ deploy with a 5×5s retry, so a transient cutover blip won't fail CI.
 
 There is no live data store, so a deploy *is* the data refresh.
 
-## Future state: writable surface
+## Backups (SQLite submission queue)
 
-The public submission queue is not yet wired at the storage layer.
-The next phase introduces a small SQLite store on a Fly volume for
-submissions + future API keys; approval will open a GitHub PR
-appending the org to `orgs.toml`. See the in-tree design spec at
-[`superpowers/specs/2026-05-27-submissions-sqlite-design.md`](./superpowers/specs/2026-05-27-submissions-sqlite-design.md)
-for the schema, wire contract, approval flow, and bring-up steps.
+[`.github/workflows/backup-sqlite.yml`](../.github/workflows/backup-sqlite.yml)
+runs nightly at 09:17 UTC. It opens an `flyctl ssh console` into the
+running Fly machine, pipes `sqlite3 /data/atlas.db .dump | gzip` to
+stdout, and uploads the resulting `atlas-<date>.sql.gz` to the
+`urbanist-atlas-backups` R2 bucket (30-day lifecycle retention set
+out-of-band on the bucket).
+
+Required Actions secrets:
+
+| Secret | Source |
+|---|---|
+| `CF_ACCOUNT_ID` | Cloudflare dashboard → account ID (expanded into `https://<id>.r2.cloudflarestorage.com` by the workflow) |
+| `R2_ACCESS_KEY_ID` | R2 API token (Object R/W on the backups bucket) |
+| `R2_SECRET_ACCESS_KEY` | same R2 API token |
+| `R2_BACKUP_BUCKET` | `urbanist-atlas-backups` |
+
+These names match the secrets already provisioned for the prior
+Postgres-era backup workflow, so the new workflow reuses them
+without duplication.
+
+`FLY_API_TOKEN_DEPLOY` (already configured for `ci.yml`) is reused
+for the `flyctl ssh` step.
+
+### Restore
+
+```sh
+# 1. Pull the snapshot locally and confirm the gzip stream is intact
+#    (the nightly workflow already gunzip -t's before upload, but the
+#    restore path is rare enough to double-check).
+rclone copy r2:urbanist-atlas-backups/atlas-2026-05-28-0917.sql.gz .
+gunzip -t atlas-2026-05-28-0917.sql.gz
+
+# 2. Reconstruct a fresh DB.
+gunzip -c atlas-2026-05-28-0917.sql.gz | sqlite3 /tmp/atlas.db.new
+
+# 3. Stop the app machine so its open SQLite handle releases the file.
+#    Skipping this and just mv'ing the file under a running binary
+#    leaves the kernel holding the old inode open until the next
+#    restart — submissions written in between will land in the OLD
+#    file and disappear when the mv eventually takes effect.
+flyctl machines list -a urbanist-atlas    # note the machine id
+flyctl machines stop <machine-id> -a urbanist-atlas
+
+# 4. Push the new DB onto the Fly volume.
+flyctl ssh sftp shell -a urbanist-atlas
+  put /tmp/atlas.db.new /data/atlas.db.new
+  bye
+flyctl ssh console -a urbanist-atlas -C \
+  "sh -c 'mv /data/atlas.db /data/atlas.db.bak && mv /data/atlas.db.new /data/atlas.db'"
+
+# 5. Restart and smoke-test.
+flyctl machines start <machine-id> -a urbanist-atlas
+curl -fsS https://qa-api.urbanistatlas.com/readyz
+```
+
+### Re-running a failed promotion PR
+
+If the GitHub PR worker logs a `promotion_error` (token expired,
+GitHub outage, etc.) for an already-approved submission, re-run it
+without needing to flip the row back to pending:
+
+```sh
+flyctl ssh console -a urbanist-atlas -C \
+  "urbanist-atlas-server submissions retry-pr --id=<uuid>"
+```
+
+The retry uses the current `URBANIST_GITHUB_TOKEN` Fly secret and
+overwrites `promotion_pr_url` / `promotion_error` on the row.

@@ -9,6 +9,26 @@ primary_region = 'iad'
 [build]
   dockerfile = 'Dockerfile'
 
+# Persistent volume for the SQLite submissions DB. The Fly volume
+# survives machine recycles; the binary opens /data/atlas.db at boot
+# and runs goose migrations on the embedded FS in api/migrations-sqlite.
+#
+# SQLite is single-writer. Fly volumes are single-attach, so a second
+# machine would silently start its own empty DB on a fresh volume. The
+# app is therefore pinned to one machine: do NOT add `max_machines > 1`
+# or any auto-scaling config below without first moving the write path
+# off SQLite. min_machines_running=1 + auto_stop_machines=false (below)
+# also keep the in-process rate limiter and the GitHub PR worker queue
+# alive between requests — both live in RAM and would silently reset on
+# a suspend/resume cycle.
+#
+# Provision once:
+#   flyctl volumes create atlas_data --size 1 --region iad -a urbanist-atlas
+# See docs/deploy.md §Bring-up.
+[[mounts]]
+  source = 'atlas_data'
+  destination = '/data'
+
 [env]
   # CORS allowlist for Phase 1.
   # - https://qa.urbanistatlas.com — the QA SPA hostname (custom domain on the Workers project)
@@ -23,12 +43,29 @@ primary_region = 'iad'
   # to the seed bundle embedded at build time via //go:embed. To pin
   # a deployed instance to an on-disk override, set this to the
   # directory path here (and add a matching COPY to the Dockerfile).
+  #
+  # The submission write path lives on the mounted volume:
+  URBANIST_DB_PATH = '/data/atlas.db'
+  # Submissions per IP per hour (in-process limiter; the WAF rule at
+  # the edge is the first defense).
+  URBANIST_SUBMISSIONS_RATE_PER_HOUR = '5'
+  # URBANIST_ADMIN_TOKEN and URBANIST_GITHUB_TOKEN are Fly secrets, set
+  # via:  flyctl secrets set URBANIST_ADMIN_TOKEN=… URBANIST_GITHUB_TOKEN=…
+  # Without ADMIN_TOKEN, admin endpoints return 503; without
+  # GITHUB_TOKEN, approval still flips status but the PR worker
+  # records promotion_error="worker disabled (no token configured)".
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'suspend'
-  auto_start_machines = true
+  # auto_stop_machines=false (and auto_start_machines=false) is
+  # load-bearing: see the [[mounts]] comment above. The in-process
+  # rate limiter (internal/httpapi/ratelimit.go) and the GitHub PR
+  # worker's job channel (internal/githubpr/worker.go) both keep state
+  # in RAM, so any suspend/resume cycle drops queued PR jobs and resets
+  # the per-IP submission window.
+  auto_stop_machines = false
+  auto_start_machines = false
   min_machines_running = 1
   processes = ['app']
 

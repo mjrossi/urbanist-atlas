@@ -261,7 +261,14 @@ export interface paths {
          * List pending submissions.
          * @description Returns submissions in the moderation queue. By default returns
          *     only `pending` submissions; pass `status=approved` or
-         *     `status=rejected` to view history.
+         *     `status=rejected` to view history. Results are newest-first
+         *     with stable keyset pagination on `(created_at, id)`.
+         *
+         *     Pagination uses an opaque cursor. When more rows exist beyond
+         *     the current page, the response carries an `X-Next-Cursor`
+         *     header; pass that value back as `?cursor=` to fetch the next
+         *     page. The cursor format is undocumented and may change without
+         *     notice — treat it as opaque.
          */
         get: operations["listSubmissions"];
         put?: never;
@@ -282,12 +289,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a submission and promote it to a real organization.
-         * @description Atomically: creates an `organizations` row (status `approved`)
-         *     from the submission payload, links it to the submitted region
-         *     slugs via `organization_regions`, sets
-         *     `submissions.promoted_org_id`, and marks the submission
-         *     `approved`.
+         * Approve a submission and queue a promotion PR.
+         * @description Marks the submission `approved` and enqueues an async GitHub PR
+         *     that appends the new organization to `api/seed/orgs.toml`. The
+         *     approval call returns as soon as the row is updated; the PR URL
+         *     (or a `promotion_error`) is attached to the row when the worker
+         *     finishes. If the worker failed, `urbanist-atlas-server
+         *     submissions retry-pr --id=<uuid>` re-queues the job.
          */
         post: operations["approveSubmission"];
         delete?: never;
@@ -656,8 +664,12 @@ export interface components {
         };
         /** @description A queued or processed public submission. */
         Submission: {
-            /** Format: int64 */
-            id: number;
+            /**
+             * Format: uuid
+             * @description UUIDv7 string generated server-side when the submission was
+             *     accepted. This is the only ID exposed on the wire.
+             */
+            id: string;
             payload: components["schemas"]["SubmissionPayload"];
             submitter_name?: string;
             /** Format: email */
@@ -672,10 +684,19 @@ export interface components {
              */
             processed_at?: string;
             /**
-             * Format: int64
-             * @description Set on approval to the ID of the created organization.
+             * Format: uri
+             * @description Set on approval when the GitHub PR worker successfully opens a
+             *     pull request appending the approved org to `api/seed/orgs.toml`.
+             *     The PR is the editorial-review surface; the org becomes visible
+             *     after a maintainer merges it and the API redeploys.
              */
-            promoted_org_id?: number;
+            promotion_pr_url?: string;
+            /**
+             * @description Set on approval when the GitHub PR worker failed (network,
+             *     auth, etc.). The submission stays `approved`; the PR is
+             *     re-queued via `urbanist-atlas-server submissions retry-pr`.
+             */
+            promotion_error?: string;
             /** @description Set on rejection. */
             rejection_reason?: string;
         };
@@ -859,8 +880,11 @@ export interface components {
          *     (Canadian CMA), `metro-vancouver` (regional district).
          */
         RegionSlug: string;
-        /** @description The submission's numeric ID. */
-        SubmissionID: number;
+        /**
+         * @description The submission's public ID — a UUIDv7 string generated when the
+         *     row was created. The numeric storage ID is never exposed.
+         */
+        SubmissionID: string;
     };
     requestBodies: never;
     headers: {
@@ -1131,6 +1155,14 @@ export interface operations {
             query?: {
                 /** @description Filter by submission status. Defaults to `pending`. */
                 status?: components["schemas"]["SubmissionStatus"];
+                /** @description Maximum number of submissions to return. Capped at 200. */
+                limit?: number;
+                /**
+                 * @description Opaque pagination token. Pass the value of the previous
+                 *     response's `X-Next-Cursor` header to fetch the next page.
+                 *     Omit to start at the newest submission.
+                 */
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -1141,12 +1173,18 @@ export interface operations {
             /** @description Submissions matching the filter, newest first. */
             200: {
                 headers: {
+                    /**
+                     * @description Opaque cursor for the next page. Present only when more
+                     *     rows exist beyond the current page.
+                     */
+                    "X-Next-Cursor"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Submission"][];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
@@ -1156,14 +1194,21 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The submission's numeric ID. */
+                /**
+                 * @description The submission's public ID — a UUIDv7 string generated when the
+                 *     row was created. The numeric storage ID is never exposed.
+                 */
                 id: components["parameters"]["SubmissionID"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Submission approved; returns the updated submission with `promoted_org_id` set. */
+            /**
+             * @description Submission approved. The returned record may already include
+             *     `promotion_pr_url` or `promotion_error` if the worker
+             *     finished synchronously.
+             */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1195,7 +1240,10 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The submission's numeric ID. */
+                /**
+                 * @description The submission's public ID — a UUIDv7 string generated when the
+                 *     row was created. The numeric storage ID is never exposed.
+                 */
                 id: components["parameters"]["SubmissionID"];
             };
             cookie?: never;

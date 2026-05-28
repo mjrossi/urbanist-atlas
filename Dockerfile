@@ -47,11 +47,18 @@ FROM alpine:3.20
 # ca-certificates for any outbound TLS the binary might do.
 # Non-root user because there's no reason to run as root for a
 # stateless API listening on a non-privileged port.
-RUN apk add --no-cache ca-certificates && \
+RUN apk add --no-cache ca-certificates sqlite && \
     addgroup -S app && \
     adduser -S app -G app
 
 WORKDIR /app
+
+# Pre-create /data so the non-root app user can write the SQLite DB
+# even on the first boot before the Fly volume's lifecycle attaches.
+# Fly mounts inherit the in-image ownership on first mount, so this
+# also fixes the long-term permissions.
+RUN mkdir -p /data && chown app:app /data
+VOLUME ["/data"]
 
 COPY --from=builder --chown=app:app /out/urbanist-atlas-server /usr/local/bin/urbanist-atlas-server
 

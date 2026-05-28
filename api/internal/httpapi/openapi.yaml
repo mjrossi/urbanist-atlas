@@ -367,7 +367,14 @@ paths:
       description: |
         Returns submissions in the moderation queue. By default returns
         only `pending` submissions; pass `status=approved` or
-        `status=rejected` to view history.
+        `status=rejected` to view history. Results are newest-first
+        with stable keyset pagination on `(created_at, id)`.
+
+        Pagination uses an opaque cursor. When more rows exist beyond
+        the current page, the response carries an `X-Next-Cursor`
+        header; pass that value back as `?cursor=` to fetch the next
+        page. The cursor format is undocumented and may change without
+        notice — treat it as opaque.
       operationId: listSubmissions
       security:
         - BearerAuth: []
@@ -378,15 +385,42 @@ paths:
           schema:
             $ref: '#/components/schemas/SubmissionStatus'
           description: Filter by submission status. Defaults to `pending`.
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          description: Maximum number of submissions to return. Capped at 200.
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+          description: |
+            Opaque pagination token. Pass the value of the previous
+            response's `X-Next-Cursor` header to fetch the next page.
+            Omit to start at the newest submission.
       responses:
         '200':
           description: Submissions matching the filter, newest first.
+          headers:
+            X-Next-Cursor:
+              description: |
+                Opaque cursor for the next page. Present only when more
+                rows exist beyond the current page.
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/Submission'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -395,13 +429,14 @@ paths:
   /api/v1/admin/submissions/{id}/approve:
     post:
       tags: [admin]
-      summary: Approve a submission and promote it to a real organization.
+      summary: Approve a submission and queue a promotion PR.
       description: |
-        Atomically: creates an `organizations` row (status `approved`)
-        from the submission payload, links it to the submitted region
-        slugs via `organization_regions`, sets
-        `submissions.promoted_org_id`, and marks the submission
-        `approved`.
+        Marks the submission `approved` and enqueues an async GitHub PR
+        that appends the new organization to `api/seed/orgs.toml`. The
+        approval call returns as soon as the row is updated; the PR URL
+        (or a `promotion_error`) is attached to the row when the worker
+        finishes. If the worker failed, `urbanist-atlas-server
+        submissions retry-pr --id=<uuid>` re-queues the job.
       operationId: approveSubmission
       security:
         - BearerAuth: []
@@ -409,7 +444,10 @@ paths:
         - $ref: '#/components/parameters/SubmissionID'
       responses:
         '200':
-          description: Submission approved; returns the updated submission with `promoted_org_id` set.
+          description: |
+            Submission approved. The returned record may already include
+            `promotion_pr_url` or `promotion_error` if the worker
+            finished synchronously.
           content:
             application/json:
               schema:
@@ -515,9 +553,11 @@ components:
       name: id
       required: true
       schema:
-        type: integer
-        format: int64
-      description: The submission's numeric ID.
+        type: string
+        format: uuid
+      description: |
+        The submission's public ID — a UUIDv7 string generated when the
+        row was created. The numeric storage ID is never exposed.
 
   headers:
     XDataLicense:
@@ -1012,8 +1052,11 @@ components:
       required: [id, payload, status, created_at]
       properties:
         id:
-          type: integer
-          format: int64
+          type: string
+          format: uuid
+          description: |
+            UUIDv7 string generated server-side when the submission was
+            accepted. This is the only ID exposed on the wire.
         payload:
           $ref: '#/components/schemas/SubmissionPayload'
         submitter_name:
@@ -1032,10 +1075,20 @@ components:
           type: string
           format: date-time
           description: Set when status moves from `pending` to a terminal state.
-        promoted_org_id:
-          type: integer
-          format: int64
-          description: Set on approval to the ID of the created organization.
+        promotion_pr_url:
+          type: string
+          format: uri
+          description: |
+            Set on approval when the GitHub PR worker successfully opens a
+            pull request appending the approved org to `api/seed/orgs.toml`.
+            The PR is the editorial-review surface; the org becomes visible
+            after a maintainer merges it and the API redeploys.
+        promotion_error:
+          type: string
+          description: |
+            Set on approval when the GitHub PR worker failed (network,
+            auth, etc.). The submission stays `approved`; the PR is
+            re-queued via `urbanist-atlas-server submissions retry-pr`.
         rejection_reason:
           type: string
           description: Set on rejection.

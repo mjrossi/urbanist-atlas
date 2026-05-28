@@ -18,6 +18,7 @@ Thumbs.db
 !.env.example
 
 # ── mise: machine-local overrides ───────────────────
+mise.*.local.toml
 mise.local.toml
 
 # ── Go (api/) ───────────────────────────────────────

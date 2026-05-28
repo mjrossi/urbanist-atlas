@@ -2523,7 +2523,26 @@ a.tag:hover::before {
   text-transform: none;
   color: var(--muted);
   line-height: 1.4;
-  max-width: 26ch;
+  /* On mobile the label sits above the input — let the hint use the
+     full row width. The 26ch cap is desirable only in the 2-column
+     desktop layout where the label gets a 180px column. */
+  max-width: none;
+}
+
+@media (min-width: 720px) {
+  .field-label .hint {
+    max-width: 26ch;
+  }
+}
+
+.field-label .hint code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-style: normal;
+  font-size: 12px;
+  padding: 1px 4px;
+  background: rgba(143, 85, 32, 0.08);
+  border-radius: 2px;
+  color: var(--ink);
 }
 
 .field-label .required {
@@ -2584,7 +2603,16 @@ a.tag:hover::before {
 .textarea {
   resize: vertical;
   min-height: 96px;
-  padding: 8px 6px;
+  /* Tightened on desktop where the input-row column gives plenty of
+     room; on mobile the textarea spans edge-to-edge so we need
+     comfortable left/right breathing room. */
+  padding: 8px 12px;
+}
+
+@media (min-width: 720px) {
+  .textarea {
+    padding: 8px 6px;
+  }
 }
 
 .textarea.tall {
@@ -2657,9 +2685,19 @@ a.tag:hover::before {
 }
 
 .choices.inline {
-  flex-direction: row;
+  /* On mobile, "I'm a member, volunteer, or staff" is too wide for an
+     inline row alongside two other options — give the disclosure
+     radios their own lines so each is comfortably tappable. */
+  flex-direction: column;
   flex-wrap: wrap;
-  gap: 8px 28px;
+  gap: 4px;
+}
+
+@media (min-width: 720px) {
+  .choices.inline {
+    flex-direction: row;
+    gap: 8px 28px;
+  }
 }
 
 .choices.inline .choice {
@@ -2693,6 +2731,119 @@ a.tag:hover::before {
   color: var(--muted);
   max-width: 44ch;
   line-height: 1.45;
+}
+
+.slip-foot .btn-primary {
+  /* Submit button is the slip's most important touch target — on
+     mobile let it span the row so a thumb-stretched user can hit it
+     without precision. */
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+}
+
+@media (min-width: 720px) {
+  .slip-foot .btn-primary {
+    width: auto;
+  }
+}
+
+/* ── Submission "received" receipt card ─────────────── */
+
+.receipt {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+  padding: 22px 20px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 720px) {
+  .receipt {
+    padding: 28px 32px;
+    gap: 18px;
+  }
+}
+
+.receipt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.receipt-row:last-of-type {
+  border-bottom: 2px double var(--rule-strong);
+}
+
+.receipt-label {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  min-width: 7em;
+}
+
+.receipt-value {
+  font-family: var(--serif-text);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.receipt-value.mono {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.receipt-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+@media (min-width: 720px) {
+  .receipt-foot {
+    flex-direction: row;
+    align-items: center;
+    gap: 24px;
+  }
+}
+
+.receipt-foot .btn-primary {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+}
+
+@media (min-width: 720px) {
+  .receipt-foot .btn-primary {
+    width: auto;
+  }
+}
+
+.receipt-link {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 2px;
+}
+
+.receipt-link:hover {
+  color: var(--amber);
+  border-bottom-color: var(--amber);
 }
 
 /* ── Process strip ─────────────────────────────────── */

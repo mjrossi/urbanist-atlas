@@ -1,0 +1,20 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    queries: "internal/store/sqlite/queries"
+    schema: "migrations-sqlite"
+    gen:
+      go:
+        package: "sqlitegen"
+        out: "internal/store/sqlite/gen"
+        sql_package: "database/sql"
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_prepared_queries: false
+        emit_json_tags: false
+        overrides:
+          - column: "submissions.processed_at"
+            go_type:
+              import: "database/sql"
+              type: "NullString"
+              pointer: false

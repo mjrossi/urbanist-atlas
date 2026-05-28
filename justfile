@@ -5,7 +5,7 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # oapi-codegen, and staticcheck.
 #
-# Groups: api, data, verify, web, preview, fly, smoke, ci.
+# Groups: api, data, verify, web, preview, fly, submissions, smoke, ci.
 # Each group corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
@@ -249,6 +249,73 @@ fly-secrets:
 [group('fly')]
 fly-ssh:
     flyctl ssh console -a urbanist-atlas
+
+# ── submissions: admin queue ops ──────────────────────
+# Thin curl wrappers around GET/POST /api/v1/admin/submissions so
+# triage doesn't require remembering bearer-auth invocations. All
+# three HTTP recipes need two secrets in the environment, both
+# matching the corresponding Fly secret of the same name (set them
+# in mise.local.toml or your shell):
+#   - URBANIST_ADMIN_TOKEN   — bearer token for /api/v1/admin/*
+#   - URBANIST_CLIENT_SECRET — phase-1 X-Atlas-Client shared secret
+# `base` defaults to the deployed API; pass `http://localhost:8080`
+# to drive a local server instead. Against a local server the
+# client-secret gate is typically off, but the recipe still sends
+# the header (the gate ignores it when the server-side secret is
+# empty), so the same env works for both targets.
+
+# list submissions, default status=pending. Pass `approved` to see
+# `promotion_pr_url` / `promotion_error` for already-actioned rows.
+# usage: just submissions-list
+#        just submissions-list approved
+#        just submissions-list pending http://localhost:8080
+[group('submissions')]
+[doc('GET /api/v1/admin/submissions (default status=pending)')]
+submissions-list status='pending' base='https://qa-api.urbanistatlas.com':
+    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN (e.g. via mise.local.toml or your shell)}"
+    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET (phase-1 X-Atlas-Client gate)}"
+    @curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+        -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
+        "{{base}}/api/v1/admin/submissions?status={{status}}" | jq
+
+# approve a pending submission; the API enqueues the GitHub-PR worker
+# and returns the updated row. The PR URL lands on the row a few
+# seconds later — re-run `submissions-list approved` to see it.
+# usage: just submissions-approve <uuid>
+[group('submissions')]
+[doc('POST /api/v1/admin/submissions/{id}/approve (queues GitHub PR)')]
+submissions-approve id base='https://qa-api.urbanistatlas.com':
+    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
+    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
+    @curl -sS -X POST -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+        -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
+        "{{base}}/api/v1/admin/submissions/{{id}}/approve" | jq
+
+# reject a pending submission with a moderator-facing reason. The
+# reason is JSON-encoded via jq so quotes/newlines pass through safely.
+# usage: just submissions-reject <uuid> "duplicate of foo-bar org"
+[group('submissions')]
+[doc('POST /api/v1/admin/submissions/{id}/reject with a reason')]
+submissions-reject id reason base='https://qa-api.urbanistatlas.com':
+    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
+    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
+    @body="$(jq -nc --arg r "{{reason}}" '{reason: $r}')"; \
+        curl -sS -X POST -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+            -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
+            -H "Content-Type: application/json" -d "$body" \
+            "{{base}}/api/v1/admin/submissions/{{id}}/reject" | jq
+
+# re-run the GitHub PR worker for an approved submission whose first
+# attempt failed (e.g. transient GitHub outage). Executes the
+# `submissions retry-pr` CLI subcommand inside the Fly machine, since
+# it needs filesystem access to /data/atlas.db and the bundled
+# URBANIST_GITHUB_TOKEN secret. Use after spotting a non-empty
+# `promotion_error` on an approved row via `submissions-list approved`.
+# usage: just submissions-retry-pr <uuid>
+[group('submissions')]
+[doc('retry the GitHub PR worker for an approved submission (via flyctl ssh)')]
+submissions-retry-pr id:
+    flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server submissions retry-pr --id={{id}}"
 
 # ── smoke: live curl helpers (server must be running) ─
 
