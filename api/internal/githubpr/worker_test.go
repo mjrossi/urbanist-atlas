@@ -298,6 +298,42 @@ func TestEnqueue_FullBuffer(t *testing.T) {
 	}
 }
 
+// TestWorker_Stop_DrainsBuffer pins the SIGTERM-shutdown contract:
+// Stop closes the jobs channel, Run drains whatever's already
+// buffered (processing each one), and Stop returns nil once Run
+// exits.
+func TestWorker_Stop_DrainsBuffer(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Run(ctx)
+
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	persist.wait(t, 1)
+
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer stopCancel()
+	dropped, err := w.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("Stop returned err: %v (dropped=%v)", err, dropped)
+	}
+	if len(dropped) != 0 {
+		t.Fatalf("Stop dropped IDs on clean drain: %v", dropped)
+	}
+}
+
 func TestRenderOrgBlock_Deterministic(t *testing.T) {
 	sub := sampleSubmission()
 	a, err := RenderOrgBlock(sub, "brooklyn-greenways")

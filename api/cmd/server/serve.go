@@ -108,9 +108,12 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	}
 	defer closeSubs()
 
-	var enqueuer httpapi.PromotionEnqueuer
+	var (
+		enqueuer httpapi.PromotionEnqueuer
+		worker   *githubpr.Worker
+	)
 	if subs != nil {
-		worker := githubpr.New(githubpr.Config{
+		worker = githubpr.New(githubpr.Config{
 			Token:         c.String("github-token"),
 			Logger:        logger,
 			PersistResult: subs.AttachPromotionResult,
@@ -157,8 +160,23 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		logger.Info("shutdown signal received")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		// Order: stop accepting new HTTP traffic first, then drain
+		// any GitHub-PR jobs already queued by approvals that landed
+		// in the last few seconds. Reversing this would let a fresh
+		// approval squeeze in after the worker stopped accepting.
+		// Both calls share the same shutdownCtx deadline; whichever
+		// hits it first wins.
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("graceful shutdown: %w", err)
+		}
+		if worker != nil {
+			dropped, stopErr := worker.Stop(shutdownCtx)
+			if stopErr != nil {
+				logger.Warn("githubpr: drain incomplete on shutdown",
+					"err", stopErr,
+					"dropped_count", len(dropped),
+					"dropped_ids", dropped)
+			}
 		}
 		// Wait for ListenAndServe to return (it will, with ErrServerClosed).
 		<-serverErr

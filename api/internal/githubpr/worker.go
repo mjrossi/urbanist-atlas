@@ -73,6 +73,10 @@ var ErrBufferFull = errors.New("githubpr: enqueue buffer full")
 type Worker struct {
 	cfg  Config
 	jobs chan atlas.Submission
+	// done closes when Run returns. Stop blocks on it (or on its
+	// own ctx) so callers know whether the goroutine actually
+	// drained or whether the deadline elapsed first.
+	done chan struct{}
 }
 
 // New constructs a Worker. Run is what actually starts the goroutine.
@@ -104,6 +108,7 @@ func New(cfg Config) *Worker {
 	return &Worker{
 		cfg:  cfg,
 		jobs: make(chan atlas.Submission, cfg.BufferSize),
+		done: make(chan struct{}),
 	}
 }
 
@@ -124,14 +129,93 @@ func (w *Worker) Enqueue(_ context.Context, sub atlas.Submission) error {
 
 // Run consumes the job channel until ctx is canceled. Blocks until
 // done; intended to be launched in its own goroutine at boot.
+//
+// On ctx cancellation, Run drains whatever jobs are already in the
+// channel (it does NOT accept new ones — Enqueue's non-blocking send
+// races against a closed-for-write channel from Stop's perspective)
+// so a SIGTERM mid-flight still finishes the moderator approvals
+// that were already queued. The persist write inside process() uses
+// a detached context (see context.WithoutCancel) so the SQLite row
+// for "PR opened" still lands even after the parent ctx is gone.
+//
+// Pair with Stop for the shutdown-side coordination: Stop closes the
+// jobs channel and blocks until this loop exits.
 func (w *Worker) Run(ctx context.Context) {
+	defer close(w.done)
 	for {
 		select {
+		case job, ok := <-w.jobs:
+			if !ok {
+				// Stop closed the channel; we've drained whatever was
+				// buffered.
+				w.cfg.Logger.Info("githubpr: worker drained, shutting down")
+				return
+			}
+			w.process(ctx, job)
 		case <-ctx.Done():
+			// Drain whatever's already buffered, then exit. This is the
+			// hard-cancel path: a job that's mid-flight in process()
+			// finishes whatever GitHub-side step it's on (the GitHub
+			// HTTP client respects ctx), and the persist call inside
+			// process() uses a detached ctx so it lands regardless.
+			w.drainAndExit()
+			return
+		}
+	}
+}
+
+// drainAndExit consumes any remaining jobs in the buffer with the
+// caveat that the parent ctx is already cancelled — GitHub I/O will
+// fail fast, but the persist side will still record the error on
+// each affected row. Called only from the ctx-cancelled branch of
+// Run; Stop's normal path goes through the channel-close branch.
+func (w *Worker) drainAndExit() {
+	for {
+		select {
+		case job, ok := <-w.jobs:
+			if !ok {
+				return
+			}
+			w.process(context.Background(), job)
+		default:
 			w.cfg.Logger.Info("githubpr: worker shutting down")
 			return
-		case job := <-w.jobs:
-			w.process(ctx, job)
+		}
+	}
+}
+
+// Stop signals the worker to finish draining its job buffer and
+// exit, then blocks until Run returns or the supplied ctx expires
+// (whichever comes first). Safe to call once; calling more than
+// once panics because it closes the jobs channel.
+//
+// Returns nil on a clean drain. When ctx expires before Run exits,
+// Stop returns ctx.Err() along with the public IDs of jobs that
+// were observed in the channel when the deadline fired. Callers
+// (serve.go's shutdown path) log them at slog.Warn so the operator
+// can re-queue with `urbanist-atlas-server submissions retry-pr`.
+func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
+	close(w.jobs)
+	select {
+	case <-w.done:
+		return nil, nil
+	case <-ctx.Done():
+		// Grab whatever's still in the buffer for the operator log.
+		// Run's drainAndExit loop will pull these as it winds down
+		// (the channel is already closed; receives won't block past
+		// the buffered count) but the parent caller has already
+		// reported "shutdown deadline exceeded", so the IDs here are
+		// the ones at risk of dropping on the floor.
+		for {
+			select {
+			case job, ok := <-w.jobs:
+				if !ok {
+					return droppedIDs, ctx.Err()
+				}
+				droppedIDs = append(droppedIDs, job.PublicID)
+			default:
+				return droppedIDs, ctx.Err()
+			}
 		}
 	}
 }
