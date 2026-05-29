@@ -103,9 +103,13 @@ func ValidateSubmissionPayload(p SubmissionPayloadInput, s SubmitterInput) map[s
 		}
 	}
 
-	if len(p.RegionSlugs) == 0 {
-		errs["region_slugs"] = "At least one region slug is required."
-	} else if len(p.RegionSlugs) > MaxRegionSlugs {
+	// region_slugs is optional on the public-submission wire: the SPA's
+	// region field is free-form text (most submitters don't know the
+	// canonical slug — e.g. nyc-tri-state, washington-dc-msa), so we
+	// trust editors to finalize the slug in PR review. Loader-side
+	// validation (ValidateOrgFields) still requires at least one entry
+	// for orgs.toml records that are already in the dataset.
+	if len(p.RegionSlugs) > MaxRegionSlugs {
 		errs["region_slugs"] = fmt.Sprintf("Region slugs must have at most %d entries.", MaxRegionSlugs)
 	} else {
 		for i, slug := range p.RegionSlugs {

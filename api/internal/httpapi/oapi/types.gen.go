@@ -490,13 +490,16 @@ type SubmissionPayload struct {
 	ContactUrl *string `json:"contact_url,omitempty"`
 	Name       string  `json:"name"`
 
-	// RegionSlugs Slugs of the regions this organization serves (e.g.
-	// `["brooklyn-ny","nyc-metro"]`). The server resolves these
-	// against the `regions` table at approval time.
-	RegionSlugs []string `json:"region_slugs"`
-	ShortDesc   string   `json:"short_desc"`
-	Tags        []string `json:"tags"`
-	WebsiteUrl  string   `json:"website_url"`
+	// RegionSlugs Optional. Slugs of the regions this organization serves
+	// (e.g. `["brooklyn-ny","nyc-metro"]`). When provided, every
+	// entry must resolve against the `regions` table at submit
+	// time. May be omitted or sent as `[]` when the submitter
+	// doesn't know the canonical slug — editors finalize the
+	// region in PR review using `submitter_note`.
+	RegionSlugs *[]string `json:"region_slugs,omitempty"`
+	ShortDesc   string    `json:"short_desc"`
+	Tags        []string  `json:"tags"`
+	WebsiteUrl  string    `json:"website_url"`
 }
 
 // SubmissionStatus Lifecycle state of a public submission.

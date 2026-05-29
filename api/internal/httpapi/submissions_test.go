@@ -207,6 +207,37 @@ func TestCreateSubmission_UnknownRegionSlug_Returns400(t *testing.T) {
 	}
 }
 
+// Empty region_slugs is accepted on the public-submission wire because
+// most submitters don't know the canonical slug. Editors finalize the
+// region in PR review from submitter_note context. The loader-side
+// validation in ValidateOrgFields keeps the "at least one" rule for
+// records already in the orgs.toml dataset.
+func TestCreateSubmission_EmptyRegionSlugs_Returns201(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	body["payload"].(map[string]any)["region_slugs"] = []string{}
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status: want 201, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateSubmission_OmittedRegionSlugs_Returns201(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	delete(body["payload"].(map[string]any), "region_slugs")
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status: want 201, got %d", resp.StatusCode)
+	}
+}
+
 func TestCreateSubmission_RateLimit_Returns429WithRetryAfter(t *testing.T) {
 	rig := newSubmissionsTestServer(t)
 

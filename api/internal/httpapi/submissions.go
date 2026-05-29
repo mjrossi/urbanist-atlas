@@ -72,12 +72,20 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 			return
 		}
 
+		// region_slugs is optional on the wire; the SPA's region field
+		// is free-form text and most submissions don't carry a
+		// canonical slug. nil pointer and empty slice both flow through
+		// as zero-length input to ValidateSubmissionPayload.
+		var rawRegionSlugs []string
+		if body.Payload.RegionSlugs != nil {
+			rawRegionSlugs = *body.Payload.RegionSlugs
+		}
 		payload := atlas.SubmissionPayload{
 			Name:        strings.TrimSpace(body.Payload.Name),
 			ShortDesc:   strings.TrimSpace(body.Payload.ShortDesc),
 			WebsiteURL:  strings.TrimSpace(body.Payload.WebsiteUrl),
 			Tags:        normalizeStringSlice(body.Payload.Tags),
-			RegionSlugs: normalizeStringSlice(body.Payload.RegionSlugs),
+			RegionSlugs: normalizeStringSlice(rawRegionSlugs),
 		}
 		if body.Payload.ContactUrl != nil {
 			payload.ContactURL = strings.TrimSpace(*body.Payload.ContactUrl)
@@ -376,12 +384,16 @@ func toOAPISubmission(s atlas.Submission) oapi.Submission {
 }
 
 func toOAPISubmissionPayload(p atlas.SubmissionPayload) oapi.SubmissionPayload {
+	// region_slugs is optional on the schema since slice α; always
+	// emit a non-nil pointer (possibly to an empty array) so the
+	// admin response shape stays predictable for downstream consumers.
+	regions := nonNilSlice(append([]string(nil), p.RegionSlugs...))
 	out := oapi.SubmissionPayload{
 		Name:        p.Name,
 		ShortDesc:   p.ShortDesc,
 		WebsiteUrl:  p.WebsiteURL,
 		Tags:        nonNilSlice(append([]string(nil), p.Tags...)),
-		RegionSlugs: nonNilSlice(append([]string(nil), p.RegionSlugs...)),
+		RegionSlugs: &regions,
 	}
 	if p.ContactURL != "" {
 		c := p.ContactURL

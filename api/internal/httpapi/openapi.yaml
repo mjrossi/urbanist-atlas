@@ -1008,7 +1008,7 @@ components:
     SubmissionPayload:
       type: object
       description: The proposed organization, as submitted by a member of the public.
-      required: [name, short_desc, website_url, tags, region_slugs]
+      required: [name, short_desc, website_url, tags]
       properties:
         name:
           type: string
@@ -1030,9 +1030,12 @@ components:
           items:
             type: string
           description: |
-            Slugs of the regions this organization serves (e.g.
-            `["brooklyn-ny","nyc-metro"]`). The server resolves these
-            against the `regions` table at approval time.
+            Optional. Slugs of the regions this organization serves
+            (e.g. `["brooklyn-ny","nyc-metro"]`). When provided, every
+            entry must resolve against the `regions` table at submit
+            time. May be omitted or sent as `[]` when the submitter
+            doesn't know the canonical slug — editors finalize the
+            region in PR review using `submitter_note`.
 
     NewSubmissionRequest:
       type: object
