@@ -17,10 +17,21 @@ import {
 const SUBMIT_COOLDOWN_MS = 1500;
 
 // Map from API field names (snake-case wire shape, see
-// SubmissionPayload in openapi.yaml) to the matching react-hook-form
-// field names in SubmitForm. Only fields that exist on the form are
-// listed — unknown server fields fall through to the top-level
-// `detail` message.
+// SubmissionPayload + NewSubmissionRequest in openapi.yaml and the
+// API-side `errors` extension keys emitted by
+// seedfiles.ValidateSubmissionPayload) to the matching
+// react-hook-form field names in SubmitForm. Server fields the form
+// doesn't render (notably `tags`, which the SPA always sends as `[]`)
+// are intentionally absent — they fall through to the top-level
+// `detail` banner instead of being silently swallowed.
+//
+// Caveat: `region_slugs` and `short_desc` map to inputs that the form
+// HIDES for correction/removal submissions. In practice both API
+// errors are unreachable for those types (the SPA sends `[]` for
+// region_slugs and a short synthetic placeholder for short_desc), so
+// the hidden-field path doesn't surface. If a future API change makes
+// either reachable, render the top-level banner alongside the
+// invisible field error.
 const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
   name: 'name',
   website_url: 'website',
@@ -49,7 +60,6 @@ export function Submit() {
     register,
     handleSubmit,
     formState: { isValid, errors },
-    getValues,
     setError,
     control,
   } = useForm<SubmitForm>({
@@ -65,8 +75,11 @@ export function Submit() {
   // are folded into the API contract.
   //
   // useWatch (vs the destructured watch()) is the memoization-safe
-  // subscription per react-hook-form's API guidance.
-  const submissionType = useWatch({ control, name: 'type' });
+  // subscription per react-hook-form's API guidance. The `?? 'new'`
+  // is defensive: useWatch can briefly return undefined before
+  // defaultValues propagate, and we'd rather render the new-org
+  // variant in that window than render nothing.
+  const submissionType = useWatch({ control, name: 'type' }) ?? 'new';
   const isNewOrg = submissionType === 'new';
   const isCorrection = submissionType === 'correction';
   const isRemoval = submissionType === 'removal';
@@ -145,6 +158,15 @@ export function Submit() {
     mutation.mutate(form);
   };
 
+  // Subscribe to every form value so the GitHub-issue fallback link
+  // (rendered on 5xx) stays current when the user edits between
+  // seeing the error and clicking the link. `getValues()` inside
+  // render would snapshot at render time and go stale on subsequent
+  // keystrokes (the form uses uncontrolled inputs via register, so
+  // keystrokes don't otherwise re-render). Must be called before the
+  // mutation.isSuccess early return below to keep hook order stable.
+  const fallbackValues = useWatch({ control });
+
   if (mutation.isSuccess) {
     return (
       <SubmissionReceived
@@ -164,6 +186,9 @@ export function Submit() {
   // server didn't break it down.
   const showTopLevelValidationErr =
     isValidationErr && (!submitErr?.fieldErrors || Object.keys(submitErr.fieldErrors).length === 0);
+  const issueFallbackUrl = isServerErr
+    ? buildIssueUrl({ ...SUBMIT_FORM_DEFAULTS, ...fallbackValues })
+    : '';
 
   return (
     <>
@@ -457,7 +482,7 @@ https://kuow.org/stories/..."
                 <p className="field-error" role="alert">
                   Our submission queue is having a moment. You can{' '}
                   <a
-                    href={buildIssueUrl(getValues())}
+                    href={issueFallbackUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
