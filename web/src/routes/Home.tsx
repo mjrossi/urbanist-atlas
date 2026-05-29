@@ -82,7 +82,7 @@ export function Home() {
             <div className="rail-kicker">Browse the atlas</div>
             <TopPlaces query={places} />
             <Link to="/browse" className="read-on mt-14">
-              All places <span className="arrow">→</span>
+              All regions <span className="arrow">→</span>
             </Link>
           </div>
           <div className="rail-block amber desktop-only">
@@ -108,11 +108,13 @@ function TopPlaces({ query }: { query: UseQueryResult<RegionSummary[], ApiError>
       query={query}
       loading="Loading places…"
       error={() => (
-        <p className="results-state error">Region list is temporarily unavailable.</p>
+        <p className="results-state error">
+          The region list isn&rsquo;t loading right now. Refresh to try again.
+        </p>
       )}
       empty={{
         when: (data) => data.length === 0,
-        render: <p className="results-state">No places indexed yet.</p>,
+        render: <p className="results-state">No regions indexed yet.</p>,
       }}
     >
       {(data) => {
@@ -162,14 +164,17 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
       query={query}
       loading="Loading recent entries…"
       error={() => (
-        <p className="results-state error">Recent entries are temporarily unavailable.</p>
+        <p className="results-state error">
+          Recent entries aren&rsquo;t loading right now. Refresh, or browse the full
+          index.
+        </p>
       )}
       empty={{
         when: (data) => data.length === 0,
         render: (
           <EmptyState
             title="Nothing filed yet"
-            body="Nothing has crossed the editor's desk lately. If you know a group organizing out there, you can be the first to put them on the map."
+            body="The editor's desk has been quiet lately."
             cta={<Link to="/submit">File the first tip.</Link>}
           />
         ),
@@ -185,7 +190,7 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
                 className="org-card"
                 to={`/orgs/${encodeURIComponent(org.slug)}`}
               >
-                <div className="added">+ Newly indexed</div>
+                <div className="added">Newly indexed</div>
                 <h3 className="org-name">{org.name}</h3>
                 {where ? <div className="org-where">{where}</div> : null}
                 <p className="org-desc">{truncate(org.short_desc, 180)}</p>
@@ -257,12 +262,12 @@ function ByTheNumbers({
           <div className="n">
             <span className="em">{formatNumber(totalOrgCount)}</span>
           </div>
-          <div className="label">Org entries on file</div>
+          <div className="label">Organizations on file</div>
           <div className="sub">Across the US and Canada</div>
         </div>
         <div className="stat">
           <div className="n">{formatNumber(placeCount)}</div>
-          <div className="label">Places indexed</div>
+          <div className="label">Regions indexed</div>
           <div className="sub">
             {usCount !== null && caCount !== null
               ? `${usCount} US · ${caCount} Canada`

@@ -103,7 +103,7 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: /metro 7/i })).toBeDefined();
   });
 
-  it('includes an "All places" link to /browse', async () => {
+  it('includes an "All regions" link to /browse', async () => {
     listRegionsMock.mockResolvedValueOnce([
       makeRegion('nyc-metro', 'New York Metro', 12),
     ]);
@@ -113,7 +113,7 @@ describe('Home', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
-    const browseLink = screen.getByRole('link', { name: /all places/i });
+    const browseLink = screen.getByRole('link', { name: /all regions/i });
     expect(browseLink.getAttribute('href')).toBe('/browse');
   });
 
@@ -159,7 +159,7 @@ describe('Home', () => {
     expect(loading.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows the region-list temporarily-unavailable message on regions error', async () => {
+  it('shows the region-list unavailable message on regions error', async () => {
     listRegionsMock.mockRejectedValueOnce(
       new ApiError(
         500,
@@ -173,12 +173,12 @@ describe('Home', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/region list is temporarily unavailable/i),
+        screen.getByText(/region list isn.t loading right now/i),
       ).toBeDefined();
     });
   });
 
-  it('shows the recent-entries temporarily-unavailable message on recent error', async () => {
+  it('shows the recent-entries unavailable message on recent error', async () => {
     listRegionsMock.mockReturnValue(new Promise(() => {}));
     listRecentMock.mockRejectedValueOnce(
       new ApiError(
@@ -192,7 +192,7 @@ describe('Home', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/recent entries are temporarily unavailable/i),
+        screen.getByText(/recent entries aren.t loading right now/i),
       ).toBeDefined();
     });
   });

@@ -209,7 +209,7 @@ function OrgContent({ org }: { org: OrgT }) {
           </p>
           {org.regions.length === 0 ? (
             <p>
-              {org.name} doesn&rsquo;t have a region attached yet —{' '}
+              {org.name} isn&rsquo;t tied to a region yet —{' '}
               <Link to="/submit">file a tip</Link> if you can place them.
             </p>
           ) : null}
