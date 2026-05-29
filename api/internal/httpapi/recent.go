@@ -23,8 +23,7 @@ func recentHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 		orgs, err := store.ListRecent(r.Context())
 		if err != nil {
 			logger.ErrorContext(r.Context(), "list recent failed", "err", err, "rid", rid)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
-				"An unexpected error occurred while handling this request.", rid)
+			writeInternalProblem(w, r, rid)
 			return
 		}
 		respondCollection(w, toOAPIOrgs(orgs))

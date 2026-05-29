@@ -281,9 +281,26 @@ func (w *Worker) process(ctx context.Context, sub atlas.Submission) {
 		"submission_id", sub.PublicID, "url", prURL)
 }
 
+// openPRTimeout bounds the whole GitHub call-chain (get-ref →
+// get-contents → create-ref → put-contents → create-PR). Without it a
+// single hung remote call could pin the worker goroutine — and during
+// graceful shutdown, the worker's parent ctx — indefinitely. On expiry
+// the in-flight step's ctx is canceled, openPR returns a wrapped
+// deadline error, and process() persists it as the promotion_error
+// (no retry), matching the existing failure semantics.
+const openPRTimeout = 30 * time.Second
+
 // openPR runs the full pipeline against GitHub and returns the new
 // PR's html_url. Any step that fails returns a wrapped error.
+//
+// The work is bounded by openPRTimeout: a per-call deadline derived
+// from the caller's ctx (so an already-canceled parent still short-
+// circuits immediately). cancel is deferred so the derived ctx is
+// always released.
 func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, openPRTimeout)
+	defer cancel()
+
 	baseSHA, err := w.getBranchSHA(ctx, w.cfg.BaseBranch)
 	if err != nil {
 		return "", fmt.Errorf("get base branch: %w", err)

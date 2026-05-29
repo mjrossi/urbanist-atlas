@@ -143,8 +143,7 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 		sub, err := subs.Create(r.Context(), in)
 		if err != nil {
 			logger.ErrorContext(r.Context(), "create submission failed", "err", err, "rid", rid)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
-				"An unexpected error occurred while handling this request.", rid)
+			writeInternalProblem(w, r, rid)
 			return
 		}
 		writeJSON(w, http.StatusCreated, toOAPISubmission(sub))
@@ -190,8 +189,7 @@ func listSubmissionsHandler(subs atlas.SubmissionStore, logger *slog.Logger) htt
 				return
 			}
 			logger.ErrorContext(r.Context(), "list submissions failed", "err", err, "rid", rid)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
-				"An unexpected error occurred while handling this request.", rid)
+			writeInternalProblem(w, r, rid)
 			return
 		}
 		if page.NextCursor != "" {
@@ -294,8 +292,7 @@ func writeSubmissionStateErr(w http.ResponseWriter, r *http.Request, err error, 
 			"This submission has already been approved or rejected and cannot transition again.", rid)
 	default:
 		logger.ErrorContext(r.Context(), op+" failed", "err", err, "rid", rid)
-		writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
-			"An unexpected error occurred while handling this request.", rid)
+		writeInternalProblem(w, r, rid)
 	}
 }
 
