@@ -127,19 +127,33 @@ export function buildIssueUrl(form: SubmitForm): string {
  * we trust the user. Moderators finalize slugs in PR review.
  */
 export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionRequest {
-  const regionRaw = form.region.trim();
   const submitterNote = buildSubmitterNote(form);
   return {
     payload: {
       name: form.name.trim(),
-      short_desc: form.oneLineDesc.trim(),
+      short_desc: shortDescForWire(form),
       website_url: form.website.trim(),
       tags: [],
-      region_slugs: regionToSlugs(regionRaw),
+      region_slugs: form.type === 'new' ? regionToSlugs(form.region.trim()) : [],
     },
     submitter_note: submitterNote,
     ...(form.contact.trim() ? maybeContact(form.contact) : {}),
   };
+}
+
+/**
+ * For `new` submissions the form collects a real one-line
+ * description. For corrections and removals there is no new
+ * description to write — the existing entry's copy is the subject of
+ * the request — so we mint a synthetic short_desc that points
+ * moderators at submitter_note for the full context. Keeps the wire
+ * shape stable (short_desc is a required field) without asking the
+ * submitter to invent placeholder copy.
+ */
+function shortDescForWire(form: SubmitForm): string {
+  if (form.type === 'new') return form.oneLineDesc.trim();
+  if (form.type === 'correction') return '(correction request — see editor note)';
+  return '(removal request — see editor note)';
 }
 
 /**

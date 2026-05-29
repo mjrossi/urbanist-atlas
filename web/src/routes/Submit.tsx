@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm, type FieldPath } from 'react-hook-form';
+import { useForm, useWatch, type FieldPath } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
@@ -51,10 +51,50 @@ export function Submit() {
     formState: { isValid, errors },
     getValues,
     setError,
+    control,
   } = useForm<SubmitForm>({
     mode: 'onBlur',
     defaultValues: SUBMIT_FORM_DEFAULTS,
   });
+
+  // The form adapts to the submission type. For "new" we ask for the
+  // full org dossier; for "correction" and "removal" the org already
+  // exists in the Atlas, so we collect a smaller identification +
+  // context payload. Wire-shape stays the same — see
+  // submitForm.ts:buildNewSubmissionRequest for how the missing fields
+  // are folded into the API contract.
+  //
+  // useWatch (vs the destructured watch()) is the memoization-safe
+  // subscription per react-hook-form's API guidance.
+  const submissionType = useWatch({ control, name: 'type' });
+  const isNewOrg = submissionType === 'new';
+  const isCorrection = submissionType === 'correction';
+  const isRemoval = submissionType === 'removal';
+  const nameHint = isCorrection
+    ? 'The entry you want corrected. Use the name as it appears in the Atlas.'
+    : isRemoval
+      ? 'The entry you want removed. Use the name as it appears in the Atlas.'
+      : 'As it appears on their site, not what locals call them.';
+  const editorialLabel = isCorrection
+    ? 'What needs correcting'
+    : isRemoval
+      ? 'Why this organization should be removed'
+      : 'Why this org belongs';
+  const editorialHint = isCorrection
+    ? "What's off, what should it say instead, and how do you know?"
+    : isRemoval
+      ? 'Shut down, merged, domain hijacked — what happened, and roughly when?'
+      : 'What have they worked on recently? Who do they organize? Who do they push? Concrete examples help us more than superlatives.';
+  const editorialPlaceholder = isCorrection
+    ? 'The entry describes them as rail-focused, but in 2025 they pivoted to bus rapid transit and a fare-equity push. The leadership listed is also two years out of date.'
+    : isRemoval
+      ? 'Their domain expired in March 2025 and is now parked. Last social-media post was October 2024. The 2023 990 was their last filing.'
+      : 'In 2025 they organized riders to defend the 60-cent fare against a council proposal to double it; ran a candidate forum that 4 of 9 councilmembers attended; testified at every transit board meeting since 2022.';
+  const sourcesHint = isCorrection
+    ? "Anything that shows what's changed: a press release, an organizational chart, a recent article."
+    : isRemoval
+      ? 'Anything that confirms the change: a dead site, an archived final post, a merger announcement.'
+      : "Links to news coverage, their social accounts, or campaigns they've worked on. One per line.";
 
   const [cooldown, setCooldown] = useState(false);
   // Seconds remaining on a 429 lockout. Initialized from
@@ -206,9 +246,7 @@ export function Submit() {
                 <label htmlFor="submit-name" className="field-label">
                   Organization name
                   <span className="required">*</span>
-                  <span className="hint">
-                    As it appears on their site, not what locals call them.
-                  </span>
+                  <span className="hint">{nameHint}</span>
                 </label>
               </div>
               <div>
@@ -232,7 +270,9 @@ export function Submit() {
                 <label htmlFor="submit-website" className="field-label">
                   Primary website
                   <span className="required">*</span>
-                  <span className="hint">Their own URL, not a coverage article.</span>
+                  <span className="hint">
+                    The organization&rsquo;s own site, not a news article about them.
+                  </span>
                 </label>
               </div>
               <div>
@@ -251,73 +291,74 @@ export function Submit() {
               </div>
             </div>
 
-            <div className="field">
-              <div>
-                <label htmlFor="submit-region" className="field-label">
-                  Region served
-                  <span className="required">*</span>
-                  <span className="hint">
-                    City or metro slug, e.g. <code>nyc</code> or{' '}
-                    <code>chicago</code>. Editors finalize the region in PR
-                    review.
-                  </span>
-                </label>
-              </div>
-              <div>
-                <input
-                  id="submit-region"
-                  type="text"
-                  className="input"
-                  placeholder="brooklyn-ny"
-                  {...register('region', { required: 'Required' })}
-                />
-                {errors.region ? (
-                  <span className="field-error" role="alert">
-                    {errors.region.message}
-                  </span>
-                ) : null}
-              </div>
-            </div>
+            {isNewOrg ? (
+              <>
+                <div className="field">
+                  <div>
+                    <label htmlFor="submit-region" className="field-label">
+                      Region served
+                      <span className="required">*</span>
+                      <span className="hint">
+                        City or metro slug, e.g. <code>nyc</code> or{' '}
+                        <code>chicago</code>. Editors finalize the region in
+                        PR review.
+                      </span>
+                    </label>
+                  </div>
+                  <div>
+                    <input
+                      id="submit-region"
+                      type="text"
+                      className="input"
+                      placeholder="brooklyn-ny"
+                      {...register('region', { required: 'Required' })}
+                    />
+                    {errors.region ? (
+                      <span className="field-error" role="alert">
+                        {errors.region.message}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
 
-            <div className="field stacked">
-              <div>
-                <label htmlFor="submit-oneline" className="field-label">
-                  One-line description of what they actually do
-                  <span className="required">*</span>
-                  <span className="hint inline">
-                    Plain English. ~140 characters.
-                  </span>
-                </label>
-              </div>
-              <textarea
-                id="submit-oneline"
-                className="textarea"
-                rows={2}
-                placeholder="Pushes for bus service expansion and rider-led transit policy."
-                {...register('oneLineDesc', { required: 'Required' })}
-              />
-              {errors.oneLineDesc ? (
-                <span className="field-error" role="alert">
-                  {errors.oneLineDesc.message}
-                </span>
-              ) : null}
-            </div>
+                <div className="field stacked">
+                  <div>
+                    <label htmlFor="submit-oneline" className="field-label">
+                      One-line description of what they actually do
+                      <span className="required">*</span>
+                      <span className="hint inline">
+                        Plain English. ~140 characters.
+                      </span>
+                    </label>
+                  </div>
+                  <textarea
+                    id="submit-oneline"
+                    className="textarea"
+                    rows={2}
+                    placeholder="Pushes for bus service expansion and rider-led transit policy."
+                    {...register('oneLineDesc', { required: 'Required' })}
+                  />
+                  {errors.oneLineDesc ? (
+                    <span className="field-error" role="alert">
+                      {errors.oneLineDesc.message}
+                    </span>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
 
             <div className="field stacked">
               <div>
                 <label htmlFor="submit-why" className="field-label">
-                  Why this org belongs
-                  <span className="hint inline">
-                    Recent campaigns, who they organize, who they push. Specifics beat
-                    adjectives.
-                  </span>
+                  {editorialLabel}
+                  <span className="hint inline">{editorialHint}</span>
                 </label>
               </div>
               <textarea
                 id="submit-why"
                 className="textarea tall"
                 rows={4}
-                placeholder="In 2025 they organized riders to defend the 60-cent fare against a council proposal to double it; ran a candidate forum that 4 of 9 councilmembers attended; testified at every transit board meeting since 2022."
+                placeholder={editorialPlaceholder}
                 {...register('why')}
               />
             </div>
@@ -326,9 +367,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-sources" className="field-label">
                   Sources
-                  <span className="hint inline">
-                    News coverage, social handles, prior wins. One per line.
-                  </span>
+                  <span className="hint inline">{sourcesHint}</span>
                 </label>
               </div>
               <textarea
@@ -456,7 +495,7 @@ https://kuow.org/stories/..."
                 <h4>You file the tip.</h4>
                 <p>
                   Your submission lands in the editorial queue with a
-                  reference ID. No GitHub account needed.
+                  reference ID you can hold onto.
                 </p>
               </div>
               <div className="process-step">
