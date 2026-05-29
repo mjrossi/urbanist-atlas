@@ -77,8 +77,7 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 				"country", country,
 				"rid", rid,
 			)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
-				"An unexpected error occurred while handling this request.", rid)
+			writeInternalProblem(w, r, rid)
 			return
 		}
 
