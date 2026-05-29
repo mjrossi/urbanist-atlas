@@ -298,20 +298,18 @@ func TestLookup_NormalizesPostalCodeAtBoundary(t *testing.T) {
 }
 
 // TestLookup_NationalTierOrg_ExcludedFromDefaultLookup pins the
-// editorial sibling-attachment contract: when a national region is NOT
-// an ancestor of the leaf chain (as MUBi sits relative to
-// lisboa-municipio in the PT seed), it must not leak into either bucket.
-// This works equally against MemStore and Postgres because the ancestor
-// walk never reaches the national region in either backend.
+// editorial sibling-attachment contract: when a national region is
+// NOT an ancestor of the leaf chain (as MUBi sat relative to
+// lisboa-municipio in the PT validation fixture), its orgs must
+// not leak into either /lookup bucket.
 //
-// What this test does NOT exercise: the recursive-CTE safety-net filter
-// (lookup.sql `WHERE r.scope_tier <> 'national'`) — i.e. an ancestor-
-// attached national region that the SQL filter is responsible for
-// pruning. That case is covered by
-// TestPipeline_NationalTierAncestor_FilteredByCTE in
-// api/internal/store/postgres/pipeline_test.go (build tag: integration),
-// where only the Postgres backend's behavior is meaningful (MemStore
-// does not filter at the AncestorRegions seam).
+// This is the API-level pin. The structural national-tier filter
+// itself lives in MemStore.AncestorRegions / DescendantRegions
+// (see pkg/atlas/store.go); the per-store contract is exercised
+// generically by pkg/atlas/storetest. This test pins the wire
+// behavior so a future change to the lookup pipeline (e.g. a
+// "popular nearby regions" pass) can't silently start including
+// non-ancestor national orgs.
 func TestLookup_NationalTierOrg_ExcludedFromDefaultLookup(t *testing.T) {
 	s := atlas.NewMemStore()
 
