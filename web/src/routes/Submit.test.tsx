@@ -270,6 +270,39 @@ describe('Submit', () => {
     expect(screen.queryByText(/one or more fields failed validation/i)).toBeNull();
   });
 
+  it('surfaces unmapped/hidden-field validation errors in the top-level banner', async () => {
+    // `tags` has no entry in FIELD_NAME_MAP; `submitter_email` maps to
+    // the `contact` form field, which renders no inline error slot.
+    // Both would be swallowed if only `setError`-mapped fields showed.
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/validation',
+          title: 'Bad Request',
+          detail: 'one or more fields failed validation',
+          status: 400,
+          errors: {
+            tags: 'too many tags (max 5)',
+            submitter_email: 'must be a valid email address',
+          },
+        },
+        { status: 400, problem: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user);
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    // Neither error has a home in the form, so both must appear in the
+    // banner rather than vanishing.
+    await waitFor(() => {
+      expect(screen.getByText(/too many tags/i)).toBeDefined();
+    });
+    expect(screen.getByText(/must be a valid email address/i)).toBeDefined();
+  });
+
   it('shows the validation message when the API returns 400', async () => {
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(

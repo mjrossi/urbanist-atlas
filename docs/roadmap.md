@@ -11,24 +11,26 @@ the plan is the *design* view.
 
 ## Status
 
-**Terminology — what "v1.0" means here.** v1.0 is the Phase 1 QA
-deliverable: every feature below in this table marked `Done` plus the
-gating/security pieces in the *Gatekeeping* section. The apex
-domains (`urbanistatlas.com`, `api.urbanistatlas.com`) wait on the
-Phase 2 work (slices #26–#28 — API keys, rate limiting, public CORS).
-"Production-ready" therefore means the QA stack is on the apex DNS
-once Phase 2 lands; the QA gate itself stays on for safety until
-then.
+**Terminology — what "v1.0" means here.** v1.0 is every feature
+below marked `Done` plus the gating/security pieces in the
+*Gatekeeping* section. The apex DNS cutover landed standalone
+on 2026-05-27 (slice #28 — see below); what remains on the
+Phase 2 docket is purely public-access work (slices #26–#27 +
+the narrowing/teardown step in #28 — API keys, rate limiting,
+CORS narrowing, secret removal). The `X-Atlas-Client` gate
+stays on for safety until then.
 
-**Phase 1 QA dogfooding is LIVE (2026-05-21):**
-`qa.urbanistatlas.com` (SPA on Cloudflare Workers + Pages) +
-`qa-api.urbanistatlas.com` (API on Fly.io, region `iad`, behind the
-`X-Atlas-Client` shared-secret gate). DB is a sibling Fly app
-running `postgres:17-alpine` on a 1 GB volume. 130 orgs and 35,417
-postal codes seeded. Nightly R2 backups are live (workflow at
-`.github/workflows/backup.yml`, bucket `urbanist-atlas-backups`
-with a 30-day lifecycle), with the enablement steps documented at
-[`docs/runbooks/r2-backups.md`](./runbooks/r2-backups.md).
+**Live on apex (2026-05-27):**
+[`urbanistatlas.com`](https://urbanistatlas.com) (SPA on Cloudflare
+Workers + Pages) + `api.urbanistatlas.com` (API on Fly.io, region
+`iad`, behind the `X-Atlas-Client` shared-secret gate). The runtime
+is now stateless: `api/seed/` is baked into the API image and read
+into an in-memory FileStore at boot; submissions land in a SQLite
+DB at `/data/atlas.db` on a 1 GiB Fly volume. 130 orgs and 35,417
+postal codes ship with the bundle. Nightly R2 backups of the
+SQLite submission store are live (workflow at
+`.github/workflows/backup-sqlite.yml`, bucket
+`urbanist-atlas-backups` with a 30-day lifecycle).
 
 **Done:**
 
@@ -292,19 +294,20 @@ with a 30-day lifecycle), with the enablement steps documented at
   the middleware into a no-op (preserves local-dev ergonomics).
   Frontend (`web/src/lib/api.ts`) injects the header from
   `VITE_API_CLIENT_SECRET` on every `apiFetch`.
-- **Phase 1 deploy (Fly + sibling Postgres + Cloudflare Workers +
-  Pages):** API on a Fly app in region `iad` via a multi-stage
-  Alpine Dockerfile (`release_command = "migrate up"`); database on
-  a sibling Fly app running plain `postgres:17-alpine` with a 1 GB
-  volume (same image as the testcontainers integration suite, so
-  the wire is identical); SPA on Cloudflare Workers + Pages (Static
-  Assets), SPA fallback via `wrangler.jsonc`'s
-  `assets.not_found_handling = "single-page-application"`; nightly
-  `pg_dump | gzip` → Cloudflare R2 via a GitHub Actions cron with a
-  30-day bucket lifecycle. `qa.urbanistatlas.com` +
-  `qa-api.urbanistatlas.com` live behind the `X-Atlas-Client` gate.
-  Design: [`docs/superpowers/specs/2026-05-21-fly-deploy-design.md`](./superpowers/specs/2026-05-21-fly-deploy-design.md);
-  runbook: [`docs/deploy.md`](./deploy.md).
+- **Phase 1 deploy (Fly + Cloudflare Workers + Pages, apex):** API on
+  a Fly app in region `iad` via a multi-stage Alpine Dockerfile;
+  reads are stateless (`api/seed/` baked into the image via
+  `//go:embed`, loaded into an in-memory FileStore at boot), so no
+  release command and no migrations on deploy. Submissions land in
+  a SQLite DB at `/data/atlas.db` on a 1 GiB Fly volume; nightly
+  `sqlite3 .dump | gzip` → Cloudflare R2 via a GitHub Actions cron
+  with a 30-day bucket lifecycle. SPA on Cloudflare Workers + Pages
+  (Static Assets), SPA fallback via `wrangler.jsonc`'s
+  `assets.not_found_handling = "single-page-application"`. Live on
+  apex (`urbanistatlas.com` + `api.urbanistatlas.com`) since
+  2026-05-27 behind the `X-Atlas-Client` gate. Design:
+  [`docs/superpowers/specs/2026-05-21-fly-deploy-design.md`](./superpowers/specs/2026-05-21-fly-deploy-design.md)
+  (historical snapshot); runbook: [`docs/deploy.md`](./deploy.md).
 - `justfile` recipes: `api-*` (build / vet / test / sqlc-gen /
   oapi-gen / test-integration / gen-check), `migrate-*`, `pg-*`,
   `healthz`, `lookup`, `seed`, `loadregions`, `loadpostal`,
@@ -456,13 +459,13 @@ execution against live infra; ⏳ = not yet started.
 
 | # | Slice | What lands | Status |
 |---|-------|------------|--------|
-| Bring-up | **Phase 1 deploy: Fly + sibling Postgres + Cloudflare Workers + Pages + DNS + CORS + smoke** *(merged + live 2026-05-21)* | **Shipped:** `Dockerfile` + `fly.toml` at the repo root (multi-stage Alpine Go build, `release_command = "migrate up"`); `infra/postgres/{Dockerfile, entrypoint-fly.sh, fly.toml}` for the sibling `urbanist-atlas-db` app — postgres:17-alpine wrapped with a root-stage `chown` so the postgres user can write the PGDATA subdir on Fly's root-owned mount, with `[[restart]] policy = "always"` for resilience; `[group('fly')]` justfile recipes (`fly-deploy`, `fly-deploy-db`, `fly-logs`, `fly-logs-db`, `fly-secrets`, `fly-ssh`, `fly-loaddata`, `db-backup`, `db-restore`); `just smoke` recipe in `[group('smoke')]` (curl checks against `/healthz`, `/api/v1/lookup` with + without `X-Atlas-Client`, ODbL headers, meta envelope, OpenAPI YAML); `wrangler.jsonc` at repo root for Cloudflare Workers + Pages (Static Assets) with SPA fallback via `not_found_handling = "single-page-application"`; `.github/workflows/backup.yml` nightly cron + workflow_dispatch (pg_dump → R2, 30-day retention); `docs/deploy.md` operator runbook; `docs/superpowers/specs/2026-05-21-fly-deploy-design.md` design doc. **Live:** `qa.urbanistatlas.com` (Workers + Pages) + `qa-api.urbanistatlas.com` (Fly app, region `iad`) behind the `X-Atlas-Client` gate; 130 orgs, 35,417 postal codes seeded; release_command, PGDATA, restart, Workers/Pages unified bring-up bugs all caught and fixed with docs/runbook patches. R2 backups live (bucket + workflow + first run verified). | ✅ |
-| CORS | **Production CORS (Phase 1 lockdown)** | `URBANIST_CORS_ORIGINS` locked to `https://qa.urbanistatlas.com` + `*.<account>.workers.dev` in `fly.toml`'s `[env]` block; verified by `just smoke`. (On prod cutover, swap in `https://urbanistatlas.com`.) | ✅ |
+| Bring-up | **Phase 1 deploy: Fly + Cloudflare Workers + Pages + DNS + CORS + smoke** *(merged + live 2026-05-21; apex cutover 2026-05-27)* | **Shipped:** `Dockerfile` + `fly.toml` at the repo root (multi-stage Alpine Go build); `[group('fly')]` justfile recipes (`fly-deploy`, `fly-logs`, `fly-secrets`, `fly-ssh`); `just smoke` recipe in `[group('smoke')]` (curl checks against `/healthz`, `/api/v1/lookup` with + without `X-Atlas-Client`, ODbL headers, meta envelope, OpenAPI YAML); `wrangler.jsonc` at repo root for Cloudflare Workers + Pages (Static Assets) with SPA fallback via `not_found_handling = "single-page-application"`; `.github/workflows/backup-sqlite.yml` nightly cron (sqlite dump → R2, 30-day retention); `docs/deploy.md` operator runbook; `docs/superpowers/specs/2026-05-21-fly-deploy-design.md` design doc (historical snapshot). **Live on apex:** [`urbanistatlas.com`](https://urbanistatlas.com) (Workers + Pages) + `api.urbanistatlas.com` (Fly app, region `iad`) behind the `X-Atlas-Client` gate; 130 orgs, 35,417 postal codes seeded; bring-up bugs (release_command, PGDATA, restart, Workers/Pages unified) all caught and fixed with docs/runbook patches before the Postgres path was retired. R2 backups live for the SQLite submissions store (bucket + workflow). | ✅ |
+| CORS | **Production CORS (Phase 1 lockdown)** | `URBANIST_CORS_ORIGINS` set to `https://urbanistatlas.com` + `https://qa.urbanistatlas.com` (retained for the cutover window) + `*.<account>.workers.dev` in `fly.toml`'s `[env]` block; verified by `just smoke`. Old `qa.*` origin drops in a follow-up commit once the apex cutover is verified. | ✅ |
 | Gate | **Shared-secret gate (Phase 1)** | Middleware checking `X-Atlas-Client` against `URBANIST_CLIENT_SECRET`; mismatch → 401 RFC 9457 `unauthorized`. Frontend bundles the secret via `VITE_API_CLIENT_SECRET`. Bypass list: `/healthz`, `/api/v1/openapi.yaml`. | ✅ |
-| Smoke | **End-to-end smoke (Phase 1)** | `just smoke` recipe hits the live QA endpoint: `/healthz` (200), `/api/v1/lookup?postal_code=10001&country=US` without secret (401), with secret (200 + `X-Data-License: ODbL-1.0` + `X-Data-Attribution` + `meta` envelope), `/api/v1/openapi.yaml` (200). Submissions + admin smoke deferred to Phase 2 with their slices. | ✅ |
+| Smoke | **End-to-end smoke (Phase 1)** | `just smoke` recipe hits the live apex endpoint: `/healthz` (200), `/api/v1/lookup?postal_code=10001&country=US` without secret (401), with secret (200 + `X-Data-License: ODbL-1.0` + `X-Data-Attribution` + `meta` envelope), `/api/v1/openapi.yaml` (200). Submissions + admin smoke deferred to Phase 2 with their slices. | ✅ |
 | 26 | **API key model — schema & issuance (Phase 2)** | `api_keys` table (id, hashed key, owner_email, tier, created_at, revoked_at); admin endpoints to issue + revoke; a tiny `/keys/register` flow for self-serve free keys (email-verified). Migrations + sqlc + httpapi handlers. | ⏳ |
 | 27 | **Tiered rate limiting (Phase 2)** | Token-bucket middleware keyed by API key (or IP for anonymous traffic). Tight anonymous budget; generous keyed budget; explicit `429 Too Many Requests` problem doc with `Retry-After`. | ⏳ |
-| 28 | **Phase 2 cutover** | Add `urbanistatlas.com` as a second Workers + Pages custom domain + `flyctl certs add api.urbanistatlas.com -a urbanist-atlas` + A/AAAA records for `api`; loosen CORS to include the prod origin; remove the shared-secret middleware; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. | ⏳ |
+| 28 | **Phase 2 CORS narrowing + secret removal** | Apex DNS + cert + Workers custom-domain swap landed standalone 2026-05-27 (see Bring-up). Remaining: narrow `URBANIST_CORS_ORIGINS` to `https://urbanistatlas.com` only (drop the `qa.*` cutover-window entry); remove the shared-secret middleware once slices #26–#27 are live; document the keyed-auth requirement in the public docs + landing-page section. Telemetry dashboard for key-tier traffic patterns. | ⏳ |
 
 ## Deferred (v1.1+)
 

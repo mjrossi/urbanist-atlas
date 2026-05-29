@@ -29,8 +29,7 @@ func listRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc
 		regions, err := store.ListRegions(r.Context())
 		if err != nil {
 			logger.ErrorContext(r.Context(), "list regions failed", "err", err, "rid", rid)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
-				"An unexpected error occurred while handling this request.", rid)
+			writeInternalProblem(w, r, rid)
 			return
 		}
 		respondCollection(w, toOAPIRegionSummaries(regions))
@@ -49,8 +48,7 @@ func getRegionHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 		detail, err := atlas.GetRegion(r.Context(), store, slug)
 		if err != nil {
 			logger.ErrorContext(r.Context(), "get region failed", "err", err, "slug", slug, "rid", rid)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
-				"An unexpected error occurred while handling this request.", rid)
+			writeInternalProblem(w, r, rid)
 			return
 		}
 		if detail == nil {

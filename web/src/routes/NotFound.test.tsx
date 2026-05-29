@@ -18,9 +18,9 @@ describe('NotFound', () => {
     expect(h1.textContent).toMatch(/page not in this edition/i);
   });
 
-  it('renders the italic subhead about the missing story', () => {
+  it('renders the italic subhead about the missing page', () => {
     renderNotFound();
-    expect(screen.getByText(/story you were looking for/i)).toBeDefined();
+    expect(screen.getByText(/find the page you were after/i)).toBeDefined();
   });
 
   it('renders a body paragraph for users who followed a stale link', () => {

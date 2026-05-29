@@ -114,8 +114,8 @@ Common verbs (run `just` with no args for the full list):
 
 ## Full-stack PR review
 
-Cloudflare Workers preview URLs target the *current* QA API at
-`qa-api.urbanistatlas.com`, **not** the API as it stands on the
+Cloudflare Workers preview URLs target the *current* production API
+at `api.urbanistatlas.com`, **not** the API as it stands on the
 PR's branch. For PRs that add or change an API endpoint, the
 preview frontend will 404 (or otherwise misbehave) against the
 not-yet-deployed backend. Two workflows handle this:
@@ -134,8 +134,8 @@ not-yet-deployed backend. Two workflows handle this:
 
 2. **Merge backend first** — if the work can be split, land + deploy
    the API change first; then open the frontend PR. The Cloudflare
-   preview will then hit a QA API that has the new endpoint and Just
-   Work.
+   preview will then hit a production API that has the new endpoint
+   and Just Work.
 
 This asymmetry exists because Workers previews are stateless and
 near-free, while a per-branch API preview would need its own
@@ -198,7 +198,7 @@ See [`SECURITY.md`](./SECURITY.md) for the private reporting path.
 
 ## Where to ask questions
 
-- **Github issues:** for anything bug-like, anything specific to a
+- **GitHub issues:** for anything bug-like, anything specific to a
   feature or organization entry, or anything that needs a written
   trail.
 - **Discussions:** if enabled on the repo, for open-ended questions

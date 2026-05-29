@@ -94,7 +94,7 @@ export function Submit() {
       ? 'Why this organization should be removed'
       : 'Why this org belongs';
   const editorialHint = isCorrection
-    ? "What's off, what should it say instead, and how do you know?"
+    ? 'What is incorrect, what should it say instead, and how do you know?'
     : isRemoval
       ? 'Shut down, merged, domain hijacked — what happened, and roughly when?'
       : 'What have they worked on recently? Who do they organize? Who do they push? Concrete examples help us more than superlatives.';
@@ -180,12 +180,38 @@ export function Submit() {
   const isRateLimited = submitErr?.status === 429;
   const isValidationErr = submitErr?.status === 400 || submitErr?.status === 422;
   const isServerErr = submitErr?.status !== undefined && submitErr.status >= 500;
+
+  // Per-field errors only become visible if they map to a form field
+  // that renders its own `field-error` slot AND that field is shown
+  // for the active submission type. Errors that don't (an unmapped
+  // API key, or a key mapped to a field this submission type hides —
+  // e.g. `region_slugs`/`short_desc` on a correction/removal, or
+  // `contact`/`why` which have no inline error slot) would otherwise
+  // be swallowed. Collect their messages so the top-level banner can
+  // surface them instead of dropping them on the floor.
+  const visibleFieldErrorSlots = new Set<FieldPath<SubmitForm>>(
+    isNewOrg
+      ? ['name', 'website', 'region', 'oneLineDesc']
+      : ['name', 'website'],
+  );
+  const unmappedFieldErrors = submitErr?.fieldErrors
+    ? Object.entries(submitErr.fieldErrors)
+        .filter(([apiField]) => {
+          const formField = FIELD_NAME_MAP[apiField];
+          return !formField || !visibleFieldErrorSlots.has(formField);
+        })
+        .map(([, message]) => message)
+    : [];
+
   // When the API returned a per-field errors map, the individual
   // fields render their own messages — the top-level banner would
-  // duplicate the same complaint. Only show the banner when the
-  // server didn't break it down.
+  // duplicate the same complaint. Show the banner when the server
+  // didn't break it down, or when it did but some of those errors
+  // have no visible home in the form (see `unmappedFieldErrors`).
+  const hasMappedFieldErrors =
+    !!submitErr?.fieldErrors && Object.keys(submitErr.fieldErrors).length > 0;
   const showTopLevelValidationErr =
-    isValidationErr && (!submitErr?.fieldErrors || Object.keys(submitErr.fieldErrors).length === 0);
+    isValidationErr && (!hasMappedFieldErrors || unmappedFieldErrors.length > 0);
   const issueFallbackUrl = isServerErr
     ? buildIssueUrl({ ...SUBMIT_FORM_DEFAULTS, ...fallbackValues })
     : '';
@@ -233,7 +259,7 @@ export function Submit() {
                 <label className="choice">
                   <input type="radio" value="new" {...register('type', { required: true })} />
                   <span className="text">
-                    A new organization to add
+                    A new organization to index
                     <span className="sub">A group not yet in the Atlas — local or regional.</span>
                   </span>
                 </label>
@@ -462,9 +488,8 @@ https://kuow.org/stories/..."
 
             <div className="slip-foot">
               <p className="note">
-                Your submission goes straight to the editorial queue. We
-                review every tip and open a public pull request when we
-                accept one — usually within a week.
+                We read every tip. The ones we accept open a public pull
+                request anyone can follow — usually within a week.
               </p>
               {isRateLimited ? (
                 <p className="field-error" role="alert">
@@ -474,9 +499,20 @@ https://kuow.org/stories/..."
                 </p>
               ) : null}
               {showTopLevelValidationErr ? (
-                <p className="field-error" role="alert">
-                  {submitErr?.problem?.detail ?? submitErr?.message ?? 'Validation failed.'}
-                </p>
+                <div className="field-error" role="alert">
+                  <p>
+                    {submitErr?.problem?.detail ??
+                      submitErr?.message ??
+                      'Validation failed.'}
+                  </p>
+                  {unmappedFieldErrors.length > 0 ? (
+                    <ul>
+                      {unmappedFieldErrors.map((message, i) => (
+                        <li key={i}>{message}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               ) : null}
               {isServerErr ? (
                 <p className="field-error" role="alert">
@@ -555,7 +591,7 @@ https://kuow.org/stories/..."
           <div className="rail-block">
             <div className="rail-kicker">Inclusion criteria</div>
             <p>
-              The full criteria — what we include, what we skip — lives at{' '}
+              The full list — what we include, what we skip — lives at{' '}
               <Link to="/about#methodology">About / Methodology</Link>.
             </p>
           </div>

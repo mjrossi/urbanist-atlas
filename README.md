@@ -2,13 +2,13 @@
 
 > Find the people fighting for better streets where you live.
 
-A geographically-organized directory of transit and safe-streets advocacy
-organizations across the US and Canada. Enter a ZIP or postal code, get
-back the local and regional groups working in your area.
+A directory of transit and safe-streets advocacy organizations across the
+US and Canada, searchable by where you live. Enter a ZIP or Canadian postal
+code and the Atlas hands back the local and regional groups working near you.
 
 A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
-**Site:** Phase 1 dogfooding is live at `qa.urbanistatlas.com` (SPA on Cloudflare Workers + Pages) and `qa-api.urbanistatlas.com` (API on Fly.io, region `iad`). The API is locked down behind an `X-Atlas-Client` shared-secret header bundled into the frontend build — public access (apex `urbanistatlas.com` + `api.urbanistatlas.com`) waits on Phase 2 (API keys, rate limiting, slice #28 cutover).
+**Site:** Live at [`urbanistatlas.com`](https://urbanistatlas.com) (SPA on Cloudflare Workers + Pages) and `api.urbanistatlas.com` (API on Fly.io, region `iad`). The API is still locked down behind an `X-Atlas-Client` shared-secret header bundled into the frontend build — a Phase 1 holdover; public, unkeyed access opens up with Phase 2 (API keys + rate limiting, roadmap slices #26–#28).
 
 ---
 

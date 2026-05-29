@@ -1,15 +1,15 @@
 # Urbanist Atlas — Web
 
-React + Vite SPA for Urbanist Atlas. Phase 1 dogfooding is **live**
-at [qa.urbanistatlas.com](https://qa.urbanistatlas.com), deployed to
+React + Vite SPA for Urbanist Atlas. **Live** at
+[urbanistatlas.com](https://urbanistatlas.com), deployed to
 Cloudflare Workers + Pages (Static Assets) via `wrangler.jsonc` at
-the repo root. The production `urbanistatlas.com` hostname attaches
-to the same project at Phase 2 cutover (slice #28). The SPA fallback
-for direct navigation to client routes (`/about`, `/browse`,
-`/region/:regionSlug`, `/r/:postalCode`, `/orgs/:slug`, `/submit`,
-`/colophon`) is handled by `assets.not_found_handling =
-"single-page-application"` in `wrangler.jsonc` — no `_redirects`
-file is needed.
+the repo root. The `X-Atlas-Client` shared-secret gate is a Phase 1
+holdover that comes off with slices #26–#28 (API keys + rate
+limiting + secret removal). The SPA fallback for direct navigation
+to client routes (`/about`, `/browse`, `/region/:regionSlug`,
+`/r/:postalCode`, `/orgs/:slug`, `/submit`, `/colophon`) is handled
+by `assets.not_found_handling = "single-page-application"` in
+`wrangler.jsonc` — no `_redirects` file is needed.
 
 ## Layout
 
@@ -60,11 +60,12 @@ npm run build
 ```
 
 Point the SPA at a non-default API base by setting `VITE_API_BASE` in
-`.env.local` (e.g. `VITE_API_BASE=https://qa-api.urbanistatlas.com`).
+`.env.local` (e.g. `VITE_API_BASE=https://api.urbanistatlas.com`).
 The default is `http://localhost:8080`, which matches
 `cd ../api && just api-run`.
 
-During Phase 1 dogfooding (CLAUDE.md § Launch strategy), the API
+While the Phase 1 `X-Atlas-Client` gate is still in place (CLAUDE.md
+§ Launch strategy), the API
 checks an `X-Atlas-Client` header against a shared secret. The SPA
 sources its copy of the secret from `VITE_API_CLIENT_SECRET`; if
 unset the header isn't sent and the backend's empty-secret no-op

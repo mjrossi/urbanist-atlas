@@ -4,15 +4,15 @@
 #   (401 without, 200 with), ODbL attribution headers + meta envelope
 #   present on the collection endpoint, OpenAPI YAML served.
 #
-# Defaults to the QA host. Invoked via `just smoke`; can also be
-# called directly by CI without needing `just` on the runner:
+# Defaults to the apex production host. Invoked via `just smoke`; can
+# also be called directly by CI without needing `just` on the runner:
 #
 #   URBANIST_CLIENT_SECRET=... ./scripts/smoke.sh
 #   ./scripts/smoke.sh <secret> [host]
 set -euo pipefail
 
 SECRET="${1:-${URBANIST_CLIENT_SECRET:-}}"
-HOST="${2:-qa-api.urbanistatlas.com}"
+HOST="${2:-api.urbanistatlas.com}"
 
 if [ -z "$SECRET" ]; then
     echo "smoke: URBANIST_CLIENT_SECRET is required (env var or first positional arg)" >&2

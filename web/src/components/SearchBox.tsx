@@ -21,14 +21,14 @@ function detectCountry(raw: string): DetectedCountry {
 }
 
 function validate(normalized: string, country: Country): string | null {
-  if (normalized.length === 0) return 'Enter a ZIP or postal code.';
+  if (normalized.length === 0) return 'Enter a US ZIP code or Canadian postal code.';
   if (country === 'US') {
     if (!/^\d{5}$/.test(normalized)) {
-      return 'US ZIP codes are 5 digits.';
+      return 'US ZIP codes are five digits (e.g. 10027).';
     }
   } else {
     if (!/^[A-Z]\d[A-Z](\d[A-Z]\d)?$/.test(normalized)) {
-      return 'Canadian postal codes look like A1A or A1A 1A1.';
+      return 'Canadian postal codes look like A1A or A1A 1A1 (e.g. M5V 1J1).';
     }
   }
   return null;
@@ -96,8 +96,8 @@ export function SearchBox() {
         </p>
       ) : (
         <p id={`${inputId}-hint`} className="lookup-hint">
-          US ZIP (5 digits) or Canadian postal code (FSA or full). We&rsquo;ll name
-          the metro and surface the groups working there.
+          US ZIP (5 digits) or Canadian postal code (FSA or full). We&rsquo;ll
+          name your metro and the groups working there.
         </p>
       )}
       <div className="lookup-suggestions">

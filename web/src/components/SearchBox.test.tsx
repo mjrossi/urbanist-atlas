@@ -101,7 +101,7 @@ describe('SearchBox', () => {
     await user.type(getInput(), '123');
     await user.click(getButton());
 
-    expect(screen.getByRole('alert').textContent).toMatch(/5 digits/i);
+    expect(screen.getByRole('alert').textContent).toMatch(/five digits/i);
     expect(getLocation().pathname).toBe('/');
   });
 });

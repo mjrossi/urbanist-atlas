@@ -23,9 +23,8 @@ export function NotFound() {
           Page <span className="accent">not in this edition.</span>
         </h1>
         <p className="deck">
-          The story you were looking for could not be found in our directory.
-          The link you followed either never went to press, or has since been
-          retired.
+          We couldn&rsquo;t find the page you were after. The link you followed
+          either never went to press, or has since been retired.
         </p>
       </div>
       <div className="spread mt-24">

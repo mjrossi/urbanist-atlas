@@ -66,10 +66,10 @@ export function About() {
     <div className="rail-block amber">
       <div className="rail-kicker">At a glance</div>
       <ul>
-        <li>Transit + safe-streets advocacy only</li>
-        <li>United States &amp; Canada (v1)</li>
-        <li>Curated by hand, one entry at a time</li>
-        <li>ODbL 1.0 — open data with attribution</li>
+        <li>Scope — transit + safe-streets advocacy only</li>
+        <li>Coverage — United States &amp; Canada (v1)</li>
+        <li>Curation — by hand, one entry at a time</li>
+        <li>License — ODbL 1.0 (open data, with attribution)</li>
       </ul>
     </div>
   );
@@ -170,7 +170,7 @@ export function About() {
             <div className="row">
               <p className="term">Housing &amp; YIMBY</p>
               <p className="def">
-                A neighbouring movement with overlapping priorities, but a
+                A neighboring movement with overlapping priorities, but a
                 tighter scope keeps local search useful here.
               </p>
               <span className="verdict no">Excluded</span>

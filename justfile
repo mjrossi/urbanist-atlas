@@ -203,9 +203,9 @@ web-gen-check:
 web-check: web-deps web-lint web-test web-build web-gen-check
 
 # ── preview: full-stack PR review against a local stack ─
-# Cloudflare Workers preview URLs target the *current* QA API at
-# qa-api.urbanistatlas.com — they don't see the API changes on a
-# PR's branch. For a PR that adds or changes an API endpoint, the
+# Cloudflare Workers preview URLs target the *current* production
+# API at api.urbanistatlas.com — they don't see the API changes on
+# a PR's branch. For a PR that adds or changes an API endpoint, the
 # preview frontend will 404 against the not-yet-deployed backend.
 #
 # `just preview` is the local-stack alternative: runs the API in the
@@ -277,7 +277,7 @@ fly-ssh:
 #        just submissions-list pending http://localhost:8080
 [group('submissions')]
 [doc('GET /api/v1/admin/submissions (default status=pending)')]
-submissions-list status='pending' base='https://qa-api.urbanistatlas.com':
+submissions-list status='pending' base='https://api.urbanistatlas.com':
     @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN (e.g. via mise.local.toml or your shell)}"
     @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET (phase-1 X-Atlas-Client gate)}"
     @curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
@@ -290,7 +290,7 @@ submissions-list status='pending' base='https://qa-api.urbanistatlas.com':
 # usage: just submissions-approve <uuid>
 [group('submissions')]
 [doc('POST /api/v1/admin/submissions/{id}/approve (queues GitHub PR)')]
-submissions-approve id base='https://qa-api.urbanistatlas.com':
+submissions-approve id base='https://api.urbanistatlas.com':
     @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
     @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
     @curl -sS -X POST -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
@@ -302,7 +302,7 @@ submissions-approve id base='https://qa-api.urbanistatlas.com':
 # usage: just submissions-reject <uuid> "duplicate of foo-bar org"
 [group('submissions')]
 [doc('POST /api/v1/admin/submissions/{id}/reject with a reason')]
-submissions-reject id reason base='https://qa-api.urbanistatlas.com':
+submissions-reject id reason base='https://api.urbanistatlas.com':
     @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
     @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
     @body="$(jq -nc --arg r "{{reason}}" '{reason: $r}')"; \
@@ -337,15 +337,15 @@ healthz port='8080':
 lookup code country='US' port='8080':
     @curl -sS "http://localhost:{{port}}/api/v1/lookup?postal_code={{code}}&country={{country}}" | jq
 
-# End-to-end smoke against the LIVE QA endpoint. The script lives at
-# scripts/smoke.sh so CI can invoke it directly without needing `just`
-# on the runner. Requires URBANIST_CLIENT_SECRET in the environment
-# (or pass as a positional arg).
+# End-to-end smoke against the LIVE production endpoint. The script
+# lives at scripts/smoke.sh so CI can invoke it directly without
+# needing `just` on the runner. Requires URBANIST_CLIENT_SECRET in
+# the environment (or pass as a positional arg).
 # usage: URBANIST_CLIENT_SECRET=... just smoke
 #        or: just smoke <secret> [host]
 [group('smoke')]
-[doc('e2e smoke against qa-api.urbanistatlas.com (set URBANIST_CLIENT_SECRET first)')]
-smoke secret='' host='qa-api.urbanistatlas.com':
+[doc('e2e smoke against api.urbanistatlas.com (set URBANIST_CLIENT_SECRET first)')]
+smoke secret='' host='api.urbanistatlas.com':
     ./scripts/smoke.sh "{{secret}}" "{{host}}"
 
 # ── ci-equivalent ─────────────────────────────────────

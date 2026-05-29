@@ -306,7 +306,7 @@ describe('Region', () => {
     renderAt('/region/nyc-metro');
 
     await waitFor(() => {
-      expect(screen.getByText(/no organizations indexed yet/i)).toBeDefined();
+      expect(screen.getByText(/it belongs in the atlas/i)).toBeDefined();
     });
   });
 

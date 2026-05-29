@@ -53,22 +53,23 @@ export function Home() {
 
           <div className="prose mt-48">
             <p className="lead drop">
-              The Urbanist Atlas catalogues the people in your city, county,
-              and region who are organizing — patiently, stubbornly, sometimes
-              gloriously — for safer streets and better transit. Type a US ZIP
-              or a Canadian postal code and we&rsquo;ll name them.
+              Within a few blocks of you, people show up to transportation
+              meetings week after week, patiently arguing for safer streets and
+              better transit. The Urbanist Atlas helps you find them. Type a US
+              ZIP or a Canadian postal code and we&rsquo;ll name the ones
+              working where you live.
             </p>
             <p>
               We index local and regional advocates only. National outfits do
               plenty of good work, but they are easy to find on their own; the
-              harder search is for the neighbourhood committee three blocks from
+              harder search is for the neighborhood committee three blocks from
               your door, the metro rider alliance two transfers away, the county
               Vision Zero coalition you have never heard of but should have.
             </p>
             <div className="editors-note">
               <div className="label">Editor&rsquo;s note · Vol. I</div>
               <p>
-                Each entry is curated by hand against{' '}
+                Every entry is picked by hand, weighed against{' '}
                 <Link to="/about#methodology">our criteria</Link>.{' '}
                 <Link to="/submit">File a tip</Link> if your region is missing.
               </p>
@@ -81,14 +82,14 @@ export function Home() {
             <div className="rail-kicker">Browse the atlas</div>
             <TopPlaces query={places} />
             <Link to="/browse" className="read-on mt-14">
-              All places <span className="arrow">→</span>
+              All regions <span className="arrow">→</span>
             </Link>
           </div>
           <div className="rail-block amber desktop-only">
             <div className="rail-kicker">From the editors</div>
             <p className="pullquote-rail">
               National advocacy is easy to find. The harder search is the
-              neighbourhood committee three blocks from your door.
+              neighborhood committee three blocks from your door.
             </p>
           </div>
         </aside>
@@ -105,13 +106,15 @@ function TopPlaces({ query }: { query: UseQueryResult<RegionSummary[], ApiError>
   return (
     <QueryState
       query={query}
-      loading="Loading places…"
+      loading="Loading regions…"
       error={() => (
-        <p className="results-state error">Region list is temporarily unavailable.</p>
+        <p className="results-state error">
+          The region list isn&rsquo;t loading right now. Refresh to try again.
+        </p>
       )}
       empty={{
         when: (data) => data.length === 0,
-        render: <p className="results-state">No places indexed yet.</p>,
+        render: <p className="results-state">No regions indexed yet.</p>,
       }}
     >
       {(data) => {
@@ -161,14 +164,17 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
       query={query}
       loading="Loading recent entries…"
       error={() => (
-        <p className="results-state error">Recent entries are temporarily unavailable.</p>
+        <p className="results-state error">
+          Recent entries aren&rsquo;t loading right now. Refresh, or browse the full
+          index.
+        </p>
       )}
       empty={{
         when: (data) => data.length === 0,
         render: (
           <EmptyState
             title="Nothing filed yet"
-            body="The editor hasn't published an entry recently — the indexing pipeline is quiet."
+            body="The editor's desk has been quiet lately."
             cta={<Link to="/submit">File the first tip.</Link>}
           />
         ),
@@ -184,7 +190,7 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
                 className="org-card"
                 to={`/orgs/${encodeURIComponent(org.slug)}`}
               >
-                <div className="added">+ Newly indexed</div>
+                <div className="added">Newly indexed</div>
                 <h3 className="org-name">{org.name}</h3>
                 {where ? <div className="org-where">{where}</div> : null}
                 <p className="org-desc">{truncate(org.short_desc, 180)}</p>
@@ -256,12 +262,12 @@ function ByTheNumbers({
           <div className="n">
             <span className="em">{formatNumber(totalOrgCount)}</span>
           </div>
-          <div className="label">Org entries on file</div>
+          <div className="label">Organizations on file</div>
           <div className="sub">Across the US and Canada</div>
         </div>
         <div className="stat">
           <div className="n">{formatNumber(placeCount)}</div>
-          <div className="label">Places indexed</div>
+          <div className="label">Regions indexed</div>
           <div className="sub">
             {usCount !== null && caCount !== null
               ? `${usCount} US · ${caCount} Canada`
@@ -305,10 +311,9 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
             ))}
           </ul>
           <p className="fineprint mt-22">
-            Tags are editorial labels, applied by hand. An organization can
-            carry up to five. Per-topic filtering launches with Phase 2; until
-            then, <Link to="/browse">the place index</Link> is the wander
-            view.
+            Tags are editorial labels, applied by hand — up to five per
+            organization. Filtering by topic arrives with Phase 2; until then,{' '}
+            <Link to="/browse">the region index</Link> is how you wander.
           </p>
         </div>
         <aside className="rail desktop-only">
@@ -316,8 +321,8 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
             <div className="rail-kicker">For developers</div>
             <p>
               The dataset is published under the Open Database License (ODbL
-              1.0). Phase 2 opens self-serve free API keys; until then, an
-              editor will hand-issue one on request.
+              1.0). Phase 2 opens self-serve free API keys; until then, ask and
+              an editor will set one up by hand.
             </p>
             <Link to="/about#for-developers" className="read-on">
               Developer preview <span className="arrow">→</span>

@@ -209,7 +209,7 @@ function OrgContent({ org }: { org: OrgT }) {
           </p>
           {org.regions.length === 0 ? (
             <p>
-              {org.name} doesn&rsquo;t have a region attached yet —{' '}
+              {org.name} isn&rsquo;t tied to a region yet —{' '}
               <Link to="/submit">file a tip</Link> if you can place them.
             </p>
           ) : null}
@@ -245,10 +245,10 @@ function OrgContent({ org }: { org: OrgT }) {
           <div className="editors-note mt-16">
             <div className="label">Something off?</div>
             <p>
-              We try to verify every entry on a rolling cadence. If a campaign
-              listed here has wrapped, leadership has changed, or a fact looks
-              wrong — <Link to="/submit">file a correction</Link> and
-              we&rsquo;ll fix it.
+              We check entries periodically, but the world moves faster than we
+              do. If a campaign listed here has wrapped, the leadership has
+              changed, or a fact looks wrong — <Link to="/submit">file a
+              correction</Link> and we&rsquo;ll fix it.
             </p>
           </div>
         </main>
@@ -258,10 +258,9 @@ function OrgContent({ org }: { org: OrgT }) {
           <div className="rail-block">
             <div className="rail-kicker">Filed by</div>
             <p>
-              An entry in the Urbanist Atlas — curated by hand against the{' '}
-              <Link to="/about#methodology">inclusion criteria</Link>, verified
-              against public sources. Spot something off?{' '}
-              <Link to="/submit">File a correction</Link>.
+              An entry in the Urbanist Atlas, chosen by hand against the{' '}
+              <Link to="/about#methodology">inclusion criteria</Link> and
+              checked against public sources.
             </p>
           </div>
           <div className="rail-block muted">
