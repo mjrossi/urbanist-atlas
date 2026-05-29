@@ -459,9 +459,9 @@ structured US + CA. Files at minimum:
 | `regions_de_lander.toml` (or `_states`) | Top-tier hand-defined Länder. `scope_tier=regional`. No parents. |
 | `regions_de_multistate.toml` *(optional)* | Multi-Länder advocacy regions or transit federations (e.g., VBB, MVV). |
 | `regions_de_msas.toml` *(generated, optional)* | Metro-equivalent regions from a Census-style upstream source via the ETL pipeline. Skip if you start hand-curated. |
-| `regions_de.toml` | Hand-curated city/Gemeinde leaves. Parents reference state/multi-state/MSA slugs from the files above (cross-file resolution handled by `internal/loadregions/write.go`'s `RegionIDBySlug` fallback). |
+| `regions_de.toml` | Hand-curated city/Gemeinde leaves. Parents reference state/multi-state/MSA slugs from the files above (cross-file resolution handled inside `internal/seedfiles/` while the FileStore builds the in-memory graph). |
 
-Per-country file lists live in `api/internal/loaddata/loaddata.go`'s
+Per-country file lists live in `api/internal/seedfiles/build.go`'s
 `countries` table — add a `{code, regionFiles, postal}` entry there
 when adding a country, in the right load order.
 
@@ -497,11 +497,13 @@ when adding a country, in the right load order.
 6. **Add DE orgs to `api/seed/orgs.toml`.** Use `region_slugs` to
    attach them.
 
-7. **Update `api/internal/loaddata/loaddata.go`.** Add a
+7. **Update `api/internal/seedfiles/build.go`.** Add a
    `{"DE", []string{"de_lander", "de_multistate", "de"}, "de"}`
-   entry so `just loaddata` picks up the new country.
+   entry to the `countries` table so the FileStore loader picks up
+   the new country on boot.
 
-8. **Run `just loaddata` against a fresh dev DB.**
+8. **Restart `just api-run`.** The FileStore reloads the bundle on
+   each start; no DB or migration step.
 
 9. **Add a per-country postal normalizer if needed.** Edit
    `api/pkg/atlas/postal.go`. The default normalizer
@@ -517,8 +519,8 @@ when adding a country, in the right load order.
     ```
 
 That's the flow. No schema changes; no code changes beyond the
-single-line addition in `loaddata.go` (and the ETL plan if you
-choose to build one).
+single-line addition in `seedfiles/build.go` (and the ETL plan if
+you choose to build one).
 
 ---
 
