@@ -25,6 +25,13 @@ func TestHEAD_PublicRoutes_Return200WithEmptyBody(t *testing.T) {
 			wantContent: "text/plain",
 		},
 		{
+			name: "readyz",
+			path: "/readyz",
+			// FileStore doesn't implement pinger so /readyz collapses
+			// to plaintext "ok" — same shape as /healthz.
+			wantContent: "text/plain",
+		},
+		{
 			name:        "openapi.yaml",
 			path:        "/api/v1/openapi.yaml",
 			wantContent: "application/yaml",
@@ -32,6 +39,26 @@ func TestHEAD_PublicRoutes_Return200WithEmptyBody(t *testing.T) {
 		{
 			name:        "lookup",
 			path:        "/api/v1/lookup?postal_code=11217&country=US",
+			wantContent: "application/json",
+		},
+		{
+			name:        "regions",
+			path:        "/api/v1/regions",
+			wantContent: "application/json",
+		},
+		{
+			name:        "regions/{slug}",
+			path:        "/api/v1/regions/brooklyn-ny",
+			wantContent: "application/json",
+		},
+		{
+			name:        "orgs/{slug}",
+			path:        "/api/v1/orgs/transalt-brooklyn",
+			wantContent: "application/json",
+		},
+		{
+			name:        "recent",
+			path:        "/api/v1/recent",
 			wantContent: "application/json",
 		},
 	}
