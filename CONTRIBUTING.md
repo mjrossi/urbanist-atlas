@@ -198,7 +198,7 @@ See [`SECURITY.md`](./SECURITY.md) for the private reporting path.
 
 ## Where to ask questions
 
-- **Github issues:** for anything bug-like, anything specific to a
+- **GitHub issues:** for anything bug-like, anything specific to a
   feature or organization entry, or anything that needs a written
   trail.
 - **Discussions:** if enabled on the repo, for open-ended questions

@@ -2,9 +2,9 @@
 
 > Find the people fighting for better streets where you live.
 
-A geographically-organized directory of transit and safe-streets advocacy
-organizations across the US and Canada. Enter a ZIP or postal code, get
-back the local and regional groups working in your area.
+A directory of transit and safe-streets advocacy organizations across the
+US and Canada, searchable by where you live. Enter a ZIP or Canadian postal
+code and the Atlas hands back the local and regional groups working near you.
 
 A companion volume to [*Urbanist Lexicon*](https://mjrossi.com).
 
