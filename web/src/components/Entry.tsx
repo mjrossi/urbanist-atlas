@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import type { Org } from '../lib/api.ts';
-import { domainOf } from '../lib/format.ts';
+import { domainOf, prettyTag } from '../lib/format.ts';
 
 /**
  * One row in the classified-section list. Renders the broadsheet
@@ -66,7 +66,7 @@ export function Entry({
           <ul className="tag-list">
             {org.tags.map((tag) => (
               <li key={tag}>
-                <span className="tag">{tag.replace(/-/g, ' ')}</span>
+                <span className="tag">{prettyTag(tag)}</span>
               </li>
             ))}
           </ul>

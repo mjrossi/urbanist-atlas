@@ -21,8 +21,8 @@ func bearerAuthMiddleware(adminToken string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				writeProblem(w, r, http.StatusServiceUnavailable, problemInternal,
-					"Admin endpoints disabled",
-					"URBANIST_ADMIN_TOKEN is not configured on this server",
+					"Admin Endpoints Disabled",
+					"URBANIST_ADMIN_TOKEN is not configured on this server.",
 					requestIDFromContext(r.Context()))
 			})
 		}
@@ -31,9 +31,14 @@ func bearerAuthMiddleware(adminToken string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			got := extractBearerToken(r.Header.Get("Authorization"))
+			// Identical title/detail for missing AND wrong tokens so the
+			// response shape doesn't leak which case the server hit. The
+			// constant-time compare above gives the same property at the
+			// byte level.
 			if subtle.ConstantTimeCompare([]byte(got), expected) != 1 {
 				writeProblem(w, r, http.StatusUnauthorized, problemUnauthorized,
-					"Unauthorized", "missing or invalid Authorization bearer token",
+					"Unauthorized",
+					"Authentication is required for this endpoint.",
 					requestIDFromContext(r.Context()))
 				return
 			}

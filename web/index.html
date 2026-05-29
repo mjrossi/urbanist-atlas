@@ -34,12 +34,16 @@
 
     <meta name="twitter:card" content="summary_large_image" />
 
-    <link
-      rel="alternate"
-      type="application/yaml"
-      title="OpenAPI"
-      href="https://api.urbanistatlas.com/api/v1/openapi.yaml"
-    />
+    <!--
+      An <link rel="alternate"> pointing at the OpenAPI spec belongs
+      here, but the URL has to be env-aware (Phase 1 only runs
+      qa-api.urbanistatlas.com; api.urbanistatlas.com is unreachable
+      until Phase 2 cutover). Vite doesn't substitute import.meta.env
+      into index.html without a custom transformIndexHtml hook, so the
+      link is exposed instead via the env-aware About + Colophon
+      "OpenAPI spec" links. Restore here once the API host name
+      stabilizes.
+    -->
 
     <script type="module" src="/src/main.tsx"></script>
   </head>

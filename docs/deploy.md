@@ -143,18 +143,70 @@ Provision `urbanist-atlas` in the Cloudflare dashboard (Workers &
 Pages → Create application → Connect to git). Production branch =
 `main`, build command = `cd web && npm ci && npm run build`,
 output directory = `web/dist`. The `wrangler.jsonc` at the repo root
-carries everything else (asset handling, SPA fallback, headers).
+carries asset handling and SPA fallback. Response headers — including
+the Content-Security-Policy — live in `web/public/_headers`, which
+Vite copies to `dist/_headers` at build time (the same `_headers`
+convention Cloudflare Pages uses; Workers Static Assets honors it).
 
 Set the SPA's API base + client secret as Workers environment
 variables:
 
 | Variable | Value |
 |---|---|
-| `VITE_API_BASE_URL` | `https://qa-api.urbanistatlas.com` |
+| `VITE_API_BASE` | `https://qa-api.urbanistatlas.com` |
 | `VITE_API_CLIENT_SECRET` | the same value set on Fly as `URBANIST_CLIENT_SECRET` |
 
 CNAME `qa.urbanistatlas.com` → the Workers project hostname; add it
 in the Workers project's custom-domain settings.
+
+#### Response headers (Content-Security-Policy)
+
+`web/public/_headers` declares the response-header policy applied to
+every static asset Cloudflare serves. The Content-Security-Policy is:
+
+```
+default-src 'self';
+script-src  'self';
+style-src   'self';
+font-src    'self';
+img-src     'self' data:;
+connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com;
+frame-ancestors 'none';
+base-uri    'self';
+form-action 'self';
+```
+
+Notes on the directives:
+
+- `script-src 'self'` — the SPA has no inline `<script>`; everything
+  goes through Vite's bundled module graph.
+- `style-src 'self'` — Vite's production build emits all CSS as
+  external `<link rel="stylesheet">` assets. There are no inline
+  `<style>` blocks in `dist/index.html`. Dev mode (HMR) uses inline
+  styles, but `_headers` only applies on Cloudflare, so that's not
+  a real constraint. If a future plugin starts inlining critical
+  CSS, add `'unsafe-inline'` back with a one-line justification.
+- `font-src 'self'` — all four families ship via
+  `@fontsource-variable/*` and are bundled with the build.
+- `connect-src` — the only outbound fetches are to the Atlas API.
+  The QA host stays in the list until Phase 2 cutover collapses
+  qa/prod onto a single origin; drop the QA entry then.
+- `frame-ancestors 'none'` — the Atlas is never embedded in an
+  iframe.
+
+The same file also sets:
+
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` —
+  one-year HSTS with subdomain coverage. Cloudflare already terminates
+  HTTPS at the edge; the header is defense in depth.
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-Content-Type-Options: nosniff`
+- `Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()`
+  — turn off browser features the Atlas has no reason to touch.
+
+When you add a new outbound origin (e.g. a future analytics endpoint),
+edit the `connect-src` list in `web/public/_headers` and update this
+section.
 
 ### 4. Smoke test
 

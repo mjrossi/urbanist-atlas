@@ -195,6 +195,15 @@ type ProblemDetails struct {
 	// Safe to display to end users.
 	Detail *string `json:"detail,omitempty"`
 
+	// Errors Extension field. Per-field validation messages keyed by
+	// JSON field name (e.g. `name`, `short_desc`,
+	// `submitter_email`). Present only on validation failures
+	// where multiple fields may be at fault — currently
+	// `POST /api/v1/submissions`. Each value is a sentence safe
+	// to render to end users; clients can dispatch them into
+	// per-field form validators.
+	Errors *map[string]string `json:"errors,omitempty"`
+
 	// Instance URI reference that identifies the specific occurrence of
 	// the problem — typically the request path.
 	Instance *string `json:"instance,omitempty"`
@@ -481,13 +490,16 @@ type SubmissionPayload struct {
 	ContactUrl *string `json:"contact_url,omitempty"`
 	Name       string  `json:"name"`
 
-	// RegionSlugs Slugs of the regions this organization serves (e.g.
-	// `["brooklyn-ny","nyc-metro"]`). The server resolves these
-	// against the `regions` table at approval time.
-	RegionSlugs []string `json:"region_slugs"`
-	ShortDesc   string   `json:"short_desc"`
-	Tags        []string `json:"tags"`
-	WebsiteUrl  string   `json:"website_url"`
+	// RegionSlugs Optional. Slugs of the regions this organization serves
+	// (e.g. `["brooklyn-ny","nyc-metro"]`). When provided, every
+	// entry must resolve against the `regions` table at submit
+	// time. May be omitted or sent as `[]` when the submitter
+	// doesn't know the canonical slug — editors finalize the
+	// region in PR review using `submitter_note`.
+	RegionSlugs *[]string `json:"region_slugs,omitempty"`
+	ShortDesc   string    `json:"short_desc"`
+	Tags        []string  `json:"tags"`
+	WebsiteUrl  string    `json:"website_url"`
 }
 
 // SubmissionStatus Lifecycle state of a public submission.

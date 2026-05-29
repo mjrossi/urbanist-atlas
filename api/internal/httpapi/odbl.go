@@ -24,15 +24,17 @@ const dataAttributionURL = "https://urbanistatlas.com"
 // response that passes through it. Mount inside the /api/v1 route
 // group so /healthz (which is not a data endpoint) stays clean.
 //
-// Headers are set BEFORE delegating to next.ServeHTTP so they're
-// already in the response writer's header map by the time a handler
-// calls WriteHeader — net/http flushes headers on the first body
-// write, so ordering matters.
-//
-// Headers are set unconditionally (success or error). Distinguishing
-// 2xx from non-2xx in middleware would require response-status
-// sniffing, and an error response that quotes the dataset license
-// is harmless. See the slice #24 spec §1 for the rationale.
+// Ordering note: headers MUST be set BEFORE delegating to
+// next.ServeHTTP. Once a downstream handler calls
+// w.WriteHeader (explicitly or implicitly via the first w.Write),
+// net/http freezes the response header map and flushes it onto the
+// wire — any Set call after that point is a silent no-op. Setting
+// them up-front guarantees the X-Data-License / X-Data-Attribution
+// pair lands on both success responses AND error responses
+// (writeProblem also calls WriteHeader, which would otherwise lock
+// the headers before this middleware got its chance). Decorating the
+// response with attribution on a 4xx/5xx is harmless — see slice #24
+// spec §1 for the rationale.
 func odblHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -74,15 +76,12 @@ func newMeta() oapi.Meta {
 // JSON has `"data": []`, never `"data": null`. Downstream clients
 // can rely on `data` always being an array.
 func respondCollection[T any](w http.ResponseWriter, items []T) {
-	if items == nil {
-		items = []T{}
-	}
 	body := struct {
 		Meta oapi.Meta `json:"meta"`
 		Data []T       `json:"data"`
 	}{
 		Meta: newMeta(),
-		Data: items,
+		Data: nonNilSlice(items),
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)

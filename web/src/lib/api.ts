@@ -64,27 +64,106 @@ export const apiBase: string = import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE
 const apiClientSecret: string = import.meta.env.VITE_API_CLIENT_SECRET ?? '';
 
 /**
+ * Map of field name to human-readable error message, as returned by
+ * the API in a problem+json `errors` extension on 400/422 responses.
+ *
+ * The current API only surfaces a top-level `detail` string (see
+ * `internal/httpapi/submissions.go`), so this map will be `undefined`
+ * in production today. Wired through ahead of a parallel pre-launch
+ * API change that may add field-level errors; the SPA degrades to
+ * the top-level `detail` when this is missing or empty.
+ */
+export type FieldErrors = Readonly<Record<string, string>>;
+
+/**
  * Error thrown for any non-2xx response from the API. Carries the HTTP
  * status, the parsed RFC 9457 problem document (when the server sent
  * one), and the request ID for log correlation.
+ *
+ * Two extras lifted out of common headers / extensions:
+ *   - {@link retryAfterSeconds}: parsed `Retry-After` (seconds or
+ *     HTTP-date), used by the submission form to render a countdown
+ *     after a 429.
+ *   - {@link fieldErrors}: per-field validation errors when the
+ *     problem+json envelope includes an `errors` extension. Falls
+ *     back to top-level `detail` rendering at the call site when
+ *     this is undefined.
  */
 export class ApiError extends Error {
   readonly status: number;
   readonly problem: ProblemDetails | undefined;
   readonly requestId: string | undefined;
+  readonly retryAfterSeconds: number | undefined;
+  readonly fieldErrors: FieldErrors | undefined;
 
   constructor(
     status: number,
     message: string,
     problem: ProblemDetails | undefined,
     requestId: string | undefined,
+    extras?: {
+      retryAfterSeconds?: number;
+      fieldErrors?: FieldErrors;
+    },
   ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.problem = problem;
     this.requestId = requestId;
+    this.retryAfterSeconds = extras?.retryAfterSeconds;
+    this.fieldErrors = extras?.fieldErrors;
   }
+}
+
+/**
+ * Parses a `Retry-After` header value into a non-negative number of
+ * seconds. Accepts either the delta-seconds form (an integer) or an
+ * HTTP-date (RFC 9110 §5.6.7); returns `undefined` for missing,
+ * malformed, or past-dated values so callers can fall back to
+ * static copy.
+ *
+ * Exported for direct testing; the `apiFetch` path attaches the
+ * parsed value to `ApiError.retryAfterSeconds`.
+ */
+export function parseRetryAfter(
+  header: string | null,
+  now: () => number = Date.now,
+): number | undefined {
+  if (header === null) return undefined;
+  const trimmed = header.trim();
+  if (trimmed === '') return undefined;
+  // Delta-seconds form: "120"
+  if (/^\d+$/.test(trimmed)) {
+    const n = Number.parseInt(trimmed, 10);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  }
+  // HTTP-date form: "Wed, 21 Oct 2026 07:28:00 GMT"
+  const t = Date.parse(trimmed);
+  if (Number.isNaN(t)) return undefined;
+  const delta = Math.ceil((t - now()) / 1000);
+  return delta > 0 ? delta : 0;
+}
+
+/**
+ * Best-effort extractor for per-field validation errors from a
+ * problem+json envelope. Looks for an `errors` extension shaped as
+ * `{ [field]: string }` (the convention this project will adopt if
+ * the parallel API worktree adds it). Anything else returns
+ * undefined and the caller falls back to top-level `detail`.
+ */
+function extractFieldErrors(
+  problem: ProblemDetails | undefined,
+): FieldErrors | undefined {
+  if (!problem || typeof problem !== 'object') return undefined;
+  const raw = (problem as { errors?: unknown }).errors;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof k !== 'string' || k === '') continue;
+    if (typeof v === 'string' && v !== '') out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /**
@@ -121,7 +200,15 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       }
     }
     const message = problem?.title ?? problem?.detail ?? `HTTP ${response.status}`;
-    throw new ApiError(response.status, message, problem, requestId);
+    const retryAfterSeconds =
+      response.status === 429
+        ? parseRetryAfter(response.headers.get('Retry-After'))
+        : undefined;
+    const fieldErrors = extractFieldErrors(problem);
+    throw new ApiError(response.status, message, problem, requestId, {
+      retryAfterSeconds,
+      fieldErrors,
+    });
   }
 
   return (await response.json()) as T;

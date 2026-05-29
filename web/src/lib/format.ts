@@ -27,3 +27,20 @@ export function domainOf(url: string): string | null {
     return null;
   }
 }
+
+/**
+ * Renders an editorial tag slug for display. Seed data stores tags
+ * as hyphen-lowercase ('vision-zero', 'rider-union', 'safe-streets')
+ * and the API ships them unchanged; this helper swaps hyphens for
+ * spaces so the chip reads naturally.
+ *
+ * Hyphens are the only separator the seed file uses today — the
+ * loader (`api/internal/seedfiles/orgs.go`) bounds tag length and
+ * non-emptiness but doesn't constrain charset, so this stays a
+ * one-line replace rather than a full slug-to-Title-Case routine.
+ * Bump the regex if underscores or other separators ever start
+ * appearing in `api/seed/orgs.toml`.
+ */
+export function prettyTag(tag: string): string {
+  return tag.replace(/-/g, ' ');
+}

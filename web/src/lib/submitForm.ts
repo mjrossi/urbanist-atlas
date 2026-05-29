@@ -118,24 +118,22 @@ export function buildIssueUrl(form: SubmitForm): string {
  * Markdown-formatted `submitter_note` so moderators see the same
  * structured context they would on the old GitHub-issue path.
  *
- * Region matching: the form's `region` is a free-form text input
- * (city / metro / state). The wire `region_slugs` array expects
- * canonical slugs. Until a region-picker autocomplete lands, we
- * carry the raw text through in `submitter_note` and submit an
- * empty slug list IF the user typed something the API won't
- * accept verbatim. For the common-case match (e.g. "brooklyn-ny"),
- * we trust the user. Moderators finalize slugs in PR review.
+ * Region: `region_slugs` is optional on the wire. The form's region
+ * input is free-form text — a typical submitter writes "Brooklyn, NY"
+ * or "Seattle", not a canonical slug like `nyc-tri-state` — so we
+ * always send an empty array and carry the raw text through in
+ * `submitter_note`. Editors finalize the canonical slug during PR
+ * review.
  */
 export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionRequest {
-  const regionRaw = form.region.trim();
   const submitterNote = buildSubmitterNote(form);
   return {
     payload: {
       name: form.name.trim(),
-      short_desc: form.oneLineDesc.trim(),
+      short_desc: shortDescForWire(form),
       website_url: form.website.trim(),
       tags: [],
-      region_slugs: regionToSlugs(regionRaw),
+      region_slugs: [],
     },
     submitter_note: submitterNote,
     ...(form.contact.trim() ? maybeContact(form.contact) : {}),
@@ -143,28 +141,18 @@ export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionReques
 }
 
 /**
- * Splits a free-form region input into candidate slugs. The form
- * collects something like "Brooklyn, NY" or "brooklyn-ny, nyc-metro";
- * the API rejects unknown slugs with a 400. Strategy: take the user's
- * text, split on commas, lowercase, replace spaces with hyphens. If
- * the result yields a slug the API recognizes, great; if not, the
- * 400 surfaces a clear field-level error and moderators can finalize
- * the slug in PR review when they merge the auto-PR.
+ * For `new` submissions the form collects a real one-line
+ * description. For corrections and removals there is no new
+ * description to write — the existing entry's copy is the subject of
+ * the request — so we mint a synthetic short_desc that points
+ * moderators at submitter_note for the full context. Keeps the wire
+ * shape stable (short_desc is a required field) without asking the
+ * submitter to invent placeholder copy.
  */
-function regionToSlugs(input: string): string[] {
-  if (!input) return [];
-  return input
-    .split(',')
-    .map((s) =>
-      s
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '')
-        .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, ''),
-    )
-    .filter(Boolean);
+function shortDescForWire(form: SubmitForm): string {
+  if (form.type === 'new') return form.oneLineDesc.trim();
+  if (form.type === 'correction') return '(correction request — see editor note)';
+  return '(removal request — see editor note)';
 }
 
 function maybeContact(raw: string): Partial<NewSubmissionRequest> {
@@ -181,6 +169,10 @@ function maybeContact(raw: string): Partial<NewSubmissionRequest> {
 function buildSubmitterNote(form: SubmitForm): string {
   const lines: string[] = [];
   lines.push(`Submission type: ${labelForType(form.type)}.`);
+  // For correction/removal the Region input is hidden, so form.region
+  // is the SUBMIT_FORM_DEFAULTS empty-string and this line drops out
+  // automatically. New-org submissions surface the user's raw text
+  // here for editorial slug-finalization.
   if (form.region.trim()) {
     lines.push(`Region served (raw): ${form.region.trim()}`);
   }

@@ -29,9 +29,10 @@ If you're not sure whether something fits, open an issue and ask.
 
 ### Suggest or correct an organization
 
-Open an [organization correction or addition][issue-org] issue.
-This is the most useful contribution for most readers — the directory
-only works if its entries are right.
+File a tip through the submission form on the site, or — if your
+change needs a written trail — open an [organization correction or
+addition][issue-org] issue. This is the most useful contribution for
+most readers; the directory only works if its entries are right.
 
 Good entries include:
 
@@ -40,12 +41,15 @@ Good entries include:
 - The region they serve (city, county, metro, state)
 - Whether they're a chapter of a national federation
 
-If you're listing your own organization, say so in the issue — it's
-not disqualifying, just useful context for the editor.
+If you're listing your own organization, say so in the submission —
+it's not disqualifying, just useful context for the editor.
 
-A full public submission flow ships with Phase 2 (slices #5 + #13
-in [`docs/roadmap.md`](./docs/roadmap.md)). Until then, the issue
-tracker is the staffed channel.
+The public submission form on the site is the primary channel; the
+issue tracker is the fallback for corrections that need a written
+trail. Either way, please read
+[`docs/editorial-style.md`](./docs/editorial-style.md) for the voice
+the directory aims for — verb-first descriptions, concrete campaigns
+over adjectives, words to avoid.
 
 ### Report a bug
 

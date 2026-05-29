@@ -173,8 +173,8 @@ func TestGetRegion_404_UnknownSlug(t *testing.T) {
 	if prob.Status != int32(http.StatusNotFound) {
 		t.Errorf("status: want 404, got %d", prob.Status)
 	}
-	if prob.Title != "Not Found" {
-		t.Errorf("title: want %q, got %q", "Not Found", prob.Title)
+	if prob.Title != "Region Not Found" {
+		t.Errorf("title: want %q, got %q", "Region Not Found", prob.Title)
 	}
 	if prob.RequestId == nil || *prob.RequestId == "" {
 		t.Errorf("request_id: want non-empty, got %v", prob.RequestId)

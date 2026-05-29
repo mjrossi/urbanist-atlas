@@ -43,13 +43,21 @@ func corsMiddleware(allowed []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			if origin != "" && allow(origin) {
-				h := w.Header()
-				h.Set("Access-Control-Allow-Origin", origin)
-				h.Add("Vary", "Origin")
-				h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Atlas-Client, X-Request-ID")
-				h.Set("Access-Control-Max-Age", "86400")
+			// Always Vary on Origin when one is present, even for
+			// disallowed origins — otherwise a shared cache could
+			// store the no-CORS-headers response for origin A and
+			// serve it back to origin B's preflight (or vice versa).
+			// Set BEFORE the allowlist check so the preflight-from-
+			// disallowed-origin 204 below also carries it.
+			if origin != "" {
+				w.Header().Add("Vary", "Origin")
+				if allow(origin) {
+					h := w.Header()
+					h.Set("Access-Control-Allow-Origin", origin)
+					h.Set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS")
+					h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Atlas-Client, X-Request-ID")
+					h.Set("Access-Control-Max-Age", "86400")
+				}
 			}
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)

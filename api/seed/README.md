@@ -70,6 +70,13 @@ fixtures here. Modeling conventions:
 - `scope_tier` is editorial. Berlin is `de:land` but `scope_tier='local'` because Berliners experience it as a city.
 - `scope_tier='national'` exists for country-wide umbrella orgs (MUBi national for PT, future Living Streets for UK). National regions get no incoming parent edges from the leaf chain, and the default `/lookup` filters them out of the ancestor walk. See [`docs/region-graph.md`](../../docs/region-graph.md) for the per-country editorial policy — US/CA do NOT create `us:national`/`ca:national` regions in v1, preserving the local-first ethos.
 
+When adding or rewriting an entry in `orgs.toml`, read
+[`docs/editorial-style.md`](../../docs/editorial-style.md) first.
+It codifies the broadsheet voice the directory uses — verb-first
+descriptions, sentence case, concrete campaigns over adjectives,
+and the short list of words ("leading", "transform", "ecosystem"
+as metaphor, …) the editor reliably strikes on review.
+
 ## Validation fixtures
 
 `regions_pt.toml` + `postal_codes_pt.csv` are a deliberate

@@ -30,14 +30,14 @@ func newIPRateLimiter(maxPerWindow int, window time.Duration) *ipRateLimiter {
 		maxPerWindow = 5
 	}
 	if window <= 0 {
-		window = time.Hour
+		window = rateLimitWindow
 	}
 	return &ipRateLimiter{
 		hits:       make(map[string][]time.Time),
 		window:     window,
 		maxPerWin:  maxPerWindow,
 		nowFunc:    func() time.Time { return time.Now() },
-		sweepEvery: 5 * time.Minute,
+		sweepEvery: rateLimitSweepInterval,
 	}
 }
 
@@ -85,11 +85,28 @@ func keepRecent(ts []time.Time, cutoff time.Time) []time.Time {
 	return out
 }
 
-// clientIP picks the most plausible source IP from r. We trust Fly's
-// `Fly-Client-IP` if present (Fly sets it on every request from its
-// proxy), then a single-value X-Forwarded-For, then RemoteAddr.
-// Multi-value XFF is intentionally ignored — picking the wrong entry
-// is worse than over-limiting one upstream proxy.
+// clientIP picks the most plausible source IP from r.
+//
+// Proxy-trust model. The production deployment runs behind exactly
+// one proxy hop: Fly's edge layer. Fly strips any inbound
+// `Fly-Client-IP` header on the way in and sets its own value on the
+// way out to the app — so on every request reaching this handler,
+// `Fly-Client-IP` is the real client IP as observed at the Fly edge.
+// We trust it unconditionally for that reason.
+//
+// X-Forwarded-For is a fallback for non-Fly deployments (local dev,
+// a future move behind a different fronting CDN). We only accept the
+// single-value form: a multi-hop XFF chain requires picking the
+// "rightmost trusted" entry, and we don't currently configure that
+// trusted-proxy list. Picking the wrong index is a worse failure
+// mode (rate-limit bypass) than over-limiting one upstream proxy.
+//
+// If the API ever moves behind a CDN other than Fly (e.g. Cloudflare
+// in front of Fly), update this function to: (1) drop the
+// unconditional Fly-Client-IP trust, (2) add an allowlist of the new
+// proxy's source CIDRs, and (3) parse the new proxy's client-IP
+// header (e.g. `CF-Connecting-IP`) only when the request's
+// RemoteAddr is in that allowlist.
 func clientIP(r *http.Request) string {
 	if v := r.Header.Get("Fly-Client-IP"); v != "" {
 		return strings.TrimSpace(v)
@@ -110,6 +127,6 @@ func writeRateLimited(w http.ResponseWriter, r *http.Request, retryAfterSec int,
 	w.Header().Set("Retry-After", strconv.Itoa(retryAfterSec))
 	writeProblem(w, r, http.StatusTooManyRequests, problemRateLimited,
 		"Too Many Requests",
-		"submission rate limit exceeded for your source IP; retry later",
+		"You have exceeded the submission rate limit for your IP address. Try again after the Retry-After interval.",
 		rid)
 }

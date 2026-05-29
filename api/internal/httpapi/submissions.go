@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -39,11 +38,6 @@ type PromotionEnqueuer interface {
 	Enqueue(ctx context.Context, sub atlas.Submission) error
 }
 
-// Maximum body size we'll read from a public submission. Way more
-// than the form needs (~1 KiB typical) and small enough that a
-// malicious client can't pin a worker on JSON parsing.
-const submissionBodyLimit = 64 * 1024
-
 // createSubmissionHandler answers POST /api/v1/submissions. Public
 // endpoint; gated by clientSecretMiddleware upstream + rate-limited
 // per-IP below.
@@ -59,32 +53,42 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&body); err != nil {
-			detail := "request body is not valid JSON for NewSubmissionRequest"
+			title := "Invalid Request Body"
+			detail := "The request body is not valid JSON for NewSubmissionRequest."
 			if errors.Is(err, io.EOF) {
-				detail = "request body is empty"
+				title = "Empty Request Body"
+				detail = "The request body is empty; expected a NewSubmissionRequest JSON object."
 			}
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", detail, rid)
+			// http.MaxBytesReader surfaces an oversize body as a
+			// MaxBytesError; surface that with the 413-shape title even
+			// though we keep the 400 status (oversize submissions are a
+			// validation failure from the client's perspective).
+			var mbErr *http.MaxBytesError
+			if errors.As(err, &mbErr) {
+				title = "Request Body Too Large"
+				detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
+			}
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, title, detail, rid)
 			return
 		}
 
+		// region_slugs is optional on the wire; the SPA's region field
+		// is free-form text and most submissions don't carry a
+		// canonical slug. nil pointer and empty slice both flow through
+		// as zero-length input to ValidateSubmissionPayload.
+		var rawRegionSlugs []string
+		if body.Payload.RegionSlugs != nil {
+			rawRegionSlugs = *body.Payload.RegionSlugs
+		}
 		payload := atlas.SubmissionPayload{
 			Name:        strings.TrimSpace(body.Payload.Name),
 			ShortDesc:   strings.TrimSpace(body.Payload.ShortDesc),
 			WebsiteURL:  strings.TrimSpace(body.Payload.WebsiteUrl),
 			Tags:        normalizeStringSlice(body.Payload.Tags),
-			RegionSlugs: normalizeStringSlice(body.Payload.RegionSlugs),
+			RegionSlugs: normalizeStringSlice(rawRegionSlugs),
 		}
 		if body.Payload.ContactUrl != nil {
 			payload.ContactURL = strings.TrimSpace(*body.Payload.ContactUrl)
-		}
-
-		if err := seedfiles.ValidateOrgFields(payload.Name, payload.ShortDesc, payload.WebsiteURL, payload.ContactURL, payload.Tags, payload.RegionSlugs); err != nil {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", err.Error(), rid)
-			return
-		}
-		if err := validateRegionSlugs(r.Context(), regions, payload.RegionSlugs); err != nil {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", err.Error(), rid)
-			return
 		}
 
 		in := atlas.NewSubmissionInput{Payload: payload}
@@ -97,24 +101,55 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 		if body.SubmitterNote != nil {
 			in.SubmitterNote = *body.SubmitterNote
 		}
-		if err := validateSubmitterFields(in.SubmitterName, in.SubmitterEmail, in.SubmitterNote); err != nil {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request", err.Error(), rid)
+
+		fieldErrs := seedfiles.ValidateSubmissionPayload(
+			seedfiles.SubmissionPayloadInput{
+				Name:        payload.Name,
+				ShortDesc:   payload.ShortDesc,
+				WebsiteURL:  payload.WebsiteURL,
+				ContactURL:  payload.ContactURL,
+				Tags:        payload.Tags,
+				RegionSlugs: payload.RegionSlugs,
+			},
+			seedfiles.SubmitterInput{
+				Name:  in.SubmitterName,
+				Email: in.SubmitterEmail,
+				Note:  in.SubmitterNote,
+			},
+		)
+
+		// Region-slug existence is the one check the shared validator
+		// can't do (it needs the store + context). Run it only when
+		// shape validation already passed for `region_slugs`, then merge
+		// the result into the field-errors map so the client receives a
+		// single per-field response.
+		if _, alreadyBad := fieldErrs["region_slugs"]; !alreadyBad {
+			if msg := checkRegionSlugsExist(r.Context(), regions, payload.RegionSlugs); msg != "" {
+				if fieldErrs == nil {
+					fieldErrs = map[string]string{}
+				}
+				fieldErrs["region_slugs"] = msg
+			}
+		}
+
+		if len(fieldErrs) > 0 {
+			writeProblemWithErrors(w, r, http.StatusBadRequest, problemValidation,
+				"Submission Validation Failed",
+				"One or more fields in the submission failed validation. See the errors map for per-field messages.",
+				rid, fieldErrs)
 			return
 		}
 
 		sub, err := subs.Create(r.Context(), in)
 		if err != nil {
 			logger.ErrorContext(r.Context(), "create submission failed", "err", err, "rid", rid)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)
+			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
+				"An unexpected error occurred while handling this request.", rid)
 			return
 		}
 		writeJSON(w, http.StatusCreated, toOAPISubmission(sub))
 	}
 }
-
-// Hard upper bound on ?limit=. Matches the store's internal cap and
-// keeps the admin UI responsive — pagination > deep scrolling.
-const maxAdminListLimit = 200
 
 // listSubmissionsHandler answers GET /api/v1/admin/submissions.
 // Bearer-gated. Defaults to status=pending. Returns at most ?limit=
@@ -130,16 +165,16 @@ func listSubmissionsHandler(subs atlas.SubmissionStore, logger *slog.Logger) htt
 			case atlas.SubmissionPending, atlas.SubmissionApproved, atlas.SubmissionRejected:
 				q.Status = atlas.SubmissionStatus(raw)
 			default:
-				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request",
-					"status must be one of pending, approved, rejected", rid)
+				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Status Filter",
+					"The status query parameter must be one of pending, approved, or rejected.", rid)
 				return
 			}
 		}
 		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 			n, err := strconv.Atoi(raw)
 			if err != nil || n < 1 || n > maxAdminListLimit {
-				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request",
-					fmt.Sprintf("limit must be an integer between 1 and %d", maxAdminListLimit), rid)
+				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Limit",
+					fmt.Sprintf("The limit query parameter must be an integer between 1 and %d.", maxAdminListLimit), rid)
 				return
 			}
 			q.Limit = n
@@ -150,12 +185,13 @@ func listSubmissionsHandler(subs atlas.SubmissionStore, logger *slog.Logger) htt
 		page, err := subs.ListPage(r.Context(), q)
 		if err != nil {
 			if errors.Is(err, sqlite.ErrInvalidCursor) {
-				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request",
-					"cursor is malformed; pass the value of the previous response's X-Next-Cursor header", rid)
+				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Cursor",
+					"The cursor query parameter is malformed; pass the value of the previous response's X-Next-Cursor header.", rid)
 				return
 			}
 			logger.ErrorContext(r.Context(), "list submissions failed", "err", err, "rid", rid)
-			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)
+			writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
+				"An unexpected error occurred while handling this request.", rid)
 			return
 		}
 		if page.NextCursor != "" {
@@ -213,14 +249,16 @@ func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger) ht
 		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&body); err != nil {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request",
-				"request body is not valid JSON for RejectSubmissionRequest", rid)
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Request Body",
+				"The request body is not valid JSON for RejectSubmissionRequest.", rid)
 			return
 		}
 		reason := strings.TrimSpace(body.Reason)
 		if reason == "" {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request",
-				"reason required", rid)
+			writeProblemWithErrors(w, r, http.StatusBadRequest, problemValidation,
+				"Submission Validation Failed",
+				"A rejection reason is required.", rid,
+				map[string]string{"reason": "A rejection reason is required."})
 			return
 		}
 		sub, err := subs.Reject(r.Context(), publicID, reason)
@@ -237,8 +275,8 @@ func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger) ht
 func readSubmissionID(w http.ResponseWriter, r *http.Request, rid string) (string, bool) {
 	raw := strings.TrimSpace(chi.URLParam(r, "id"))
 	if _, err := uuid.Parse(raw); err != nil {
-		writeProblem(w, r, http.StatusBadRequest, problemValidation, "Bad Request",
-			"submission id is not a valid UUID", rid)
+		writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Submission ID",
+			"The submission id path parameter is not a valid UUID.", rid)
 		return "", false
 	}
 	return raw, true
@@ -249,14 +287,15 @@ func readSubmissionID(w http.ResponseWriter, r *http.Request, rid string) (strin
 func writeSubmissionStateErr(w http.ResponseWriter, r *http.Request, err error, rid string, logger *slog.Logger, op string) {
 	switch {
 	case errors.Is(err, atlas.ErrSubmissionNotFound):
-		writeProblem(w, r, http.StatusNotFound, problemNotFound, "Not Found",
-			"no submission with that id", rid)
+		writeProblem(w, r, http.StatusNotFound, problemNotFound, "Submission Not Found",
+			"No submission matches that id.", rid)
 	case errors.Is(err, atlas.ErrSubmissionNotPending):
-		writeProblem(w, r, http.StatusConflict, problemConflict, "Conflict",
-			"submission has already been processed", rid)
+		writeProblem(w, r, http.StatusConflict, problemConflict, "Submission Already Processed",
+			"This submission has already been approved or rejected and cannot transition again.", rid)
 	default:
 		logger.ErrorContext(r.Context(), op+" failed", "err", err, "rid", rid)
-		writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error", "internal error", rid)
+		writeProblem(w, r, http.StatusInternalServerError, problemInternal, "Internal Server Error",
+			"An unexpected error occurred while handling this request.", rid)
 	}
 }
 
@@ -267,62 +306,32 @@ func enqueueOrDisabled(ctx context.Context, enq PromotionEnqueuer, sub atlas.Sub
 	return enq.Enqueue(ctx, sub)
 }
 
-// Submitter-side caps. submitter_email is bounded by the RFC's 320
-// characters (local 64 + "@" + domain 255). submitter_note is the
-// largest by far because moderators want context — but we still cap
-// it so a single submission can't pin a worker on JSON parsing or
-// stuff a multi-MB blob into orgs.toml prep notes.
-const (
-	maxSubmitterNameLen  = 200
-	maxSubmitterEmailLen = 320
-	maxSubmitterNoteLen  = 2000
-)
-
-func validateSubmitterFields(name, email, note string) error {
-	if utf8.RuneCountInString(name) > maxSubmitterNameLen {
-		return fmt.Errorf("submitter_name must be at most %d characters", maxSubmitterNameLen)
-	}
-	if len(email) > maxSubmitterEmailLen {
-		return fmt.Errorf("submitter_email must be at most %d characters", maxSubmitterEmailLen)
-	}
-	if email != "" {
-		at := strings.IndexByte(email, '@')
-		// Cheap shape check: exactly one '@', non-empty local and
-		// domain, and a '.' somewhere in the domain. Catches the worst
-		// junk (`"@@"`, `"foo"`, `"a@b"`) without pretending to do full
-		// RFC 5322 — strict validation would reject perfectly valid
-		// addresses and we don't need it for a contact field.
-		if at <= 0 || at != strings.LastIndexByte(email, '@') || at == len(email)-1 ||
-			!strings.ContainsRune(email[at+1:], '.') {
-			return fmt.Errorf("submitter_email is not a valid email address")
-		}
-	}
-	if utf8.RuneCountInString(note) > maxSubmitterNoteLen {
-		return fmt.Errorf("submitter_note must be at most %d characters", maxSubmitterNoteLen)
-	}
-	return nil
-}
-
-func validateRegionSlugs(ctx context.Context, regions atlas.Store, slugs []string) error {
+// checkRegionSlugsExist resolves each region slug against the store
+// and returns a sentence-form message naming the first offender (or
+// "" when every slug resolves and no duplicates are present). The
+// existence check requires a context-bound store call so it lives
+// here rather than in seedfiles.ValidateSubmissionPayload.
+func checkRegionSlugsExist(ctx context.Context, regions atlas.Store, slugs []string) string {
 	if regions == nil {
-		// Defensive: a missing read-side store at this point would be a
-		// programmer error. Return validation failure rather than crash.
-		return errors.New("region resolver unavailable")
+		// Defensive: a missing read-side store at this point would be
+		// a programmer error. Surface it as a validation failure rather
+		// than crash.
+		return "Region resolver is unavailable; cannot verify region slugs."
 	}
 	seen := map[string]bool{}
 	for _, slug := range slugs {
 		if seen[slug] {
-			return fmt.Errorf("region_slugs contains duplicate %q", slug)
+			return fmt.Sprintf("Region slug %q appears more than once.", slug)
 		}
 		seen[slug] = true
 		if _, err := regions.ResolveRegionBySlug(ctx, slug); err != nil {
 			if errors.Is(err, atlas.ErrRegionNotFound) {
-				return fmt.Errorf("region_slugs contains unknown slug %q", slug)
+				return fmt.Sprintf("Region slug %q does not match any known region.", slug)
 			}
-			return fmt.Errorf("region lookup failed for %q: %w", slug, err)
+			return fmt.Sprintf("Region lookup failed for %q.", slug)
 		}
 	}
-	return nil
+	return ""
 }
 
 func normalizeStringSlice(in []string) []string {
@@ -375,20 +384,16 @@ func toOAPISubmission(s atlas.Submission) oapi.Submission {
 }
 
 func toOAPISubmissionPayload(p atlas.SubmissionPayload) oapi.SubmissionPayload {
-	tags := append([]string(nil), p.Tags...)
-	if tags == nil {
-		tags = []string{}
-	}
-	regions := append([]string(nil), p.RegionSlugs...)
-	if regions == nil {
-		regions = []string{}
-	}
+	// region_slugs is optional on the schema since slice α; always
+	// emit a non-nil pointer (possibly to an empty array) so the
+	// admin response shape stays predictable for downstream consumers.
+	regions := nonNilSlice(append([]string(nil), p.RegionSlugs...))
 	out := oapi.SubmissionPayload{
 		Name:        p.Name,
 		ShortDesc:   p.ShortDesc,
 		WebsiteUrl:  p.WebsiteURL,
-		Tags:        tags,
-		RegionSlugs: regions,
+		Tags:        nonNilSlice(append([]string(nil), p.Tags...)),
+		RegionSlugs: &regions,
 	}
 	if p.ContactURL != "" {
 		c := p.ContactURL

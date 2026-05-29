@@ -198,8 +198,43 @@ func TestCreateSubmission_UnknownRegionSlug_Returns400(t *testing.T) {
 	}
 	var problem map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&problem)
-	if got, _ := problem["detail"].(string); !strings.Contains(got, "no-such-region") {
-		t.Fatalf("detail does not mention bad slug: %v", problem)
+	// Bad region slugs now surface via the per-field `errors` map
+	// rather than the top-level `detail`. Mirrors the wire shape the
+	// SPA's Submit page consumes for per-input validator dispatch.
+	errs, _ := problem["errors"].(map[string]any)
+	if got, _ := errs["region_slugs"].(string); !strings.Contains(got, "no-such-region") {
+		t.Fatalf("errors.region_slugs does not mention bad slug: %v", problem)
+	}
+}
+
+// Empty region_slugs is accepted on the public-submission wire because
+// most submitters don't know the canonical slug. Editors finalize the
+// region in PR review from submitter_note context. The loader-side
+// validation in ValidateOrgFields keeps the "at least one" rule for
+// records already in the orgs.toml dataset.
+func TestCreateSubmission_EmptyRegionSlugs_Returns201(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	body["payload"].(map[string]any)["region_slugs"] = []string{}
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status: want 201, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateSubmission_OmittedRegionSlugs_Returns201(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	delete(body["payload"].(map[string]any), "region_slugs")
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status: want 201, got %d", resp.StatusCode)
 	}
 }
 

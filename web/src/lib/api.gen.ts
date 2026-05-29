@@ -37,12 +37,18 @@ export interface paths {
         /**
          * Readiness probe.
          * @description Returns 200 only when the data store is reachable (a 1-second
-         *     Postgres ping has succeeded). Returns 503 with an
+         *     store ping has succeeded). Returns 503 with an
          *     `application/problem+json` body (`type=https://urbanistatlas.com/problems/not-ready`)
          *     when the store is unavailable. Use this as the Fly readiness
          *     check so traffic stops routing to a machine that can't serve
          *     queries; keep `/healthz` as the liveness check so a transient
-         *     DB blip doesn't trigger a machine recycle.
+         *     downstream blip doesn't trigger a machine recycle.
+         *
+         *     The bundled in-memory FileStore currently has no out-of-process
+         *     dependency to ping, so `/readyz` resolves to 200 as soon as the
+         *     process is up. The probe stays in place so a future
+         *     network-bound store implementation can opt in to the
+         *     readiness gate without an API change.
          */
         get: operations["getReady"];
         put?: never;
@@ -643,11 +649,14 @@ export interface components {
             contact_url?: string;
             tags: string[];
             /**
-             * @description Slugs of the regions this organization serves (e.g.
-             *     `["brooklyn-ny","nyc-metro"]`). The server resolves these
-             *     against the `regions` table at approval time.
+             * @description Optional. Slugs of the regions this organization serves
+             *     (e.g. `["brooklyn-ny","nyc-metro"]`). When provided, every
+             *     entry must resolve against the `regions` table at submit
+             *     time. May be omitted or sent as `[]` when the submitter
+             *     doesn't know the canonical slug — editors finalize the
+             *     region in PR review using `submitter_note`.
              */
-            region_slugs: string[];
+            region_slugs?: string[];
         };
         /** @description Request body for `POST /api/v1/submissions`. */
         NewSubmissionRequest: {
@@ -790,6 +799,22 @@ export interface components {
              * @example a1b2c3d4e5f6g7h8
              */
             request_id?: string;
+            /**
+             * @description Extension field. Per-field validation messages keyed by
+             *     JSON field name (e.g. `name`, `short_desc`,
+             *     `submitter_email`). Present only on validation failures
+             *     where multiple fields may be at fault — currently
+             *     `POST /api/v1/submissions`. Each value is a sentence safe
+             *     to render to end users; clients can dispatch them into
+             *     per-field form validators.
+             * @example {
+             *       "short_desc": "A short description is required.",
+             *       "website_url": "Website URL must use http or https."
+             *     }
+             */
+            errors?: {
+                [key: string]: string;
+            };
         };
     };
     responses: {

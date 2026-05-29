@@ -102,12 +102,12 @@ func TestLookup_BadRequests(t *testing.T) {
 		{
 			name:       "empty postal_code",
 			query:      "postal_code=&country=US",
-			wantDetail: "postal_code is required",
+			wantDetail: "The postal_code query parameter is required.",
 		},
 		{
 			name:       "empty country",
 			query:      "postal_code=11217&country=",
-			wantDetail: "country is required",
+			wantDetail: "The country query parameter is required.",
 		},
 		{
 			// postal_code is checked first; both-empty is still a
@@ -115,14 +115,14 @@ func TestLookup_BadRequests(t *testing.T) {
 			// of the validation checks is a visible change.
 			name:       "both empty",
 			query:      "postal_code=&country=",
-			wantDetail: "postal_code is required",
+			wantDetail: "The postal_code query parameter is required.",
 		},
 		{
 			// Whitespace-only postal codes are trimmed at the boundary
 			// (strings.TrimSpace), so they reduce to the empty case.
 			name:       "whitespace-only postal_code",
 			query:      "postal_code=%20%20&country=US",
-			wantDetail: "postal_code is required",
+			wantDetail: "The postal_code query parameter is required.",
 		},
 		{
 			// Length-cap the raw input before normalization. 17 chars
@@ -130,13 +130,13 @@ func TestLookup_BadRequests(t *testing.T) {
 			// count matches the rune count.
 			name:       "postal_code over length cap",
 			query:      "postal_code=" + strings.Repeat("A", maxPostalCodeLen+1) + "&country=US",
-			wantDetail: "postal_code too long",
+			wantDetail: "The postal_code query parameter is longer than the maximum allowed length.",
 		},
 		{
 			// 5 chars is one over maxCountryLen.
 			name:       "country over length cap",
 			query:      "postal_code=11217&country=" + strings.Repeat("A", maxCountryLen+1),
-			wantDetail: "country too long",
+			wantDetail: "The country query parameter is longer than the maximum allowed length.",
 		},
 	}
 
@@ -236,8 +236,8 @@ func TestLookup_PostalCodeNotFound_ReturnsProblemJSON(t *testing.T) {
 	if prob.Status != int32(http.StatusNotFound) {
 		t.Errorf("status: want 404, got %d", prob.Status)
 	}
-	if prob.Title != "Not Found" {
-		t.Errorf("title: want %q, got %q", "Not Found", prob.Title)
+	if prob.Title != "Postal Code Not Found" {
+		t.Errorf("title: want %q, got %q", "Postal Code Not Found", prob.Title)
 	}
 }
 
@@ -298,20 +298,18 @@ func TestLookup_NormalizesPostalCodeAtBoundary(t *testing.T) {
 }
 
 // TestLookup_NationalTierOrg_ExcludedFromDefaultLookup pins the
-// editorial sibling-attachment contract: when a national region is NOT
-// an ancestor of the leaf chain (as MUBi sits relative to
-// lisboa-municipio in the PT seed), it must not leak into either bucket.
-// This works equally against MemStore and Postgres because the ancestor
-// walk never reaches the national region in either backend.
+// editorial sibling-attachment contract: when a national region is
+// NOT an ancestor of the leaf chain (as MUBi sat relative to
+// lisboa-municipio in the PT validation fixture), its orgs must
+// not leak into either /lookup bucket.
 //
-// What this test does NOT exercise: the recursive-CTE safety-net filter
-// (lookup.sql `WHERE r.scope_tier <> 'national'`) — i.e. an ancestor-
-// attached national region that the SQL filter is responsible for
-// pruning. That case is covered by
-// TestPipeline_NationalTierAncestor_FilteredByCTE in
-// api/internal/store/postgres/pipeline_test.go (build tag: integration),
-// where only the Postgres backend's behavior is meaningful (MemStore
-// does not filter at the AncestorRegions seam).
+// This is the API-level pin. The structural national-tier filter
+// itself lives in MemStore.AncestorRegions / DescendantRegions
+// (see pkg/atlas/store.go); the per-store contract is exercised
+// generically by pkg/atlas/storetest. This test pins the wire
+// behavior so a future change to the lookup pipeline (e.g. a
+// "popular nearby regions" pass) can't silently start including
+// non-ancestor national orgs.
 func TestLookup_NationalTierOrg_ExcludedFromDefaultLookup(t *testing.T) {
 	s := atlas.NewMemStore()
 

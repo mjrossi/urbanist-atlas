@@ -17,9 +17,16 @@ URBANIST_LOG_FORMAT = "text"
 
 # Point the file-backed store at the bundled seed in the repo. The
 # server reads regions_*.toml, postal_codes_*.csv, and orgs.toml at
-# boot — no database needed.
-URBANIST_SEED_DIR = "api/seed"
+# boot — no database needed. Absolute via {{config_root}} so the
+# value survives recipes that `cd api` before invoking the server.
+URBANIST_SEED_DIR = "{{config_root}}/api/seed"
 
 # Dev-only admin token. Do not deploy this value anywhere. The real
 # production token lives in Fly app secrets, not in this repo.
 URBANIST_ADMIN_TOKEN = "dev-admin-token-not-secret"
+
+# Local-dev SQLite for the submission queue. /data/atlas.db is the
+# Fly volume mount used in prod; locally we keep it under api/tmp/
+# (gitignored). The server `mkdir -p`s the parent dir at boot.
+# Absolute via {{config_root}} for the same reason as URBANIST_SEED_DIR.
+URBANIST_DB_PATH = "{{config_root}}/api/tmp/atlas.db"

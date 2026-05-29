@@ -32,8 +32,14 @@ func clientSecretMiddleware(secret string) func(http.Handler) http.Handler {
 				// upstream) so the problem document's request_id matches
 				// the X-Request-ID response header even when the client
 				// didn't send one — same behavior as every other handler.
+				//
+				// Identical title/detail for missing AND wrong secret so
+				// the response shape doesn't leak which case the server
+				// hit; the constant-time compare above provides the same
+				// property at the byte level.
 				writeProblem(w, r, http.StatusUnauthorized, problemUnauthorized,
-					"Unauthorized", "missing or invalid X-Atlas-Client header",
+					"Unauthorized",
+					"Authentication is required for this endpoint.",
 					requestIDFromContext(r.Context()))
 				return
 			}

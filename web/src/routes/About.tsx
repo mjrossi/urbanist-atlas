@@ -1,9 +1,67 @@
-import { Link } from 'react-router';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'react-router';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { apiBase } from '../lib/api.ts';
 
 export function About() {
   useDocumentTitle('About — Urbanist Atlas');
+  const { hash } = useLocation();
+
+  // On desktop, all sections must render expanded. Chrome's UA stylesheet
+  // hides closed-<details> body content through a mechanism that author
+  // CSS — even with !important — can't override (the ::details-content
+  // internal slot). The reliable fix is to keep [open] true at desktop
+  // widths and prevent the summary click from toggling it back closed.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 769px)');
+    const sections = Array.from(
+      document.querySelectorAll<HTMLDetailsElement>('.method-section'),
+    );
+    const summaries = sections
+      .map((d) => d.querySelector('summary'))
+      .filter((s): s is HTMLElement => s !== null);
+
+    const forceOpenIfDesktop = () => {
+      if (!mq.matches) return;
+      for (const d of sections) {
+        if (!d.open) d.open = true;
+      }
+    };
+    const preventToggleOnDesktop = (e: MouseEvent) => {
+      if (mq.matches) e.preventDefault();
+    };
+
+    forceOpenIfDesktop();
+    mq.addEventListener('change', forceOpenIfDesktop);
+    summaries.forEach((s) => s.addEventListener('click', preventToggleOnDesktop));
+
+    return () => {
+      mq.removeEventListener('change', forceOpenIfDesktop);
+      summaries.forEach((s) =>
+        s.removeEventListener('click', preventToggleOnDesktop),
+      );
+    };
+  }, []);
+
+  // Open the surrounding <details> on mobile before the global
+  // useScrollToTop lands on a kicker whose body is still collapsed.
+  useEffect(() => {
+    const id = decodeURIComponent(hash.replace(/^#/, ''));
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    const details = target.closest('details');
+    if (details && !details.open) {
+      details.open = true;
+    }
+    const raf = requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [hash]);
+
+  const openapiUrl = `${apiBase}/api/v1/openapi.yaml`;
   const atAGlance = (
     <div className="rail-block amber">
       <div className="rail-kicker">At a glance</div>
@@ -63,10 +121,9 @@ export function About() {
               <div className="h2-rule" />
             </summary>
           <p>
-            Entries are curated by hand. Each organization in the Atlas was
-            reviewed by an editor against the criteria below before being added.
-            There is no algorithmic ingestion and no automated scraping; the
-            directory grows one editorial decision at a time.
+            Every entry passes through an editor before it gets in. No
+            scraper, no algorithm picking favorites — just the criteria
+            below, applied case by case, as the time and the leads turn up.
           </p>
           <h3>What gets in.</h3>
           <div className="criteria">
@@ -132,10 +189,10 @@ export function About() {
               <div className="h2-rule" />
             </summary>
           <p>
-            The Atlas is an independent reference work. It is not affiliated
-            with, endorsed by, or representing any of the organizations listed
-            here. Listings are based on publicly available information and
-            editorial judgment, and they can go stale — a website lapses, a
+            The Atlas is an independent reference work. It isn&rsquo;t
+            affiliated with, endorsed by, or representing any of the
+            organizations listed here. Entries draw on public sources and
+            editorial judgment, and they go stale: a site lapses, a
             coalition reorganizes, a chapter folds.
           </p>
           <p>
@@ -159,22 +216,22 @@ export function About() {
               <div className="h2-rule" />
             </summary>
           <p>
-            The Atlas runs on a small Go service whose entire surface is
-            described by the OpenAPI document at{' '}
-            <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">
+            The Atlas runs on a small Go service. Every endpoint and
+            response shape lives in the OpenAPI document at{' '}
+            <a href={openapiUrl}>
               <code>/api/v1/openapi.yaml</code>
             </a>
-            . The dataset is licensed under the{' '}
+            . The dataset itself is licensed under the{' '}
             <a href="https://opendatacommons.org/licenses/odbl/">
               Open Database License (ODbL) 1.0
             </a>{' '}
-            for downstream reuse with attribution and share-alike. See the{' '}
-            <Link to="/colophon">colophon</Link> for the data-source and
-            licensing picture.
+            — open for reuse with attribution and share-alike. See the{' '}
+            <Link to="/colophon">colophon</Link> for the full data-source
+            and licensing picture.
           </p>
           <p>
-            During the Phase 1 dogfood window the API sits behind a
-            shared-secret gate while we shake out schema and query bugs. The
+            During Phase 1 the API sits behind a shared-secret gate while we
+            shake out schema and query bugs. The
             Phase 2 program will open self-serve free keys. If you&rsquo;d like
             an early key before Phase 2 — to build a directory widget, a
             regional dashboard, anything — write to{' '}

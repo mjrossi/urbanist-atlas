@@ -3930,9 +3930,12 @@ a.tag:hover::before {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   Desktop guard for the About <details> accordion. On any viewport
-   wider than 768px we hide the <summary> shell and force the body to
-   render — visually identical to the pre-accordion DOM.
+   Desktop guard for the About <details> accordion. Restore the
+   pre-accordion DOM look: the <summary> is the visible section
+   header (it carries the kicker + h2 + h2-rule), and body content
+   stays rendered regardless of [open] state. Explicit `display:
+   block` (not `revert`) overrides the UA's
+   `details:not([open]) > :not(summary) { display: none }`.
    ───────────────────────────────────────────────────────────────────── */
 @media (min-width: 769px) {
   .prose details {
@@ -3940,10 +3943,28 @@ a.tag:hover::before {
     border: none;
   }
   .prose details > summary {
+    display: block;
+    list-style: none;
+    padding: 0;
+    min-height: 0;
+    cursor: default;
+  }
+  .prose details > summary::-webkit-details-marker {
     display: none;
   }
+  .prose details > summary::after {
+    content: none;
+  }
+  /* `.prose h2 + .h2-rule` doesn't match here (rule isn't adjacent
+     to h2 inside summary), so render it explicitly. */
+  .prose details > summary .h2-rule {
+    display: block;
+    height: 1px;
+    background: var(--rule);
+    margin-bottom: 24px;
+  }
   .prose details > :not(summary) {
-    display: revert;
+    display: block;
   }
 }
 

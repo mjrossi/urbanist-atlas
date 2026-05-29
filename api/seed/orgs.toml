@@ -136,7 +136,7 @@ region_slugs = ["cambridge-ma"]
 [[org]]
 slug = "boston-cyclists-union"
 name = "Boston Cyclists Union"
-short_desc = "Boston-based cycling advocacy nonprofit working to transform Greater Boston streets into equitable, people-centered spaces. Runs policy campaigns, bike-parking advocacy, and a free community bike repair program serving low-income riders."
+short_desc = "Boston-based cycling advocacy nonprofit working to make Greater Boston streets safer and more equitable. Runs policy campaigns, bike-parking advocacy, and a free community bike repair program serving low-income riders."
 website_url = "https://bostoncyclistsunion.org"
 contact_url = "https://bostoncyclistsunion.org/about_us/contact"
 tags = ["cycling", "safe-streets", "advocacy", "equity"]
@@ -439,7 +439,7 @@ region_slugs = ["washington-dc-metro"]
 [[org]]
 slug = "coalition-for-smarter-growth"
 name = "Coalition for Smarter Growth"
-short_desc = "Leading DC-region smart-growth advocacy organization, founded 1997. Fights for Metro funding, bus-network transformation, transit-oriented housing, and safer streets across the District, Maryland, and Virginia."
+short_desc = "DC-region smart-growth advocacy organization, founded 1997. Pushes for Metro funding, bus-network transformation, transit-oriented housing, and safer streets across the District, Maryland, and Virginia."
 website_url = "https://www.smartergrowth.net"
 tags = ["transit", "land-use", "advocacy", "policy", "regional"]
 region_slugs = ["washington-dc-metro", "dc"]
@@ -484,7 +484,7 @@ region_slugs = ["philadelphia-pa-metro"]
 [[org]]
 slug = "propel-atl"
 name = "Propel ATL"
-short_desc = "Atlanta multimodal advocacy nonprofit, formed by the 2021 merger of the Atlanta Bicycle Coalition and pedestrian-advocacy group PEDS. Works to transform Atlanta streets into safer spaces for biking, walking, and rolling."
+short_desc = "Atlanta multimodal advocacy nonprofit, formed by the 2021 merger of the Atlanta Bicycle Coalition and pedestrian-advocacy group PEDS. Pushes for safer streets for biking, walking, and rolling."
 website_url = "https://www.letspropelatl.org"
 tags = ["cycling", "walking", "safe-streets", "advocacy", "vision-zero"]
 region_slugs = ["atlanta-ga-metro"]
@@ -734,7 +734,7 @@ region_slugs = ["st-louis-mo-metro"]
 [[org]]
 slug = "citizens-for-modern-transit"
 name = "Citizens for Modern Transit"
-short_desc = "St. Louis-region transit advocacy nonprofit leading the push to expand light rail and integrated, affordable public transit across the metro. Active on the 2026 Missouri legislative agenda."
+short_desc = "St. Louis-region transit advocacy nonprofit pushing to expand light rail and integrated, affordable public transit across the metro. Active on the 2026 Missouri legislative agenda."
 website_url = "https://cmt-stl.org"
 tags = ["transit", "rail", "advocacy", "regional", "policy"]
 region_slugs = ["st-louis-mo-metro"]
@@ -972,7 +972,7 @@ region_slugs = ["indianapolis-in-metro"]
 [[org]]
 slug = "bike-cleveland"
 name = "Bike Cleveland"
-short_desc = "Greater Cleveland's leading advocacy nonprofit for cyclists and pedestrians. Organizes neighborhood-level Better Streets Committees, pushes city policy and infrastructure under the Cleveland Moves plan, and partners with Clevelanders for Public Transit on multimodal advocacy."
+short_desc = "Greater Cleveland advocacy nonprofit for cyclists and pedestrians. Organizes neighborhood-level Better Streets Committees, pushes city policy and infrastructure under the Cleveland Moves plan, and partners with Clevelanders for Public Transit on multimodal advocacy."
 website_url = "https://www.bikecleveland.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets"]
 region_slugs = ["cleveland-oh-metro"]
@@ -1449,7 +1449,7 @@ region_slugs = ["ct"]
 [[org]]
 slug = "bicycle-coalition-of-maine"
 name = "Bicycle Coalition of Maine"
-short_desc = "Maine's leading bicycle and pedestrian advocacy organization, founded 1992. Works to make the entire state safer for biking, walking, and rolling, from Portland's neighborhoods to rural Aroostook County."
+short_desc = "Statewide bicycle and pedestrian advocacy organization, founded 1992. Makes the entire state safer for biking, walking, and rolling, from Portland's neighborhoods to rural Aroostook County."
 website_url = "https://www.bikemaine.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets"]
 region_slugs = ["me"]
@@ -1716,7 +1716,7 @@ region_slugs = ["tx"]
 [[org]]
 slug = "texas-streets-coalition"
 name = "Texas Streets Coalition"
-short_desc = "Texas statewide coalition of more than 30 nonprofit and community organizations working to put people first in transportation planning. Informs, reforms, and transforms TxDOT projects, processes, and policies — pushing back on the 89% of the state's 10-year, $100-billion-plus transportation budget that is constitutionally dedicated to highways."
+short_desc = "Texas statewide coalition of more than 30 nonprofit and community organizations pushing back on the 89% of the state's 10-year, $100-billion-plus transportation budget that is constitutionally dedicated to highways. Informs and reforms TxDOT projects, processes, and policies."
 website_url = "https://texasstreetscoalition.org"
 tags = ["transit", "safe-streets", "advocacy", "policy", "equity"]
 region_slugs = ["tx"]

@@ -4,10 +4,13 @@ How to add or correct **data** in Urbanist Atlas — orgs, regions, MSA
 overrides. Code/contract changes flow through the normal PR review;
 this file is the operator guide for the editorial side.
 
-All edits flow through git (no admin UI yet); changes ship via merge
-to `main` + `just fly-loaddata`. Auto-deploy ships the *code* that
-references the seed; the seed itself is reloaded manually so a
-malformed file can't block a code deploy. See
+All edits flow through git (no admin UI yet). The API image bakes
+`api/seed/` into the binary via `//go:embed`, so a code+data deploy
+is a single step: edit the seed, open a PR, merge, and the next
+`deploy-api` run ships the new bundle. There is no separate
+post-merge load step. CI runs `just api-check` on every PR, which
+exercises the FileStore loader against the new bundle — a malformed
+TOML row fails the PR rather than the deploy. See
 [`docs/deploy.md`](./deploy.md) § Deploys for the full deploy
 contract.
 
@@ -18,20 +21,20 @@ contract.
    or more regions via stable slugs in the `regions` array (e.g.
    `regions = ["nyc", "nyc-tristate"]`). The slugs must already exist
    in one of the `regions_*.toml` files.
-2. Reload locally and exercise:
+2. Exercise locally — the FileStore reloads from disk on each
+   server start, so there is no DB or migration step:
 
    ```sh
-   just pg-reset && just pg-up        # fresh dev DB
-   just migrate-up                    # apply schema
-   just loaddata                      # regions → postal → orgs
-   just api-run                       # in another shell
-   just lookup <postal_code>          # exercise the change
+   just api-run                       # serves the edited api/seed/
+   just lookup <postal_code>          # in another shell
    ```
 
-3. Commit, open a PR, merge. The `deploy-api` job auto-ships the
-   code; seed data is *not* auto-applied.
-4. **Required post-merge:** `just fly-loaddata`. Loaders upsert by
-   stable key, so a re-run converges rather than duplicates.
+3. Commit, open a PR. CI runs `just api-check`, which boots the
+   FileStore loader against the new bundle and fails fast on
+   malformed rows.
+4. Merge. The next `deploy-api` workflow rebuilds the image with
+   the updated seed baked in and ships it to Fly — no separate
+   load step.
 
 If you're adding an org for an area that has no leaf region yet, add
 the leaf first (see below) and merge that PR before the org PR — or
@@ -57,17 +60,14 @@ explains the trade-off.
    `regions_us_msa_overrides.toml` workflow below — the overrides
    feed into the ETL, which re-anchors postal codes via the
    smallest-anchor algorithm.
-3. Reload locally as in the org flow above:
+3. Exercise locally as in the org flow above:
 
    ```sh
-   just pg-reset && just pg-up
-   just migrate-up
-   just loaddata
+   just api-run
    just lookup <postal_code>   # confirm the new leaf surfaces
    ```
 
-4. Commit, PR, merge.
-5. **Required post-merge:** `just fly-loaddata`.
+4. Commit, PR, merge. The next deploy ships the new bundle.
 
 ## Override an MSA / CMA region slug, name, or parents
 
@@ -93,8 +93,7 @@ regenerated on the next ETL run and your edit will vanish.
    postal-code re-anchoring in `api/seed/postal_codes_us.csv`).
    Diffs should be small and signal-rich.
 4. Commit both the override edit and the regenerated outputs in
-   the same PR.
-5. **Required post-merge:** `just fly-loaddata`.
+   the same PR. Merge — the next deploy ships the new bundle.
 
 **CA (kind + slug overrides in code):**
 
@@ -110,8 +109,8 @@ regenerated on the next ETL run and your edit will vanish.
    ```
 
 3. Review and commit the regenerated `regions_ca_cmas.toml` +
-   `postal_codes_ca.csv` outputs alongside the code change.
-4. **Required post-merge:** `just fly-loaddata`.
+   `postal_codes_ca.csv` outputs alongside the code change. Merge —
+   the next deploy ships the new bundle.
 
 ETL is deterministic — same upstream vintage produces byte-identical
 output. If you see noise in the diff that you didn't expect, the
@@ -131,8 +130,8 @@ just etl-download US                          # or CA
 just etl-regenerate US
 ```
 
-Then commit the seed-file diffs (not the upstream sources) and run
-`just fly-loaddata` post-merge as usual. Bump
+Then commit the seed-file diffs (not the upstream sources). Merge —
+the next deploy ships the new bundle. Bump
 [`etl/SOURCES.md`](../etl/SOURCES.md) with the new vintage's
 checksums in the same PR.
 
@@ -170,7 +169,7 @@ Triage rules:
 
 Out of scope until v1.1+. US + CA are the only shipping countries in
 v1; PT seed files exist as a multi-parent DAG validation fixture but
-are no longer loaded by the user-facing `loaddata` pipeline. To
+are no longer loaded by the user-facing FileStore pipeline. To
 re-enable PT (or add ES / MX / NL / UK) when editorial coverage is
 ready, see
 [`docs/region-graph.md`](./region-graph.md) § Adding a new country,

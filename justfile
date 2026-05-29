@@ -20,9 +20,15 @@ default:
 # ── api: build & verify ───────────────────────────────
 
 # run the API server with text logs
+# Pins --seed-dir and --db-path to absolute paths via justfile_directory()
+# so the recipe survives any URBANIST_* env state in the contributor's
+# shell (mise.development.toml carries the same values for direct
+# `go run` invocations; flags override env per urfave/cli).
 [group('api')]
 api-run:
-    cd api && go run ./cmd/server serve --log-format=text
+    cd api && go run ./cmd/server serve --log-format=text \
+        --seed-dir={{justfile_directory()}}/api/seed \
+        --db-path={{justfile_directory()}}/api/tmp/atlas.db
 
 # build the api binary to api/bin/urbanist-atlas-server
 [group('api')]
