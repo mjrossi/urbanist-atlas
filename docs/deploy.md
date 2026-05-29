@@ -153,7 +153,7 @@ variables:
 
 | Variable | Value |
 |---|---|
-| `VITE_API_BASE_URL` | `https://qa-api.urbanistatlas.com` |
+| `VITE_API_BASE` | `https://qa-api.urbanistatlas.com` |
 | `VITE_API_CLIENT_SECRET` | the same value set on Fly as `URBANIST_CLIENT_SECRET` |
 
 CNAME `qa.urbanistatlas.com` → the Workers project hostname; add it
@@ -167,7 +167,7 @@ every static asset Cloudflare serves. The Content-Security-Policy is:
 ```
 default-src 'self';
 script-src  'self';
-style-src   'self' 'unsafe-inline';
+style-src   'self';
 font-src    'self';
 img-src     'self' data:;
 connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com;
@@ -180,12 +180,12 @@ Notes on the directives:
 
 - `script-src 'self'` — the SPA has no inline `<script>`; everything
   goes through Vite's bundled module graph.
-- `style-src 'self' 'unsafe-inline'` — Vite injects critical CSS as
-  inline `<style>` tags during HMR (dev) and for above-the-fold
-  styling in production. Removing `'unsafe-inline'` would break the
-  broadsheet render on first paint. Risk is bounded — no
-  third-party scripts run, so an injected style tag is the worst
-  case, not an injected script.
+- `style-src 'self'` — Vite's production build emits all CSS as
+  external `<link rel="stylesheet">` assets. There are no inline
+  `<style>` blocks in `dist/index.html`. Dev mode (HMR) uses inline
+  styles, but `_headers` only applies on Cloudflare, so that's not
+  a real constraint. If a future plugin starts inlining critical
+  CSS, add `'unsafe-inline'` back with a one-line justification.
 - `font-src 'self'` — all four families ship via
   `@fontsource-variable/*` and are bundled with the build.
 - `connect-src` — the only outbound fetches are to the Atlas API.
@@ -194,10 +194,19 @@ Notes on the directives:
 - `frame-ancestors 'none'` — the Atlas is never embedded in an
   iframe.
 
-The same file also sets `Referrer-Policy: strict-origin-when-cross-origin`
-and `X-Content-Type-Options: nosniff`. When you add a new outbound
-origin (e.g. a future analytics endpoint), edit the `connect-src`
-list in `web/public/_headers` and update this section.
+The same file also sets:
+
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` —
+  one-year HSTS with subdomain coverage. Cloudflare already terminates
+  HTTPS at the edge; the header is defense in depth.
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-Content-Type-Options: nosniff`
+- `Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()`
+  — turn off browser features the Atlas has no reason to touch.
+
+When you add a new outbound origin (e.g. a future analytics endpoint),
+edit the `connect-src` list in `web/public/_headers` and update this
+section.
 
 ### 4. Smoke test
 
