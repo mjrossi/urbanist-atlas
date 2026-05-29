@@ -46,6 +46,12 @@ func serveCommand() *cli.Command {
 				Sources: cli.EnvVars("URBANIST_LOG_FORMAT"),
 			},
 			&cli.StringFlag{
+				Name:    "log-level",
+				Usage:   "minimum log level: debug, info, warn, or error",
+				Value:   "info",
+				Sources: cli.EnvVars("URBANIST_LOG_LEVEL"),
+			},
+			&cli.StringFlag{
 				Name:    "cors-origins",
 				Usage:   "comma-separated allowed CORS origins (exact match)",
 				Value:   "http://localhost:5173",
@@ -95,7 +101,7 @@ func serveCommand() *cli.Command {
 }
 
 func runServe(ctx context.Context, c *cli.Command) error {
-	logger := buildLogger(c.String("log-format"))
+	logger := buildLogger(c.String("log-format"), c.String("log-level"))
 
 	store, closeStore, err := buildStore(ctx, c, logger)
 	if err != nil {
@@ -274,9 +280,10 @@ func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
 	return s
 }
 
-// buildLogger returns an slog.Logger writing JSON or text to stderr.
-func buildLogger(format string) *slog.Logger {
-	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+// buildLogger returns an slog.Logger writing JSON or text to stderr at the
+// given minimum level.
+func buildLogger(format, level string) *slog.Logger {
+	opts := &slog.HandlerOptions{Level: parseLevel(level)}
 	var h slog.Handler
 	if strings.EqualFold(format, "text") {
 		h = slog.NewTextHandler(os.Stderr, opts)
@@ -284,6 +291,22 @@ func buildLogger(format string) *slog.Logger {
 		h = slog.NewJSONHandler(os.Stderr, opts)
 	}
 	return slog.New(h)
+}
+
+// parseLevel maps a log-level string to an slog.Level, defaulting to Info
+// for empty or unrecognized values (mirrors how buildLogger treats any
+// non-"text" format as JSON).
+func parseLevel(s string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default: // "info" and anything unrecognized
+		return slog.LevelInfo
+	}
 }
 
 func splitCSV(s string) []string {

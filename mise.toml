@@ -35,3 +35,4 @@ python = "3.14"
 # Defaults that apply everywhere. Per-env files override these.
 URBANIST_PORT = "8080"
 URBANIST_LOG_FORMAT = "json"
+URBANIST_LOG_LEVEL = "info"
