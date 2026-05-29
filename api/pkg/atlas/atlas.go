@@ -54,15 +54,21 @@ type Tag string
 // directed acyclic graph; ParentSlugs lists the direct parents (not
 // transitive). SortPriority is a server-side hint used by Lookup to
 // order orgs within the Regional bucket (lower = more specific = earlier).
+//
+// The TOML tags name the seed-file shape (regions_<cc>.toml). ID and
+// Country are stamped by the seedfiles loader after parsing and
+// carry `toml:"-"`. The TOML field for parents is `parents` (a
+// historical name; the Go field is ParentSlugs to disambiguate from
+// the full Region structs that would otherwise be implied).
 type Region struct {
-	ID           int64      `json:"id"`
-	Kind         RegionKind `json:"kind"`
-	Name         string     `json:"name"`
-	Slug         string     `json:"slug"`
-	Country      Country    `json:"country"`
-	ScopeTier    ScopeTier  `json:"scope_tier"`
-	ParentSlugs  []string   `json:"parent_slugs"`
-	SortPriority int        `json:"-"` // server-side only, not on the wire
+	ID           int64      `json:"id" toml:"-"`
+	Kind         RegionKind `json:"kind" toml:"kind"`
+	Name         string     `json:"name" toml:"name"`
+	Slug         string     `json:"slug" toml:"slug"`
+	Country      Country    `json:"country" toml:"-"`
+	ScopeTier    ScopeTier  `json:"scope_tier" toml:"scope_tier"`
+	ParentSlugs  []string   `json:"parent_slugs" toml:"parents"`
+	SortPriority int        `json:"-" toml:"sort_priority"` // server-side only, not on the wire
 }
 
 // Org is a single advocacy organization. Regions is denormalized onto
@@ -75,17 +81,24 @@ type Region struct {
 // ordering in Store.ListRecent and Store.OrgsForRegions. The wire
 // contract in api/openapi.yaml does not include it; a future spec
 // addition can expose it without changing the data model.
+//
+// The TOML tags name the seed-file shape (orgs.toml). Fields that
+// the seedfiles loader stamps after parsing (ID, Regions hydration)
+// or that are server-side-only (MatchedRegionSlugs, CreatedAt) carry
+// `toml:"-"`. The TOML schema has a `region_slugs` field that's not
+// on this type; seedfiles unmarshals it onto an OrgEntry wrapper
+// that embeds this struct, then resolves it to IDs at load time.
 type Org struct {
-	ID                 int64     `json:"id"`
-	Slug               string    `json:"slug"`
-	Name               string    `json:"name"`
-	ShortDesc          string    `json:"short_desc"`
-	WebsiteURL         string    `json:"website_url"`
-	ContactURL         string    `json:"contact_url,omitempty"`
-	Tags               []Tag     `json:"tags"`
-	Regions            []Region  `json:"regions"`
-	MatchedRegionSlugs []string  `json:"matched_region_slugs,omitempty"`
-	CreatedAt          time.Time `json:"-"`
+	ID                 int64     `json:"id" toml:"-"`
+	Slug               string    `json:"slug" toml:"slug"`
+	Name               string    `json:"name" toml:"name"`
+	ShortDesc          string    `json:"short_desc" toml:"short_desc"`
+	WebsiteURL         string    `json:"website_url" toml:"website_url"`
+	ContactURL         string    `json:"contact_url,omitempty" toml:"contact_url,omitempty"`
+	Tags               []Tag     `json:"tags" toml:"tags"`
+	Regions            []Region  `json:"regions" toml:"-"`
+	MatchedRegionSlugs []string  `json:"matched_region_slugs,omitempty" toml:"-"`
+	CreatedAt          time.Time `json:"-" toml:"-"`
 }
 
 // LookupQuery is the input to Lookup.

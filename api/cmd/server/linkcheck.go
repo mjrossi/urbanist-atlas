@@ -13,7 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/linkcheck"
-	"github.com/mjrossi/urbanist-atlas/api/internal/seed"
+	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
 )
 
 func linkcheckCommand() *cli.Command {
@@ -56,12 +56,12 @@ func runLinkcheck(ctx context.Context, c *cli.Command) error {
 	}
 	defer func() { _ = f.Close() }()
 
-	file, err := seed.Parse(f)
+	orgs, err := seedfiles.ParseOrgs(f)
 	if err != nil {
 		return err
 	}
 
-	results := linkcheck.Check(ctx, file.Orgs, linkcheck.Options{
+	results := linkcheck.Check(ctx, orgs, linkcheck.Options{
 		Timeout:     c.Duration("timeout"),
 		Concurrency: c.Int("concurrency"),
 	})

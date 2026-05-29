@@ -7,7 +7,8 @@
 # array creates rows in `region_parents`. A region may appear before
 # its parents in the file — loadregions resolves slugs after parsing.
 # Parents not defined in this file are resolved from the DB at write
-# time (see internal/loadregions/write.go's RegionIDBySlug fallback).
+# time via the batched RegionIDsBySlugs lookup
+# (see internal/loadregions/write.go).
 #
 # See docs/region-graph.md for modeling conventions, including:
 #   - State edges live on the leaf (city), not on the metro.

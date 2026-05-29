@@ -109,7 +109,7 @@ Two implementations:
 - **`postgres.Store`** ([`api/internal/store/postgres/`](../api/internal/store/postgres/)) —
   the production store. Queries are written in SQL under
   `queries/`, code-generated to Go via sqlc (regenerate with
-  `just api-sqlc-gen`), driven by pgx. `serve --store=postgres`
+  `just api-gen`), driven by pgx. `serve --store=postgres`
   (the default) selects it; `DATABASE_URL` configures it.
 
 Postgres-backed implementations can optimize internally — e.g. fold
@@ -149,7 +149,7 @@ Workflow when editing the spec:
 ```sh
 # 1. Edit api/openapi.yaml.
 # 2. Regenerate both halves.
-just api-oapi-gen   # → embedded copy + Go types
+just api-gen   # → embedded copy + Go types
 just web-oapi-gen   # → TS types
 # 3. Commit spec + regenerated artifacts together.
 ```
@@ -296,7 +296,7 @@ Two ordering rules to preserve when extending:
 1. Edit `api/openapi.yaml` — request params, response schema, error
    types. Commit this in its own PR if it's a significant shape
    change.
-2. `just api-oapi-gen` to regenerate Go types + embedded copy.
+2. `just api-gen` to regenerate Go types + embedded copy.
 3. `just web-oapi-gen` to regenerate TS types (if the SPA will
    consume it).
 4. Add the business logic to `pkg/atlas` — a new function on the
@@ -307,7 +307,7 @@ Two ordering rules to preserve when extending:
    encode. Keep it ~10 lines. Write an httptest+MemStore handler
    test asserting the wire shape and status codes.
 6. Add the Postgres-side query in `internal/store/postgres/queries/`,
-   regenerate with `just api-sqlc-gen`, and write a testcontainers
+   regenerate with `just api-gen`, and write a testcontainers
    integration test under `//go:build integration`.
 7. Wire the handler in `router.go`. Inside the gated group unless
    it's a discovery endpoint like `/openapi.yaml`.

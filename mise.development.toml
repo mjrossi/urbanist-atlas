@@ -15,13 +15,10 @@
 # Human-friendly logs in dev; production stays JSON via mise.toml's default.
 URBANIST_LOG_FORMAT = "text"
 
-# Points at the docker-managed dev Postgres on :55432 (see the
-# pg-* recipes in the justfile). The non-default port keeps the
-# dev DB from clashing with any system Postgres on :5432.
-# Credentials/db match what `just pg-up` provisions on first run.
-# Override in mise.local.toml if you'd rather use a system Postgres
-# or different credentials.
-DATABASE_URL = "postgres://urbanist:urbanist@localhost:55432/urbanist_atlas_dev?sslmode=disable"
+# Point the file-backed store at the bundled seed in the repo. The
+# server reads regions_*.toml, postal_codes_*.csv, and orgs.toml at
+# boot — no database needed.
+URBANIST_SEED_DIR = "api/seed"
 
 # Dev-only admin token. Do not deploy this value anywhere. The real
 # production token lives in Fly app secrets, not in this repo.

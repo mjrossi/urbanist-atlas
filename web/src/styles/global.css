@@ -29,7 +29,6 @@
  *   .editors-note    amber-tinted italic callout
  *   .criteria        ✓/✕ inclusion table
  *   .engage          3-up "how to plug in" row
- *   .timeline        vertical campaigns timeline
  *   .slip            Submit form treatment
  *   .site-foot       four-column footer
  *   .colophon-strip  bottom-of-page printer strip
@@ -53,6 +52,36 @@
   --serif-text: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
   --sans: 'Inter Variable', -apple-system, 'Segoe UI', system-ui, sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* ── Vertical-spacing utilities ─────────────────────────
+   Use these instead of inline style={{ marginTop: N }} on
+   layout elements. The discrete pixel values match the
+   broadsheet design system's vertical rhythm; the long
+   list isn't a smell, it's the codified rhythm. */
+.mt-0   { margin-top: 0; }
+.mt-12  { margin-top: 12px; }
+.mt-14  { margin-top: 14px; }
+.mt-16  { margin-top: 16px; }
+.mt-22  { margin-top: 22px; }
+.mt-24  { margin-top: 24px; }
+.mt-32  { margin-top: 32px; }
+.mt-40  { margin-top: 40px; }
+.mt-48  { margin-top: 48px; }
+.mt-56  { margin-top: 56px; }
+.mb-0   { margin-bottom: 0; }
+.pt-6   { padding-top: 6px; }
+.gap-12 { gap: 12px; }
+
+/* Small-print body-copy size used in colophon/about
+   footnotes (~14px instead of the default ~17px). */
+.text-sm { font-size: 14px; }
+
+/* The .hint default is block with capped width; .inline
+   lets it flow alongside the label text. */
+.hint.inline {
+  max-width: none;
+  display: inline;
 }
 
 /* ── Reset + base ───────────────────────────────────── */
@@ -482,6 +511,24 @@ a {
   color: var(--ink-2);
 }
 
+/* Breadcrumb list reset: keep the visual rendering identical to the
+   pre-a11y inline-span layout while exposing semantic <ol>/<li>
+   structure to assistive tech. The list flows inline; the trailing
+   separator on the last <li> is suppressed since there's nothing
+   to separate from. */
+.kicker .crumb-trail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+.kicker .crumb-trail li {
+  display: inline;
+}
+.kicker .crumb-trail li:last-child .crumb-sep {
+  display: none;
+}
+
 /* ── Spread (two-column layout) ─────────────────────── */
 
 .spread {
@@ -551,8 +598,16 @@ a {
   font-size: clamp(48px, 8vw, 92px);
 }
 
-.lede h1 .accent {
+/* Accent text — italicised amber emphasis. The plain `.accent` rule
+   sets just the color, so the class can be reused outside lede headings
+   (e.g. section-break titles) without dragging headline typography
+   along. The .lede h1 nesting keeps the italic + weight treatment
+   that the broadsheet headlines were designed around. */
+.accent {
   color: var(--amber);
+}
+
+.lede h1 .accent {
   font-style: italic;
   font-weight: 500;
 }
@@ -800,28 +855,6 @@ a {
   }
 }
 
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-  text-decoration: none;
-  padding-bottom: 2px;
-  border-bottom: 1px solid transparent;
-  background: none;
-  cursor: pointer;
-}
-
-.btn-ghost:hover {
-  color: var(--amber);
-  border-bottom-color: var(--amber);
-}
-
 a.read-on {
   display: inline-flex;
   align-items: center;
@@ -1031,6 +1064,10 @@ a.tag:hover::before {
   font-style: italic;
   font-size: 14.5px;
   color: var(--muted);
+}
+
+.lookup-hint.error {
+  color: var(--amber);
 }
 
 .lookup-suggestions {
@@ -1352,6 +1389,48 @@ a.tag:hover::before {
    the desktop pass can switch them on later without re-plumbing. */
 .org-section {
   counter-reset: entry;
+}
+
+/* ── Org detail: "Regions served" list ─────────────── */
+/* Mirrors the inline styles that used to live in Org.tsx so the
+   markup stays declarative. Each <li> is a row with the region
+   name + small caps subtitle ("US · us:metro"). */
+
+.org-regions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 32px;
+}
+
+.org-region-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 18px;
+}
+
+.org-region-item .name {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 19px;
+}
+
+.org-region-item .name a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+.org-region-item .meta {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 2px;
 }
 
 .org-entry {
@@ -1679,6 +1758,14 @@ a.tag:hover::before {
   color: var(--amber);
 }
 
+/* Slugs and other identifier-shaped values render compact mono so
+   the serif metric doesn't visually inflate them next to the
+   adjacent .val rows. */
+.org-feature .meta-strip .item .val code {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
 .org-feature .dateline {
   font-family: var(--sans);
   font-size: 10.5px;
@@ -1928,28 +2015,6 @@ a.tag:hover::before {
   color: var(--ink);
 }
 
-/* ── Two-column body ───────────────────────────────── */
-
-.cols-2 {
-  font-family: var(--serif-text);
-  font-size: 17px;
-  line-height: 1.6;
-  color: var(--ink-2);
-}
-
-@media (min-width: 720px) {
-  .cols-2 {
-    column-count: 2;
-    column-gap: 40px;
-  }
-}
-
-.cols-2 p {
-  margin: 0 0 16px;
-  break-inside: avoid;
-  text-wrap: pretty;
-}
-
 /* ── Criteria table ────────────────────────────────── */
 
 .criteria {
@@ -2014,60 +2079,6 @@ a.tag:hover::before {
 
 .criteria .row .verdict.no::before {
   content: '✕';
-}
-
-/* ── Timeline ──────────────────────────────────────── */
-
-.timeline {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 32px;
-  border-left: 1px solid var(--rule);
-}
-
-.timeline li {
-  position: relative;
-  padding: 12px 0 18px 24px;
-  font-family: var(--serif-text);
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--ink);
-  border-bottom: 1px solid var(--rule);
-}
-
-.timeline li:last-child {
-  border-bottom: none;
-}
-
-.timeline li::before {
-  content: '';
-  position: absolute;
-  left: -5px;
-  top: 22px;
-  width: 9px;
-  height: 9px;
-  background: var(--amber);
-  border-radius: 50%;
-}
-
-.timeline li .when {
-  display: block;
-  font-family: var(--sans);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--amber);
-  margin-bottom: 6px;
-}
-
-.timeline li .where {
-  display: inline-block;
-  font-family: var(--sans);
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  margin-left: 8px;
 }
 
 /* ── Engage row ────────────────────────────────────── */
@@ -2512,7 +2523,26 @@ a.tag:hover::before {
   text-transform: none;
   color: var(--muted);
   line-height: 1.4;
-  max-width: 26ch;
+  /* On mobile the label sits above the input — let the hint use the
+     full row width. The 26ch cap is desirable only in the 2-column
+     desktop layout where the label gets a 180px column. */
+  max-width: none;
+}
+
+@media (min-width: 720px) {
+  .field-label .hint {
+    max-width: 26ch;
+  }
+}
+
+.field-label .hint code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-style: normal;
+  font-size: 12px;
+  padding: 1px 4px;
+  background: rgba(143, 85, 32, 0.08);
+  border-radius: 2px;
+  color: var(--ink);
 }
 
 .field-label .required {
@@ -2573,7 +2603,16 @@ a.tag:hover::before {
 .textarea {
   resize: vertical;
   min-height: 96px;
-  padding: 8px 6px;
+  /* Tightened on desktop where the input-row column gives plenty of
+     room; on mobile the textarea spans edge-to-edge so we need
+     comfortable left/right breathing room. */
+  padding: 8px 12px;
+}
+
+@media (min-width: 720px) {
+  .textarea {
+    padding: 8px 6px;
+  }
 }
 
 .textarea.tall {
@@ -2646,9 +2685,19 @@ a.tag:hover::before {
 }
 
 .choices.inline {
-  flex-direction: row;
+  /* On mobile, "I'm a member, volunteer, or staff" is too wide for an
+     inline row alongside two other options — give the disclosure
+     radios their own lines so each is comfortably tappable. */
+  flex-direction: column;
   flex-wrap: wrap;
-  gap: 8px 28px;
+  gap: 4px;
+}
+
+@media (min-width: 720px) {
+  .choices.inline {
+    flex-direction: row;
+    gap: 8px 28px;
+  }
 }
 
 .choices.inline .choice {
@@ -2682,6 +2731,119 @@ a.tag:hover::before {
   color: var(--muted);
   max-width: 44ch;
   line-height: 1.45;
+}
+
+.slip-foot .btn-primary {
+  /* Submit button is the slip's most important touch target — on
+     mobile let it span the row so a thumb-stretched user can hit it
+     without precision. */
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+}
+
+@media (min-width: 720px) {
+  .slip-foot .btn-primary {
+    width: auto;
+  }
+}
+
+/* ── Submission "received" receipt card ─────────────── */
+
+.receipt {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+  padding: 22px 20px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 720px) {
+  .receipt {
+    padding: 28px 32px;
+    gap: 18px;
+  }
+}
+
+.receipt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.receipt-row:last-of-type {
+  border-bottom: 2px double var(--rule-strong);
+}
+
+.receipt-label {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  min-width: 7em;
+}
+
+.receipt-value {
+  font-family: var(--serif-text);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.receipt-value.mono {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.receipt-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+@media (min-width: 720px) {
+  .receipt-foot {
+    flex-direction: row;
+    align-items: center;
+    gap: 24px;
+  }
+}
+
+.receipt-foot .btn-primary {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+}
+
+@media (min-width: 720px) {
+  .receipt-foot .btn-primary {
+    width: auto;
+  }
+}
+
+.receipt-link {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 2px;
+}
+
+.receipt-link:hover {
+  color: var(--amber);
+  border-bottom-color: var(--amber);
 }
 
 /* ── Process strip ─────────────────────────────────── */
@@ -2947,13 +3109,18 @@ a.tag:hover::before {
   line-height: 1.5;
 }
 
-.dateline {
-  font-family: var(--sans);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--amber);
+/* Standalone code-block treatment for API examples and other
+   verbatim wire payloads rendered inside <pre>. Mono face, paper-2
+   ground, rule border, comfortable padding. */
+.codeblock {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 18px 22px;
+  overflow-x: auto;
+  color: var(--ink-2);
 }
 
 /* ── Misc helpers ──────────────────────────────────── */

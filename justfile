@@ -3,10 +3,10 @@
 #
 # `just` itself is pinned in mise.toml (`aqua:casey/just`); a single
 # `mise install` at the repo root provisions it alongside go, node,
-# sqlc, goose, oapi-codegen, and staticcheck.
+# oapi-codegen, and staticcheck.
 #
-# Groups: api, data, postgres, web, preview, fly, smoke, ci. Each
-# group corresponds to a section comment below.
+# Groups: api, data, verify, web, preview, fly, submissions, smoke, ci.
+# Each group corresponds to a section comment below.
 
 set shell := ["bash", "-cu"]
 
@@ -34,19 +34,13 @@ api-build:
 api-fmt:
     cd api && gofmt -w .
 
-# fail if any Go file would be rewritten by gofmt. `gofmt -l` prints
-# the offending paths and exits 0 even on drift, so the explicit
-# non-empty check turns that into a CI signal.
+# fail if any Go file would be rewritten by gofmt. `gofmt -l` lists
+# offenders and exits 0 even on drift, so the explicit non-empty
+# check turns that into a CI signal.
 [group('api')]
 [doc('fail if any Go file is not gofmt-clean')]
 api-fmt-check:
-    @cd api && \
-      drift="$(gofmt -l .)"; \
-      if [ -n "$drift" ]; then \
-        echo "gofmt drift in:"; echo "$drift"; \
-        echo "run \`just api-fmt\` and commit." >&2; \
-        exit 1; \
-      fi
+    @cd api && drift="$(gofmt -l .)"; [ -z "$drift" ] || { echo "gofmt drift:"; echo "$drift"; echo "run \`just api-fmt\` and commit." >&2; exit 1; }
 
 # go vet ./...
 [group('api')]
@@ -75,21 +69,14 @@ api-check: api-fmt-check api-vet api-staticcheck api-test api-gen-check
 api-tidy:
     cd api && go mod tidy
 
-# regenerate sqlc Go bindings from internal/store/postgres/queries/*.sql.
-# Wrapped in `mise exec --` so the pinned sqlc version is used even
-# when the shell doesn't have mise activated.
+# regenerate every codegen artifact: oapi-codegen Go types, the
+# embedded copy of openapi.yaml, and sqlc bindings. All three flow
+# through `go generate ./...` via //go:generate directives, so adding
+# a new generated artifact is just a matter of dropping another
+# directive on the right file.
 [group('api')]
-[doc('regenerate sqlc Go bindings (mise-pinned sqlc)')]
-api-sqlc-gen:
-    cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
-
-# regenerate oapi-codegen Go types AND refresh the embedded copy of
-# openapi.yaml next to the handler that serves it. Both flow through
-# `go generate ./...` so adding a new generated artifact is just a
-# matter of dropping a //go:generate directive on the right file.
-[group('api')]
-[doc('regenerate oapi-codegen types + sync embedded openapi.yaml')]
-api-oapi-gen:
+[doc('regenerate all codegen (oapi-codegen + embedded spec + sqlc)')]
+api-gen:
     cd api && mise exec -- go generate ./...
 
 # run the link checker over the seed orgs, write to /tmp/links.tsv
@@ -99,79 +86,26 @@ linkcheck:
     cd api && go run ./cmd/server linkcheck --src ./seed/orgs.toml --out /tmp/links.tsv
     @echo "report: /tmp/links.tsv"
 
-# run the postgres-backed integration tests under the `integration`
-# build tag (requires Docker). Cheap default test suite stays
-# tag-free so `just api-test` keeps running on machines without
-# Docker.
-[group('api')]
-[doc('run postgres integration tests (Docker; build tag: integration)')]
-api-test-integration:
-    cd api && go test -tags=integration -race -count=1 ./internal/store/postgres/...
-
-# fail if any generated file would change. Regenerates oapi-codegen
-# and the embedded spec copy via `go generate`, then regenerates sqlc,
-# then asks git if anything moved. Used inside api-check so `just ci`
-# rejects commits that forgot to regenerate.
+# fail if any generated file would change after a fresh regen. One
+# `go generate ./...` covers both artifacts via the //go:generate
+# directives in oapi/doc.go and httpapi/openapi_handler.go. Used
+# inside api-check so `just ci` rejects commits that forgot to
+# regenerate.
 [group('api')]
 [doc('fail if any generated file would drift after a regen')]
 api-gen-check:
     @cd api && mise exec -- go generate ./...
-    @cd api && mise exec -- sqlc generate -f internal/store/postgres/sqlc.yaml
     @cd api && git diff --exit-code -- \
         internal/httpapi/oapi/types.gen.go \
         internal/httpapi/openapi.yaml \
-        internal/store/postgres/gen/ \
-        || (echo "generated files drifted; run \`just api-oapi-gen && just api-sqlc-gen\` and commit." && exit 1)
+        || (echo "generated files drifted; run \`just api-gen\` and commit." && exit 1)
 
 # ── data: operational subcommands ─────────────────────
-# These wrap the server binary's urfave/cli subcommands for the
-# data-loading flow (migrations + seed fixtures).
-
-# apply pending DB migrations
-[group('data')]
-migrate-up:
-    cd api && go run ./cmd/server migrate up
-
-# roll back the most recent migration
-[group('data')]
-migrate-down:
-    cd api && go run ./cmd/server migrate down
-
-# show migration status
-[group('data')]
-migrate-status:
-    cd api && go run ./cmd/server migrate status
-
-# load curated org seed data (api/seed/orgs.toml) into the DB
-[group('data')]
-seed:
-    cd api && go run ./cmd/server seed
-
-# load region taxonomy (toml -> regions + region_parents)
-# usage: just loadregions seed/regions_us.toml US
-[group('data')]
-[doc('load region taxonomy; e.g. `just loadregions seed/regions_us.toml US`')]
-loadregions src country='US':
-    cd api && go run ./cmd/server loadregions --src {{src}} --country {{country}}
-
-# map postal codes to leaf regions (csv -> postal_codes)
-# usage: just loadpostal seed/postal_codes_us.csv US
-[group('data')]
-[doc('map postal codes to leaf regions; e.g. `just loadpostal seed/postal_codes_us.csv US`')]
-loadpostal src country='US':
-    cd api && go run ./cmd/server loadpostal --src {{src}} --country {{country}}
-
-# load all bundled fixtures in the right order:
-# regions first (so leaf slugs resolve), then postal codes, then orgs.
-# Wraps the `loaddata` binary subcommand so dev runs go through the
-# exact same orchestration the Fly deploy uses
-# (flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata").
-# The country list lives in api/internal/loaddata/loaddata.go — add
-# new countries there, not here.
-[group('data')]
-[doc('load every bundled fixture in dependency order (regions → postal → orgs)')]
-loaddata:
-    cd api && go run ./cmd/server loaddata
+# The TOML/CSV files under api/seed/ are the runtime source of truth
+# for orgs/regions/postal — the server loads them into an in-memory
+# FileStore at boot, so editing a seed file + redeploying is the
+# whole data-update workflow. The historical loaddata/migrate/seed
+# recipes are gone with the Postgres read-path retirement.
 
 # fetch upstream Census/StatsCan source files into etl/sources/<country>/
 # and validate checksums against etl/SOURCES.md. Foundation slice
@@ -190,67 +124,29 @@ etl-download country:
 etl-regenerate country:
     cd api && go run ./cmd/server etl regenerate --country {{country}} --src ../etl/sources --out seed
 
-# ── postgres: dev container lifecycle ─────────────────
-# Local dev Postgres runs in a named docker container with a
-# persistent volume on port 55432 (non-default to avoid clashing
-# with any system Postgres on :5432). Same image
-# (postgres:17-alpine) as the integration test suite, so the wire
-# is identical.
-#
-# Credentials and DB name are dev-only and match what
-# mise.development.toml hands to DATABASE_URL:
-#   user: urbanist  pass: urbanist  db: urbanist_atlas_dev
+# ── verify: out-of-band data hygiene checks ───────────
+# These probe third-party URLs from the seed data. Because a handful
+# of advocacy-org domains have lapsed and now resolve to parked
+# domains that log requester IPs, the recipes egress via a gluetun
+# container speaking Proton WireGuard. Set WIREGUARD_PRIVATE_KEY in
+# mise.local.toml [env] before first run (see mise.local.toml.example).
 
-# start the dev postgres container (creates on first run, starts on subsequent), then wait for it to accept connections
-[group('postgres')]
-[doc('start the dev postgres container and wait for readiness')]
-pg-up:
-    @if ! docker container inspect urbanist-atlas-pg >/dev/null 2>&1; then \
-        docker run -d --name urbanist-atlas-pg \
-            -p 55432:5432 \
-            -e POSTGRES_USER=urbanist \
-            -e POSTGRES_PASSWORD=urbanist \
-            -e POSTGRES_DB=urbanist_atlas_dev \
-            -v urbanist-atlas-pg-data:/var/lib/postgresql/data \
-            postgres:17-alpine >/dev/null; \
-    else \
-        docker start urbanist-atlas-pg >/dev/null; \
-    fi
-    @i=0; until docker exec urbanist-atlas-pg pg_isready -U urbanist -d urbanist_atlas_dev >/dev/null 2>&1; do \
-        i=$((i+1)); \
-        if [ "$i" -ge 120 ]; then \
-            echo "pg-up: postgres still not ready after ~60s; check 'docker logs urbanist-atlas-pg'" >&2; \
-            exit 1; \
-        fi; \
-        sleep 0.5; \
-    done
-    @echo "dev postgres ready on :55432 (db: urbanist_atlas_dev)"
+# probe every website_url + contact_url in api/seed/orgs.toml through
+# the VPN; writes tmp/org-url-report.{md,tsv}. Leaves gluetun running
+# so re-runs are fast — `just verify-org-urls-down` when you're done.
+[group('verify')]
+[doc('probe every seed org website_url + contact_url via VPN; writes tmp/org-url-report.{md,tsv}')]
+verify-org-urls:
+    @mkdir -p tmp
+    docker compose -f scripts/verify-org-urls.compose.yml --profile verify run --rm --build verify
 
-# stop the dev postgres container (keeps the data volume so a later pg-up is instant)
-[group('postgres')]
-[doc('stop the dev postgres container (data volume kept)')]
-pg-down:
-    @docker stop urbanist-atlas-pg >/dev/null 2>&1 || true
-    @echo "dev postgres stopped (data volume kept; pg-reset to nuke)"
-
-# nuke the container AND the data volume — start completely fresh
-[group('postgres')]
-pg-reset:
-    @docker rm -f urbanist-atlas-pg >/dev/null 2>&1 || true
-    @docker volume rm urbanist-atlas-pg-data >/dev/null 2>&1 || true
-    @echo "dev postgres container + data volume removed; run 'just pg-up' to recreate"
-
-# open a psql shell into the dev database (via TCP — the alpine
-# image puts its socket at /var/run/postgresql, not psql's default /tmp)
-[group('postgres')]
-[doc('open a psql shell into the dev database (via TCP)')]
-pg-shell:
-    docker exec -it urbanist-atlas-pg psql -h localhost -U urbanist urbanist_atlas_dev
-
-# tail the dev postgres container logs (Ctrl-C to detach)
-[group('postgres')]
-pg-logs:
-    docker logs -f urbanist-atlas-pg
+# stop the gluetun VPN container brought up by `verify-org-urls`.
+# The verify container itself is removed by --rm each run; gluetun
+# is what lingers.
+[group('verify')]
+[doc('stop the gluetun VPN container used by verify-org-urls')]
+verify-org-urls-down:
+    docker compose -f scripts/verify-org-urls.compose.yml down
 
 # ── web: build & verify ───────────────────────────────
 
@@ -306,82 +202,43 @@ web-check: web-deps web-lint web-test web-build web-gen-check
 # PR's branch. For a PR that adds or changes an API endpoint, the
 # preview frontend will 404 against the not-yet-deployed backend.
 #
-# `just preview` is the local-stack alternative: brings up the dev
-# Postgres, applies any pending migrations, seeds the DB if empty,
-# and runs the API in the foreground. Reviewer is expected to be on
+# `just preview` is the local-stack alternative: runs the API in the
+# foreground against the file-backed store (api/seed/ is the runtime
+# source of truth, no DB to start). Reviewer is expected to be on
 # the PR branch already (e.g. via `gh pr checkout <PR#>`) and to run
-# `just web-dev` in a second terminal. See CONTRIBUTING.md
-# "Full-stack PR review" for the workflow.
-#
-# Idempotent: pg-up reuses an existing container, migrate-up is a
-# no-op when migrations are current, and loaddata is skipped when
-# the orgs table is already populated.
+# `just web-dev` in a second terminal.
 [group('preview')]
-[doc('one-shot local stack for full-stack PR review (DB + migrate + seed-if-empty + api)')]
+[doc('one-shot local stack for full-stack PR review (file store + api)')]
 preview:
-    @just pg-up
-    @just migrate-up
-    @# Fail fast if the dev DB container isn't reachable, instead of
-    @# letting `|| echo 0` silently fall through to a confusing
-    @# `just loaddata` failure one indirection later.
-    @if ! docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -c "SELECT 1" >/dev/null 2>&1; then \
-        echo "preview: postgres container 'urbanist-atlas-pg' is not reachable. Check 'docker ps' and 'just pg-up'." >&2; \
-        exit 1; \
-    fi
-    @count=$(docker exec urbanist-atlas-pg psql -U urbanist -d urbanist_atlas_dev -t -A -c "SELECT COUNT(*) FROM organizations" 2>/dev/null || echo 0); \
-    if [ "$count" = "0" ]; then \
-        echo "preview: empty DB — running loaddata"; \
-        just loaddata; \
-    else \
-        echo "preview: $count orgs already loaded — skipping loaddata"; \
-    fi
-    @echo ""
-    @echo "preview: API starting on http://localhost:8080"
+    @echo "preview: API starting on http://localhost:8080 (file store)"
     @echo "preview: in another terminal, run \`just web-dev\` (http://localhost:5173)"
     @echo ""
     just api-run
 
 # ── fly: deploy + ops ─────────────────────────────────
 # Thin wrappers around `flyctl` so the deploy / logs / secrets /
-# ssh verbs are discoverable via `just --list`. App names
-# (urbanist-atlas for the API, urbanist-atlas-db for the sibling
-# Postgres) are pinned via -a so these work from any branch
-# without flyctl config. Initial provisioning (app creation, volume,
-# secrets, DNS, certs) lives in docs/deploy.md — these recipes
-# are for ongoing ops once both apps exist.
+# ssh verbs are discoverable via `just --list`. The API runs as a
+# single Fly app (urbanist-atlas) backed by an in-memory FileStore
+# built from the api/seed/ bundle baked into the image — no
+# database, no sibling app. Initial provisioning lives in
+# docs/deploy.md; these recipes are for ongoing ops.
 
-# deploy the API app from the current checkout. Release-command in
-# fly.toml runs `migrate up` before the new machine takes traffic.
+# deploy the API app from the current checkout.
 #
 # Manual fallback: every merge to main triggers a Fly deploy from the
 # `deploy-api` job in .github/workflows/ci.yml using
 # `flyctl deploy --remote-only`. Use this recipe when GitHub Actions
 # is degraded, when you need to deploy a non-main branch for a
-# hot-fix, or when you want to watch the build locally. For an
-# Actions-side re-deploy of current main without an empty commit,
-# `gh workflow run ci.yml --ref main`.
+# hot-fix, or when you want to watch the build locally.
 [group('fly')]
 [doc('deploy the API to Fly — manual fallback; primary path is GHA on merge to main')]
 fly-deploy:
     flyctl deploy -a urbanist-atlas
 
-# deploy the sibling Postgres app. Rarely needed after first launch;
-# the image rolls forward when we bump postgres:17-alpine to a newer
-# patch, which is an explicit maintenance decision.
-[group('fly')]
-[doc('deploy the sibling Postgres app (rare; only on image bumps)')]
-fly-deploy-db:
-    flyctl deploy -a urbanist-atlas-db -c infra/postgres/fly.toml
-
-# tail live Fly logs (API)
+# tail live Fly logs
 [group('fly')]
 fly-logs:
     flyctl logs -a urbanist-atlas
-
-# tail live Fly logs (DB)
-[group('fly')]
-fly-logs-db:
-    flyctl logs -a urbanist-atlas-db
 
 # list app secrets (names + digests; values are write-only)
 [group('fly')]
@@ -393,37 +250,72 @@ fly-secrets:
 fly-ssh:
     flyctl ssh console -a urbanist-atlas
 
-# Runs against PROD data in a one-off ssh session. Idempotent —
-# every loader upserts by stable key, so re-runs converge rather than
-# duplicate. Use after a seed-data edit lands on main.
-[group('fly')]
-[doc('re-seed the LIVE database (flyctl ssh; idempotent upserts)')]
-fly-loaddata:
-    flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server loaddata"
+# ── submissions: admin queue ops ──────────────────────
+# Thin curl wrappers around GET/POST /api/v1/admin/submissions so
+# triage doesn't require remembering bearer-auth invocations. All
+# three HTTP recipes need two secrets in the environment, both
+# matching the corresponding Fly secret of the same name (set them
+# in mise.local.toml or your shell):
+#   - URBANIST_ADMIN_TOKEN   — bearer token for /api/v1/admin/*
+#   - URBANIST_CLIENT_SECRET — phase-1 X-Atlas-Client shared secret
+# `base` defaults to the deployed API; pass `http://localhost:8080`
+# to drive a local server instead. Against a local server the
+# client-secret gate is typically off, but the recipe still sends
+# the header (the gate ignores it when the server-side secret is
+# empty), so the same env works for both targets.
 
-# capture an on-demand Postgres backup to a local file. Same pipeline
-# as the nightly GHA cron workflow at .github/workflows/backup.yml,
-# but writes locally rather than uploading to R2 — for ad-hoc
-# snapshots the maintainer wants in hand before a risky change.
-[group('fly')]
-[doc('on-demand local pg_dump via flyctl ssh (writes ./urbanist-atlas-YYYY-MM-DD.sql.gz)')]
-db-backup:
-    @out="urbanist-atlas-$(date -u +%Y-%m-%d).sql.gz"; \
-    flyctl ssh console -a urbanist-atlas-db \
-        -C "sh -c 'pg_dump -U urbanist urbanist_atlas | gzip -c'" \
-        > "$out" && \
-    test -s "$out" && \
-    ls -lh "$out"
+# list submissions, default status=pending. Pass `approved` to see
+# `promotion_pr_url` / `promotion_error` for already-actioned rows.
+# usage: just submissions-list
+#        just submissions-list approved
+#        just submissions-list pending http://localhost:8080
+[group('submissions')]
+[doc('GET /api/v1/admin/submissions (default status=pending)')]
+submissions-list status='pending' base='https://qa-api.urbanistatlas.com':
+    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN (e.g. via mise.local.toml or your shell)}"
+    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET (phase-1 X-Atlas-Client gate)}"
+    @curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+        -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
+        "{{base}}/api/v1/admin/submissions?status={{status}}" | jq
 
-# Restore a previously captured backup into the LIVE Postgres. Destructive;
-# the operator confirms by passing the dump path explicitly.
-# usage: just db-restore ./urbanist-atlas-2026-05-21.sql.gz
-[group('fly')]
-[doc('restore a .sql.gz dump into the LIVE Postgres (destructive)')]
-db-restore dump:
-    @echo "→ Restoring {{dump}} into urbanist-atlas-db (DESTRUCTIVE)"
-    @gunzip -c {{dump}} | flyctl ssh console -a urbanist-atlas-db \
-        -C "psql -U urbanist -d urbanist_atlas"
+# approve a pending submission; the API enqueues the GitHub-PR worker
+# and returns the updated row. The PR URL lands on the row a few
+# seconds later — re-run `submissions-list approved` to see it.
+# usage: just submissions-approve <uuid>
+[group('submissions')]
+[doc('POST /api/v1/admin/submissions/{id}/approve (queues GitHub PR)')]
+submissions-approve id base='https://qa-api.urbanistatlas.com':
+    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
+    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
+    @curl -sS -X POST -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+        -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
+        "{{base}}/api/v1/admin/submissions/{{id}}/approve" | jq
+
+# reject a pending submission with a moderator-facing reason. The
+# reason is JSON-encoded via jq so quotes/newlines pass through safely.
+# usage: just submissions-reject <uuid> "duplicate of foo-bar org"
+[group('submissions')]
+[doc('POST /api/v1/admin/submissions/{id}/reject with a reason')]
+submissions-reject id reason base='https://qa-api.urbanistatlas.com':
+    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
+    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
+    @body="$(jq -nc --arg r "{{reason}}" '{reason: $r}')"; \
+        curl -sS -X POST -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+            -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
+            -H "Content-Type: application/json" -d "$body" \
+            "{{base}}/api/v1/admin/submissions/{{id}}/reject" | jq
+
+# re-run the GitHub PR worker for an approved submission whose first
+# attempt failed (e.g. transient GitHub outage). Executes the
+# `submissions retry-pr` CLI subcommand inside the Fly machine, since
+# it needs filesystem access to /data/atlas.db and the bundled
+# URBANIST_GITHUB_TOKEN secret. Use after spotting a non-empty
+# `promotion_error` on an approved row via `submissions-list approved`.
+# usage: just submissions-retry-pr <uuid>
+[group('submissions')]
+[doc('retry the GitHub PR worker for an approved submission (via flyctl ssh)')]
+submissions-retry-pr id:
+    flyctl ssh console -a urbanist-atlas -C "urbanist-atlas-server submissions retry-pr --id={{id}}"
 
 # ── smoke: live curl helpers (server must be running) ─
 
@@ -439,67 +331,16 @@ healthz port='8080':
 lookup code country='US' port='8080':
     @curl -sS "http://localhost:{{port}}/api/v1/lookup?postal_code={{code}}&country={{country}}" | jq
 
-# End-to-end smoke against the LIVE QA endpoint. Verifies:
-# /healthz reachable, /api/v1/lookup behind the X-Atlas-Client gate
-# (401 without, 200 with), ODbL attribution headers + meta envelope
-# present, OpenAPI YAML served. Requires URBANIST_CLIENT_SECRET in
-# the environment (or pass as a positional arg).
+# End-to-end smoke against the LIVE QA endpoint. The script lives at
+# scripts/smoke.sh so CI can invoke it directly without needing `just`
+# on the runner. Requires URBANIST_CLIENT_SECRET in the environment
+# (or pass as a positional arg).
 # usage: URBANIST_CLIENT_SECRET=... just smoke
 #        or: just smoke <secret> [host]
 [group('smoke')]
 [doc('e2e smoke against qa-api.urbanistatlas.com (set URBANIST_CLIENT_SECRET first)')]
 smoke secret='' host='qa-api.urbanistatlas.com':
-    #!/usr/bin/env bash
-    set -euo pipefail
-    SECRET="{{secret}}"
-    if [ -z "$SECRET" ]; then SECRET="${URBANIST_CLIENT_SECRET:-}"; fi
-    if [ -z "$SECRET" ]; then
-        echo "smoke: URBANIST_CLIENT_SECRET is required (env var or first positional arg)" >&2
-        exit 2
-    fi
-    BASE="https://{{host}}"
-    fail=0
-    echo "→ GET $BASE/healthz"
-    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/healthz")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-
-    echo "→ GET $BASE/api/v1/lookup?postal_code=10001&country=US (no X-Atlas-Client)"
-    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/lookup?postal_code=10001&country=US")
-    if [ "$code" != "401" ]; then echo "  FAIL: expected 401, got $code"; fail=1; else echo "  OK 401"; fi
-
-    echo "→ GET $BASE/api/v1/lookup?postal_code=10001&country=US (with secret)"
-    headers=$(mktemp)
-    body=$(mktemp)
-    code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
-        -H "X-Atlas-Client: $SECRET" \
-        "$BASE/api/v1/lookup?postal_code=10001&country=US")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-    if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
-    if ! grep -qi '^X-Data-Attribution: ' "$headers"; then echo "  FAIL: missing X-Data-Attribution header"; fail=1; else echo "  OK X-Data-Attribution"; fi
-    rm -f "$headers" "$body"
-
-    # /lookup is a single-resource endpoint; the {meta, data} envelope
-    # only wraps collection responses (per the slice #24 ODbL design,
-    # see docs/api-architecture.md § Response envelope). Check meta on
-    # /regions, which is a collection endpoint.
-    echo "→ GET $BASE/api/v1/regions (collection meta envelope)"
-    headers=$(mktemp)
-    body=$(mktemp)
-    code=$(curl -sS -o "$body" -D "$headers" -w '%{http_code}' \
-        -H "X-Atlas-Client: $SECRET" \
-        "$BASE/api/v1/regions")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-    if ! grep -qi '^X-Data-License: ODbL-1.0' "$headers"; then echo "  FAIL: missing X-Data-License header"; fail=1; else echo "  OK X-Data-License"; fi
-    if ! jq -e '.meta.license and .meta.attribution_url and .meta.generated_at' "$body" >/dev/null; then echo "  FAIL: meta envelope missing license/attribution_url/generated_at"; fail=1; else echo "  OK meta envelope"; fi
-    if ! jq -e '.data | type == "array"' "$body" >/dev/null; then echo "  FAIL: data is not an array"; fail=1; else echo "  OK data array"; fi
-    rm -f "$headers" "$body"
-
-    echo "→ GET $BASE/api/v1/openapi.yaml"
-    code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/v1/openapi.yaml")
-    if [ "$code" != "200" ]; then echo "  FAIL: expected 200, got $code"; fail=1; else echo "  OK 200"; fi
-
-    if [ "$fail" -ne 0 ]; then echo "smoke: FAILED"; exit 1; fi
-    echo "smoke: PASS"
+    ./scripts/smoke.sh "{{secret}}" "{{host}}"
 
 # ── ci-equivalent ─────────────────────────────────────
 

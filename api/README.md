@@ -7,36 +7,33 @@ Go service powering [urbanistatlas.com](https://urbanistatlas.com). Public JSON 
 ```
 api/
 ├── cmd/server/         # urfave/cli entry point. Subcommands:
-│                       #   serve, migrate {up|down|status},
-│                       #   loadregions, loadpostal, seed, loaddata
+│                       #   serve, linkcheck, etl
 ├── pkg/atlas/          # Public, importable library. Pure Go.
 │                       # Org/Region/LookupResult types, the lookup
-│                       # algorithm, the Store interface, and an
-│                       # in-memory Store impl for tests + CLI use.
-├── internal/store/     # Non-public Store implementations.
-│   └── postgres/       # Postgres store: queries written in SQL,
-│                       # codegen'd to Go via sqlc.
+│                       # algorithm, the Store interface, and the
+│                       # in-memory MemStore that backs the runtime.
+├── internal/seedfiles/ # Parses the bundled TOML/CSV files into
+│                       # atlas.Region / atlas.Org (with toml tags)
+│                       # and builds the in-memory MemStore at boot.
+│                       # Works against either an fs.FS embed or a
+│                       # disk path via os.DirFS.
 ├── internal/httpapi/   # chi handlers. Thin wrappers over pkg/atlas.
-├── migrations/         # goose-style SQL migrations, embedded into
-│                       # the binary.
-└── seed/               # Human-reviewed seed data:
-                        #   regions_<cc>.toml (taxonomy + DAG edges)
+└── seed/               # Human-reviewed seed data (the runtime source of truth):
+                        #   regions_<cc>*.toml (taxonomy + DAG edges)
                         #   postal_codes_<cc>.csv (postal → leaf)
                         #   orgs.toml (curated org directory)
 ```
 
 ## Conventions
 
-See the root `CLAUDE.md` and the approved plan at
-`~/.claude/plans/we-are-planning-a-smooth-candy.md`. In short:
+See the root `CLAUDE.md`. In short:
 
 - Standard library first; deliberate exceptions are listed in CLAUDE.md.
 - Router: `go-chi/chi` v5.
 - CLI / startup: `urfave/cli` v3.
-- DB: `sqlc` → `pgx/v5` driver.
-- Migrations: `pressly/goose` v3, embedded.
 - Logging: `log/slog` (stdlib).
 - Errors: stdlib `errors` + `fmt.Errorf("...: %w", err)`.
+- No database: the API is stateless and reads `api/seed/` into memory at boot.
 
 ## Wire contract
 
@@ -56,7 +53,7 @@ real copy of `openapi.yaml` lives at
 Whenever you edit the canonical spec, run:
 
 ```
-just api-oapi-gen   # `go generate ./...` — refreshes both the embedded copy AND the oapi-codegen types
+just api-gen   # `go generate ./...` — refreshes both the embedded copy AND the oapi-codegen types
 ```
 
 `TestEmbeddedOpenAPISpecMatchesCanonical` (in
@@ -67,61 +64,33 @@ through review.
 
 ## Local dev
 
-Migrations and the Postgres store are owned by the server binary —
-no external goose CLI required.
-
 ```
-# 1. provision Postgres locally; DATABASE_URL is read by every
-#    Postgres-touching subcommand.
-createdb urbanist_atlas_dev
-export DATABASE_URL=postgres://localhost:5432/urbanist_atlas_dev?sslmode=disable
+# 1. (one time) install Go, Node, oapi-codegen via mise.
+mise install
 
-# 2. apply schema migrations (embedded into the binary).
-just migrate-up
-just migrate-status
-
-# 3. load the bundled fixtures — regions first (so leaf slugs resolve),
-#    then postal-code crosswalks, then orgs. `just loaddata` does all
-#    three countries in the right order:
-just loaddata
-
-# … or step-by-step (idempotent — each recipe is re-runnable):
-just loadregions seed/regions_us.toml US
-just loadpostal  seed/postal_codes_us.csv US
-just loadregions seed/regions_ca.toml CA
-just loadpostal  seed/postal_codes_ca.csv CA
-just loadregions seed/regions_pt.toml PT
-just loadpostal  seed/postal_codes_pt.csv PT
-just seed
-
-# 4. serve. Defaults to --store=postgres so dev configurations
-#    fail loudly on a missing DB rather than silently feeding back
-#    fixture data.
+# 2. run the server. Defaults to --store=file --seed-dir=./seed,
+#    so this is the entire setup.
 just api-run
 ```
 
 The bundled TOMLs and CSVs live under [`api/seed/`](./seed); see
 [`api/seed/README.md`](./seed/README.md) for the file format and the
 documented upstream sources (US Census ZCTA, StatsCan FSA, OpenPLZ
-for PT) if you want to scale beyond the fixture-sized dataset.
+for PT).
 
 Pass `--store=memory` (or set `URBANIST_STORE=memory`) to use the
-fixture-backed in-memory store. Useful for the frontend devloop and
-for offline `pkg/atlas` exploration.
+tiny dev-fixture set hard-coded in `pkg/atlas/devfixtures.go` instead
+of the full bundle. Useful for offline `pkg/atlas` exploration and
+demos where you don't want to ship `api/seed/` alongside the binary.
 
-## Integration tests
-
-The Postgres store has its own integration test under
-`internal/store/postgres/store_test.go`, gated by the `integration`
-build tag so the default `go test ./...` stays fast and Docker-free.
-The test spins up an ephemeral Postgres 17 container with
-[testcontainers-go](https://github.com/testcontainers/testcontainers-go)
-and runs the embedded migrations against it before exercising the
-adapter through the same `atlas.Store` interface the production
-server uses.
+## Tests
 
 ```
-just api-test-integration
+just api-test            # unit + the BuildMemStore test that loads the real api/seed/ bundle
+just api-check           # vet + tests + oapi gen-no-diff (what CI runs)
 ```
 
-This requires a running Docker daemon. CI does not run it.
+There is no separate Postgres integration suite — the FileStore is
+exercised against the real bundled seed inside `just api-test`, and
+the `pkg/atlas/storetest` contract harness validates every Store
+behavioral guarantee against MemStore.

@@ -8,6 +8,7 @@ import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { EntryList } from '../components/EntryList.tsx';
+import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 
@@ -92,43 +93,43 @@ function ResultsBody({
   country: Country | null;
   rawCountry: string | null;
 }) {
+  // Pre-query gates: URL hasn't reached a state where a lookup makes sense yet.
   if (postalCode.length === 0) {
     return (
-      <p className="results-state" style={{ marginTop: 48 }}>
+      <p className="results-state mt-48">
         No postal code in the URL. <Link to="/">Try the lookup</Link>.
       </p>
     );
   }
   if (country === null) {
     return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
+      <p className="results-state error mt-48" role="alert">
         Country <code>{rawCountry}</code> isn&rsquo;t supported yet. Try{' '}
         <code>?country=US</code> or <code>?country=CA</code>.
       </p>
     );
   }
-  if (query.isPending) {
-    return (
-      <p className="results-state" role="status" style={{ marginTop: 48 }}>
-        Looking up groups near {postalCode}…
-      </p>
-    );
-  }
-  if (query.isError) {
-    return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
-        {query.error.message}
-        {query.error.requestId ? (
-          <span className="results-state-detail">
-            request id: {query.error.requestId}
-          </span>
-        ) : null}
-      </p>
-    );
-  }
 
-  const placeLabel = query.data.resolved_place_label ?? postalCode;
-  const { local, regional, resolved_ancestry } = query.data;
+  return (
+    <QueryState
+      query={query}
+      loading={<>Looking up groups near {postalCode}…</>}
+      className="mt-48"
+    >
+      {(data) => <ResultsContent data={data} postalCode={postalCode} />}
+    </QueryState>
+  );
+}
+
+function ResultsContent({
+  data,
+  postalCode,
+}: {
+  data: LookupResult;
+  postalCode: string;
+}) {
+  const placeLabel = data.resolved_place_label ?? postalCode;
+  const { local, regional, resolved_ancestry } = data;
   const empty = local.length === 0 && regional.length === 0;
 
   // EntryList needs a slug -> display name map for its "Matched
@@ -141,7 +142,7 @@ function ResultsBody({
 
   return (
     <>
-      <div className="lede" style={{ marginTop: 48 }}>
+      <div className="lede mt-48">
         <div className="eyebrow">
           § Postal-code lookup<span className="eyebrow-rule" />
         </div>
@@ -157,7 +158,7 @@ function ResultsBody({
       </div>
 
       {empty ? (
-        <div className="editors-note" style={{ marginTop: 24 }}>
+        <div className="editors-note mt-24">
           <div className="label">No entries here yet</div>
           <p>
             Know an organization that should be in the Atlas for {placeLabel}?{' '}
@@ -166,7 +167,7 @@ function ResultsBody({
           </p>
         </div>
       ) : (
-        <div style={{ marginTop: 24 }}>
+        <div className="mt-24">
           <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />
         </div>
       )}

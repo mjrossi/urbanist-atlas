@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
 import { Submit } from './Submit.tsx';
+import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
 function renderSubmit() {
-  return render(
-    <MemoryRouter initialEntries={['/submit']}>
-      <Submit />
-    </MemoryRouter>,
-  );
+  return renderWithProviders(<Submit />, { initialEntries: ['/submit'] });
 }
 
 async function fillRequired(
@@ -31,7 +27,7 @@ async function fillRequired(
   );
   await user.type(
     screen.getByLabelText(/region served/i),
-    overrides.region ?? 'Anytown, USA',
+    overrides.region ?? 'brooklyn-ny',
   );
   await user.type(
     screen.getByLabelText(/one-line description/i),
@@ -39,15 +35,47 @@ async function fillRequired(
   );
 }
 
+// Build a Response that the form's fetch helper will see. The
+// ApiError wrapper reads `Content-Type` to decide whether to parse
+// the body as a problem document, so we set it deliberately.
+function jsonResponse(body: unknown, init: ResponseInit & { problem?: boolean } = {}) {
+  const { problem, headers, ...rest } = init;
+  return new Response(JSON.stringify(body), {
+    status: init.status ?? 200,
+    headers: {
+      'Content-Type': problem
+        ? 'application/problem+json'
+        : 'application/json',
+      ...(headers ?? {}),
+    },
+    ...rest,
+  });
+}
+
+const SUCCESS_BODY = {
+  id: '01928200-3344-7000-9abc-000000000001',
+  status: 'pending' as const,
+  payload: {
+    name: 'Strong Towns Sample',
+    short_desc: 'Advocates for safer streets in Anytown.',
+    website_url: 'https://example.org',
+    tags: [],
+    region_slugs: ['brooklyn-ny'],
+  },
+  created_at: '2026-05-28T15:00:00Z',
+};
+
 describe('Submit', () => {
-  let openSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(SUCCESS_BODY, { status: 201 }));
   });
 
   afterEach(() => {
-    openSpy.mockRestore();
+    fetchSpy.mockRestore();
   });
 
   it('renders all required field labels', () => {
@@ -58,9 +86,16 @@ describe('Submit', () => {
     expect(screen.getByLabelText(/one-line description/i)).toBeDefined();
   });
 
+  it('renders the page breadcrumb as a navigation landmark', () => {
+    renderSubmit();
+    const nav = screen.getByRole('navigation', { name: /breadcrumb/i });
+    const current = within(nav).getByText('Submissions');
+    expect(current.getAttribute('aria-current')).toBe('page');
+  });
+
   it('submit button is disabled when required fields are empty', () => {
     renderSubmit();
-    const button = screen.getByRole('button', { name: /open as github issue/i });
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -68,66 +103,115 @@ describe('Submit', () => {
     const user = userEvent.setup();
     renderSubmit();
     await fillRequired(user);
-    // mode:'onBlur' — tab off the last field to trigger validation.
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as github issue/i });
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
     await waitFor(() => {
       expect((button as HTMLButtonElement).disabled).toBe(false);
     });
   });
 
-  it('clicking submit opens a GitHub issue URL with the encoded title and body', async () => {
+  it('happy-path submit POSTs to the API and shows the receipt card', async () => {
     const user = userEvent.setup();
     renderSubmit();
     await fillRequired(user, { name: 'Sample Riders Alliance' });
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as github issue/i });
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
     await waitFor(() => {
       expect((button as HTMLButtonElement).disabled).toBe(false);
     });
     await user.click(button);
 
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('github.com/mjrossi/urbanist-atlas/issues/new');
-    expect(url).toContain('title=%5BNew%20org%5D');
-    expect(url).toContain(encodeURIComponent('Sample Riders Alliance'));
-    // template= would silently override our pre-filled body.
-    expect(url).not.toContain('template=');
-    expect(openSpy.mock.calls[0][1]).toBe('_blank');
-    expect(openSpy.mock.calls[0][2]).toBe('noopener');
+    // Receipt card appears, with the first 8 hex chars of the UUIDv7
+    // surfaced as the human reference.
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: /tip received/i })).toBeDefined();
+    });
+    // Short id appears in both the headline and the receipt row — at
+    // least one match is enough.
+    expect(screen.getAllByText('#01928200').length).toBeGreaterThan(0);
+
+    // Fetch was called with the API payload.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('/api/v1/submissions');
+    expect((init as RequestInit).method).toBe('POST');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.payload.name).toBe('Sample Riders Alliance');
+    expect(body.payload.region_slugs).toEqual(['brooklyn-ny']);
+    // The free-form submitter context is rolled into submitter_note.
+    expect(typeof body.submitter_note).toBe('string');
+    expect(body.submitter_note).toMatch(/new organization/i);
   });
 
-  it('correction type produces a [Correction] title prefix', async () => {
+  it('shows the rate-limit message when the API returns 429', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/rate-limited',
+          title: 'Too Many Requests',
+          status: 429,
+        },
+        { status: 429, problem: true, headers: { 'Retry-After': '600' } },
+      ),
+    );
     const user = userEvent.setup();
     renderSubmit();
-    await user.click(screen.getByLabelText(/correction to an existing entry/i));
     await fillRequired(user);
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as github issue/i });
-    await waitFor(() => {
-      expect((button as HTMLButtonElement).disabled).toBe(false);
-    });
-    await user.click(button);
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
 
-    const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('title=%5BCorrection%5D');
+    await waitFor(() => {
+      expect(screen.getByText(/breather/i)).toBeDefined();
+    });
   });
 
-  it('removal type produces a [Removal] title prefix', async () => {
+  it('shows the validation message when the API returns 400', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/validation',
+          title: 'Bad Request',
+          detail: 'region_slugs contains unknown slug "anytown-usa"',
+          status: 400,
+        },
+        { status: 400, problem: true },
+      ),
+    );
     const user = userEvent.setup();
     renderSubmit();
-    await user.click(screen.getByLabelText(/removal request/i));
-    await fillRequired(user);
+    await fillRequired(user, { region: 'anytown, usa' });
     await user.tab();
-    const button = screen.getByRole('button', { name: /open as github issue/i });
-    await waitFor(() => {
-      expect((button as HTMLButtonElement).disabled).toBe(false);
-    });
-    await user.click(button);
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
 
-    const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('title=%5BRemoval%5D');
+    await waitFor(() => {
+      expect(screen.getByText(/unknown slug/i)).toBeDefined();
+    });
+  });
+
+  it('shows the GitHub-issue fallback link on 5xx', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/internal',
+          title: 'Internal Server Error',
+          status: 500,
+        },
+        { status: 500, problem: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user, { name: 'Fallback Org' });
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    const fallback = await screen.findByRole('link', {
+      name: /open this as a github issue instead/i,
+    });
+    const href = fallback.getAttribute('href') ?? '';
+    expect(href).toContain('github.com/mjrossi/urbanist-atlas/issues/new');
+    const url = new URL(href);
+    expect(url.searchParams.get('body') ?? '').toContain('Fallback Org');
   });
 
   it('sets the browser tab title', async () => {
@@ -135,13 +219,5 @@ describe('Submit', () => {
     await waitFor(() => {
       expect(document.title).toMatch(/submit.*urbanist atlas/i);
     });
-  });
-
-  it('intro paragraph mentions GitHub and a pre-filled issue', () => {
-    renderSubmit();
-    const header = screen.getByRole('heading', { level: 1 }).parentElement;
-    expect(header?.textContent).toMatch(/github/i);
-    expect(header?.textContent).toMatch(/pre-filled/i);
-    expect(header?.textContent).toMatch(/issue/i);
   });
 });

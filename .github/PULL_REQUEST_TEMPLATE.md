@@ -5,7 +5,7 @@
     are easier to review separately.
   - New behavior needs tests. See docs/testing-strategy.md.
   - If you edited api/openapi.yaml, regenerate both halves:
-    `just api-oapi-gen && just web-oapi-gen`.
+    `just api-gen && just web-oapi-gen`.
   - `just ci` passes locally before pushing.
   - Full-stack PRs (API + frontend in the same PR): the Cloudflare
     preview URL points at QA, not your branch — review the change

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -13,14 +14,17 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/githubpr"
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
-	"github.com/mjrossi/urbanist-atlas/api/internal/store/postgres"
+	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
+	"github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
+	seedfs "github.com/mjrossi/urbanist-atlas/api/seed"
 )
 
 const (
-	storeKindPostgres = "postgres"
-	storeKindMemory   = "memory"
+	storeKindFile   = "file"
+	storeKindMemory = "memory"
 )
 
 func serveCommand() *cli.Command {
@@ -48,19 +52,41 @@ func serveCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "store",
-				Usage:   "store backing: postgres or memory",
-				Value:   storeKindPostgres,
+				Usage:   "store backing: file (default; reads from --seed-dir) or memory (built-in dev fixtures)",
+				Value:   storeKindFile,
 				Sources: cli.EnvVars("URBANIST_STORE"),
 			},
 			&cli.StringFlag{
-				Name:    "db-url",
-				Usage:   "Postgres connection string (required when --store=postgres)",
-				Sources: cli.EnvVars("DATABASE_URL"),
+				Name:    "seed-dir",
+				Usage:   "directory containing regions_<cc>.toml, postal_codes_<cc>.csv, orgs.toml; empty (default) uses the bundle embedded in the binary",
+				Sources: cli.EnvVars("URBANIST_SEED_DIR"),
 			},
 			&cli.StringFlag{
 				Name:    "client-secret",
 				Usage:   "shared secret expected in the X-Atlas-Client header; empty disables the gate",
 				Sources: cli.EnvVars("URBANIST_CLIENT_SECRET"),
+			},
+			&cli.StringFlag{
+				Name:    "db-path",
+				Usage:   "SQLite database path for the submission queue; empty disables /submissions endpoints",
+				Value:   "/data/atlas.db",
+				Sources: cli.EnvVars("URBANIST_DB_PATH"),
+			},
+			&cli.StringFlag{
+				Name:    "admin-token",
+				Usage:   "bearer token guarding /api/v1/admin/*; empty disables admin endpoints (they 503)",
+				Sources: cli.EnvVars("URBANIST_ADMIN_TOKEN"),
+			},
+			&cli.StringFlag{
+				Name:    "github-token",
+				Usage:   "fine-grained GitHub PAT for the promotion PR worker; empty disables the worker",
+				Sources: cli.EnvVars("URBANIST_GITHUB_TOKEN"),
+			},
+			&cli.IntFlag{
+				Name:    "submissions-rate-per-hour",
+				Usage:   "per-IP cap on POST /api/v1/submissions",
+				Value:   5,
+				Sources: cli.EnvVars("URBANIST_SUBMISSIONS_RATE_PER_HOUR"),
 			},
 		},
 		Action: runServe,
@@ -76,13 +102,34 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	}
 	defer closeStore()
 
+	subs, closeSubs, err := buildSubmissionStore(ctx, c, logger)
+	if err != nil {
+		return err
+	}
+	defer closeSubs()
+
+	var enqueuer httpapi.PromotionEnqueuer
+	if subs != nil {
+		worker := githubpr.New(githubpr.Config{
+			Token:         c.String("github-token"),
+			Logger:        logger,
+			PersistResult: subs.AttachPromotionResult,
+		})
+		go worker.Run(ctx)
+		enqueuer = worker
+	}
+
 	origins := splitCSV(c.String("cors-origins"))
 	handler := httpapi.New(httpapi.Config{
-		Store:        store,
-		Logger:       logger,
-		CORSOrigins:  origins,
-		APIVersion:   "v1",
-		ClientSecret: c.String("client-secret"),
+		Store:                  store,
+		Logger:                 logger,
+		CORSOrigins:            origins,
+		APIVersion:             "v1",
+		ClientSecret:           c.String("client-secret"),
+		Submissions:            submissionsOrNil(subs),
+		PromotionEnqueuer:      enqueuer,
+		AdminToken:             c.String("admin-token"),
+		SubmissionsRatePerHour: c.Int("submissions-rate-per-hour"),
 	})
 
 	addr := net.JoinHostPort("", c.String("port"))
@@ -124,12 +171,17 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	}
 }
 
-// buildStore returns an atlas.Store backed by either Postgres or the
-// in-memory MemStore, depending on --store. Memory is opt-in (for
-// tests and offline use); the default is Postgres so production
-// configurations are accidentally-correct rather than accidentally-
-// fixture-backed.
-func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas.Store, func(), error) {
+// buildStore returns an atlas.Store backed by the file-loaded
+// MemStore (default) or the built-in dev fixtures (--store=memory).
+// The dev-fixture path stays available so the binary can boot and
+// serve a few sample orgs without a seed bundle — useful for demos.
+//
+// When --seed-dir is empty (production default) the loader reads
+// from the seedfs.FS embed baked into the binary; when non-empty
+// it reads from os.DirFS(seedDir). The latter is what mise.development
+// activates (URBANIST_SEED_DIR=api/seed) so dev iterates against
+// the on-disk files without rebuilds.
+func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.Store, func(), error) {
 	kind := strings.ToLower(strings.TrimSpace(c.String("store")))
 	switch kind {
 	case storeKindMemory:
@@ -137,20 +189,61 @@ func buildStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (atlas
 		atlas.LoadDevFixtures(s)
 		logger.Info("store initialized", "kind", storeKindMemory, "fixtures", "dev")
 		return s, func() {}, nil
-	case storeKindPostgres, "":
-		dbURL := c.String("db-url")
-		if dbURL == "" {
-			return nil, nil, errors.New("serve: --db-url or DATABASE_URL is required when --store=postgres")
+	case storeKindFile, "":
+		seedDir := c.String("seed-dir")
+		var (
+			source string
+			seedFS fs.FS
+		)
+		if seedDir == "" {
+			source = "embed"
+			seedFS = seedfs.FS
+		} else {
+			source = seedDir
+			seedFS = os.DirFS(seedDir)
 		}
-		s, closeFn, err := postgres.Open(ctx, dbURL)
+		s, err := seedfiles.BuildMemStore(logger, seedFS)
 		if err != nil {
 			return nil, nil, err
 		}
-		logger.Info("store initialized", "kind", storeKindPostgres)
-		return s, closeFn, nil
+		logger.Info("store initialized", "kind", storeKindFile, "source", source)
+		return s, func() {}, nil
 	default:
-		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindPostgres, storeKindMemory)
+		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindFile, storeKindMemory)
 	}
+}
+
+// buildSubmissionStore opens the SQLite submission database and runs
+// migrations. An empty --db-path is treated as "no submissions" — the
+// returned store is nil and the /submissions endpoints stay
+// unregistered.
+func buildSubmissionStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (*sqlite.Store, func(), error) {
+	path := strings.TrimSpace(c.String("db-path"))
+	if path == "" {
+		logger.Info("submission store disabled (empty --db-path)")
+		return nil, func() {}, nil
+	}
+	s, err := sqlite.Open(path)
+	if err != nil {
+		return nil, func() {}, fmt.Errorf("submission store: %w", err)
+	}
+	if err := s.Migrate(ctx); err != nil {
+		_ = s.Close()
+		return nil, func() {}, fmt.Errorf("submission store migrate: %w", err)
+	}
+	logger.Info("submission store initialized", "path", path)
+	return s, func() { _ = s.Close() }, nil
+}
+
+// submissionsOrNil converts the concrete *sqlite.Store into the
+// atlas.SubmissionStore interface, preserving nil-ness so the router
+// can detect the "disabled" case (a typed nil would route to handlers
+// that then segfault on store calls).
+func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
+	if s == nil {
+		return nil
+	}
+	return s
 }
 
 // buildLogger returns an slog.Logger writing JSON or text to stderr.

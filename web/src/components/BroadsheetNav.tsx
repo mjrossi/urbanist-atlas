@@ -80,17 +80,15 @@ export function BroadsheetNav() {
           const active = isActive(entry, pathname);
           return (
             <li key={entry.to} className="nav-item">
-              {active ? (
-                <span className="current" onClick={closeMenu}>
-                  <span className="roman">{entry.roman}</span>
-                  {entry.label}
-                </span>
-              ) : (
-                <Link to={entry.to} onClick={closeMenu}>
-                  <span className="roman">{entry.roman}</span>
-                  {entry.label}
-                </Link>
-              )}
+              <Link
+                to={entry.to}
+                onClick={closeMenu}
+                className={active ? 'current' : undefined}
+                aria-current={active ? 'page' : undefined}
+              >
+                <span className="roman">{entry.roman}</span>
+                {entry.label}
+              </Link>
             </li>
           );
         })}

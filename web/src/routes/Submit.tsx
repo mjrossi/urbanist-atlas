@@ -1,29 +1,30 @@
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { ApiError, createSubmission, type Submission } from '../lib/api.ts';
+import {
+  buildIssueUrl,
+  buildNewSubmissionRequest,
+  SUBMIT_FORM_DEFAULTS,
+  type SubmitForm,
+} from '../lib/submitForm.ts';
 
-type SubmissionType = 'new' | 'correction' | 'removal';
-type Affiliation = 'none' | 'member' | 'other';
-
-interface SubmitForm {
-  type: SubmissionType;
-  name: string;
-  website: string;
-  region: string;
-  oneLineDesc: string;
-  why: string;
-  sources: string;
-  affiliation: Affiliation;
-  contact: string;
-}
+// Brief lockout after a successful submit so a triple-click can't
+// trigger duplicate POSTs.
+const SUBMIT_COOLDOWN_MS = 1500;
 
 /**
- * `/submit` — composes a pre-filled GitHub issue from the form values
- * and opens it in a new tab. The Phase 2 in-app submission queue is
- * the eventual destination; this form is the staffed channel until
- * then. See the issue template at
- * `.github/ISSUE_TEMPLATE/org_correction_or_addition.md` for the
- * canonical section structure mirrored in `buildIssueBody`.
+ * `/submit` — accepts an org tip, POSTs it to `/api/v1/submissions`,
+ * and shows a "received" confirmation card with the short submission
+ * id moderators will reference in the auto-PR. On API failure we fall
+ * back to a manual GitHub-issue link so the submitter isn't stranded.
+ *
+ * The form schema is shared with the GitHub-issue path so a future
+ * regression in the API surface doesn't lose data the submitter
+ * already typed.
  */
 export function Submit() {
   useDocumentTitle('Submit an organization — Urbanist Atlas');
@@ -32,43 +33,53 @@ export function Submit() {
     register,
     handleSubmit,
     formState: { isValid, errors },
+    getValues,
   } = useForm<SubmitForm>({
     mode: 'onBlur',
-    defaultValues: {
-      type: 'new',
-      name: '',
-      website: '',
-      region: '',
-      oneLineDesc: '',
-      why: '',
-      sources: '',
-      affiliation: 'none',
-      contact: '',
-    },
+    defaultValues: SUBMIT_FORM_DEFAULTS,
+  });
+
+  const [cooldown, setCooldown] = useState(false);
+
+  useEffect(() => {
+    if (!cooldown) return;
+    const id = setTimeout(() => setCooldown(false), SUBMIT_COOLDOWN_MS);
+    return () => clearTimeout(id);
+  }, [cooldown]);
+
+  const mutation = useMutation<Submission, ApiError, SubmitForm>({
+    mutationFn: (form) => createSubmission(buildNewSubmissionRequest(form)),
+    onSuccess: () => setCooldown(true),
   });
 
   const onValid = (form: SubmitForm) => {
-    const title = `${titlePrefix(form.type)} ${form.name}`;
-    const body = buildIssueBody(form);
-    // GitHub silently drops `body=` when `template=` is also present,
-    // so we deliberately omit the template param and ship the full
-    // pre-filled body instead.
-    const url = `https://github.com/mjrossi/urbanist-atlas/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
-    window.open(url, '_blank', 'noopener');
+    if (cooldown || mutation.isPending) return;
+    mutation.mutate(form);
   };
+
+  if (mutation.isSuccess) {
+    return (
+      <SubmissionReceived
+        submission={mutation.data}
+        onAnother={() => mutation.reset()}
+      />
+    );
+  }
+
+  const submitErr = mutation.error;
+  const isRateLimited = submitErr?.status === 429;
+  const isValidationErr = submitErr?.status === 400 || submitErr?.status === 422;
+  const isServerErr = submitErr?.status !== undefined && submitErr.status >= 500;
 
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">Submissions</span>
-        </div>
-        <div>Open year-round</div>
-      </div>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="Submissions"
+        meta="Open year-round"
+      />
 
-      <div className="spread" style={{ marginTop: 48 }}>
+      <div className="spread mt-48">
         <div>
           <div className="lede">
             <div className="eyebrow">
@@ -79,9 +90,9 @@ export function Submit() {
             </h1>
             <p className="deck">
               Know an advocacy group that should be in the Atlas? Spotted a
-              stale entry? Tell us here. Submitting opens a pre-filled GitHub
-              issue in a new tab — review what&rsquo;s there, edit anything,
-              and post.
+              stale entry? Tell us here. Your submission goes straight to
+              the editorial queue and we open a pull request against the
+              public dataset when we accept it.
             </p>
           </div>
 
@@ -192,7 +203,8 @@ export function Submit() {
                   Region served
                   <span className="required">*</span>
                   <span className="hint">
-                    City, county, metro, or state. Be specific.
+                    City or metro slug, e.g. <code>nyc</code> or{' '}
+                    <code>chicago</code>. We&rsquo;ll finalize it in review.
                   </span>
                 </label>
               </div>
@@ -201,7 +213,7 @@ export function Submit() {
                   id="submit-region"
                   type="text"
                   className="input"
-                  placeholder="Seattle, WA"
+                  placeholder="brooklyn-ny"
                   {...register('region', { required: 'Required' })}
                 />
                 {errors.region ? (
@@ -217,7 +229,7 @@ export function Submit() {
                 <label htmlFor="submit-oneline" className="field-label">
                   One-line description of what they actually do
                   <span className="required">*</span>
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     Plain English. ~140 characters.
                   </span>
                 </label>
@@ -240,7 +252,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-why" className="field-label">
                   Why this org belongs
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     Recent campaigns, who they organize, who they push. Specifics beat
                     adjectives.
                   </span>
@@ -259,7 +271,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-sources" className="field-label">
                   Sources
-                  <span className="hint" style={{ maxWidth: 'none', display: 'inline' }}>
+                  <span className="hint inline">
                     News coverage, social handles, prior wins. One per line.
                   </span>
                 </label>
@@ -331,12 +343,46 @@ https://kuow.org/stories/..."
 
             <div className="slip-foot">
               <p className="note">
-                Filing this opens a pre-filled GitHub issue in a new tab. You can
-                review it, edit anything, and post — or close the tab to start
-                over. <strong>Nothing is sent yet.</strong>
+                Your submission goes straight to the editorial queue. We
+                review every tip and open a public pull request when we
+                accept one — usually within a week.
               </p>
-              <button type="submit" className="btn-primary" disabled={!isValid}>
-                Open as GitHub issue <span className="arrow">→</span>
+              {isRateLimited ? (
+                <p className="field-error" role="alert">
+                  You&rsquo;ve sent a few in a short window. Take a breather and
+                  retry in a few minutes.
+                </p>
+              ) : null}
+              {isValidationErr ? (
+                <p className="field-error" role="alert">
+                  {submitErr?.problem?.detail ?? submitErr?.message ?? 'Validation failed.'}
+                </p>
+              ) : null}
+              {isServerErr ? (
+                <p className="field-error" role="alert">
+                  Our submission queue is having a moment. You can{' '}
+                  <a
+                    href={buildIssueUrl(getValues())}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    open this as a GitHub issue instead
+                  </a>{' '}
+                  while we look into it.
+                </p>
+              ) : null}
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={!isValid || cooldown || mutation.isPending}
+              >
+                {mutation.isPending ? (
+                  'Sending…'
+                ) : (
+                  <>
+                    Send to editorial queue <span className="arrow">→</span>
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -351,8 +397,8 @@ https://kuow.org/stories/..."
                 <div className="num">i.</div>
                 <h4>You file the tip.</h4>
                 <p>
-                  A pre-filled GitHub issue opens in a new tab. Takes about a
-                  minute to read and post.
+                  Your submission lands in the editorial queue with a
+                  reference ID. No GitHub account needed.
                 </p>
               </div>
               <div className="process-step">
@@ -375,8 +421,8 @@ https://kuow.org/stories/..."
                 <div className="num">iv.</div>
                 <h4>Published or declined.</h4>
                 <p>
-                  Either way you get a reply on the issue. We always say why if
-                  we decline, so you can re-file with more.
+                  Accepted orgs land in a public pull request anyone can read.
+                  When the PR merges, the org appears in the Atlas.
                 </p>
               </div>
             </div>
@@ -411,55 +457,68 @@ https://kuow.org/stories/..."
   );
 }
 
-function titlePrefix(type: SubmissionType): string {
-  switch (type) {
-    case 'new':
-      return '[New org]';
-    case 'correction':
-      return '[Correction]';
-    case 'removal':
-      return '[Removal]';
-  }
+interface SubmissionReceivedProps {
+  submission: Submission;
+  onAnother: () => void;
 }
 
-function check(condition: boolean): 'x' | ' ' {
-  return condition ? 'x' : ' ';
-}
+function SubmissionReceived({ submission, onAnother }: SubmissionReceivedProps) {
+  const shortId = String(submission.id).replace(/-/g, '').slice(0, 8);
+  return (
+    <>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="Submissions"
+        meta="Tip received"
+      />
+      <div className="spread mt-48">
+        <div>
+          <div className="lede">
+            <div className="eyebrow">
+              № II — Submissions desk<span className="eyebrow-rule" />
+            </div>
+            <h1>
+              Tip received — <span className="accent">#{shortId}</span>
+            </h1>
+            <p className="deck">
+              Thanks. Your submission is in the editorial queue. When an
+              editor accepts it, you&rsquo;ll see the org appear in the
+              Atlas after the next deploy. If we have follow-up questions
+              and you left contact info, we&rsquo;ll reach out.
+            </p>
+          </div>
 
-function buildIssueBody(form: SubmitForm): string {
-  const why = form.why.trim() || '_Not provided._';
-  const sources = form.sources.trim() || '_Not provided._';
-  const contact = form.contact.trim();
-  const submittedSuffix = contact ? ` by ${contact}` : '';
-  return `## Type
-
-- [${check(form.type === 'new')}] New organization to add
-- [${check(form.type === 'correction')}] Correction to an existing entry
-- [${check(form.type === 'removal')}] Removal request (e.g., org has shut down or rebranded)
-
-## Organization
-
-- **Name:** ${form.name}
-- **Primary website:** ${form.website}
-- **Region served:** ${form.region}
-- **One-line description of what they actually do:** ${form.oneLineDesc}
-
-## Why this org belongs
-
-${why}
-
-## Sources
-
-${sources}
-
-## Disclosure
-
-- [${check(form.affiliation === 'none')}] I have no affiliation with this organization.
-- [${check(form.affiliation === 'member')}] I am a member, volunteer, or staff of this organization.
-- [${check(form.affiliation === 'other')}] Other.
-
----
-
-_Submitted via the urbanistatlas.com submit form${submittedSuffix}._
-`;
+          <div className="receipt">
+            <div className="receipt-row">
+              <span className="receipt-label">Reference</span>
+              <span className="receipt-value mono">#{shortId}</span>
+            </div>
+            <div className="receipt-row">
+              <span className="receipt-label">Status</span>
+              <span className="receipt-value">{submission.status}</span>
+            </div>
+            <div className="receipt-foot">
+              <button type="button" className="btn-primary" onClick={onAnother}>
+                File another tip <span className="arrow">→</span>
+              </button>
+              <Link to="/" className="receipt-link">
+                Back to the atlas
+              </Link>
+            </div>
+          </div>
+        </div>
+        <aside className="rail">
+          <div className="rail-block">
+            <div className="rail-kicker">What happens next</div>
+            <p>
+              When we accept your tip, the change shows up in a public
+              pull request against the dataset. When the PR merges, the
+              org appears in the Atlas after the next deploy — usually a
+              few minutes.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
 }

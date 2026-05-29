@@ -178,6 +178,44 @@ func TestClientSecret_Unauthorized_ProblemDocShape(t *testing.T) {
 	}
 }
 
+// TestClientSecret_Unauthorized_RequestIDMatchesResponseHeader pins
+// the rid round-trip through the full router stack: when the client
+// doesn't send X-Request-ID, requestIDMiddleware generates one, sets
+// it as the response header, AND stuffs it into the request context.
+// The 401 problem document must read the rid from the context (not
+// the request header) so the body field and the response header
+// agree.
+func TestClientSecret_Unauthorized_RequestIDMatchesResponseHeader(t *testing.T) {
+	srv := newSecretedTestServer(t, "the-secret")
+
+	// Deliberately no X-Request-ID header — let the middleware generate one.
+	resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=11217&country=US")
+	if err != nil {
+		t.Fatalf("GET /api/v1/lookup: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status: got %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+
+	responseRID := resp.Header.Get("X-Request-ID")
+	if responseRID == "" {
+		t.Fatal("X-Request-ID response header is empty; middleware should have generated one")
+	}
+
+	var body oapi.ProblemDetails
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body.RequestId == nil {
+		t.Fatalf("problem.request_id: got nil, want %q (rid from generated header)", responseRID)
+	}
+	if *body.RequestId != responseRID {
+		t.Errorf("problem.request_id: got %q, want %q (must match X-Request-ID response header)", *body.RequestId, responseRID)
+	}
+}
+
 // TestClientSecret_CorrectHeader_PassesThrough documents the happy
 // path: when the X-Atlas-Client header matches the configured secret,
 // the middleware lets the request through to the downstream handler.

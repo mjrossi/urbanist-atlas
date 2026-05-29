@@ -195,3 +195,27 @@ export function listRecent(init?: RequestInit): Promise<Org[]> {
     (env) => env.data,
   );
 }
+
+/**
+ * `POST /api/v1/submissions` — queue an organization for editorial
+ * review. The returned `Submission` carries the server-generated UUIDv7
+ * `id` (echoed to the user as a short reference) and `status: 'pending'`.
+ *
+ * Validation errors come back as 400/422 problem documents; per-IP rate
+ * limiting returns 429 with a `Retry-After` header. Callers handle the
+ * three classes via `ApiError.status`.
+ */
+export function createSubmission(
+  body: NewSubmissionRequest,
+  init?: RequestInit,
+): Promise<Submission> {
+  return apiFetch<Submission>('/api/v1/submissions', {
+    ...init,
+    method: 'POST',
+    headers: {
+      ...(init?.headers ?? {}),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}

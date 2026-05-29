@@ -273,7 +273,7 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves
 # that may reference these metros). Cross-file parent resolution lives
-# in internal/loadregions/write.go.
+# in internal/seedfiles/regions.go.
 `
 
 // WritePostalCodesCSV emits the postal_codes_us.csv file

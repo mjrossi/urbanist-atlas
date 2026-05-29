@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { SearchBox } from '../components/SearchBox.tsx';
+import { QueryState } from '../components/QueryState.tsx';
 import { ApiError, listRegions, listRecent } from '../lib/api.ts';
 import type { RegionSummary, Org } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
@@ -44,11 +45,11 @@ export function Home() {
         <div>Vol. I · 2026 Edition</div>
       </div>
 
-      <div className="spread lede-first" style={{ marginTop: 40 }}>
+      <div className="spread lede-first mt-40">
         <div>
           <SearchBox />
 
-          <div className="prose" style={{ marginTop: 48 }}>
+          <div className="prose mt-48">
             <p className="lead drop">
               The Urbanist Atlas catalogues the people in your city, your county,
               your region who are organizing — patiently, stubbornly, sometimes
@@ -77,7 +78,7 @@ export function Home() {
           <div className="rail-block">
             <div className="rail-kicker">Browse the atlas</div>
             <TopPlaces query={places} />
-            <Link to="/browse" className="read-on" style={{ marginTop: 14 }}>
+            <Link to="/browse" className="read-on mt-14">
               All places <span className="arrow">→</span>
             </Link>
           </div>
@@ -99,36 +100,43 @@ export function Home() {
 }
 
 function TopPlaces({ query }: { query: UseQueryResult<RegionSummary[], ApiError> }) {
-  if (query.isPending) {
-    return <p className="results-state">Loading places…</p>;
-  }
-  if (query.isError) {
-    return <p className="results-state error">Region list is temporarily unavailable.</p>;
-  }
-  const items = query.data.slice(0, TOP_PLACES_LIMIT);
-  if (items.length === 0) {
-    return <p className="results-state">No places indexed yet.</p>;
-  }
   return (
-    <ul className="metros compact">
-      {items.map((p) => (
-        <li key={p.region.slug}>
-          <Link className="metro" to={`/region/${p.region.slug}`}>
-            <div>
-              <p className="name">{p.region.name}</p>
-              <div className="meta">
-                {p.region.country}
-                {p.region.parent_slugs[0] ? ` · ${p.region.parent_slugs[0]}` : ''}
-              </div>
-            </div>
-            <div className="count">
-              <span className="n">{p.org_count}</span>
-              {p.org_count === 1 ? 'group' : 'groups'}
-            </div>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <QueryState
+      query={query}
+      loading="Loading places…"
+      error={() => (
+        <p className="results-state error">Region list is temporarily unavailable.</p>
+      )}
+      empty={{
+        when: (data) => data.length === 0,
+        render: <p className="results-state">No places indexed yet.</p>,
+      }}
+    >
+      {(data) => {
+        const items = data.slice(0, TOP_PLACES_LIMIT);
+        return (
+          <ul className="metros compact">
+            {items.map((p) => (
+              <li key={p.region.slug}>
+                <Link className="metro" to={`/region/${p.region.slug}`}>
+                  <div>
+                    <p className="name">{p.region.name}</p>
+                    <div className="meta">
+                      {p.region.country}
+                      {p.region.parent_slugs[0] ? ` · ${p.region.parent_slugs[0]}` : ''}
+                    </div>
+                  </div>
+                  <div className="count">
+                    <span className="n">{p.org_count}</span>
+                    {p.org_count === 1 ? 'group' : 'groups'}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        );
+      }}
+    </QueryState>
   );
 }
 
@@ -146,34 +154,38 @@ function RecentlyFiled({ query }: { query: UseQueryResult<Org[], ApiError> }) {
 }
 
 function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
-  if (query.isPending) {
-    return <p className="results-state">Loading recent entries…</p>;
-  }
-  if (query.isError) {
-    return <p className="results-state error">Recent entries are temporarily unavailable.</p>;
-  }
-  const items = query.data.slice(0, RECENT_LIMIT);
-  if (items.length === 0) {
-    return <p className="results-state">Nothing filed yet.</p>;
-  }
   return (
-    <div className="org-strip">
-      {items.map((org) => {
-        const where = primaryRegionLabel(org);
-        return (
-          <Link
-            key={org.id}
-            className="org-card"
-            to={`/orgs/${encodeURIComponent(org.slug)}`}
-          >
-            <div className="added">+ Newly indexed</div>
-            <h3 className="org-name">{org.name}</h3>
-            {where ? <div className="org-where">{where}</div> : null}
-            <p className="org-desc">{truncate(org.short_desc, 180)}</p>
-          </Link>
-        );
-      })}
-    </div>
+    <QueryState
+      query={query}
+      loading="Loading recent entries…"
+      error={() => (
+        <p className="results-state error">Recent entries are temporarily unavailable.</p>
+      )}
+      empty={{
+        when: (data) => data.length === 0,
+        render: <p className="results-state">Nothing filed yet.</p>,
+      }}
+    >
+      {(data) => (
+        <div className="org-strip">
+          {data.slice(0, RECENT_LIMIT).map((org) => {
+            const where = primaryRegionLabel(org);
+            return (
+              <Link
+                key={org.id}
+                className="org-card"
+                to={`/orgs/${encodeURIComponent(org.slug)}`}
+              >
+                <div className="added">+ Newly indexed</div>
+                <h3 className="org-name">{org.name}</h3>
+                {where ? <div className="org-where">{where}</div> : null}
+                <p className="org-desc">{truncate(org.short_desc, 180)}</p>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </QueryState>
   );
 }
 
@@ -201,7 +213,7 @@ function ByTheNumbers({
 
   return (
     <>
-      <section className="section-break" style={{ marginTop: 56 }}>
+      <section className="section-break mt-56">
         <span className="num">III.</span>
         <h2 className="title">The Atlas, by the numbers.</h2>
         <span className="aside">From the live directory</span>
@@ -245,21 +257,21 @@ function ByTheNumbers({
 function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
   return (
     <>
-      <section className="section-break" style={{ marginTop: 56 }}>
+      <section className="section-break mt-56">
         <span className="num">IV.</span>
         <h2 className="title">The topics the Atlas covers.</h2>
         <span className="aside">Editorial scope</span>
       </section>
-      <div className="spread lede-first" style={{ marginTop: 12 }}>
+      <div className="spread lede-first mt-12">
         <div>
-          <ul className="tag-list" style={{ gap: 12 }}>
+          <ul className="tag-list gap-12">
             {tags.map((label) => (
               <li key={label}>
                 <span className="tag">{label}</span>
               </li>
             ))}
           </ul>
-          <p className="fineprint" style={{ marginTop: 22 }}>
+          <p className="fineprint mt-22">
             Tags are editorial labels, applied by hand. An organization can
             carry up to five. Per-topic filtering ships with Phase 2; until
             then, <Link to="/browse">the place index</Link> is the wander

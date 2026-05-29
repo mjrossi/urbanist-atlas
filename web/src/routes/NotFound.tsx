@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { BroadsheetNav } from '../components/BroadsheetNav.tsx';
 import { Footer } from '../components/Footer.tsx';
 import { Masthead } from '../components/Masthead.tsx';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { useScrollToTop } from '../lib/useScrollToTop.ts';
 
@@ -9,15 +10,12 @@ export function NotFound() {
   useDocumentTitle('Page not in this edition — Urbanist Atlas');
   return (
     <>
-      <div className="kicker">
-        <div>
-          <Link to="/">Atlas</Link>
-          <span className="crumb-sep">/</span>
-          <span className="crumb-here">Not found</span>
-        </div>
-        <div>404 · Page retracted</div>
-      </div>
-      <div className="lede" style={{ marginTop: 56 }}>
+      <PageBreadcrumb
+        prefix={[{ label: 'Atlas', to: '/' }]}
+        current="Not found"
+        meta="404 · Page retracted"
+      />
+      <div className="lede mt-56">
         <div className="eyebrow">
           § Retractions desk<span className="eyebrow-rule" />
         </div>
@@ -30,7 +28,7 @@ export function NotFound() {
           retired.
         </p>
       </div>
-      <div className="spread" style={{ marginTop: 24 }}>
+      <div className="spread mt-24">
         <div className="prose">
           <p>
             If you followed a link from another site and you think this page

@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor } from '@testing-library/react';
 import type { LookupOrg, Region as RegionT, RegionDetail } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
+import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
 const { getRegionMock } = vi.hoisted(() => ({ getRegionMock: vi.fn() }));
 
@@ -18,18 +17,10 @@ vi.mock('../lib/api.ts', async () => {
 const { Region } = await import('./Region.tsx');
 
 function renderAt(path: string) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+  return renderWithProviders(<Region />, {
+    initialEntries: [path],
+    routePath: '/region/:regionSlug',
   });
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/region/:regionSlug" element={<Region />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
 }
 
 function makeOrg(overrides: Partial<LookupOrg> = {}): LookupOrg {

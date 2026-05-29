@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor, within } from '@testing-library/react';
 import type { Org as OrgT } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
+import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
 const { getOrgMock } = vi.hoisted(() => ({ getOrgMock: vi.fn() }));
 
@@ -18,18 +17,10 @@ vi.mock('../lib/api.ts', async () => {
 const { Org } = await import('./Org.tsx');
 
 function renderAt(path: string) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+  return renderWithProviders(<Org />, {
+    initialEntries: [path],
+    routePath: '/orgs/:slug',
   });
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/orgs/:slug" element={<Org />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
 }
 
 function makeOrg(overrides: Partial<OrgT> = {}): OrgT {
@@ -205,6 +196,21 @@ describe('Org', () => {
       expect(contactLink).toBeDefined();
       expect(contactLink?.getAttribute('target')).toBe('_blank');
     });
+  });
+
+  it('renders the page breadcrumb as a navigation landmark with the org name as current page', async () => {
+    getOrgMock.mockResolvedValueOnce(makeOrg());
+    renderAt('/orgs/transalt');
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Transportation Alternatives' }),
+      ).toBeDefined();
+    });
+
+    const nav = screen.getByRole('navigation', { name: /breadcrumb/i });
+    const current = within(nav).getByText('Transportation Alternatives');
+    expect(current.getAttribute('aria-current')).toBe('page');
   });
 
   it('passes the URL slug through to getOrg', async () => {

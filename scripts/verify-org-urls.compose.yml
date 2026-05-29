@@ -1,0 +1,86 @@
+# Run scripts/verify-org-urls.sh on your laptop, egress via Proton WireGuard.
+#
+# The `verify` service joins gluetun's network namespace, so every probe
+# leaves through the VPN tunnel. If the tunnel drops, the probe loses
+# network — no leaks via the laptop's default route.
+#
+# Setup (one-time): drop your Proton WireGuard private key into
+# mise.local.toml (gitignored) so it's available in any shell mise
+# activates in this repo:
+#
+#   # mise.local.toml
+#   [env]
+#   WIREGUARD_PRIVATE_KEY = "…paste from account.protonvpn.com/downloads…"
+#   # SERVER_COUNTRIES    = "United States"   # optional override
+#
+# Run (from the repo root, with mise active):
+#   just verify-org-urls            # writes tmp/org-url-report.{md,tsv}
+#   just verify-org-urls-down       # stops gluetun when finished
+#
+# The recipes are thin wrappers around `docker compose -f $THIS \
+# --profile verify run --rm --build verify` and `docker compose -f $THIS
+# down` — drop down to raw compose if you need custom flags.
+#
+# Notes:
+#   - `--profile verify` is required to start the verify service; without
+#     it, `up` only brings gluetun, which is occasionally useful as a
+#     standalone HTTP proxy on localhost:8888.
+#   - `run --rm` exits when the script exits and discards the container;
+#     gluetun stays running so re-runs are fast.
+#   - UID/GID default to your shell's; override via env if needed.
+#   - `docker compose -f … config` renders this file with environment
+#     interpolated — including WIREGUARD_PRIVATE_KEY. Don't paste the
+#     output into bug reports, gists, or PR descriptions.
+
+name: urbanist-atlas-verify
+
+services:
+  gluetun:
+    # Pinned to a tagged release so the recipe doesn't break between
+    # maintenance windows when `latest` rotates. Bump deliberately.
+    image: qmcgaw/gluetun:v3.41.1
+    container_name: atlas-verify-gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      # HTTP proxy + control server, bound to loopback so nothing on the
+      # LAN can route through your tunnel.
+      - "127.0.0.1:8888:8888/tcp"
+      - "127.0.0.1:8000:8000/tcp"
+    environment:
+      - TZ=America/New_York
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY:?set WIREGUARD_PRIVATE_KEY in mise.local.toml [env]}
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES:-United States}
+    restart: unless-stopped
+
+  verify:
+    profiles: ["verify"]
+    build:
+      context: ..
+      dockerfile: scripts/verify-org-urls.Dockerfile
+    image: atlas-url-verify:latest
+    # Share gluetun's network namespace — all egress goes through the VPN.
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      - CONCURRENCY=${CONCURRENCY:-8}
+      - TIMEOUT=${TIMEOUT:-20}
+      - ORGS_TOML=/work/api/seed/orgs.toml
+      - REPORT=/work/tmp/org-url-report.md
+    volumes:
+      - ../api/seed:/work/api/seed:ro
+      - ../tmp:/work/tmp

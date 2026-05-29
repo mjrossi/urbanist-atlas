@@ -283,19 +283,22 @@ type Region struct {
 
 // RegionDetail A region (any non-national kind) with the organizations
 // in scope for it, bucketed by attachment tier. "In scope"
-// means orgs attached to the region itself, any descendant
-// in the DAG (so a metro surfaces its constituent cities'
-// orgs), or any ancestor (so a city surfaces the orgs
-// covering its parent metro / state / multi-state region).
+// means orgs attached to the region itself or any DAG
+// descendant — a metro surfaces its constituent cities'
+// orgs, a state surfaces every metro/city beneath it.
+// Ancestor orgs are NOT pulled in: this is "what does the
+// region contain?", not "what works at this address?" (the
+// latter is `/lookup`'s job, with its upward ancestor walk).
 //
-// This makes `/regions/{slug}` answer the same question
-// `/lookup` answers for a postal code: "every advocate
-// someone navigating to this region might care about."
+// Keeping the in-scope set descendant-only means the
+// `RegionSummary.org_count` shown on the browse card matches
+// the count delivered by this endpoint — no surprises when a
+// user clicks through.
+//
 // Orgs are bucketed by the `scope_tier` of the attachment
 // region they matched on — `local` for city/county-tier
-// attachments, `regional` for metro/state/multi-state. The
-// rule mirrors `/lookup`'s; `national`-tier attachments are
-// always filtered.
+// attachments, `regional` for metro/state/multi-state.
+// `national`-tier attachments are always filtered.
 //
 // Each `LookupOrg.matched_region_slugs` names the
 // attachment regions in scope that caused the org to
@@ -440,7 +443,10 @@ type ScopeTier string
 // Submission A queued or processed public submission.
 type Submission struct {
 	CreatedAt time.Time `json:"created_at"`
-	Id        int64     `json:"id"`
+
+	// Id UUIDv7 string generated server-side when the submission was
+	// accepted. This is the only ID exposed on the wire.
+	Id openapi_types.UUID `json:"id"`
 
 	// Payload The proposed organization, as submitted by a member of the public.
 	Payload SubmissionPayload `json:"payload"`
@@ -448,8 +454,16 @@ type Submission struct {
 	// ProcessedAt Set when status moves from `pending` to a terminal state.
 	ProcessedAt *time.Time `json:"processed_at,omitempty"`
 
-	// PromotedOrgId Set on approval to the ID of the created organization.
-	PromotedOrgId *int64 `json:"promoted_org_id,omitempty"`
+	// PromotionError Set on approval when the GitHub PR worker failed (network,
+	// auth, etc.). The submission stays `approved`; the PR is
+	// re-queued via `urbanist-atlas-server submissions retry-pr`.
+	PromotionError *string `json:"promotion_error,omitempty"`
+
+	// PromotionPrUrl Set on approval when the GitHub PR worker successfully opens a
+	// pull request appending the approved org to `api/seed/orgs.toml`.
+	// The PR is the editorial-review surface; the org becomes visible
+	// after a maintainer merges it and the API redeploys.
+	PromotionPrUrl *string `json:"promotion_pr_url,omitempty"`
 
 	// RejectionReason Set on rejection.
 	RejectionReason *string `json:"rejection_reason,omitempty"`
@@ -491,7 +505,7 @@ type PostalCodeQuery = string
 type RegionSlug = string
 
 // SubmissionID defines model for SubmissionID.
-type SubmissionID = int64
+type SubmissionID = openapi_types.UUID
 
 // BadRequest Standard [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 // Problem Details object. Returned on every non-2xx response with
@@ -660,6 +674,14 @@ type bearerAuthContextKey string
 type ListSubmissionsParams struct {
 	// Status Filter by submission status. Defaults to `pending`.
 	Status *SubmissionStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Limit Maximum number of submissions to return. Capped at 200.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque pagination token. Pass the value of the previous
+	// response's `X-Next-Cursor` header to fetch the next page.
+	// Omit to start at the newest submission.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // LookupParams defines parameters for Lookup.

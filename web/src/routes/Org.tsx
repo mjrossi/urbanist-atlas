@@ -3,9 +3,12 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getOrg } from '../lib/api.ts';
 import type { Org as OrgT } from '../lib/api.ts';
+import { domainOf } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
+import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
+import { QueryState } from '../components/QueryState.tsx';
 
 export function Org() {
   const params = useParams<{ slug: string }>();
@@ -33,59 +36,47 @@ export function Org() {
 function OrgKicker({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
   const org = query.data;
   return (
-    <div className="kicker">
-      <div>
-        <Link to="/">Atlas</Link>
-        <span className="crumb-sep">/</span>
-        <Link to="/browse">Browse</Link>
-        <span className="crumb-sep">/</span>
-        <span className="crumb-here">{org ? org.name : 'Organization'}</span>
-      </div>
-      <div>{org ? `Slug · ${org.slug}` : 'Organization file'}</div>
-    </div>
+    <PageBreadcrumb
+      prefix={[
+        { label: 'Atlas', to: '/' },
+        { label: 'Browse', to: '/browse' },
+      ]}
+      current={org ? org.name : 'Organization'}
+      meta={org ? `Slug · ${org.slug}` : 'Organization file'}
+    />
   );
 }
 
 function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
-  if (query.isPending) {
-    return (
-      <p className="results-state" role="status" style={{ marginTop: 48 }}>
-        Loading organization…
-      </p>
-    );
-  }
-  if (query.isError) {
-    const apiErr = query.error instanceof ApiError ? query.error : null;
-    if (apiErr?.status === 404) {
-      return (
-        <div className="lede" style={{ marginTop: 48 }}>
-          <div className="eyebrow">
-            § Organization file<span className="eyebrow-rule" />
+  return (
+    <QueryState
+      query={query}
+      loading="Loading organization…"
+      className="mt-48"
+      error={(e) =>
+        e.status === 404 ? (
+          <div className="lede mt-48">
+            <div className="eyebrow">
+              § Organization file<span className="eyebrow-rule" />
+            </div>
+            <h1>
+              This organization <span className="accent">isn&rsquo;t in the atlas yet.</span>
+            </h1>
+            <p className="deck">
+              Try <Link to="/browse">browse</Link> for the metros we have indexed,
+              or <Link to="/submit">file a tip</Link> if you know who&rsquo;s
+              doing the work here.
+            </p>
           </div>
-          <h1>
-            This organization <span className="accent">isn&rsquo;t in the atlas yet.</span>
-          </h1>
-          <p className="deck">
-            Try <Link to="/browse">browse</Link> for the metros we have indexed,
-            or <Link to="/submit">file a tip</Link> if you know who&rsquo;s
-            doing the work here.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <p className="results-state error" role="alert" style={{ marginTop: 48 }}>
-        {apiErr?.message ?? 'Something went wrong loading this organization.'}
-        {apiErr?.requestId ? (
-          <span className="results-state-detail">
-            request id: {apiErr.requestId}
-          </span>
-        ) : null}
-      </p>
-    );
-  }
+        ) : undefined
+      }
+    >
+      {(org) => <OrgContent org={org} />}
+    </QueryState>
+  );
+}
 
-  const org = query.data;
+function OrgContent({ org }: { org: OrgT }) {
   const domain = domainOf(org.website_url);
   const primaryMetro = org.regions.find((r) => isMetroKind(r.kind));
   const tagsTopline = org.tags.slice(0, 3).map(prettyTag).join(' · ');
@@ -144,7 +135,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
         </p>
         <div className="deck-row">
           <p className="deck">{org.short_desc}</p>
-          <div style={{ paddingTop: 6 }}>
+          <div className="pt-6">
             {org.tags.length > 0 ? (
               <ul className="tag-list">
                 {org.tags.map((tag, i) => (
@@ -186,9 +177,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
           <div className="item">
             <div>Slug</div>
             <span className="val">
-              <code style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>
-                {org.slug}
-              </code>
+              <code>{org.slug}</code>
             </span>
           </div>
           {org.contact_url ? (
@@ -204,7 +193,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
         </div>
       </header>
 
-      <div className="spread" style={{ marginTop: 0 }}>
+      <div className="spread mt-0">
         <main className="prose">
           <div className="glance-mobile">{atAGlance}</div>
           <div className="section-kicker">§ I — The entry</div>
@@ -227,53 +216,20 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
               <div className="section-kicker">§ II — Where they work</div>
               <h2>Regions served.</h2>
               <div className="h2-rule" />
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px' }}>
+              <ul className="org-regions-list">
                 {org.regions.map((region) => (
-                  <li
-                    key={region.id}
-                    style={{
-                      padding: '14px 0',
-                      borderBottom: '1px solid var(--rule)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'baseline',
-                      gap: 18,
-                    }}
-                  >
+                  <li key={region.id} className="org-region-item">
                     <div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--serif)',
-                          fontWeight: 600,
-                          fontSize: 19,
-                        }}
-                      >
+                      <div className="name">
                         {isBrowseableKind(region.kind) ? (
-                          <Link
-                            to={`/region/${encodeURIComponent(region.slug)}`}
-                            style={{
-                              color: 'inherit',
-                              textDecoration: 'none',
-                              borderBottom: '1px solid var(--rule)',
-                            }}
-                          >
+                          <Link to={`/region/${encodeURIComponent(region.slug)}`}>
                             {region.name}
                           </Link>
                         ) : (
                           region.name
                         )}
                       </div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--sans)',
-                          fontSize: 10.5,
-                          fontWeight: 600,
-                          letterSpacing: '0.16em',
-                          textTransform: 'uppercase',
-                          color: 'var(--muted)',
-                          marginTop: 2,
-                        }}
-                      >
+                      <div className="meta">
                         {region.country} · {region.kind}
                       </div>
                     </div>
@@ -283,7 +239,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
             </>
           ) : null}
 
-          <div className="editors-note" style={{ marginTop: 16 }}>
+          <div className="editors-note mt-16">
             <div className="label">Something off?</div>
             <p>
               We try to verify every entry on a rolling cadence. If a campaign
@@ -331,12 +287,4 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 
 function prettyTag(tag: string): string {
   return tag.replace(/-/g, ' ');
-}
-
-function domainOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
 }
