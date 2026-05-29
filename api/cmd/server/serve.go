@@ -293,9 +293,9 @@ func buildLogger(format, level string) *slog.Logger {
 	return slog.New(h)
 }
 
-// parseLevel maps a log-level string to an slog.Level, defaulting to Info
-// for empty or unrecognized values (mirrors how buildLogger treats any
-// non-"text" format as JSON).
+// parseLevel maps a log-level string to an slog.Level. Matching is
+// case-insensitive and tolerant of surrounding whitespace; empty or
+// unrecognized values fall back to Info.
 func parseLevel(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "debug":
