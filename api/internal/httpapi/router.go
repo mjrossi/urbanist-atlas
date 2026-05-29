@@ -75,22 +75,22 @@ func New(cfg Config) http.Handler {
 		r.Use(corsMiddleware(cfg.CORSOrigins))
 	}
 
-	r.Get("/healthz", healthHandler())
-	r.Get("/readyz", readyHandler(cfg.Store, logger))
+	getHead(r, "/healthz", healthHandler())
+	getHead(r, "/readyz", readyHandler(cfg.Store, logger))
 
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
 		r.Use(odblHeadersMiddleware)
 		// /openapi.yaml stays public so consumers can discover the
 		// wire contract before any auth. Registered BEFORE the
 		// gated group so the client-secret middleware doesn't reach it.
-		r.Get("/openapi.yaml", openapiHandler())
+		getHead(r, "/openapi.yaml", openapiHandler())
 		r.Group(func(r chi.Router) {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
-			r.Get("/lookup", lookupHandler(cfg.Store, logger))
-			r.Get("/regions", listRegionsHandler(cfg.Store, logger))
-			r.Get("/regions/{slug}", getRegionHandler(cfg.Store, logger))
-			r.Get("/orgs/{slug}", getOrgHandler(cfg.Store, logger))
-			r.Get("/recent", recentHandler(cfg.Store, logger))
+			getHead(r, "/lookup", lookupHandler(cfg.Store, logger))
+			getHead(r, "/regions", listRegionsHandler(cfg.Store, logger))
+			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger))
+			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger))
+			getHead(r, "/recent", recentHandler(cfg.Store, logger))
 
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
@@ -106,4 +106,20 @@ func New(cfg Config) http.Handler {
 	})
 
 	return r
+}
+
+// getHead registers `h` to handle both GET and HEAD for `pattern`.
+// chi.Get alone returns 405 to HEAD requests, which breaks
+// link-preview tools (Slack, Discord, etc.) that HEAD a URL before
+// unfurling, and uptime probes that prefer HEAD.
+//
+// Per RFC 9110 §9.3.2, a HEAD response must be identical to the GET
+// response except for the absence of a body. Go's net/http already
+// honors that: when the request method is HEAD, the server's response
+// writer suppresses body bytes automatically. So reusing the GET
+// handler is correct and produces a compliant Content-Length without
+// any per-handler bookkeeping.
+func getHead(r chi.Router, pattern string, h http.HandlerFunc) {
+	r.Get(pattern, h)
+	r.Head(pattern, h)
 }
