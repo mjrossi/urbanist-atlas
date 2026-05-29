@@ -137,13 +137,60 @@ describe('Submit', () => {
     expect((init as RequestInit).method).toBe('POST');
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.payload.name).toBe('Sample Riders Alliance');
-    expect(body.payload.region_slugs).toEqual(['brooklyn-ny']);
-    // The free-form submitter context is rolled into submitter_note.
+    // region_slugs is optional on the wire (see openapi.yaml) — the
+    // SPA always sends an empty array. The user-typed Region text
+    // flows into submitter_note for editor context.
+    expect(body.payload.region_slugs).toEqual([]);
     expect(typeof body.submitter_note).toBe('string');
     expect(body.submitter_note).toMatch(/new organization/i);
+    expect(body.submitter_note).toMatch(/brooklyn-ny/);
   });
 
-  it('shows the rate-limit message when the API returns 429', async () => {
+  it('correction submissions hide the new-org fields and POST a valid wire shape', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    await user.click(
+      screen.getByRole('radio', { name: /a correction to an existing entry/i }),
+    );
+    // Region and one-line description are hidden for corrections; the
+    // org is already in the Atlas, so the wire ships synthetic
+    // placeholders that point moderators at submitter_note.
+    expect(screen.queryByLabelText(/region served/i)).toBeNull();
+    expect(screen.queryByLabelText(/one-line description/i)).toBeNull();
+
+    await user.type(
+      screen.getByLabelText(/organization name/i),
+      'Existing Org',
+    );
+    await user.type(
+      screen.getByLabelText(/primary website/i),
+      'https://example.org',
+    );
+    await user.type(
+      screen.getByLabelText(/what needs correcting/i),
+      'Their website moved to example.org last March.',
+    );
+    await user.tab();
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+    });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    // Wire contract: short_desc is required but synthesized for
+    // correction; region_slugs is optional (always sent as []).
+    expect(body.payload.name).toBe('Existing Org');
+    expect(body.payload.short_desc).toMatch(/correction request/i);
+    expect(body.payload.region_slugs).toEqual([]);
+    expect(body.submitter_note).toMatch(/correction to an existing entry/i);
+  });
+
+  it('shows the rate-limit message with a Retry-After countdown when the API returns 429', async () => {
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -160,9 +207,67 @@ describe('Submit', () => {
     await user.tab();
     await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
 
+    // Server-provided Retry-After: countdown drives the copy.
+    await waitFor(() => {
+      expect(screen.getByText(/try again in 600 seconds/i)).toBeDefined();
+    });
+    // Submit button is disabled and reflects the same countdown.
+    expect(
+      screen.getByRole('button', { name: /retry in 600s/i }),
+    ).toHaveProperty('disabled', true);
+  });
+
+  it('falls back to the static "breather" copy when Retry-After is missing on a 429', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/rate-limited',
+          title: 'Too Many Requests',
+          status: 429,
+        },
+        { status: 429, problem: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user);
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
     await waitFor(() => {
       expect(screen.getByText(/breather/i)).toBeDefined();
     });
+  });
+
+  it('routes per-field validation errors to the matching form fields', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/validation',
+          title: 'Bad Request',
+          detail: 'one or more fields failed validation',
+          status: 400,
+          errors: {
+            name: 'required',
+            website_url: 'must be a valid URL',
+          },
+        },
+        { status: 400, problem: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user);
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    await waitFor(() => {
+      // Per-field errors render at the field, not as a top-level banner.
+      expect(screen.getByText(/must be a valid URL/i)).toBeDefined();
+    });
+    expect(screen.getByText(/^required$/i)).toBeDefined();
+    // The top-level `detail` banner is suppressed when field errors handled it.
+    expect(screen.queryByText(/one or more fields failed validation/i)).toBeNull();
   });
 
   it('shows the validation message when the API returns 400', async () => {

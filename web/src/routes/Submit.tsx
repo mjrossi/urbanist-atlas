@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch, type FieldPath } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
@@ -15,6 +15,33 @@ import {
 // Brief lockout after a successful submit so a triple-click can't
 // trigger duplicate POSTs.
 const SUBMIT_COOLDOWN_MS = 1500;
+
+// Map from API field names (snake-case wire shape, see
+// SubmissionPayload + NewSubmissionRequest in openapi.yaml and the
+// API-side `errors` extension keys emitted by
+// seedfiles.ValidateSubmissionPayload) to the matching
+// react-hook-form field names in SubmitForm. Server fields the form
+// doesn't render (notably `tags`, which the SPA always sends as `[]`)
+// are intentionally absent — they fall through to the top-level
+// `detail` banner instead of being silently swallowed.
+//
+// Caveat: `region_slugs` and `short_desc` map to inputs that the form
+// HIDES for correction/removal submissions. In practice both API
+// errors are unreachable for those types (the SPA sends `[]` for
+// region_slugs and a short synthetic placeholder for short_desc), so
+// the hidden-field path doesn't surface. If a future API change makes
+// either reachable, render the top-level banner alongside the
+// invisible field error.
+const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
+  name: 'name',
+  website_url: 'website',
+  region_slugs: 'region',
+  short_desc: 'oneLineDesc',
+  contact_url: 'contact',
+  submitter_email: 'contact',
+  submitter_name: 'contact',
+  submitter_note: 'why',
+};
 
 /**
  * `/submit` — accepts an org tip, POSTs it to `/api/v1/submissions`,
@@ -33,13 +60,60 @@ export function Submit() {
     register,
     handleSubmit,
     formState: { isValid, errors },
-    getValues,
+    setError,
+    control,
   } = useForm<SubmitForm>({
     mode: 'onBlur',
     defaultValues: SUBMIT_FORM_DEFAULTS,
   });
 
+  // The form adapts to the submission type. For "new" we ask for the
+  // full org dossier; for "correction" and "removal" the org already
+  // exists in the Atlas, so we collect a smaller identification +
+  // context payload. Wire-shape stays the same — see
+  // submitForm.ts:buildNewSubmissionRequest for how the missing fields
+  // are folded into the API contract.
+  //
+  // useWatch (vs the destructured watch()) is the memoization-safe
+  // subscription per react-hook-form's API guidance. The `?? 'new'`
+  // is defensive: useWatch can briefly return undefined before
+  // defaultValues propagate, and we'd rather render the new-org
+  // variant in that window than render nothing.
+  const submissionType = useWatch({ control, name: 'type' }) ?? 'new';
+  const isNewOrg = submissionType === 'new';
+  const isCorrection = submissionType === 'correction';
+  const isRemoval = submissionType === 'removal';
+  const nameHint = isCorrection
+    ? 'The entry you want corrected. Use the name as it appears in the Atlas.'
+    : isRemoval
+      ? 'The entry you want removed. Use the name as it appears in the Atlas.'
+      : 'As it appears on their site, not what locals call them.';
+  const editorialLabel = isCorrection
+    ? 'What needs correcting'
+    : isRemoval
+      ? 'Why this organization should be removed'
+      : 'Why this org belongs';
+  const editorialHint = isCorrection
+    ? "What's off, what should it say instead, and how do you know?"
+    : isRemoval
+      ? 'Shut down, merged, domain hijacked — what happened, and roughly when?'
+      : 'What have they worked on recently? Who do they organize? Who do they push? Concrete examples help us more than superlatives.';
+  const editorialPlaceholder = isCorrection
+    ? 'The entry describes them as rail-focused, but in 2025 they pivoted to bus rapid transit and a fare-equity push. The leadership listed is also two years out of date.'
+    : isRemoval
+      ? 'Their domain expired in March 2025 and is now parked. Last social-media post was October 2024. The 2023 990 was their last filing.'
+      : 'In 2025 they organized riders to defend the 60-cent fare against a council proposal to double it; ran a candidate forum that 4 of 9 councilmembers attended; testified at every transit board meeting since 2022.';
+  const sourcesHint = isCorrection
+    ? "Anything that shows what's changed: a press release, an organizational chart, a recent article."
+    : isRemoval
+      ? 'Anything that confirms the change: a dead site, an archived final post, a merger announcement.'
+      : "Links to news coverage, their social accounts, or campaigns they've worked on. One per line.";
+
   const [cooldown, setCooldown] = useState(false);
+  // Seconds remaining on a 429 lockout. Initialized from
+  // ApiError.retryAfterSeconds when the mutation fails; ticks down
+  // in a useEffect; the submit button stays disabled until zero.
+  const [retryAfter, setRetryAfter] = useState<number>(0);
 
   useEffect(() => {
     if (!cooldown) return;
@@ -47,15 +121,51 @@ export function Submit() {
     return () => clearTimeout(id);
   }, [cooldown]);
 
+  useEffect(() => {
+    if (retryAfter <= 0) return;
+    const id = setInterval(() => {
+      setRetryAfter((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [retryAfter]);
+
   const mutation = useMutation<Submission, ApiError, SubmitForm>({
     mutationFn: (form) => createSubmission(buildNewSubmissionRequest(form)),
     onSuccess: () => setCooldown(true),
+    onError: (err) => {
+      // Per-field validation errors (W1.4): hand each known field
+      // to react-hook-form so the input shows its own error. The
+      // top-level fallback below renders when no field map matched.
+      if (err.fieldErrors) {
+        for (const [apiField, message] of Object.entries(err.fieldErrors)) {
+          const formField = FIELD_NAME_MAP[apiField];
+          if (formField) {
+            setError(formField, { type: 'server', message }, { shouldFocus: false });
+          }
+        }
+      }
+      // Rate-limit countdown (W1.3): start the per-second timer
+      // from the server-provided Retry-After. Static copy still
+      // renders when the header is missing.
+      if (err.status === 429 && err.retryAfterSeconds && err.retryAfterSeconds > 0) {
+        setRetryAfter(err.retryAfterSeconds);
+      }
+    },
   });
 
   const onValid = (form: SubmitForm) => {
-    if (cooldown || mutation.isPending) return;
+    if (cooldown || mutation.isPending || retryAfter > 0) return;
     mutation.mutate(form);
   };
+
+  // Subscribe to every form value so the GitHub-issue fallback link
+  // (rendered on 5xx) stays current when the user edits between
+  // seeing the error and clicking the link. `getValues()` inside
+  // render would snapshot at render time and go stale on subsequent
+  // keystrokes (the form uses uncontrolled inputs via register, so
+  // keystrokes don't otherwise re-render). Must be called before the
+  // mutation.isSuccess early return below to keep hook order stable.
+  const fallbackValues = useWatch({ control });
 
   if (mutation.isSuccess) {
     return (
@@ -70,6 +180,15 @@ export function Submit() {
   const isRateLimited = submitErr?.status === 429;
   const isValidationErr = submitErr?.status === 400 || submitErr?.status === 422;
   const isServerErr = submitErr?.status !== undefined && submitErr.status >= 500;
+  // When the API returned a per-field errors map, the individual
+  // fields render their own messages — the top-level banner would
+  // duplicate the same complaint. Only show the banner when the
+  // server didn't break it down.
+  const showTopLevelValidationErr =
+    isValidationErr && (!submitErr?.fieldErrors || Object.keys(submitErr.fieldErrors).length === 0);
+  const issueFallbackUrl = isServerErr
+    ? buildIssueUrl({ ...SUBMIT_FORM_DEFAULTS, ...fallbackValues })
+    : '';
 
   return (
     <>
@@ -152,9 +271,7 @@ export function Submit() {
                 <label htmlFor="submit-name" className="field-label">
                   Organization name
                   <span className="required">*</span>
-                  <span className="hint">
-                    As it appears on their site, not what locals call them.
-                  </span>
+                  <span className="hint">{nameHint}</span>
                 </label>
               </div>
               <div>
@@ -178,7 +295,9 @@ export function Submit() {
                 <label htmlFor="submit-website" className="field-label">
                   Primary website
                   <span className="required">*</span>
-                  <span className="hint">Their own URL, not a coverage article.</span>
+                  <span className="hint">
+                    The organization&rsquo;s own site, not a news article about them.
+                  </span>
                 </label>
               </div>
               <div>
@@ -197,72 +316,74 @@ export function Submit() {
               </div>
             </div>
 
-            <div className="field">
-              <div>
-                <label htmlFor="submit-region" className="field-label">
-                  Region served
-                  <span className="required">*</span>
-                  <span className="hint">
-                    City or metro slug, e.g. <code>nyc</code> or{' '}
-                    <code>chicago</code>. We&rsquo;ll finalize it in review.
-                  </span>
-                </label>
-              </div>
-              <div>
-                <input
-                  id="submit-region"
-                  type="text"
-                  className="input"
-                  placeholder="brooklyn-ny"
-                  {...register('region', { required: 'Required' })}
-                />
-                {errors.region ? (
-                  <span className="field-error" role="alert">
-                    {errors.region.message}
-                  </span>
-                ) : null}
-              </div>
-            </div>
+            {isNewOrg ? (
+              <>
+                <div className="field">
+                  <div>
+                    <label htmlFor="submit-region" className="field-label">
+                      Region served
+                      <span className="required">*</span>
+                      <span className="hint">
+                        City or metro slug, e.g. <code>nyc</code> or{' '}
+                        <code>chicago</code>. Editors finalize the region in
+                        PR review.
+                      </span>
+                    </label>
+                  </div>
+                  <div>
+                    <input
+                      id="submit-region"
+                      type="text"
+                      className="input"
+                      placeholder="brooklyn-ny"
+                      {...register('region', { required: 'Required' })}
+                    />
+                    {errors.region ? (
+                      <span className="field-error" role="alert">
+                        {errors.region.message}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
 
-            <div className="field stacked">
-              <div>
-                <label htmlFor="submit-oneline" className="field-label">
-                  One-line description of what they actually do
-                  <span className="required">*</span>
-                  <span className="hint inline">
-                    Plain English. ~140 characters.
-                  </span>
-                </label>
-              </div>
-              <textarea
-                id="submit-oneline"
-                className="textarea"
-                rows={2}
-                placeholder="Pushes for bus service expansion and rider-led transit policy."
-                {...register('oneLineDesc', { required: 'Required' })}
-              />
-              {errors.oneLineDesc ? (
-                <span className="field-error" role="alert">
-                  {errors.oneLineDesc.message}
-                </span>
-              ) : null}
-            </div>
+                <div className="field stacked">
+                  <div>
+                    <label htmlFor="submit-oneline" className="field-label">
+                      One-line description of what they actually do
+                      <span className="required">*</span>
+                      <span className="hint inline">
+                        Plain English. ~140 characters.
+                      </span>
+                    </label>
+                  </div>
+                  <textarea
+                    id="submit-oneline"
+                    className="textarea"
+                    rows={2}
+                    placeholder="Pushes for bus service expansion and rider-led transit policy."
+                    {...register('oneLineDesc', { required: 'Required' })}
+                  />
+                  {errors.oneLineDesc ? (
+                    <span className="field-error" role="alert">
+                      {errors.oneLineDesc.message}
+                    </span>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
 
             <div className="field stacked">
               <div>
                 <label htmlFor="submit-why" className="field-label">
-                  Why this org belongs
-                  <span className="hint inline">
-                    Recent campaigns, who they organize, who they push. Specifics beat
-                    adjectives.
-                  </span>
+                  {editorialLabel}
+                  <span className="hint inline">{editorialHint}</span>
                 </label>
               </div>
               <textarea
                 id="submit-why"
                 className="textarea tall"
                 rows={4}
-                placeholder="In 2025 they organized riders to defend the 60-cent fare against a council proposal to double it; ran a candidate forum that 4 of 9 councilmembers attended; testified at every transit board meeting since 2022."
+                placeholder={editorialPlaceholder}
                 {...register('why')}
               />
             </div>
@@ -271,9 +392,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-sources" className="field-label">
                   Sources
-                  <span className="hint inline">
-                    News coverage, social handles, prior wins. One per line.
-                  </span>
+                  <span className="hint inline">{sourcesHint}</span>
                 </label>
               </div>
               <textarea
@@ -349,11 +468,12 @@ https://kuow.org/stories/..."
               </p>
               {isRateLimited ? (
                 <p className="field-error" role="alert">
-                  You&rsquo;ve sent a few in a short window. Take a breather and
-                  retry in a few minutes.
+                  {retryAfter > 0
+                    ? `You've sent a few in a short window. Try again in ${retryAfter} ${retryAfter === 1 ? 'second' : 'seconds'}.`
+                    : "You've sent a few in a short window. Take a breather and retry in a few minutes."}
                 </p>
               ) : null}
-              {isValidationErr ? (
+              {showTopLevelValidationErr ? (
                 <p className="field-error" role="alert">
                   {submitErr?.problem?.detail ?? submitErr?.message ?? 'Validation failed.'}
                 </p>
@@ -362,7 +482,7 @@ https://kuow.org/stories/..."
                 <p className="field-error" role="alert">
                   Our submission queue is having a moment. You can{' '}
                   <a
-                    href={buildIssueUrl(getValues())}
+                    href={issueFallbackUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -374,10 +494,12 @@ https://kuow.org/stories/..."
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={!isValid || cooldown || mutation.isPending}
+                disabled={!isValid || cooldown || mutation.isPending || retryAfter > 0}
               >
                 {mutation.isPending ? (
                   'Sending…'
+                ) : retryAfter > 0 ? (
+                  <>Retry in {retryAfter}s</>
                 ) : (
                   <>
                     Send to editorial queue <span className="arrow">→</span>
@@ -398,7 +520,7 @@ https://kuow.org/stories/..."
                 <h4>You file the tip.</h4>
                 <p>
                   Your submission lands in the editorial queue with a
-                  reference ID. No GitHub account needed.
+                  reference ID you can hold onto.
                 </p>
               </div>
               <div className="process-step">

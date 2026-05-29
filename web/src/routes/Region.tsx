@@ -3,9 +3,11 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getRegion } from '../lib/api.ts';
 import type { LookupOrg, RegionDetail } from '../lib/api.ts';
+import { reverseAncestry } from '../lib/ancestry.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
@@ -33,10 +35,10 @@ export function Region() {
 
   // Breadcrumb wants ancestors broad-first (left-to-right reads
   // root → leaf), but the API hands them back closest-first.
-  // Reverse a copy so the API contract stays leaf-centric and the
+  // `reverseAncestry` keeps the API contract leaf-centric and the
   // SPA owns its display ordering.
   const ancestorsRootFirst = query.data
-    ? [...query.data.ancestry].reverse()
+    ? reverseAncestry(query.data.ancestry)
     : [];
   const currentLabel = query.data ? query.data.region.name : 'Region';
   const totalOrgs = query.data
@@ -75,7 +77,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
             </h1>
             <p className="deck">
-              Try <Link to="/browse">browse</Link> for the regions we have indexed,
+              Try <Link to="/browse">Browse</Link> for the regions we have indexed,
               or <Link to="/submit">file a tip</Link> if you know advocates here.
             </p>
           </div>
@@ -142,10 +144,12 @@ function RegionContent({ data }: { data: RegionDetail }) {
       <div className="spread mt-32">
         <main>
           {totalOrgs === 0 ? (
-            <p className="results-state mt-24">
-              No organizations indexed yet for {region.name}.{' '}
-              <Link to="/submit">File a tip.</Link>
-            </p>
+            <EmptyState
+              className="mt-24"
+              title="No entries here yet"
+              body={<>No organizations indexed yet for {region.name}.</>}
+              cta={<Link to="/submit">File a tip at the submissions desk.</Link>}
+            />
           ) : (
             <div className="mt-24">
               <EntryList

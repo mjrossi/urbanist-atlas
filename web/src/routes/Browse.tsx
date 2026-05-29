@@ -6,6 +6,7 @@ import type { RegionSummary } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 
@@ -182,7 +183,13 @@ function BrowseBody({
       empty={{
         // grouped is derived from query.data — empty data also means empty grouped.
         when: () => grouped.length === 0,
-        render: <p className="results-state">No regions indexed yet.</p>,
+        render: (
+          <EmptyState
+            title="The index is empty"
+            body="No regions indexed yet."
+            cta={<Link to="/submit">File a tip to seed one.</Link>}
+          />
+        ),
       }}
     >
       {() => (

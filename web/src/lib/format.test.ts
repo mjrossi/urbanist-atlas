@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainOf, groupCountLabel } from './format.ts';
+import { domainOf, groupCountLabel, prettyTag } from './format.ts';
 
 describe('groupCountLabel', () => {
   it('uses the singular form for exactly one', () => {
@@ -35,5 +35,22 @@ describe('domainOf', () => {
   it('returns null for malformed input', () => {
     expect(domainOf('not a url')).toBeNull();
     expect(domainOf('')).toBeNull();
+  });
+});
+
+describe('prettyTag', () => {
+  it('swaps hyphens for spaces', () => {
+    expect(prettyTag('vision-zero')).toBe('vision zero');
+    expect(prettyTag('rider-union')).toBe('rider union');
+    expect(prettyTag('safe-streets')).toBe('safe streets');
+  });
+
+  it('passes through hyphen-free tags untouched', () => {
+    expect(prettyTag('transit')).toBe('transit');
+    expect(prettyTag('')).toBe('');
+  });
+
+  it('replaces multiple hyphens in one tag', () => {
+    expect(prettyTag('bus-rapid-transit')).toBe('bus rapid transit');
   });
 });

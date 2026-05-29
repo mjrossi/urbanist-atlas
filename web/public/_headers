@@ -1,0 +1,56 @@
+# Cloudflare Workers + Pages (Static Assets) response-header rules.
+#
+# Wrangler doesn't expose response headers from `wrangler.jsonc`
+# directly — the canonical surface is a `_headers` file copied into
+# the assets directory at build time. Vite picks this file up from
+# `web/public/` and emits it to `web/dist/_headers`; Cloudflare's
+# Static Assets runtime serves it.
+#
+# Syntax (one rule block per path glob, `/*` matches every route):
+#   /pattern
+#     Header-Name: value
+#
+# Content Security Policy
+# -----------------------
+# The SPA serves no inline <script>; everything goes through Vite's
+# bundled module graph, so `script-src 'self'` is enough.
+#
+# `style-src 'self'`: Vite's production build emits all CSS as
+# external `<link rel="stylesheet">` assets — there are no inline
+# `<style>` blocks in `dist/index.html`. Dev mode (HMR) uses inline
+# styles, but `_headers` only applies on Cloudflare, so that's not a
+# real constraint. If a future plugin starts inlining critical CSS,
+# add `'unsafe-inline'` back with a one-line justification.
+#
+# `font-src 'self'`: all four families ship via
+# `@fontsource-variable/*` and are bundled with the build. No
+# external font requests on any page.
+#
+# `img-src 'self' data:`: SVG icons inlined as data: URIs.
+#
+# `connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com`:
+# the only outbound fetches are to the Atlas API. The QA host stays
+# in the list until Phase 2 cutover collapses qa/prod onto a single
+# origin.
+#
+# `frame-ancestors 'none'`: nobody embeds the Atlas in an iframe.
+#
+# Other headers
+# -------------
+# `Strict-Transport-Security`: opt into HSTS with a one-year
+# max-age + subdomain coverage. Cloudflare terminates TLS in front
+# of us, so HTTPS is already enforced at the edge — the header is
+# defense in depth for clients that handle the upgrade themselves.
+#
+# `Permissions-Policy`: turn off browser features the Atlas has no
+# legitimate reason to touch. `frame-ancestors 'none'` already
+# stops embedding, but explicit feature opt-out is cheap insurance.
+#
+# Adjust this file when adding a new origin (e.g. a future analytics
+# endpoint) — and document the change in `docs/deploy.md`.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()

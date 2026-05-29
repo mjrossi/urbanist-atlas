@@ -4,9 +4,11 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
 import type { Country, LookupResult } from '../lib/api.ts';
+import { reverseAncestry } from '../lib/ancestry.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { EmptyState } from '../components/EmptyState.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
@@ -55,10 +57,11 @@ export function Results() {
   ];
 
   // Resolved-ancestry walk: API returns leaf-first; the breadcrumb
-  // wants root-first followed by the leaf as `current`. Reverse a
-  // copy and split off the (originally first, now last) leaf.
+  // wants root-first followed by the leaf as `current`. Reverse
+  // the ancestry and drop the (now-last) leaf, which the breadcrumb
+  // renders separately via `currentLabel`.
   const ancestryRootFirst = query.data
-    ? [...query.data.resolved_ancestry].slice(1).reverse()
+    ? reverseAncestry(query.data.resolved_ancestry).slice(0, -1)
     : [];
   const leafName = query.data?.resolved_ancestry[0]?.name;
   const currentLabel = leafName ?? (postalCode || '—');
@@ -158,14 +161,17 @@ function ResultsContent({
       </div>
 
       {empty ? (
-        <div className="editors-note mt-24">
-          <div className="label">No entries here yet</div>
-          <p>
-            Know an organization that should be in the Atlas for {placeLabel}?{' '}
-            <Link to="/submit">File a tip at the submissions desk</Link> and
-            we&rsquo;ll go look.
-          </p>
-        </div>
+        <EmptyState
+          className="mt-24"
+          title="No entries here yet"
+          body={
+            <>
+              Know an organization that should be in the Atlas for {placeLabel}?{' '}
+              <Link to="/submit">File a tip at the submissions desk</Link> and
+              we&rsquo;ll go look.
+            </>
+          }
+        />
       ) : (
         <div className="mt-24">
           <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />
