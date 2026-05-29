@@ -189,7 +189,7 @@ region_slugs = ["greater-miami"]
 [[org]]
 slug = "seattle-subway"
 name = "Seattle Subway"
-short_desc = "Volunteer Seattle-area advocacy group pushing for an expanded, faster-built rail transit network across the Puget Sound region. Tracks Sound Transit project delivery and pushes for ST4 planning."
+short_desc = "Volunteer Seattle-area advocacy group pushing for an expanded, faster-built rail transit network across the Puget Sound region. Tracks Sound Transit project delivery and pushes for a fourth Sound Transit expansion (ST4)."
 website_url = "https://seattlesubway.org"
 tags = ["transit", "grassroots", "rail", "advocacy"]
 region_slugs = ["seattle-metro"]
@@ -264,7 +264,7 @@ region_slugs = ["chicago-metro"]
 [[org]]
 slug = "better-streets-chicago"
 name = "Better Streets Chicago"
-short_desc = "Volunteer-led Chicago nonprofit advocating for safer, more vibrant streets across the city. Pushed for dedicated bus lanes and protected bike lanes, helped pass Illinois transit reform in 2025, and runs the Community Blocks initiative to convert neighborhood streets into open spaces."
+short_desc = "Volunteer-led Chicago nonprofit advocating for safer, more walkable streets across the city. Pushed for dedicated bus lanes and protected bike lanes, helped pass Illinois transit reform in 2025, and runs the Community Blocks initiative to convert neighborhood streets into open spaces."
 website_url = "https://www.betterstreetschicago.org"
 tags = ["safe-streets", "transit", "cycling", "walking", "advocacy", "grassroots"]
 region_slugs = ["chicago"]
@@ -413,7 +413,7 @@ region_slugs = ["houston-tx-metro"]
 [[org]]
 slug = "link-houston"
 name = "LINK Houston"
-short_desc = "Houston transportation-equity nonprofit advocating for robust, equitable access to transit, walking, and biking. Publishes the Equity in Transit report and pushes the METRO budget toward frequent service for low-income neighborhoods."
+short_desc = "Houston transportation-equity nonprofit advocating for equitable access to transit, walking, and biking. Publishes the Equity in Transit report and pushes the METRO budget toward frequent service for low-income neighborhoods."
 website_url = "https://linkhouston.org"
 tags = ["transit", "equity", "advocacy", "policy", "research"]
 region_slugs = ["houston-tx-metro"]
@@ -904,7 +904,7 @@ region_slugs = ["kansas-city-mo-metro"]
 [[org]]
 slug = "safe-streets-austin"
 name = "Safe Streets Austin"
-short_desc = "Austin's unified safe-streets advocacy nonprofit, formed in 2022 from the merger of Bike Austin, Walk Austin, and Vision Zero ATX. Works to make Austin's streets, bikeways, and trails safe, vibrant, and equitable for people of all ages and abilities."
+short_desc = "Austin's unified safe-streets advocacy nonprofit, formed in 2022 from the merger of Bike Austin, Walk Austin, and Vision Zero ATX. Works on safer streets, bikeways, and trails across the city."
 website_url = "https://www.safestreetsaustin.org"
 tags = ["safe-streets", "cycling", "walking", "vision-zero", "advocacy"]
 region_slugs = ["austin-tx-metro"]
@@ -1198,7 +1198,7 @@ region_slugs = ["salt-lake-city-ut-metro"]
 [[org]]
 slug = "utah-transit-riders-union"
 name = "Utah Transit Riders Union"
-short_desc = "Statewide Utah transit-rider advocacy organization centered on UTA service in the Wasatch Front. Advocates for reliable, accessible, comfortable, efficient, and affordable transit for all riders."
+short_desc = "Statewide Utah transit-rider advocacy organization focused on Utah Transit Authority (UTA) service along the Wasatch Front. Pushes for more reliable, frequent, and affordable transit."
 website_url = "https://utru.org"
 tags = ["transit", "rider-union", "advocacy", "grassroots"]
 region_slugs = ["salt-lake-city-ut-metro"]
