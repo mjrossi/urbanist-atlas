@@ -2561,6 +2561,16 @@ a.tag:hover::before {
   color: var(--amber);
 }
 
+/* Multi-error banner: the global reset zeroes list padding, clipping
+   default bullets, so drop them and space the per-field messages. */
+.field-error ul {
+  list-style: none;
+}
+
+.field-error li {
+  margin-top: 4px;
+}
+
 .input,
 .textarea {
   width: 100%;

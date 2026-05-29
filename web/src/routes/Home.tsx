@@ -106,7 +106,7 @@ function TopPlaces({ query }: { query: UseQueryResult<RegionSummary[], ApiError>
   return (
     <QueryState
       query={query}
-      loading="Loading places…"
+      loading="Loading regions…"
       error={() => (
         <p className="results-state error">
           The region list isn&rsquo;t loading right now. Refresh to try again.
@@ -313,7 +313,7 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
           <p className="fineprint mt-22">
             Tags are editorial labels, applied by hand — up to five per
             organization. Filtering by topic arrives with Phase 2; until then,{' '}
-            <Link to="/browse">the place index</Link> is how you wander.
+            <Link to="/browse">the region index</Link> is how you wander.
           </p>
         </div>
         <aside className="rail desktop-only">
