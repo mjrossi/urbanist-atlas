@@ -68,7 +68,7 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 		if err != nil {
 			if errors.Is(err, atlas.ErrPostalCodeNotFound) {
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Postal Code Not Found",
-					"No region is mapped to that postal code. Try a nearby code, or submit an organization for your area.", rid)
+					"No region is mapped to that postal code. Try a nearby code, or file a tip if you know an organization there.", rid)
 				return
 			}
 			logger.ErrorContext(r.Context(), "lookup failed",
