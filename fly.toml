@@ -38,7 +38,7 @@ primary_region = 'iad'
   # - *.link00seven.workers.dev — Cloudflare Workers preview versions (account-scoped subdomain;
   #   the Workers Static Assets analog of the old Pages `*.pages.dev` previews; Cloudflare's
   #   Pages-into-Workers consolidation means previews now live under `<account>.workers.dev`)
-  URBANIST_CORS_ORIGINS = 'https://urbanistatlas.com,https://qa.urbanistatlas.com,*.link00seven.workers.dev'
+  URBANIST_CORS_ORIGINS = 'https://urbanistatlas.com,*.link00seven.workers.dev'
   URBANIST_LOG_FORMAT = 'json'
   URBANIST_PORT = '8080'
   # URBANIST_SEED_DIR is intentionally unset — the binary falls back
