@@ -20,12 +20,12 @@ func TestCORS_VaryOriginAlwaysSetWhenOriginPresent(t *testing.T) {
 	handler := mw(next)
 
 	cases := []struct {
-		name        string
-		method      string
-		origin      string
-		wantVary    bool
-		wantACAO    bool
-		wantStatus  int
+		name       string
+		method     string
+		origin     string
+		wantVary   bool
+		wantACAO   bool
+		wantStatus int
 	}{
 		{
 			name:       "allowed-origin GET",
