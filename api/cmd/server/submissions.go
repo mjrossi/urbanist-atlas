@@ -48,7 +48,7 @@ func submissionsCommand() *cli.Command {
 }
 
 func runRetryPR(ctx context.Context, c *cli.Command) error {
-	logger := buildLogger("text")
+	logger := buildLogger("text", "debug")
 
 	token := c.String("github-token")
 	if token == "" {

@@ -81,8 +81,8 @@ The dev loop has no external dependencies: `mise install`, then
   errors libraries.
 - **Config:** all via urfave/cli flags with env-var fallbacks
   (`URBANIST_ADMIN_TOKEN`, `URBANIST_PORT`, `URBANIST_LOG_FORMAT`,
-  `URBANIST_CORS_ORIGINS`, `URBANIST_STORE`, `URBANIST_SEED_DIR`,
-  `URBANIST_CLIENT_SECRET`, etc.). No `viper`.
+  `URBANIST_LOG_LEVEL`, `URBANIST_CORS_ORIGINS`, `URBANIST_STORE`,
+  `URBANIST_SEED_DIR`, `URBANIST_CLIENT_SECRET`, etc.). No `viper`.
 - **Layout:** standard. `cmd/` for binaries, `pkg/` for the public library,
   `internal/` for non-exported.
 - **Style:** `gofmt`, `go vet`, `staticcheck`. No custom linter config.

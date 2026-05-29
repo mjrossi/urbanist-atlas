@@ -71,6 +71,12 @@ func etlCommand() *cli.Command {
 			Value:   "text",
 			Sources: cli.EnvVars("URBANIST_LOG_FORMAT"),
 		},
+		&cli.StringFlag{
+			Name:    "log-level",
+			Usage:   "minimum log level: debug, info, warn, or error",
+			Value:   "info",
+			Sources: cli.EnvVars("URBANIST_LOG_LEVEL"),
+		},
 	}
 
 	return &cli.Command{
@@ -98,7 +104,7 @@ func runEtlDownload(ctx context.Context, c *cli.Command) error {
 	if country == "" {
 		return errors.New("etl download: --country is required")
 	}
-	logger := buildLogger(c.String("log-format"))
+	logger := buildLogger(c.String("log-format"), c.String("log-level"))
 
 	plan, ok := etl.Plans[country]
 	if !ok {
@@ -191,7 +197,7 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 	if country == "" {
 		return errors.New("etl regenerate: --country is required")
 	}
-	logger := buildLogger(c.String("log-format"))
+	logger := buildLogger(c.String("log-format"), c.String("log-level"))
 
 	plan, ok := etl.Plans[country]
 	if !ok {

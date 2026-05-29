@@ -15,6 +15,10 @@
 # Human-friendly logs in dev; production stays JSON via mise.toml's default.
 URBANIST_LOG_FORMAT = "text"
 
+# Verbose logs in dev so debug-level lines (e.g. "seedfiles: postal loaded")
+# surface locally; deployed instances inherit the "info" default from mise.toml.
+URBANIST_LOG_LEVEL = "debug"
+
 # Point the file-backed store at the bundled seed in the repo. The
 # server reads regions_*.toml, postal_codes_*.csv, and orgs.toml at
 # boot — no database needed. Absolute via {{config_root}} so the
