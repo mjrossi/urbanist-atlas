@@ -170,7 +170,7 @@ export function About() {
             <div className="row">
               <p className="term">Housing &amp; YIMBY</p>
               <p className="def">
-                A neighbouring movement with overlapping priorities, but a
+                A neighboring movement with overlapping priorities, but a
                 tighter scope keeps local search useful here.
               </p>
               <span className="verdict no">Excluded</span>

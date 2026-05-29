@@ -129,8 +129,8 @@ function RegionContent({ data }: { data: RegionDetail }) {
         </h1>
         <p className="deck">
           {totalOrgs === 0
-            ? `The Atlas hasn’t indexed any organizations in scope for ${region.name} yet — but the region is on the map.`
-            : `${totalOrgs} indexed ${totalOrgs === 1 ? 'group' : 'groups'} working in or covering ${region.name}. Local entries are nearest; regional entries cover wider footprints that include this region.`}
+            ? `No groups in scope for ${region.name} yet — but the region is on the map.`
+            : `${totalOrgs} ${totalOrgs === 1 ? 'group' : 'groups'} working in or covering ${region.name}. Local entries are nearest; regional entries cover wider footprints that include this region.`}
         </p>
         <div className="byline">
           <span>{region.country}</span>
@@ -147,7 +147,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
             <EmptyState
               className="mt-24"
               title="No entries here yet"
-              body={<>No organizations indexed yet for {region.name}.</>}
+              body={<>Know a group organizing in {region.name}? It belongs in the Atlas.</>}
               cta={<Link to="/submit">File a tip at the submissions desk.</Link>}
             />
           ) : (
@@ -162,9 +162,10 @@ function RegionContent({ data }: { data: RegionDetail }) {
           <div className="editors-note mt-32">
             <div className="label">Know a group we&rsquo;re missing?</div>
             <p>
-              The Atlas adds groups one editorial decision at a time.{' '}
-              <Link to="/submit">File a tip</Link> if a coalition is missing —
-              see <Link to="/about#methodology">our criteria</Link>.
+              Spotted a coalition that belongs here?{' '}
+              <Link to="/submit">File a tip</Link>, and see{' '}
+              <Link to="/about#methodology">our criteria</Link> for what makes
+              the cut.
             </p>
           </div>
         </main>

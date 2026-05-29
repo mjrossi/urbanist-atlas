@@ -102,8 +102,8 @@ describe('Results', () => {
 
     await waitFor(() => {
       // Empty deck mentions the resolved place label and the
-      // editorial-cadence framing.
-      expect(screen.getByText(/nothing indexed yet for brooklyn, ny/i)).toBeDefined();
+      // map-fills-in framing.
+      expect(screen.getByText(/no entries for brooklyn, ny yet/i)).toBeDefined();
     });
   });
 

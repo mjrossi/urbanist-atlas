@@ -155,7 +155,7 @@ function ResultsContent({
         </h1>
         <p className="deck">
           {empty
-            ? `Nothing indexed yet for ${placeLabel}. The Atlas grows one editorial decision at a time — file a tip if you know who's doing the work here.`
+            ? `No entries for ${placeLabel} yet. The map fills in metro by metro, as the leads turn up — this corner just hasn't been reached.`
             : `Groups working in or around ${placeLabel}. Local entries are nearest; regional entries cover wider footprints that include this postal code.`}
         </p>
       </div>

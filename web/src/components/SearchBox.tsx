@@ -96,8 +96,8 @@ export function SearchBox() {
         </p>
       ) : (
         <p id={`${inputId}-hint`} className="lookup-hint">
-          US ZIP (5 digits) or Canadian postal code (FSA or full). We&rsquo;ll name
-          the metro and surface the groups working there.
+          US ZIP (5 digits) or Canadian postal code (FSA or full). We&rsquo;ll
+          name your metro and the groups working there.
         </p>
       )}
       <div className="lookup-suggestions">

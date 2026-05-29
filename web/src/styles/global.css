@@ -1826,7 +1826,7 @@ a.tag:hover::before {
 }
 
 @media (max-width: 719px) {
-  /* On the 2-col mobile grid the right column has no neighbour;
+  /* On the 2-col mobile grid the right column has no neighbor;
      drop the trailing right border. */
   .stats .stat:nth-child(2n) {
     border-right: none;

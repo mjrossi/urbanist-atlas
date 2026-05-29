@@ -53,22 +53,23 @@ export function Home() {
 
           <div className="prose mt-48">
             <p className="lead drop">
-              The Urbanist Atlas catalogues the people in your city, county,
-              and region who are organizing — patiently, stubbornly, sometimes
-              gloriously — for safer streets and better transit. Type a US ZIP
-              or a Canadian postal code and we&rsquo;ll name them.
+              Within a few blocks of you, people show up to transportation
+              meetings week after week, patiently arguing for safer streets and
+              better transit. The Urbanist Atlas helps you find them. Type a US
+              ZIP or a Canadian postal code and we&rsquo;ll name the ones
+              working where you live.
             </p>
             <p>
               We index local and regional advocates only. National outfits do
               plenty of good work, but they are easy to find on their own; the
-              harder search is for the neighbourhood committee three blocks from
+              harder search is for the neighborhood committee three blocks from
               your door, the metro rider alliance two transfers away, the county
               Vision Zero coalition you have never heard of but should have.
             </p>
             <div className="editors-note">
               <div className="label">Editor&rsquo;s note · Vol. I</div>
               <p>
-                Each entry is curated by hand against{' '}
+                Every entry is picked by hand, weighed against{' '}
                 <Link to="/about#methodology">our criteria</Link>.{' '}
                 <Link to="/submit">File a tip</Link> if your region is missing.
               </p>
@@ -88,7 +89,7 @@ export function Home() {
             <div className="rail-kicker">From the editors</div>
             <p className="pullquote-rail">
               National advocacy is easy to find. The harder search is the
-              neighbourhood committee three blocks from your door.
+              neighborhood committee three blocks from your door.
             </p>
           </div>
         </aside>
@@ -168,7 +169,7 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
         render: (
           <EmptyState
             title="Nothing filed yet"
-            body="The editor hasn't published an entry recently — the indexing pipeline is quiet."
+            body="Nothing has crossed the editor's desk lately. If you know a group organizing out there, you can be the first to put them on the map."
             cta={<Link to="/submit">File the first tip.</Link>}
           />
         ),
@@ -305,10 +306,9 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
             ))}
           </ul>
           <p className="fineprint mt-22">
-            Tags are editorial labels, applied by hand. An organization can
-            carry up to five. Per-topic filtering launches with Phase 2; until
-            then, <Link to="/browse">the place index</Link> is the wander
-            view.
+            Tags are editorial labels, applied by hand — up to five per
+            organization. Filtering by topic arrives with Phase 2; until then,{' '}
+            <Link to="/browse">the place index</Link> is how you wander.
           </p>
         </div>
         <aside className="rail desktop-only">
@@ -316,8 +316,8 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
             <div className="rail-kicker">For developers</div>
             <p>
               The dataset is published under the Open Database License (ODbL
-              1.0). Phase 2 opens self-serve free API keys; until then, an
-              editor will hand-issue one on request.
+              1.0). Phase 2 opens self-serve free API keys; until then, ask and
+              an editor will set one up by hand.
             </p>
             <Link to="/about#for-developers" className="read-on">
               Developer preview <span className="arrow">→</span>

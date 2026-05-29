@@ -462,9 +462,8 @@ https://kuow.org/stories/..."
 
             <div className="slip-foot">
               <p className="note">
-                Your submission goes straight to the editorial queue. We
-                review every tip and open a public pull request when we
-                accept one — usually within a week.
+                We read every tip. The ones we accept open a public pull
+                request anyone can follow — usually within a week.
               </p>
               {isRateLimited ? (
                 <p className="field-error" role="alert">
@@ -555,7 +554,7 @@ https://kuow.org/stories/..."
           <div className="rail-block">
             <div className="rail-kicker">Inclusion criteria</div>
             <p>
-              The full criteria — what we include, what we skip — lives at{' '}
+              The full list — what we include, what we skip — lives at{' '}
               <Link to="/about#methodology">About / Methodology</Link>.
             </p>
           </div>
