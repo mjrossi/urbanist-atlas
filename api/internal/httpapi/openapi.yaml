@@ -36,6 +36,14 @@ info:
     - Admin endpoints require an `Authorization: Bearer <token>`
       header; the token is configured via the `URBANIST_ADMIN_TOKEN`
       environment variable on the server.
+    - Every public `GET` endpoint (everything listed below except the
+      admin-only routes) also accepts `HEAD` — same status, same
+      headers, empty body per RFC 9110 §9.3.2. This is for
+      link-preview tools (Slack, Discord) and uptime probes that
+      `HEAD` a URL before unfurling or alerting. The OpenAPI
+      specification does not enumerate `head:` operations
+      separately; consumers can rely on the GET-equivalent
+      contract.
 
     Companion to the maintainer's publication, *Urbanist Lexicon*
     (https://mjrossi.com).
