@@ -95,7 +95,7 @@ export function BroadsheetNav() {
       </ul>
       <div className="nav-right">
         <span className="live">
-          <strong>Indexed &amp; current</strong>
+          <strong>Live directory</strong>
         </span>
         {regionCount !== null && orgCount !== null ? (
           <span>

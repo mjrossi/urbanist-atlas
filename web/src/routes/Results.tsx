@@ -116,7 +116,7 @@ function ResultsBody({
   return (
     <QueryState
       query={query}
-      loading={<>Looking up groups near {postalCode}…</>}
+      loading={<>Finding organizations for {postalCode}…</>}
       className="mt-48"
     >
       {(data) => <ResultsContent data={data} postalCode={postalCode} />}

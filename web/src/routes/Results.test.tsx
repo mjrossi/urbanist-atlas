@@ -69,7 +69,7 @@ describe('Results', () => {
   it('renders the loading state while the query is pending', () => {
     lookupMock.mockReturnValue(new Promise(() => {}));
     renderAt('/r/11217?country=US');
-    expect(screen.getByRole('status').textContent).toMatch(/looking up groups/i);
+    expect(screen.getByRole('status').textContent).toMatch(/finding organizations/i);
   });
 
   it('renders the dateline and grouped entries on success', async () => {
