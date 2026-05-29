@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
@@ -77,6 +78,10 @@ type Worker struct {
 	// own ctx) so callers know whether the goroutine actually
 	// drained or whether the deadline elapsed first.
 	done chan struct{}
+	// closeOnce guards close(jobs) so Stop is idempotent — a second
+	// SIGTERM (or any future caller that calls Stop twice) won't
+	// panic on close-of-closed.
+	closeOnce sync.Once
 }
 
 // New constructs a Worker. Run is what actually starts the goroutine.
@@ -186,26 +191,35 @@ func (w *Worker) drainAndExit() {
 
 // Stop signals the worker to finish draining its job buffer and
 // exit, then blocks until Run returns or the supplied ctx expires
-// (whichever comes first). Safe to call once; calling more than
-// once panics because it closes the jobs channel.
+// (whichever comes first). Idempotent — a second call is a no-op
+// re: closing the channel; it still waits on Run's completion.
 //
 // Returns nil on a clean drain. When ctx expires before Run exits,
 // Stop returns ctx.Err() along with the public IDs of jobs that
 // were observed in the channel when the deadline fired. Callers
 // (serve.go's shutdown path) log them at slog.Warn so the operator
 // can re-queue with `urbanist-atlas-server submissions retry-pr`.
+//
+// The droppedIDs list is **best-effort**: when the parent ctx is
+// also cancelled, Run.drainAndExit is consuming the same channel
+// concurrently, so some IDs reported here may have been processed
+// (or attempted) by Run before the process exits. Conversely, IDs
+// drainAndExit pulled but whose GitHub call was cut off by process
+// exit won't appear here either. The canonical source of truth is
+// the `submissions` row's `promoted_pr_url` (set on success) and
+// `promotion_error` (set on failure) — operators should treat
+// droppedIDs as a "needs investigation" hint, not a definitive
+// loss list.
 func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
-	close(w.jobs)
+	w.closeOnce.Do(func() { close(w.jobs) })
 	select {
 	case <-w.done:
 		return nil, nil
 	case <-ctx.Done():
-		// Grab whatever's still in the buffer for the operator log.
-		// Run's drainAndExit loop will pull these as it winds down
-		// (the channel is already closed; receives won't block past
-		// the buffered count) but the parent caller has already
-		// reported "shutdown deadline exceeded", so the IDs here are
-		// the ones at risk of dropping on the floor.
+		// Drain whatever's still in the buffer for the operator log.
+		// Receives on a closed channel never block past the buffered
+		// count, so this terminates either via ok==false or via the
+		// default arm.
 		for {
 			select {
 			case job, ok := <-w.jobs:

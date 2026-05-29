@@ -298,6 +298,41 @@ func TestEnqueue_FullBuffer(t *testing.T) {
 	}
 }
 
+// TestWorker_Stop_IsIdempotent pins that a second Stop call is a
+// no-op rather than a panic (close-of-closed-channel). serve.go
+// currently calls Stop exactly once, but a future shutdown path
+// that fires twice (e.g., double SIGTERM) shouldn't crash the
+// process before the deferred cleanup runs.
+func TestWorker_Stop_IsIdempotent(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	w := New(Config{
+		BaseURL: server.URL,
+		Token:   "fake-token",
+		Logger:  slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Run(ctx)
+
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer stopCancel()
+	if _, err := w.Stop(stopCtx); err != nil {
+		t.Fatalf("first Stop: %v", err)
+	}
+	// Second call must not panic. Returns nil because Run has
+	// already exited and w.done is closed.
+	dropped, err := w.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("second Stop returned err: %v", err)
+	}
+	if len(dropped) != 0 {
+		t.Fatalf("second Stop reported dropped IDs: %v", dropped)
+	}
+}
+
 // TestWorker_Stop_DrainsBuffer pins the SIGTERM-shutdown contract:
 // Stop closes the jobs channel, Run drains whatever's already
 // buffered (processing each one), and Stop returns nil once Run
