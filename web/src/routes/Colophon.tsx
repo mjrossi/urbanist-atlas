@@ -1,9 +1,15 @@
 import { Link } from 'react-router';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+import { apiBase } from '../lib/api.ts';
 
 export function Colophon() {
   useDocumentTitle('Colophon — Urbanist Atlas');
+  // Match the env-aware OpenAPI link in About.tsx so QA-served builds
+  // point at the QA API and production builds point at production.
+  // Phase 1's `api.urbanistatlas.com` isn't live yet; hardcoding it
+  // would break the link for friends loading qa.urbanistatlas.com.
+  const openapiUrl = `${apiBase}/api/v1/openapi.yaml`;
   return (
     <>
       <PageBreadcrumb
@@ -152,9 +158,7 @@ X-Data-Attribution: https://urbanistatlas.com
             <div className="rail-kicker">Quick links</div>
             <ul className="plain">
               <li>
-                <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">
-                  OpenAPI spec
-                </a>
+                <a href={openapiUrl}>OpenAPI spec</a>
               </li>
               <li>
                 <a href="https://github.com/mjrossi/urbanist-atlas">

@@ -15,12 +15,12 @@
 # The SPA serves no inline <script>; everything goes through Vite's
 # bundled module graph, so `script-src 'self'` is enough.
 #
-# `style-src 'unsafe-inline'` is required: Vite injects critical CSS
-# as inline <style> tags during HMR (dev) and in the production HTML
-# for above-the-fold styling. Removing it would break the broadsheet
-# render on first paint. The risk is bounded — no third-party
-# scripts run, so an injected style tag is the worst case, not an
-# injected script.
+# `style-src 'self'`: Vite's production build emits all CSS as
+# external `<link rel="stylesheet">` assets — there are no inline
+# `<style>` blocks in `dist/index.html`. Dev mode (HMR) uses inline
+# styles, but `_headers` only applies on Cloudflare, so that's not a
+# real constraint. If a future plugin starts inlining critical CSS,
+# add `'unsafe-inline'` back with a one-line justification.
 #
 # `font-src 'self'`: all four families ship via
 # `@fontsource-variable/*` and are bundled with the build. No
@@ -35,9 +35,22 @@
 #
 # `frame-ancestors 'none'`: nobody embeds the Atlas in an iframe.
 #
+# Other headers
+# -------------
+# `Strict-Transport-Security`: opt into HSTS with a one-year
+# max-age + subdomain coverage. Cloudflare terminates TLS in front
+# of us, so HTTPS is already enforced at the edge — the header is
+# defense in depth for clients that handle the upgrade themselves.
+#
+# `Permissions-Policy`: turn off browser features the Atlas has no
+# legitimate reason to touch. `frame-ancestors 'none'` already
+# stops embedding, but explicit feature opt-out is cheap insurance.
+#
 # Adjust this file when adding a new origin (e.g. a future analytics
 # endpoint) — and document the change in `docs/deploy.md`.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()
