@@ -44,7 +44,7 @@ export function Colophon() {
             <a href="https://www.huduser.gov/portal/dataset/uspszip-api.html">
               HUD USPS ZIP-to-County crosswalk
             </a>{' '}
-            (2026 Q1 release) for the ~9,000 operational ZIPs that exist only as
+            (2025 Q4 release) for the ~9,000 operational ZIPs that exist only as
             P.O. boxes, single buildings, or APO/FPO military codes.
             Metropolitan regions come from the Census Bureau&rsquo;s CBSA
             delineation file (July 2023).
