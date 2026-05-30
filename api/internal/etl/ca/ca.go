@@ -50,6 +50,9 @@ func init() {
 				URL:      "https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip",
 				SHA256:   "9fd2b6adf66e5716d06f91ebdcdb5d8a4e8b9eeb520f8b4285030d34319959db",
 				Vintage:  "Statistics Canada FSA boundary file, 2021 census",
+				// The 155 MB FSA source feeds only the postal pass, so a
+				// --target=regions download/regenerate skips it.
+				Targets: []etl.Target{etl.TargetPostal},
 			},
 			{
 				Filename: "lcma000b21a_e.zip",

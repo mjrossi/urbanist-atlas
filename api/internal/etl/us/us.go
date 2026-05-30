@@ -83,6 +83,11 @@ func init() {
 				URL:      "https://www.huduser.gov/portal/dataset/uspszip-api.html",
 				SHA256:   "2795b91c26703d1150f2545683da0b6638d006f213e48cc70318e384b3f00f8b",
 				Vintage:  "HUD USPS ZIP-to-County crosswalk, 2025-Q4 (operator-downloaded; HUD account required)",
+				// Account-gated landing page, not a direct file: download
+				// must skip it (operator fetches by hand). Feeds the
+				// postal pass only.
+				Optional: true,
+				Targets:  []etl.Target{etl.TargetPostal},
 			},
 		},
 		Targets: []etl.OutputTarget{
