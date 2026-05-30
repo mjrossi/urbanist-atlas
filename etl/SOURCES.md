@@ -173,3 +173,116 @@ Bumping a source's vintage is a deliberate slice:
 Census ZCTA boundaries change every decennial census (next is 2030).
 StatsCan PCCF updates quarterly; vintage upgrades on a slower cadence
 are fine for our use case.
+
+## Known data-vintage gaps
+
+### Connecticut: ZCTA legacy counties vs. CBSA planning regions
+
+**Symptom.** ~267 Connecticut residential ZIPs anchor at the bare `ct`
+state node instead of their metro (Bridgeport-Stamford, Hartford, New
+Haven, …), so a lookup for e.g. Stamford 06902 surfaces only
+state-level orgs. The HUD-sourced P.O.-box/business ZIPs in the same
+towns *do* reach their metro — that residential-vs-PObox split is the
+tell.
+
+**Cause — a county-vintage mismatch between two Census sources.** On
+2022-06-06 the Census Bureau replaced Connecticut's 8 legacy counties
+(FIPS `09001`–`09015`) with 9 planning regions as county-equivalents
+(FIPS `09110`–`09190`). The two sources we join on county GEOID are now
+different vintages:
+
+- `list1_2023.csv` (CBSA delineation, **July 2023**) keys CT metros by
+  the **new planning-region** GEOIDs → these become the keys of
+  `countyToMSA`.
+- `tab20_zcta520_county20_natl.txt` (ZCTA→county, **2020**) keys CT
+  ZCTAs by the **legacy county** GEOIDs.
+
+So `countyToMSA[<legacy CT county>]` misses, the county→MSA tier fails,
+and every CT ZCTA ZIP falls through to the state. (`hud_zip_county_2025q4`
+already uses current FIPS, which is why HUD-anchored CT ZIPs resolve
+correctly.)
+
+**Why "just bump the source" doesn't work.** The ZCTA→county
+relationship file is a frozen 2020-decennial product; per the Census
+notice it keeps the 8 legacy counties indefinitely (datasets published
+before 2022-06-01 are exempt from the switch), and the ZCTA series isn't
+re-released until the 2030 boundaries. There is **no drop-in national
+ZCTA→county-equivalent file** that uses planning regions — the
+transition lives in CT-specific 2024 relationship files and tract/town
+crosswalks that don't map ZIP/ZCTA directly, and planning regions don't
+nest in legacy counties (so a flat legacy-county→region alias is lossy).
+See the Federal Register notice and the Census relationship-files /
+2024-CT record-layout pages:
+- https://www.federalregister.gov/documents/2022/06/06/2022-12063/change-to-county-equivalents-in-the-state-of-connecticut
+- https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.html
+- https://www.census.gov/programs-surveys/geography/technical-documentation/records-layout/2024-connecticut-record-layout.html
+
+**Fix (implemented): HUD fallback for retired CT FIPS.** The repo
+already vendors a current-vintage, ZIP-level, authoritative source — the
+HUD ZIP→County crosswalk — that maps every CT ZIP to the correct
+planning region. `ReconcileCTLegacyCounties`
+(`internal/etl/us/crosswalk.go`) runs between the ZCTA pass and the HUD
+backfill: for each ZCTA anchor that fell through to the bare state
+*because its source county is a retired CT legacy code* (`09001`–`09015`,
+the `ctLegacyCounties` set), it re-resolves the ZIP through HUD's current
+planning-region county and the standard county fallback chain. A more
+specific result (metro, county-leaf) replaces the anchor, tagged
+`ct-reconciled:<tier>`; anchors that already won a finer tier (the
+bridgeport city-leaf) and rural ZIPs HUD can't improve are left at their
+existing anchor. On a full `etl regenerate` this repairs **all ~267
+stranded CT ZIPs** (Hartford/New Haven/New London included), needs no new
+download, and self-heals future county-vintage skew. It is a deliberate,
+documented exception to the otherwise-strict "HUD is additive-only, never
+overrides a ZCTA row" rule — scoped narrowly to retired CT legacy
+counties so it can't silently reshape anchors elsewhere. The earlier
+per-ZIP `zipAnchorOverride` patch has been removed.
+
+> **Seed note — committed seed is now regenerated.** The fix lives in the
+> ETL *code*; `api/seed/postal_codes_us.csv` is a generated artifact, and
+> the runtime serves whatever that committed CSV says. The committed
+> snapshot **has now been regenerated** against the canonical HUD 2025-Q4
+> vintage pinned in the table above (sha256 verified before regenerate),
+> so `postal_codes_us.csv` and `regions_us_msas.toml` match
+> `etl regenerate --country=US` byte-for-byte. The full CT reconcile now
+> ships in the seed: Hartford/New Haven/New London/Norwich residential
+> ZIPs resolve to their metro, not just lower Fairfield.
+>
+> Concretely, the regenerate reconciled **221** CT ZIPs from bare `ct` to
+> their metro; **200** of those were newly written (the ~21 lower-Fairfield
+> rows were already hand-pointed at `bridgeport-ct-metro` in the original
+> Stamford slice, so they were no-ops). **61** stranded CT ZIPs have no
+> HUD-resolvable MSA and correctly remain at bare `ct` — which is why the
+> real diff is **200 rows, not the ~246 this note previously estimated**
+> (267 stranded − 21 ≈ 246 over-counted the 61 unresolvable ones).
+>
+> The "same vintage → byte-identical output" determinism invariant
+> (CLAUDE.md / above) therefore holds again for the pinned HUD 2025-Q4
+> vintage. CI still does **not** gate on `etl regenerate` — HUD is
+> account-gated and can't be fetched from a clean checkout — so the
+> invariant remains honor-system. See #67 for the proposed `seed-check`
+> drift gate that would make "committed == regenerated" a checked
+> invariant.
+>
+> The `bridgeport-ct-metro → [nyc-tristate, ct]` parent edge needed for
+> the Tri-State result is independent of the seed regeneration and is
+> already committed in `regions_us_msa_overrides.toml` and
+> `regions_us_msas.toml`.
+
+**Generalizing beyond CT (when, not now).** The reconcile is scoped to
+`ctLegacyCounties` because CT (June 2022) is the *only* county recode in
+the gap between our two sources' vintages (ZCTA 2020 ↔ CBSA 2023), so
+that set is the entire problem today. But the ZCTA→county file stays
+frozen at 2020 counties until the 2030 census while CBSA delineations
+keep advancing, so **every future county recode silently joins this
+failure class** — CT is just the first. The principled generalization
+triggers on the symptom instead of a hardcoded set: a ZCTA stranded at
+state whose source county GEOID is absent from the *current national
+county universe* is stale → reconcile via HUD. That requires vendoring
+one small extra source — a current national county gazetteer — to tell a
+stale county apart from a legitimately non-metro rural county
+(`countyToMSA` can't serve as that universe; rural counties are validly
+absent from it). Deliberately **not** a blanket
+"ZCTA-at-state → prefer HUD": that would re-litigate the intentional
+ZCTA-over-HUD primacy (see the postal-coverage design) and pull
+genuinely-rural ZIPs into adjacent metros. Generalize for real only when
+a second state actually trips this.

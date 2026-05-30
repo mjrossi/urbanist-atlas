@@ -36,6 +36,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
@@ -175,6 +176,25 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 			return err
 		}
 		logger.Info("etl us: parsed HUD ZIP-County", "rows", len(huds), "path", hudPath)
+
+		// Repair the CT county-vintage gap before backfill: re-anchor CT
+		// ZCTA ZIPs stranded at the bare state (their 2020 legacy county
+		// isn't in the 2023 planning-region countyToMSA) using HUD's
+		// current-vintage county. Mutates `anchors` in place.
+		ctReasons := ReconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, cbsaToSlug)
+		ctReconciled := 0
+		for k, n := range ctReasons {
+			if strings.HasPrefix(k, "ct-reconciled:") {
+				ctReconciled += n
+			}
+		}
+		logger.Info(fmt.Sprintf("etl us: ct legacy-county reconcile: %+v", ctReasons),
+			"reconciled_total", ctReconciled,
+			"reconciled_msa", ctReasons["ct-reconciled:msa"],
+			"skip_no_hud", ctReasons["ct-skip:no-hud"],
+			"skip_hud_unresolved", ctReasons["ct-skip:hud-unresolved"],
+		)
+
 		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug)
 		logger.Info(fmt.Sprintf("etl us: hud backfill: added %d anchors across %+v", len(hudAnchors), hudReasons),
 			"added", len(hudAnchors),

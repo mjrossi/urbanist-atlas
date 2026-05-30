@@ -25,7 +25,7 @@
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves
 # that may reference these metros). Cross-file parent resolution lives
-# in internal/loadregions/write.go.
+# in internal/seedfiles/regions.go.
 
 [[region]]
 slug = "abilene-tx-metro"
@@ -465,7 +465,7 @@ kind = "us:metro"
 name = "Bridgeport Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ct"]
+parents = ["nyc-tristate", "ct"]
 # Census CBSA 14860 — Bridgeport-Stamford-Danbury, CT
 
 [[region]]

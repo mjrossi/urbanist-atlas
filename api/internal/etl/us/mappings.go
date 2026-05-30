@@ -96,3 +96,39 @@ var statePostalToSlug = map[string]string{
 	"VT": "vt", "VA": "va", "WA": "wa", "WV": "wv", "WI": "wi",
 	"WY": "wy", "PR": "pr",
 }
+
+// ctLegacyCounties is the set of Connecticut's 8 retired legacy county
+// FIPS (09001–09015). On 2022-06-06 the Census Bureau replaced these
+// with CT's 9 planning regions as county-equivalents (FIPS 09110–09190).
+//
+// The two ETL sources we join on county GEOID are now different
+// vintages: the July-2023 CBSA delineation (which builds countyToMSA)
+// keys CT metros by the *new* planning-region GEOIDs, while the 2020
+// ZCTA→county relationship file still keys CT ZCTAs by these *legacy*
+// codes. So countyToMSA[<legacy CT county>] always misses and every CT
+// ZCTA ZIP falls through the county→MSA tier to the bare `ct` state
+// anchor — e.g. Stamford 06902 surfaced no Bridgeport-Stamford / NY
+// Tri-State orgs.
+//
+// The 2020 ZCTA→county file is a frozen decennial product with no
+// drop-in planning-region successor (next ZCTA refresh is 2030), so the
+// fix can't be a source bump. Instead ReconcileCTLegacyCounties
+// (crosswalk.go) re-resolves these ZIPs through the current-vintage HUD
+// crosswalk, which already uses the planning-region FIPS.
+//
+// CT is the only county recode in the 2020→2023 source-vintage gap, so
+// this hardcoded set is the whole problem today; future recodes will
+// join the class as the frozen ZCTA file ages toward 2030. The rationale
+// for keeping the trigger scoped (and why NOT to broaden it to a blanket
+// "ZCTA-at-state → prefer HUD") lives in etl/SOURCES.md §"Known
+// data-vintage gaps" — the single source of truth for this decision.
+var ctLegacyCounties = map[string]struct{}{
+	"09001": {}, // Fairfield
+	"09003": {}, // Hartford
+	"09005": {}, // Litchfield
+	"09007": {}, // Middlesex
+	"09009": {}, // New Haven
+	"09011": {}, // New London
+	"09013": {}, // Tolland
+	"09015": {}, // Windham
+}

@@ -67,3 +67,21 @@ cbsa_code = "31080"
 slug = "greater-la"
 name = "Greater Los Angeles"
 parents = ["ca-state"]
+
+# Bridgeport-Stamford-Danbury, CT (all of Fairfield County) is part of
+# the NY commuter shed, so its metro parents under the nyc-tristate
+# multi-state region in addition to its state. Without the nyc-tristate
+# edge, Fairfield ZIPs (Stamford 06902, Greenwich, Norwalk, Darien, …)
+# never surface Tri-State orgs through the ancestor walk even though
+# they are squarely in the Tri-State region. The `ct` edge is retained
+# so Connecticut state-tier orgs still surface for these ZIPs. The
+# companion fix that re-anchors the residential CT ZIPs at their metro
+# (they were falling through to the bare `ct` state anchor due to the
+# 2020-ZCTA-vs-2023-CBSA county-vintage gap) is ReconcileCTLegacyCounties
+# in internal/etl/us/crosswalk.go — see etl/SOURCES.md §"Known
+# data-vintage gaps".
+[[override]]
+cbsa_code = "14860"
+slug = "bridgeport-ct-metro"
+name = "Bridgeport Metro"
+parents = ["nyc-tristate", "ct"]
