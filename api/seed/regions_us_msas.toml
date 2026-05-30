@@ -25,7 +25,7 @@
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves
 # that may reference these metros). Cross-file parent resolution lives
-# in internal/loadregions/write.go.
+# in internal/seedfiles/regions.go.
 
 [[region]]
 slug = "abilene-tx-metro"

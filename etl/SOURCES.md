@@ -237,27 +237,31 @@ overrides a ZCTA row" rule — scoped narrowly to retired CT legacy
 counties so it can't silently reshape anchors elsewhere. The earlier
 per-ZIP `zipAnchorOverride` patch has been removed.
 
-> **Seed note — what ships now vs. on regenerate.** The fix lives in the
+> **Seed note — committed seed is now regenerated.** The fix lives in the
 > ETL *code*; `api/seed/postal_codes_us.csv` is a generated artifact, and
-> the runtime serves whatever that committed CSV says. The sources are
-> gitignored and weren't staged in the slice that introduced this fix, so
-> the committed snapshot was **not** regenerated — it still carries only
-> the ~21 lower-Fairfield rows hand-pointed at `bridgeport-ct-metro` in
-> the original Stamford slice. So **as committed, only lower Fairfield
-> (Stamford, Greenwich, Norwalk, …) resolves to its metro; the rest of CT
-> — most Hartford/New Haven/New London residential ZIPs — still anchors at
-> bare `ct`** until an operator runs `etl regenerate --country=US` with
-> the HUD source staged. That regenerate is what propagates the
-> reconciliation to the full ~267 and brings the committed seed back in
-> line with generator output.
+> the runtime serves whatever that committed CSV says. The committed
+> snapshot **has now been regenerated** against the canonical HUD 2025-Q4
+> vintage pinned in the table above (sha256 verified before regenerate),
+> so `postal_codes_us.csv` and `regions_us_msas.toml` match
+> `etl regenerate --country=US` byte-for-byte. The full CT reconcile now
+> ships in the seed: Hartford/New Haven/New London/Norwich residential
+> ZIPs resolve to their metro, not just lower Fairfield.
 >
-> This intentionally leaves the repo in a committed-seed ≠
-> regenerate-output state, bending the "same vintage → byte-identical
-> output" determinism invariant (CLAUDE.md / above): a regenerate with HUD
-> staged would add ~246 more CT rows. CI doesn't gate on `etl regenerate`
-> (sources are gitignored), so this won't break the build — but the next
-> regenerate will show a large, expected CT diff. Closing the gap is a
-> one-command operator step; it just couldn't run in this environment.
+> Concretely, the regenerate reconciled **221** CT ZIPs from bare `ct` to
+> their metro; **200** of those were newly written (the ~21 lower-Fairfield
+> rows were already hand-pointed at `bridgeport-ct-metro` in the original
+> Stamford slice, so they were no-ops). **61** stranded CT ZIPs have no
+> HUD-resolvable MSA and correctly remain at bare `ct` — which is why the
+> real diff is **200 rows, not the ~246 this note previously estimated**
+> (267 stranded − 21 ≈ 246 over-counted the 61 unresolvable ones).
+>
+> The "same vintage → byte-identical output" determinism invariant
+> (CLAUDE.md / above) therefore holds again for the pinned HUD 2025-Q4
+> vintage. CI still does **not** gate on `etl regenerate` — HUD is
+> account-gated and can't be fetched from a clean checkout — so the
+> invariant remains honor-system. See #67 for the proposed `seed-check`
+> drift gate that would make "committed == regenerated" a checked
+> invariant.
 >
 > The `bridgeport-ct-metro → [nyc-tristate, ct]` parent edge needed for
 > the Tri-State result is independent of the seed regeneration and is
