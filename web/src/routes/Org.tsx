@@ -262,7 +262,7 @@ function OrgContent({ org }: { org: OrgT }) {
           <div className="rail-block">
             <div className="rail-kicker">Filed by</div>
             <p>
-              An entry in the Urbanist Atlas, chosen by hand against the{' '}
+              An entry in the Urbanist Atlas, reviewed against the{' '}
               <Link to="/about#methodology">inclusion criteria</Link> and
               checked against public sources.
             </p>

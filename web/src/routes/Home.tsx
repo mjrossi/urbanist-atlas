@@ -72,8 +72,9 @@ export function Home() {
             <div className="editors-note">
               <div className="label">Editor&rsquo;s note · Vol. I</div>
               <p>
-                Every entry is picked by hand, weighed against{' '}
-                <Link to="/about#methodology">our criteria</Link>.{' '}
+                Every entry is reviewed against{' '}
+                <Link to="/about#methodology">our criteria</Link> before it goes
+                in.{' '}
                 <Link to="/submit">File a tip</Link> if your region is missing.
               </p>
             </div>
@@ -91,8 +92,8 @@ export function Home() {
           <div className="rail-block amber desktop-only">
             <div className="rail-kicker">From the editors</div>
             <p className="pullquote-rail">
-              National outfits are easy to find on their own. The hard search is
-              for the advocates right around you.
+              The most local thing on the internet is the meeting three blocks
+              from your door.
             </p>
           </div>
         </aside>
@@ -314,7 +315,7 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
             ))}
           </ul>
           <p className="fineprint mt-22">
-            Tags are editorial labels, applied by hand — up to five per
+            Tags are editorial labels — up to five per
             organization. Filtering by topic arrives with Phase 2; until then,{' '}
             <Link to="/browse">the region index</Link> is how you wander.
           </p>

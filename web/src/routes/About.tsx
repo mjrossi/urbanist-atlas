@@ -68,7 +68,7 @@ export function About() {
       <ul>
         <li>Scope — transit + safe-streets advocacy only</li>
         <li>Coverage — United States &amp; Canada (v1)</li>
-        <li>Curation — by hand, one entry at a time</li>
+        <li>Curation — editorial, against published criteria</li>
         <li>License — ODbL 1.0 (open data, with attribution)</li>
       </ul>
     </div>
@@ -92,7 +92,7 @@ export function About() {
         <p className="deck">
           The Urbanist Atlas indexes local and regional advocacy organizations
           working on transit and safe streets across the United States and
-          Canada. Searchable by postal code. Curated by hand.
+          Canada. Searchable by postal code. Curated, not scraped.
         </p>
       </div>
 
