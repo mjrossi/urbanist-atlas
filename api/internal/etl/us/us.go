@@ -268,5 +268,5 @@ func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {
 		return fmt.Errorf("etl us: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors)
+	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors, zipAnchorOverride)
 }

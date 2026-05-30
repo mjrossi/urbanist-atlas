@@ -306,7 +306,7 @@ func TestWritePostalCodesCSV_MergesAndDedupsWithZCTAWinning(t *testing.T) {
 		{ZCTA: "10001", AnchorSlug: "nyc-metro", Reason: "hud:msa"},
 	}
 	var buf strings.Builder
-	if err := WritePostalCodesCSV(&buf, zcta, hud); err != nil {
+	if err := WritePostalCodesCSV(&buf, zcta, hud, nil); err != nil {
 		t.Fatalf("WritePostalCodesCSV: %v", err)
 	}
 	got := buf.String()
@@ -328,7 +328,7 @@ func TestWritePostalCodesCSV_NilHUDPreservesZCTAOnlyBehavior(t *testing.T) {
 		{ZCTA: "10001", AnchorSlug: "manhattan"},
 	}
 	var buf strings.Builder
-	if err := WritePostalCodesCSV(&buf, zcta, nil); err != nil {
+	if err := WritePostalCodesCSV(&buf, zcta, nil, nil); err != nil {
 		t.Fatalf("WritePostalCodesCSV: %v", err)
 	}
 	got := buf.String()

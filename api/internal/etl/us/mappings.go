@@ -96,3 +96,62 @@ var statePostalToSlug = map[string]string{
 	"VT": "vt", "VA": "va", "WA": "wa", "WV": "wv", "WI": "wi",
 	"WY": "wy", "PR": "pr",
 }
+
+// zipAnchorOverride pins specific ZIPs to a curated anchor slug,
+// overriding whatever the ZCTA/HUD county crosswalk would otherwise
+// produce. It is applied last, in WritePostalCodesCSV, so it wins over
+// both the primary ZCTA pass and the HUD backfill. Editorial use only:
+// reserve it for ZIPs the upstream crosswalk mis-anchors, not as a
+// general substitute for the place/county tiers.
+//
+// Connecticut driver (slice: Stamford/Tri-State): Census adopted CT's
+// nine planning regions as county-equivalents starting with the 2022
+// vintage. The 2020 ZCTA-to-county relationship file still keys CT
+// ZCTAs by the *old* county FIPS (Fairfield County = 09001), but the
+// July-2023 CBSA delineation that builds countyToMSA references the new
+// planning-region GEOIDs instead. The old FIPS therefore isn't in
+// countyToMSA, so the residential (ZCTA-sourced) Fairfield ZIPs fell
+// through the county→MSA tier to the bare `ct` state anchor — while the
+// HUD-sourced P.O.-box ZIPs in the very same towns, keyed by the newer
+// FIPS, correctly resolved to bridgeport-ct-metro. That split is why
+// Stamford 06902 surfaced no Tri-State orgs.
+//
+// Re-anchoring these lower-Fairfield ("Gold Coast") residential ZIPs at
+// bridgeport-ct-metro restores the smallest-anchor invariant: the metro
+// is Census CBSA 14860 (Bridgeport-Stamford-Danbury) and parents under
+// nyc-tristate + ct (see regions_us_msa_overrides.toml), so these ZIPs
+// now surface both the Tri-State region and Connecticut state orgs.
+//
+// Scope is the towns squarely in the NY commuter shed — Greenwich,
+// Stamford, Darien, New Canaan, Norwalk, Westport, Weston, Wilton.
+// Mid/upper Fairfield (Danbury, Ridgefield, …) is intentionally left at
+// its current anchor; widen this map if that coverage is wanted.
+var zipAnchorOverride = map[string]string{
+	// Greenwich
+	"06807": "bridgeport-ct-metro", // Cos Cob
+	"06830": "bridgeport-ct-metro", // Greenwich
+	"06831": "bridgeport-ct-metro", // Greenwich (backcountry)
+	"06870": "bridgeport-ct-metro", // Old Greenwich
+	"06878": "bridgeport-ct-metro", // Riverside
+	// Stamford
+	"06901": "bridgeport-ct-metro",
+	"06902": "bridgeport-ct-metro",
+	"06903": "bridgeport-ct-metro",
+	"06905": "bridgeport-ct-metro",
+	"06906": "bridgeport-ct-metro",
+	"06907": "bridgeport-ct-metro",
+	// Darien
+	"06820": "bridgeport-ct-metro",
+	// New Canaan
+	"06840": "bridgeport-ct-metro",
+	// Norwalk
+	"06850": "bridgeport-ct-metro",
+	"06851": "bridgeport-ct-metro",
+	"06853": "bridgeport-ct-metro",
+	"06854": "bridgeport-ct-metro",
+	"06855": "bridgeport-ct-metro",
+	// Westport / Weston / Wilton
+	"06880": "bridgeport-ct-metro", // Westport
+	"06883": "bridgeport-ct-metro", // Weston
+	"06897": "bridgeport-ct-metro", // Wilton
+}
