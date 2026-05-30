@@ -312,7 +312,17 @@ func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, erro
 	}
 
 	slug := DeriveSlug(sub.Payload.Name)
-	block, err := RenderOrgBlock(sub, slug)
+	// added_at is sourced from the approval clock — sub.ProcessedAt
+	// is stamped by atlas.SubmissionStore.Approve, which is the only
+	// pathway that enqueues a submission to the worker. If a future
+	// caller bypasses Approve and ProcessedAt is nil, fall back to
+	// the worker-local clock so the bundle still parses under the
+	// Phase 4 required-field check.
+	addedAt := time.Now().UTC()
+	if sub.ProcessedAt != nil {
+		addedAt = sub.ProcessedAt.UTC()
+	}
+	block, err := RenderOrgBlock(sub, slug, addedAt)
 	if err != nil {
 		return "", fmt.Errorf("render org block: %w", err)
 	}
