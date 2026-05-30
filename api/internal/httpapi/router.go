@@ -76,11 +76,15 @@ func New(cfg Config) http.Handler {
 	r.Use(timeoutMiddleware(requestTimeout))
 	r.Use(recovererMiddleware(logger))
 	r.Use(loggingMiddleware(logger))
-	if cfg.Metrics != nil {
-		r.Use(metricsMiddleware(cfg.Metrics))
-	}
 	if len(cfg.CORSOrigins) > 0 {
 		r.Use(corsMiddleware(cfg.CORSOrigins))
+	}
+	// metricsMiddleware sits inside corsMiddleware so the preflight
+	// OPTIONS that CORS short-circuits with a 204 aren't recorded as
+	// "unmatched" request noise. It reuses loggingMiddleware's status
+	// recorder rather than wrapping the writer a second time.
+	if cfg.Metrics != nil {
+		r.Use(metricsMiddleware(cfg.Metrics))
 	}
 
 	getHead(r, "/healthz", healthHandler())
