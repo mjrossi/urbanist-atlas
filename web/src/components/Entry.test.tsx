@@ -13,6 +13,7 @@ function makeOrg(overrides: Partial<Org> = {}): Org {
     website_url: 'https://www.transalt.org',
     tags: ['transit', 'safe-streets'],
     regions: [],
+    added_at: '2026-05-17',
     ...overrides,
   };
 }

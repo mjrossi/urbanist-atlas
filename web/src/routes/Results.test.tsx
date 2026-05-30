@@ -39,6 +39,7 @@ function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {
         tags: ['transit'],
         regions: [],
         matched_region_slugs: [],
+        added_at: '2026-05-17',
       },
     ],
     regional: [
@@ -51,6 +52,7 @@ function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {
         tags: ['transit', 'policy'],
         regions: [],
         matched_region_slugs: [],
+        added_at: '2026-05-17',
       },
     ],
     ...overrides,

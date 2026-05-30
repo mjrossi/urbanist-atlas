@@ -18,6 +18,7 @@ function makeOrg(id: number, name: string, tags: string[] = []): LookupOrg {
     tags,
     regions: [],
     matched_region_slugs: [],
+    added_at: '2026-05-21',
   };
 }
 

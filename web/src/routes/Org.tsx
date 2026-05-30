@@ -3,7 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError, getOrg } from '../lib/api.ts';
 import type { Org as OrgT } from '../lib/api.ts';
-import { domainOf, prettyTag } from '../lib/format.ts';
+import { domainOf, formatAddedAt, prettyTag } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
@@ -179,6 +179,10 @@ function OrgContent({ org }: { org: OrgT }) {
             <span className="val">
               <code>{org.slug}</code>
             </span>
+          </div>
+          <div className="item">
+            <div>Added</div>
+            <span className="val">{formatAddedAt(org.added_at)}</span>
           </div>
           {org.contact_url ? (
             <div className="item">
