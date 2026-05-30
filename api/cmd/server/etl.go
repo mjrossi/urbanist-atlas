@@ -223,7 +223,7 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 		"src_dir", srcDir,
 		"out_dir", outDir,
 	)
-	if err := plan.Regenerate(ctx, srcDir, outDir, logger); err != nil {
+	if err := plan.Regenerate(ctx, srcDir, outDir, etl.TargetAll, logger); err != nil {
 		return fmt.Errorf("etl regenerate %s: %w", country, err)
 	}
 	logger.Info("etl regenerate: complete", "country", country)

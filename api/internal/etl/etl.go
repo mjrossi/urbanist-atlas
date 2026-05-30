@@ -146,7 +146,7 @@ type Country struct {
 	// nil for plans whose regenerate flow isn't implemented yet — in
 	// that case the cli stub returns an error indicating which slice
 	// is expected to land it.
-	Regenerate func(ctx context.Context, srcDir, outDir string, logger *slog.Logger) error
+	Regenerate func(ctx context.Context, srcDir, outDir string, target Target, logger *slog.Logger) error
 }
 
 // Plans is the registered set of country plans the ETL subcommand

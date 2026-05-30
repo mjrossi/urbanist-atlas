@@ -67,8 +67,7 @@ func init() {
 }
 
 // Regenerate runs the full CA ETL pipeline.
-func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger) error {
-	fsaZipPath := filepath.Join(srcDir, "lfsa000b21a_e.zip")
+func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, logger *slog.Logger) error {
 	cmaZipPath := filepath.Join(srcDir, "lcma000b21a_e.zip")
 
 	cmas, err := ParseCMAs(cmaZipPath)
@@ -77,23 +76,32 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 	}
 	logger.Info("etl ca: parsed CMA boundary", "cmas", len(cmas), "path", cmaZipPath)
 
-	fsas, err := ParseFSAs(fsaZipPath)
-	if err != nil {
-		return err
-	}
-	logger.Info("etl ca: parsed FSA boundary", "fsas", len(fsas), "path", fsaZipPath)
-
 	assignments := assignCMAs(cmas)
 	knownCMASlugs := make(map[string]bool, len(assignments))
 	for _, a := range assignments {
 		knownCMASlugs[a.Slug] = true
 	}
 
-	tomlPath := filepath.Join(outDir, "regions_ca_cmas.toml")
-	if err := writeCMAsToFile(tomlPath, assignments); err != nil {
+	if target.Regions() {
+		tomlPath := filepath.Join(outDir, "regions_ca_cmas.toml")
+		if err := writeCMAsToFile(tomlPath, assignments); err != nil {
+			return err
+		}
+		logger.Info("etl ca: wrote CMAs", "path", tomlPath, "count", len(assignments))
+	}
+
+	if !target.Postal() {
+		return nil
+	}
+
+	// The FSA boundary is the 155 MB source; parse it only for the postal
+	// pass so a --target=regions run needs just the CMA file.
+	fsaZipPath := filepath.Join(srcDir, "lfsa000b21a_e.zip")
+	fsas, err := ParseFSAs(fsaZipPath)
+	if err != nil {
 		return err
 	}
-	logger.Info("etl ca: wrote CMAs", "path", tomlPath, "count", len(assignments))
+	logger.Info("etl ca: parsed FSA boundary", "fsas", len(fsas), "path", fsaZipPath)
 
 	anchors, reasons := Crosswalk(fsas, knownCMASlugs)
 	csvPath := filepath.Join(outDir, "postal_codes_ca.csv")

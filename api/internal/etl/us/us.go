@@ -118,7 +118,7 @@ func init() {
 //
 // Logs row counts and reason-bucket counts (city-leaf, nyc-borough,
 // county-leaf, msa, state) so the maintainer can spot coverage gaps.
-func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger) error {
+func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, logger *slog.Logger) error {
 	cbsaPath := filepath.Join(srcDir, "list1_2023.csv")
 	zctaPlacePath := filepath.Join(srcDir, "tab20_zcta520_place20_natl.txt")
 	zctaCountyPath := filepath.Join(srcDir, "tab20_zcta520_county20_natl.txt")
@@ -154,11 +154,17 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 		cbsaToSlug[code] = a.Slug
 	}
 
-	msaTOMLPath := filepath.Join(outDir, "regions_us_msas.toml")
-	if err := writeMSAs(msaTOMLPath, msas, assignments); err != nil {
-		return err
+	if target.Regions() {
+		msaTOMLPath := filepath.Join(outDir, "regions_us_msas.toml")
+		if err := writeMSAs(msaTOMLPath, msas, assignments); err != nil {
+			return err
+		}
+		logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "count", len(msas))
 	}
-	logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "count", len(msas))
+
+	if !target.Postal() {
+		return nil
+	}
 
 	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, cbsaToSlug)
 
