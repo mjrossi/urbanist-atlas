@@ -36,7 +36,7 @@ type Seeder interface {
 	// SeedPostalCode registers a postal-code -> leaf-region mapping.
 	SeedPostalCode(t *testing.T, country atlas.Country, code string, leafRegionID int64)
 	// SeedOrg registers an approved organization and its region
-	// attachments. CreatedAt should round-trip through OrgsForRegions
+	// attachments. AddedAt should round-trip through OrgsForRegions
 	// and ListRecent.
 	SeedOrg(t *testing.T, org atlas.Org, regionIDs []int64)
 }
@@ -57,8 +57,8 @@ func RunContractSuite(t *testing.T, factory Factory) {
 	t.Run("OrgsForRegions_RegionsSortedByID", func(t *testing.T) {
 		testOrgsForRegionsRegionsSortedByID(t, factory)
 	})
-	t.Run("OrgsForRegions_PopulatesCreatedAt", func(t *testing.T) {
-		testOrgsForRegionsPopulatesCreatedAt(t, factory)
+	t.Run("OrgsForRegions_PopulatesAddedAt", func(t *testing.T) {
+		testOrgsForRegionsPopulatesAddedAt(t, factory)
 	})
 	t.Run("ListRegions_NearestBrowseableAncestor_AlphabeticTiebreak", func(t *testing.T) {
 		testNearestBrowseableAncestorAlphabeticTiebreak(t, factory)
@@ -191,9 +191,9 @@ func testOrgsForRegionsRegionsSortedByID(t *testing.T, factory Factory) {
 	}
 }
 
-// testOrgsForRegionsPopulatesCreatedAt seeds an org with a known
-// CreatedAt and asserts it round-trips through OrgsForRegions.
-func testOrgsForRegionsPopulatesCreatedAt(t *testing.T, factory Factory) {
+// testOrgsForRegionsPopulatesAddedAt seeds an org with a known
+// AddedAt and asserts it round-trips through OrgsForRegions.
+func testOrgsForRegionsPopulatesAddedAt(t *testing.T, factory Factory) {
 	store, seed, teardown := factory(t)
 	defer teardown()
 
@@ -205,7 +205,7 @@ func testOrgsForRegionsPopulatesCreatedAt(t *testing.T, factory Factory) {
 	seed.SeedOrg(t, atlas.Org{
 		ID: 100, Slug: "org-y", Name: "Org Y", ShortDesc: "test",
 		WebsiteURL: "https://example.test",
-		CreatedAt:  stamp,
+		AddedAt:    stamp,
 	}, []int64{1})
 
 	orgs, err := store.OrgsForRegions(context.Background(), []int64{1})
@@ -215,10 +215,10 @@ func testOrgsForRegionsPopulatesCreatedAt(t *testing.T, factory Factory) {
 	if len(orgs) != 1 {
 		t.Fatalf("expected 1 org, got %d", len(orgs))
 	}
-	if orgs[0].CreatedAt.IsZero() {
-		t.Errorf("Org.CreatedAt is zero; want %v round-tripped", stamp)
-	} else if !orgs[0].CreatedAt.Equal(stamp) {
-		t.Errorf("Org.CreatedAt = %v, want %v", orgs[0].CreatedAt, stamp)
+	if orgs[0].AddedAt.IsZero() {
+		t.Errorf("Org.AddedAt is zero; want %v round-tripped", stamp)
+	} else if !orgs[0].AddedAt.Equal(stamp) {
+		t.Errorf("Org.AddedAt = %v, want %v", orgs[0].AddedAt, stamp)
 	}
 }
 

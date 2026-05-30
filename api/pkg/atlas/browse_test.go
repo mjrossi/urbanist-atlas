@@ -43,14 +43,14 @@ func newBrowseFixture() *MemStore {
 	t0 := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	// Newest at offset 10 days. Orgs are added in arbitrary order so the
 	// store's sort actually has to work.
-	s.AddOrg(Org{ID: 1, Slug: "ny-state-org", Name: "NY State Org", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, CreatedAt: t0.AddDate(0, 0, 3)}, []int64{4})
-	s.AddOrg(Org{ID: 2, Slug: "transalt-brooklyn", Name: "TransAlt Brooklyn", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"safe-streets"}, CreatedAt: t0.AddDate(0, 0, 5)}, []int64{1})
-	s.AddOrg(Org{ID: 3, Slug: "riders-alliance", Name: "Riders Alliance", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, CreatedAt: t0.AddDate(0, 0, 7)}, []int64{3})
-	s.AddOrg(Org{ID: 4, Slug: "ttcriders", Name: "TTCriders", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, CreatedAt: t0.AddDate(0, 0, 9)}, []int64{20})
+	s.AddOrg(Org{ID: 1, Slug: "ny-state-org", Name: "NY State Org", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, AddedAt: t0.AddDate(0, 0, 3)}, []int64{4})
+	s.AddOrg(Org{ID: 2, Slug: "transalt-brooklyn", Name: "TransAlt Brooklyn", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"safe-streets"}, AddedAt: t0.AddDate(0, 0, 5)}, []int64{1})
+	s.AddOrg(Org{ID: 3, Slug: "riders-alliance", Name: "Riders Alliance", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, AddedAt: t0.AddDate(0, 0, 7)}, []int64{3})
+	s.AddOrg(Org{ID: 4, Slug: "ttcriders", Name: "TTCriders", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"transit"}, AddedAt: t0.AddDate(0, 0, 9)}, []int64{20})
 	// MUBi-like: ONLY a national-tier region attachment. Must NOT appear
 	// in ListRecent or GetRegion. We give it the most-recent timestamp so
 	// a forgotten filter would surface it at the top.
-	s.AddOrg(Org{ID: 5, Slug: "mubi-nacional", Name: "MUBi Nacional", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"national"}, CreatedAt: t0.AddDate(0, 0, 10)}, []int64{99})
+	s.AddOrg(Org{ID: 5, Slug: "mubi-nacional", Name: "MUBi Nacional", ShortDesc: "x", WebsiteURL: "https://x", Tags: []Tag{"national"}, AddedAt: t0.AddDate(0, 0, 10)}, []int64{99})
 
 	return s
 }
@@ -472,10 +472,10 @@ func TestMemStore_ListRecent_CapAtTen(t *testing.T) {
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	for i := 1; i <= 12; i++ {
 		s.AddOrg(Org{
-			ID:        int64(i),
-			Slug:      "org-" + string(rune('a'+i-1)),
-			Name:      "Org",
-			CreatedAt: base.Add(time.Duration(i) * time.Hour),
+			ID:      int64(i),
+			Slug:    "org-" + string(rune('a'+i-1)),
+			Name:    "Org",
+			AddedAt: base.Add(time.Duration(i) * time.Hour),
 		}, []int64{1})
 	}
 	got, err := s.ListRecent(context.Background())

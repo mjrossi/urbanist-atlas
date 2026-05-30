@@ -38,7 +38,7 @@ var ErrRegionNotFound = errors.New("atlas: region not found")
 //   - ResolveRegionBySlug returns ErrRegionNotFound for unknown slugs
 //     and for slugs that name a national-tier region.
 //   - OrgsForRegions hydrates Org.Regions sorted ascending by region ID
-//     and populates Org.CreatedAt when the row carries one.
+//     and populates Org.AddedAt when the row carries one.
 //   - ListRegions' nearest-browseable-ancestor walk resolves ties
 //     (multiple browseable parents at min depth) by slug ASC.
 type Store interface {
@@ -72,7 +72,7 @@ type Store interface {
 	// of the given region IDs. Each returned Org has its full Regions
 	// slice populated (every region the org serves, not just the ones
 	// that matched), hydrated sorted ascending by region ID, with
-	// CreatedAt populated when the storage layer carries one. Order
+	// AddedAt populated when the storage layer carries one. Order
 	// across orgs is unspecified — callers bucket and sort.
 	OrgsForRegions(ctx context.Context, regionIDs []int64) ([]Org, error)
 
