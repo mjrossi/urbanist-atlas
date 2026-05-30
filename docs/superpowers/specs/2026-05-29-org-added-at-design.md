@@ -122,11 +122,18 @@ A one-time, auditable pass. Date assignment, in priority order:
    - lines from `7693e07` (founding region-graph seed — 19 org lines) →
      **initial seed → `2026-05-17`**
 
-   Git blame is used **only** to draw the 7.6/7.7 section boundary the
+   Git blame is used **only** to draw the founding-vs-7.7 boundary the
    inline comments do not. It is not a per-org precision source: the
    later `bf3d8ae` (postal coverage) and `a5a07776` (post-launch)
    commits reordered the file, so their blame dates are confounded and
    are ignored in favor of the inline slice structure.
+4. **Residual pre-7.8 orgs** (those in the pre-7.8 block that blame to a
+   confounded reorder commit rather than to `7693e07` or `402db80`) are
+   dated by reading position: each takes the date of the nearest
+   preceding inline slice marker, defaulting to `2026-05-21` (slice 7.7,
+   the dominant pre-7.8 growth slice) when no closer marker applies.
+   These cases are flagged in the mapping table with a `position`
+   source so the maintainer can override any that look wrong.
 
 Result: ~4 distinct dates (`2026-05-17`, `2026-05-21`, `2026-05-22`,
 `2026-05-23`). The pass produces a **reviewable mapping table**
@@ -134,10 +141,10 @@ Result: ~4 distinct dates (`2026-05-17`, `2026-05-21`, `2026-05-22`,
 reasoning is auditable, then writes `added_at` into every `[[org]]` in
 `orgs.toml`.
 
-PT seed files (`api/seed/regions_pt.toml` companions /
-`orgs` entries loaded by the integration suite) also receive `added_at`
-using their own slice dates, since the integration suite loads them and
-the required-field rule applies uniformly.
+The PT org file (`api/seed/orgs_pt.toml`, loaded explicitly by the
+integration suite as a validation fixture) also receives `added_at` on
+every entry using its slice-#4.6 date, since the required-field rule
+applies uniformly to any org file the loader reads.
 
 ### 5. Submission worker (going forward)
 
@@ -192,7 +199,7 @@ the required-field rule applies uniformly.
 - `api/internal/httpapi/*.go` — `toOAPIOrgs` mapping
 - `api/internal/githubpr/toml.go` (+ approval handler) — stamp approval date
 - `api/seed/orgs.toml` — backfill all 202 entries
-- `api/seed/postal*/PT seed orgs` — backfill PT entries
+- `api/seed/orgs_pt.toml` — backfill PT fixture entries
 - `api/seed/README.md` — document the field
 - `web/src/lib/api.gen.ts` — regenerated
 - `web/src/routes/Home.tsx` (+ detail page) — render `added_at`
