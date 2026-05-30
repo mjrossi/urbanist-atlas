@@ -54,18 +54,20 @@ export function Home() {
 
           <div className="prose mt-48">
             <p className="lead drop">
-              Within a few blocks of you, people show up to transportation
-              meetings week after week, patiently arguing for safer streets and
-              better transit. The Urbanist Atlas helps you find them. Type a US
-              ZIP or a Canadian postal code and we&rsquo;ll name the ones
-              working where you live.
+              Across the country, the county, and around the corner, people show
+              up to transportation meetings patiently arguing for safer streets
+              and better transit. The Urbanist Atlas helps you find these
+              meetings and groups.
             </p>
             <p>
-              We index local and regional advocates only. National outfits do
-              plenty of good work, but they are easy to find on their own; the
-              harder search is for the neighborhood committee three blocks from
-              your door, the metro rider alliance two transfers away, the county
-              Vision Zero coalition you have never heard of but should have.
+              How it works: type a US ZIP or a Canadian postal code and
+              we&rsquo;ll name the ones working where you live.
+            </p>
+            <p>
+              We&rsquo;ll index local and regional advocates only. National
+              outfits do plenty of good work, but they&rsquo;re easier to find
+              on their own. The hard search is finding those right around you.
+              Who knows? They might be right behind your keyboard.
             </p>
             <div className="editors-note">
               <div className="label">Editor&rsquo;s note · Vol. I</div>
@@ -89,8 +91,8 @@ export function Home() {
           <div className="rail-block amber desktop-only">
             <div className="rail-kicker">From the editors</div>
             <p className="pullquote-rail">
-              National advocacy is easy to find. The harder search is the
-              neighborhood committee three blocks from your door.
+              National outfits are easy to find on their own. The hard search is
+              for the advocates right around you.
             </p>
           </div>
         </aside>
