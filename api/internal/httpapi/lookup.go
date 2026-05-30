@@ -18,7 +18,7 @@ import (
 // OpenAPI shape.
 //
 // Error responses are RFC 9457 problem documents (see problem.go).
-func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
+func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		rawPostalIn := r.URL.Query().Get("postal_code")
@@ -67,6 +67,7 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, atlas.ErrPostalCodeNotFound) {
+				m.incLookup(string(country), "miss")
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Postal Code Not Found",
 					"No region is mapped to that postal code. Try a nearby code, or file a tip if you know an organization there.", rid)
 				return
@@ -81,6 +82,7 @@ func lookupHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 
+		m.incLookup(string(country), "hit")
 		writeJSON(w, http.StatusOK, toOAPILookupResult(result))
 	}
 }

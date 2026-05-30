@@ -41,10 +41,12 @@ type PromotionEnqueuer interface {
 // createSubmissionHandler answers POST /api/v1/submissions. Public
 // endpoint; gated by clientSecretMiddleware upstream + rate-limited
 // per-IP below.
-func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, limiter *ipRateLimiter, logger *slog.Logger) http.HandlerFunc {
+func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, limiter *ipRateLimiter, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		if ok, retry := limiter.allow(clientIP(r)); !ok {
+			m.incRateLimit("submissions")
+			m.incSubmissions("rate_limited")
 			writeRateLimited(w, r, retry, rid)
 			return
 		}
@@ -68,6 +70,7 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 				title = "Request Body Too Large"
 				detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
 			}
+			m.incSubmissions("rejected_validation")
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, title, detail, rid)
 			return
 		}
@@ -133,6 +136,7 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 		}
 
 		if len(fieldErrs) > 0 {
+			m.incSubmissions("rejected_validation")
 			writeProblemWithErrors(w, r, http.StatusBadRequest, problemValidation,
 				"Submission Validation Failed",
 				"One or more fields in the submission failed validation. See the errors map for per-field messages.",
@@ -142,10 +146,12 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 
 		sub, err := subs.Create(r.Context(), in)
 		if err != nil {
+			m.incSubmissions("error")
 			logger.ErrorContext(r.Context(), "create submission failed", "err", err, "rid", rid)
 			writeInternalProblem(w, r, rid)
 			return
 		}
+		m.incSubmissions("created")
 		writeJSON(w, http.StatusCreated, toOAPISubmission(sub))
 	}
 }
