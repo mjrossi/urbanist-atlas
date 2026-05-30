@@ -173,3 +173,66 @@ Bumping a source's vintage is a deliberate slice:
 Census ZCTA boundaries change every decennial census (next is 2030).
 StatsCan PCCF updates quarterly; vintage upgrades on a slower cadence
 are fine for our use case.
+
+## Known data-vintage gaps
+
+### Connecticut: ZCTA legacy counties vs. CBSA planning regions
+
+**Symptom.** ~267 Connecticut residential ZIPs anchor at the bare `ct`
+state node instead of their metro (Bridgeport-Stamford, Hartford, New
+Haven, …), so a lookup for e.g. Stamford 06902 surfaces only
+state-level orgs. The HUD-sourced P.O.-box/business ZIPs in the same
+towns *do* reach their metro — that residential-vs-PObox split is the
+tell.
+
+**Cause — a county-vintage mismatch between two Census sources.** On
+2022-06-06 the Census Bureau replaced Connecticut's 8 legacy counties
+(FIPS `09001`–`09015`) with 9 planning regions as county-equivalents
+(FIPS `09110`–`09190`). The two sources we join on county GEOID are now
+different vintages:
+
+- `list1_2023.csv` (CBSA delineation, **July 2023**) keys CT metros by
+  the **new planning-region** GEOIDs → these become the keys of
+  `countyToMSA`.
+- `tab20_zcta520_county20_natl.txt` (ZCTA→county, **2020**) keys CT
+  ZCTAs by the **legacy county** GEOIDs.
+
+So `countyToMSA[<legacy CT county>]` misses, the county→MSA tier fails,
+and every CT ZCTA ZIP falls through to the state. (`hud_zip_county_2025q4`
+already uses current FIPS, which is why HUD-anchored CT ZIPs resolve
+correctly.)
+
+**Why "just bump the source" doesn't work.** The ZCTA→county
+relationship file is a frozen 2020-decennial product; per the Census
+notice it keeps the 8 legacy counties indefinitely (datasets published
+before 2022-06-01 are exempt from the switch), and the ZCTA series isn't
+re-released until the 2030 boundaries. There is **no drop-in national
+ZCTA→county-equivalent file** that uses planning regions — the
+transition lives in CT-specific 2024 relationship files and tract/town
+crosswalks that don't map ZIP/ZCTA directly, and planning regions don't
+nest in legacy counties (so a flat legacy-county→region alias is lossy).
+See the Federal Register notice and the Census relationship-files /
+2024-CT record-layout pages:
+- https://www.federalregister.gov/documents/2022/06/06/2022-12063/change-to-county-equivalents-in-the-state-of-connecticut
+- https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.html
+- https://www.census.gov/programs-surveys/geography/technical-documentation/records-layout/2024-connecticut-record-layout.html
+
+**Current mitigation (shipped).** A scoped `zipAnchorOverride`
+(`internal/etl/us/mappings.go`) re-anchors the lower-Fairfield "Gold
+Coast" residential ZIPs (Greenwich, Stamford, Darien, New Canaan,
+Norwalk, Westport, Weston, Wilton) at `bridgeport-ct-metro`, which is
+parented under `nyc-tristate` + `ct`. This fixes the originally-reported
+Stamford case but is a per-ZIP patch, not the systemic fix.
+
+**Recommended follow-up (not yet implemented): HUD fallback for retired
+CT FIPS.** The repo already vendors a current-vintage, ZIP-level,
+authoritative source — the HUD ZIP→County crosswalk — that maps every CT
+ZIP to the correct planning region. The clean systemic fix is: in the
+ZCTA crosswalk, when a ZCTA would resolve to the bare state *because its
+county GEOID is a retired CT legacy code* (`09001`–`09015`), re-resolve
+that ZIP via HUD's current county-equivalent. That fixes all ~267 ZIPs
+(Hartford/New Haven/New London included), needs no new download, and
+self-heals future county-vintage skew — at the cost of a deliberate,
+documented exception to the "HUD is additive-only, never overrides a
+ZCTA row" rule. When implemented, the `zipAnchorOverride` patch above
+can be removed.
