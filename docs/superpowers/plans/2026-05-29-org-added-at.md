@@ -459,5 +459,6 @@ the date in broadsheet style.
 - **go-toml/v2 `toml.LocalDate`** has `Year`, `Month`, `Day` int fields
   and parses bare `added_at = 2026-05-21` TOML dates. Verify exact field
   names against the vendored version before relying on them in build.go.
-- Each phase is an atomic, signed commit. The work stays on
-  `mr-weekend-edits` unless the maintainer asks for a PR branch.
+- Each phase is an atomic, signed commit on `org-added-at`. When all
+  phases pass the CI gates, open a PR into `main`
+  (`gh pr create --base main`).
