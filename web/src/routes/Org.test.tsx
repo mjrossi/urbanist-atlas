@@ -31,6 +31,7 @@ function makeOrg(overrides: Partial<OrgT> = {}): OrgT {
     short_desc: 'NYC-wide advocacy for walking, biking, and public transit.',
     website_url: 'https://www.transalt.org',
     tags: ['transit', 'safe-streets'],
+    added_at: '2026-05-17',
     regions: [
       {
         id: 10,

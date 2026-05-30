@@ -33,6 +33,7 @@ function makeOrg(overrides: Partial<LookupOrg> = {}): LookupOrg {
     tags: ['transit', 'policy'],
     regions: [],
     matched_region_slugs: [],
+    added_at: '2026-05-17',
     ...overrides,
   };
 }

@@ -54,6 +54,7 @@ function makeOrg(id: number, slug: string, name: string): Org {
     website_url: `https://${slug}.example.org`,
     tags: ['transit'],
     regions: [],
+    added_at: '2026-05-21',
   };
 }
 
