@@ -49,6 +49,7 @@ type submissionsTestRig struct {
 	store   atlas.Store
 	enq     *recordingEnqueuer
 	limiter *ipRateLimiter
+	metrics *Metrics
 }
 
 func newSubmissionsTestServer(t *testing.T) *submissionsTestRig {
@@ -69,7 +70,8 @@ func newSubmissionsTestServer(t *testing.T) *submissionsTestRig {
 	enq := &recordingEnqueuer{}
 	limiter := newIPRateLimiter(2, time.Hour) // tight ceiling for the 429 test
 	logger := slog.New(slog.DiscardHandler)
-	r := buildSubmissionRoutes(subs, store, enq, limiter, logger)
+	metrics := NewMetrics()
+	r := buildSubmissionRoutes(subs, store, enq, limiter, logger, metrics)
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
@@ -79,6 +81,7 @@ func newSubmissionsTestServer(t *testing.T) *submissionsTestRig {
 		store:   store,
 		enq:     enq,
 		limiter: limiter,
+		metrics: metrics,
 	}
 }
 
@@ -88,11 +91,11 @@ func newSubmissionsTestServer(t *testing.T) *submissionsTestRig {
 // This lets the test exercise the real handler-middleware stack
 // (bearer auth, rate limit, problem responses) without spinning up
 // every /api/v1/* sibling.
-func buildSubmissionRoutes(subs atlas.SubmissionStore, store atlas.Store, enq PromotionEnqueuer, limiter *ipRateLimiter, logger *slog.Logger) http.Handler {
+func buildSubmissionRoutes(subs atlas.SubmissionStore, store atlas.Store, enq PromotionEnqueuer, limiter *ipRateLimiter, logger *slog.Logger, m *Metrics) http.Handler {
 	r := chi.NewRouter()
 	r.Use(requestIDMiddleware)
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/submissions", createSubmissionHandler(subs, store, limiter, logger, NewMetrics()))
+		r.Post("/submissions", createSubmissionHandler(subs, store, limiter, logger, m))
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(bearerAuthMiddleware(testAdminToken))
 			r.Get("/submissions", listSubmissionsHandler(subs, logger))
@@ -470,7 +473,7 @@ func TestApprove_PersistsWorkerDisabledError(t *testing.T) {
 
 	limiter := newIPRateLimiter(10, time.Hour)
 	logger := slog.New(slog.DiscardHandler)
-	r := buildSubmissionRoutes(subs, store, nil /* no enqueuer */, limiter, logger)
+	r := buildSubmissionRoutes(subs, store, nil /* no enqueuer */, limiter, logger, NewMetrics())
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 

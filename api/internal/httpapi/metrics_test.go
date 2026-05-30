@@ -91,6 +91,29 @@ func TestMetrics_UnknownCountryBucketed(t *testing.T) {
 	}
 }
 
+// TestMetrics_SubmissionCounters exercises the createSubmissionHandler
+// counter paths through the real route table: one accepted submission
+// (status=created) and one that fails field validation
+// (status=rejected_validation).
+func TestMetrics_SubmissionCounters(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", goodSubmissionBody(), nil)
+	resp.Body.Close()
+
+	bad := goodSubmissionBody()
+	delete(bad["payload"].(map[string]any), "name") // required field
+	resp = postJSON(t, rig.srv.URL+"/api/v1/submissions", bad, nil)
+	resp.Body.Close()
+
+	if got := testutil.ToFloat64(rig.metrics.submissions.WithLabelValues("created")); got != 1 {
+		t.Errorf("atlas_submissions_total{status=created} = %v, want 1", got)
+	}
+	if got := testutil.ToFloat64(rig.metrics.submissions.WithLabelValues("rejected_validation")); got != 1 {
+		t.Errorf("atlas_submissions_total{status=rejected_validation} = %v, want 1", got)
+	}
+}
+
 func TestMetrics_HTTPRequestsUseRoutePattern(t *testing.T) {
 	srv, m := newMetricsTestServer(t)
 

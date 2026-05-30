@@ -124,8 +124,16 @@ func metricsMiddleware(m *Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-			next.ServeHTTP(rec, r)
+			// Reuse the access-log middleware's status recorder when it is
+			// already in the chain (loggingMiddleware runs just outside this
+			// one) so a request carries at most one wrapper; only allocate
+			// our own when this middleware is used standalone.
+			rec, ok := w.(*statusRecorder)
+			if !ok {
+				rec = &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+				w = rec
+			}
+			next.ServeHTTP(w, r)
 
 			route := chi.RouteContext(r.Context()).RoutePattern()
 			if route == "" {
