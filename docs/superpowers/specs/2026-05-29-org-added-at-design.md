@@ -52,8 +52,30 @@ fabricated precision.
 
 ### 1. Data model (Go)
 
-Rename `Org.CreatedAt` → `Org.AddedAt` everywhere; do not leave a dead
-field. `AddedAt` is a `time.Time` holding the date at midnight UTC.
+Rename `Org.CreatedAt` → `Org.AddedAt`; do not leave a dead field.
+`AddedAt` is a `time.Time` holding the date at midnight UTC.
+
+> **Scope warning — two unrelated `CreatedAt` fields exist.** The rename
+> touches **only `atlas.Org.CreatedAt`** and its usages. A separate,
+> legitimate `Submission.CreatedAt` (the submission-queue timestamp) lives
+> in `api/pkg/atlas/submission.go`, the SQLite store
+> (`api/internal/store/sqlite/`), `api/internal/githubpr/worker.go`, and
+> the generated `oapi/types.gen.go` (`created_at`). **Do not rename or
+> touch the Submission field.** A blanket `grep -rn CreatedAt` sweep is
+> therefore *wrong*; the rename is targeted at the `Org` field's
+> reference set only.
+
+Exact `Org.CreatedAt` reference set to rename (verified):
+- `api/pkg/atlas/atlas.go:80-83, 87, 101` — field + doc comments
+- `api/pkg/atlas/memstore.go:58, 311-317` — sort + comments
+- `api/pkg/atlas/store.go:41, 75` — interface doc comments
+- `api/pkg/atlas/storetest/storetest.go:39, 60-61, 194-221` — the
+  `OrgsForRegions_PopulatesCreatedAt` round-trip test (rename test +
+  helper to `…PopulatesAddedAt`)
+- `api/pkg/atlas/browse_test.go:46-53, 478` — `Org{…, CreatedAt: …}`
+  literals
+- `api/internal/httpapi/recent_test.go:82, 89` — `Org{…, CreatedAt: …}`
+  literals
 
 - `api/pkg/atlas/atlas.go:95`: field becomes
   `AddedAt time.Time `json:"added_at" toml:"-"`` (tag changes from
@@ -186,8 +208,10 @@ applies uniformly to any org file the loader reads.
 - No changes to rate-limiting, auth, region-graph, or postal-code paths.
 - No new dependencies (`go-toml/v2`, `oapi-codegen`, `openapi-typescript`
   are all already in use).
-- The rename is mechanical and total: zero `CreatedAt` references remain
-  after this work (`grep -rn CreatedAt` returns nothing).
+- The rename is mechanical but **targeted to `Org.CreatedAt` only**:
+  after this work, `grep -rn 'Org.*CreatedAt'` / the reference set in §1
+  is empty, while `Submission.CreatedAt` and all SQLite/submission
+  `created_at` usages remain untouched.
 
 ## Affected files (non-exhaustive)
 
