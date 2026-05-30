@@ -93,8 +93,8 @@ region_slugs = ["testville"]
 
 // TestBuildMemStore_EmbeddedSeedHasAddedAtEverywhere is the invariant
 // guard on the production bundle: every org in orgs.toml carries a
-// populated, in-window added_at. The point of the whole feature is
-// that the loader rejects a missing date; this test is the matching
+// populated added_at (non-zero year). The point of the whole feature
+// is that the loader rejects a missing date; this test is the matching
 // proof that the committed seed satisfies that contract today.
 func TestBuildMemStore_EmbeddedSeedHasAddedAtEverywhere(t *testing.T) {
 	if _, err := seedfiles.BuildMemStore(nil, seedfs.FS); err != nil {
