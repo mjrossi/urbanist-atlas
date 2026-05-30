@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainOf, groupCountLabel, prettyTag } from './format.ts';
+import { domainOf, formatAddedAt, groupCountLabel, prettyTag } from './format.ts';
 
 describe('groupCountLabel', () => {
   it('uses the singular form for exactly one', () => {
@@ -52,5 +52,24 @@ describe('prettyTag', () => {
 
   it('replaces multiple hyphens in one tag', () => {
     expect(prettyTag('bus-rapid-transit')).toBe('bus rapid transit');
+  });
+});
+
+describe('formatAddedAt', () => {
+  it('renders a date-only string as a broadsheet dateline', () => {
+    expect(formatAddedAt('2026-05-21')).toBe('May 21, 2026');
+  });
+
+  it('keeps the displayed day calendar-correct (no UTC drift)', () => {
+    // A bare-date `new Date('2026-01-01')` parses as UTC midnight and
+    // prints "Dec 31, 2025" west of UTC. The manual parse must show
+    // the calendar day regardless of the runner's timezone.
+    expect(formatAddedAt('2026-01-01')).toBe('January 1, 2026');
+  });
+
+  it('falls back to the raw input for malformed dates', () => {
+    expect(formatAddedAt('')).toBe('');
+    expect(formatAddedAt('not-a-date')).toBe('not-a-date');
+    expect(formatAddedAt('2026-05')).toBe('2026-05');
   });
 });
