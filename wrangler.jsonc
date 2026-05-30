@@ -35,9 +35,15 @@
     // documented surface. See docs/deploy.md for the policy notes.
   },
 
-  // Observability: cheap default. `head_sampling_rate` controls
-  // how many requests Cloudflare's analytics ingests; 1.0 = all.
-  // Drop later if traffic ever justifies a sampled view.
+  // Workers Logs. This logs Worker *invocations*; with a pure
+  // static-assets deploy (no Worker code) there is nothing to log, so
+  // it is effectively inert today — kept as a sensible default for if a
+  // Worker is ever added. NOTE: this is NOT the site's audience
+  // analytics. Page views / visitors come from Cloudflare Web Analytics
+  // (a cookieless beacon Cloudflare injects at the edge — enabled in
+  // the dashboard, not configured in this repo; the CSP in
+  // web/public/_headers allow-lists its origins). `head_sampling_rate`
+  // 1.0 = ingest all, and only matters once a Worker exists.
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
