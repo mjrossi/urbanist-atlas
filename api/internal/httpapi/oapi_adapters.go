@@ -7,6 +7,8 @@ package httpapi
 // wire-shape surface is reviewed in one file.
 
 import (
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
@@ -48,6 +50,7 @@ func toOAPIOrg(o atlas.Org) oapi.Org {
 		WebsiteUrl: o.WebsiteURL,
 		Tags:       tags,
 		Regions:    regions,
+		AddedAt:    openapi_types.Date{Time: o.AddedAt},
 	}
 	if o.ContactURL != "" {
 		cu := o.ContactURL
@@ -115,6 +118,7 @@ func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
 		Tags:               base.Tags,
 		Regions:            base.Regions,
 		ContactUrl:         base.ContactUrl,
+		AddedAt:            base.AddedAt,
 		MatchedRegionSlugs: nonNilSlice(o.MatchedRegionSlugs),
 	}
 }

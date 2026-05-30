@@ -62,6 +62,13 @@ type Country = string
 
 // LookupOrg defines model for LookupOrg.
 type LookupOrg struct {
+	// AddedAt Date the org was added to the atlas. Date-only (no time
+	// component). Sourced from the seed file's `added_at` field
+	// on import, and from the approval date for orgs added via
+	// the submission queue. Drives the homepage "Recently
+	// indexed" strip's newest-first ordering.
+	AddedAt openapi_types.Date `json:"added_at"`
+
 	// ContactUrl Optional. URL of the org's contact page.
 	ContactUrl *string `json:"contact_url,omitempty"`
 	Id         int64   `json:"id"`
@@ -144,6 +151,13 @@ type NewSubmissionRequest struct {
 // region the org serves, not just the regions that matched the
 // current query.
 type Org struct {
+	// AddedAt Date the org was added to the atlas. Date-only (no time
+	// component). Sourced from the seed file's `added_at` field
+	// on import, and from the approval date for orgs added via
+	// the submission queue. Drives the homepage "Recently
+	// indexed" strip's newest-first ordering.
+	AddedAt openapi_types.Date `json:"added_at"`
+
 	// ContactUrl Optional. URL of the org's contact page.
 	ContactUrl *string  `json:"contact_url,omitempty"`
 	Id         int64    `json:"id"`

@@ -758,7 +758,7 @@ components:
         the organization for ergonomic JSON output — it lists every
         region the org serves, not just the regions that matched the
         current query.
-      required: [id, slug, name, short_desc, website_url, tags, regions]
+      required: [id, slug, name, short_desc, website_url, tags, regions, added_at]
       properties:
         id:
           type: integer
@@ -793,6 +793,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Region'
+        added_at:
+          type: string
+          format: date
+          example: "2026-05-21"
+          description: |
+            Date the org was added to the atlas. Date-only (no time
+            component). Sourced from the seed file's `added_at` field
+            on import, and from the approval date for orgs added via
+            the submission queue. Drives the homepage "Recently
+            indexed" strip's newest-first ordering.
 
     LookupOrg:
       description: |

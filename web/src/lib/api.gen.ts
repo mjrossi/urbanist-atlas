@@ -463,6 +463,16 @@ export interface components {
              */
             tags: string[];
             regions: components["schemas"]["Region"][];
+            /**
+             * Format: date
+             * @description Date the org was added to the atlas. Date-only (no time
+             *     component). Sourced from the seed file's `added_at` field
+             *     on import, and from the approval date for orgs added via
+             *     the submission queue. Drives the homepage "Recently
+             *     indexed" strip's newest-first ordering.
+             * @example 2026-05-21
+             */
+            added_at: string;
         };
         /**
          * @description An `Org` augmented with the per-lookup `matched_region_slugs`
