@@ -12,8 +12,17 @@
 #
 # Content Security Policy
 # -----------------------
-# The SPA serves no inline <script>; everything goes through Vite's
-# bundled module graph, so `script-src 'self'` is enough.
+# The SPA serves no inline <script>; our own code all goes through
+# Vite's bundled module graph, so `script-src 'self'` covers it.
+# `https://static.cloudflareinsights.com` is the one external script
+# the app loads: the Cloudflare Web Analytics beacon (beacon.min.js).
+# We don't ship the beacon <script> ourselves — Cloudflare injects it
+# at the edge (Web Analytics "Enable" / automatic injection) into the
+# served HTML. But the browser still enforces CSP against the injected
+# tag, so `static.cloudflareinsights.com` (script) and
+# `cloudflareinsights.com` (the RUM POST, see connect-src) must be
+# allow-listed here regardless of who injects the tag. The beacon is
+# privacy-first and cookieless.
 #
 # `style-src 'self'`: Vite's production build emits all CSS as
 # external `<link rel="stylesheet">` assets — there are no inline
@@ -28,10 +37,11 @@
 #
 # `img-src 'self' data:`: SVG icons inlined as data: URIs.
 #
-# `connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com`:
-# the only outbound fetches are to the Atlas API. The QA host stays
-# in the list until Phase 2 cutover collapses qa/prod onto a single
-# origin.
+# `connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com https://cloudflareinsights.com`:
+# outbound fetches go to the Atlas API (the QA host stays in the list
+# until Phase 2 cutover collapses qa/prod onto a single origin) plus
+# `cloudflareinsights.com`, where the Web Analytics beacon POSTs its
+# cookieless RUM data.
 #
 # `frame-ancestors 'none'`: nobody embeds the Atlas in an iframe.
 #
@@ -49,7 +59,7 @@
 # Adjust this file when adding a new origin (e.g. a future analytics
 # endpoint) — and document the change in `docs/deploy.md`.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
