@@ -247,3 +247,22 @@ can't silently reshape anchors elsewhere. The earlier per-ZIP
 > `bridgeport-ct-metro → [nyc-tristate, ct]` parent edge needed for the
 > Tri-State result is already in `regions_us_msa_overrides.toml` and
 > `regions_us_msas.toml`.
+
+**Generalizing beyond CT (when, not now).** The reconcile is scoped to
+`ctLegacyCounties` because CT (June 2022) is the *only* county recode in
+the gap between our two sources' vintages (ZCTA 2020 ↔ CBSA 2023), so
+that set is the entire problem today. But the ZCTA→county file stays
+frozen at 2020 counties until the 2030 census while CBSA delineations
+keep advancing, so **every future county recode silently joins this
+failure class** — CT is just the first. The principled generalization
+triggers on the symptom instead of a hardcoded set: a ZCTA stranded at
+state whose source county GEOID is absent from the *current national
+county universe* is stale → reconcile via HUD. That requires vendoring
+one small extra source — a current national county gazetteer — to tell a
+stale county apart from a legitimately non-metro rural county
+(`countyToMSA` can't serve as that universe; rural counties are validly
+absent from it). Deliberately **not** a blanket
+"ZCTA-at-state → prefer HUD": that would re-litigate the intentional
+ZCTA-over-HUD primacy (see the postal-coverage design) and pull
+genuinely-rural ZIPs into adjacent metros. Generalize for real only when
+a second state actually trips this.
