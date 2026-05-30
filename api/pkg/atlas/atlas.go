@@ -77,17 +77,21 @@ type Region struct {
 // MatchedRegionSlugs is populated only by Lookup and identifies the
 // subset of Regions that caused the org to surface for that lookup.
 //
-// CreatedAt is server-side only (`json:"-"`) and powers newest-first
-// ordering in Store.ListRecent and Store.OrgsForRegions. The wire
-// contract in api/openapi.yaml does not include it; a future spec
-// addition can expose it without changing the data model.
+// AddedAt is the date the org was added to the atlas (held at midnight
+// UTC), sourced from the required `added_at` field in orgs.toml. It
+// powers newest-first ordering in Store.ListRecent and
+// Store.OrgsForRegions. It keeps `json:"-"`: the wire exposes the date
+// through the generated oapi.Org type (toOAPIOrg maps it to an
+// openapi_types.Date), so this internal struct is never serialized
+// directly.
 //
-// The TOML tags name the seed-file shape (orgs.toml). Fields that
-// the seedfiles loader stamps after parsing (ID, Regions hydration)
-// or that are server-side-only (MatchedRegionSlugs, CreatedAt) carry
-// `toml:"-"`. The TOML schema has a `region_slugs` field that's not
-// on this type; seedfiles unmarshals it onto an OrgEntry wrapper
-// that embeds this struct, then resolves it to IDs at load time.
+// The TOML tags name the seed-file shape (orgs.toml). Fields that the
+// seedfiles loader stamps after parsing (ID, Regions hydration,
+// AddedAt) or that are server-side-only (MatchedRegionSlugs) carry
+// `toml:"-"`. The TOML schema has `region_slugs` and `added_at` fields
+// that aren't decoded onto this type directly; seedfiles unmarshals
+// them onto an OrgEntry wrapper that embeds this struct, then resolves
+// region_slugs to IDs and copies added_at over at load time.
 type Org struct {
 	ID                 int64     `json:"id" toml:"-"`
 	Slug               string    `json:"slug" toml:"slug"`
@@ -98,7 +102,7 @@ type Org struct {
 	Tags               []Tag     `json:"tags" toml:"tags"`
 	Regions            []Region  `json:"regions" toml:"-"`
 	MatchedRegionSlugs []string  `json:"matched_region_slugs,omitempty" toml:"-"`
-	CreatedAt          time.Time `json:"-" toml:"-"`
+	AddedAt            time.Time `json:"-" toml:"-"`
 }
 
 // LookupQuery is the input to Lookup.

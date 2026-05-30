@@ -44,3 +44,33 @@ export function domainOf(url: string): string | null {
 export function prettyTag(tag: string): string {
   return tag.replace(/-/g, ' ');
 }
+
+/**
+ * Formats an `added_at` date-only string (YYYY-MM-DD, per the wire
+ * contract — see `openapi.yaml`'s Org schema) as an editorial
+ * dateline. Returns the natural broadsheet form, e.g.
+ *
+ *   "May 21, 2026"
+ *
+ * Parsing is intentionally manual (not `new Date(s)`) because the
+ * Date constructor reads bare-date inputs as UTC midnight and then
+ * renders them in the local timezone — so for a viewer west of UTC,
+ * "2026-05-21" would print as "May 20". Splitting on `-` keeps the
+ * displayed day calendar-correct everywhere.
+ */
+export function formatAddedAt(addedAt: string): string {
+  const [yStr, mStr, dStr] = addedAt.split('-');
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const d = Number(dStr);
+  if (!y || !m || !d) return addedAt;
+  // Local-noon construction sidesteps the same UTC drift on the
+  // Intl.DateTimeFormat side: noon in every IANA zone is the same
+  // calendar day regardless of how the timezone offset rounds.
+  const dt = new Date(y, m - 1, d, 12, 0, 0);
+  return dt.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}

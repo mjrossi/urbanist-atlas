@@ -18,6 +18,7 @@
 
 [[org]]
 slug = "mubi-lisboa"
+added_at = 2026-05-17
 name = "MUBi Lisboa"
 short_desc = "Lisboa chapter of MUBi (Associação pela Mobilidade Urbana em Bicicleta), advocating for cycling infrastructure and urban mobility in the Lisboa area."
 website_url = "https://mubi.pt"
@@ -26,6 +27,7 @@ region_slugs = ["lisboa-municipio"]
 
 [[org]]
 slug = "mubi-porto"
+added_at = 2026-05-17
 name = "MUBi Porto"
 short_desc = "Porto chapter of MUBi, working for safer cycling and active mobility across the Área Metropolitana do Porto."
 website_url = "https://mubi.pt"
@@ -34,6 +36,7 @@ region_slugs = ["porto-municipio"]
 
 [[org]]
 slug = "lisboa-para-pessoas"
+added_at = 2026-05-17
 name = "Lisboa Para Pessoas"
 short_desc = "Lisboa-focused walkability and public-space advocacy; pedestrian-first journalism and campaigning."
 website_url = "https://lisboaparapessoas.pt"
@@ -42,6 +45,7 @@ region_slugs = ["lisboa-municipio"]
 
 [[org]]
 slug = "mubi-nacional"
+added_at = 2026-05-17
 name = "MUBi — Associação pela Mobilidade Urbana em Bicicleta"
 short_desc = "Portugal's national cycling federation; coordinates local chapters in Lisboa, Porto, Coimbra and beyond."
 website_url = "https://mubi.pt"

@@ -79,14 +79,14 @@ func TestListRecent_ExcludesNationalTier(t *testing.T) {
 	s.AddOrg(atlas.Org{
 		ID: 1, Slug: "plain-org", Name: "Plain",
 		ShortDesc: "x", WebsiteURL: "https://x",
-		CreatedAt: t0,
+		AddedAt: t0,
 	}, []int64{1})
 	s.AddOrg(atlas.Org{
 		ID: 2, Slug: "mubi-nacional", Name: "MUBi (national)",
 		ShortDesc: "x", WebsiteURL: "https://x",
 		// Newer than the plain org — a forgotten filter would surface
 		// this one at the top.
-		CreatedAt: t0.Add(48 * time.Hour),
+		AddedAt: t0.Add(48 * time.Hour),
 	}, []int64{99})
 
 	handler := New(Config{
@@ -130,4 +130,58 @@ func oapiOrgSlugs(orgs []oapi.Org) []string {
 		out[i] = o.Slug
 	}
 	return out
+}
+
+// TestListRecent_OrgCarriesAddedAtDateOnly asserts the wire shape of
+// the Org.added_at field: a date-only ISO string ("2026-05-21"), not
+// an RFC3339 datetime. The Date marshaling lives in
+// openapi_types.Date; this test pins the contract so a future codegen
+// regression (e.g. the field accidentally typed as DateTime) is
+// caught at the JSON layer, not just at compile time.
+func TestListRecent_OrgCarriesAddedAtDateOnly(t *testing.T) {
+	s := atlas.NewMemStore()
+	s.AddRegion(atlas.Region{
+		ID: 1, Kind: "us:city", Name: "Brooklyn", Slug: "brooklyn-ny",
+		Country: atlas.CountryUS, ScopeTier: atlas.ScopeLocal,
+	})
+	added := time.Date(2026, 5, 21, 0, 0, 0, 0, time.UTC)
+	s.AddOrg(atlas.Org{
+		ID: 1, Slug: "plain-org", Name: "Plain",
+		ShortDesc: "x", WebsiteURL: "https://x",
+		AddedAt: added,
+	}, []int64{1})
+
+	handler := New(Config{
+		Store:      s,
+		Logger:     slog.New(slog.DiscardHandler),
+		APIVersion: "v1",
+	})
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/recent")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Raw-string assertion: openapi_types.Date marshals to "YYYY-MM-DD"
+	// — the date-only contract. A DateTime regression would render
+	// "2026-05-21T00:00:00Z" instead.
+	var raw struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(raw.Data) != 1 {
+		t.Fatalf("want exactly 1 org; got %d", len(raw.Data))
+	}
+	got, ok := raw.Data[0]["added_at"].(string)
+	if !ok {
+		t.Fatalf("added_at: want string, got %T", raw.Data[0]["added_at"])
+	}
+	if got != "2026-05-21" {
+		t.Errorf("added_at: want %q (date-only), got %q", "2026-05-21", got)
+	}
 }

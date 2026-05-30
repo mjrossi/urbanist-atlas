@@ -7,6 +7,7 @@ import { SearchBox } from '../components/SearchBox.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import { ApiError, listRegions, listRecent } from '../lib/api.ts';
 import type { RegionSummary, Org } from '../lib/api.ts';
+import { formatAddedAt } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
@@ -190,7 +191,7 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
                 className="org-card"
                 to={`/orgs/${encodeURIComponent(org.slug)}`}
               >
-                <div className="added">Newly indexed</div>
+                <div className="added">Added {formatAddedAt(org.added_at)}</div>
                 <h3 className="org-name">{org.name}</h3>
                 {where ? <div className="org-where">{where}</div> : null}
                 <p className="org-desc">{truncate(org.short_desc, 180)}</p>
