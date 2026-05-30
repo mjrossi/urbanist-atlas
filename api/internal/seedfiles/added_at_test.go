@@ -2,11 +2,13 @@ package seedfiles_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
+	seedfs "github.com/mjrossi/urbanist-atlas/api/seed"
 )
 
 // region returns a minimal one-row regions_<cc>.toml document. The
@@ -60,5 +62,59 @@ added_at = 2026-05-21
 	want := time.Date(2026, 5, 21, 0, 0, 0, 0, time.UTC)
 	if !org.AddedAt.Equal(want) {
 		t.Errorf("Org.AddedAt = %v, want %v", org.AddedAt, want)
+	}
+}
+
+// TestBuildMemStore_RequiresAddedAt asserts the loader rejects any org
+// that omits added_at, and that the error names the offending slug so
+// an operator can fix the seed file without grep gymnastics. This is
+// the regression guard the whole feature exists to provide: a future
+// editor who forgets the field gets a loud boot failure, not a silent
+// near-year-zero AddedAt that breaks the recent strip.
+func TestBuildMemStore_RequiresAddedAt(t *testing.T) {
+	const orgs = `[[org]]
+slug = "org-x"
+name = "Org X"
+short_desc = "d"
+website_url = "https://x.org"
+region_slugs = ["testville"]
+`
+	_, err := seedfiles.BuildMemStore(nil, minimalSeedFS(orgs))
+	if err == nil {
+		t.Fatal("BuildMemStore: want error for missing added_at, got nil")
+	}
+	if !strings.Contains(err.Error(), "org-x") {
+		t.Errorf("error must name the offending slug; got %q", err)
+	}
+	if !strings.Contains(err.Error(), "added_at") {
+		t.Errorf("error must name the missing field; got %q", err)
+	}
+}
+
+// TestBuildMemStore_EmbeddedSeedHasAddedAtEverywhere is the invariant
+// guard on the production bundle: every org in orgs.toml carries a
+// populated, in-window added_at. The point of the whole feature is
+// that the loader rejects a missing date; this test is the matching
+// proof that the committed seed satisfies that contract today.
+func TestBuildMemStore_EmbeddedSeedHasAddedAtEverywhere(t *testing.T) {
+	if _, err := seedfiles.BuildMemStore(nil, seedfs.FS); err != nil {
+		t.Fatalf("BuildMemStore embed: %v", err)
+	}
+	f, err := seedfs.FS.Open("orgs.toml")
+	if err != nil {
+		t.Fatalf("open embedded orgs.toml: %v", err)
+	}
+	defer f.Close()
+	entries, err := seedfiles.ParseOrgs(f)
+	if err != nil {
+		t.Fatalf("ParseOrgs: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("embedded orgs.toml is empty?")
+	}
+	for _, e := range entries {
+		if e.AddedAt.Year == 0 {
+			t.Errorf("org %q has zero added_at — Phase 3 backfill missed it", e.Slug)
+		}
 	}
 }

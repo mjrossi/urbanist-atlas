@@ -125,14 +125,17 @@ func BuildMemStore(logger *slog.Logger, seedFS fs.FS) (*atlas.MemStore, error) {
 		if err != nil {
 			return nil, fmt.Errorf("seedfiles: orgs: %w", err)
 		}
+		// added_at is required; a missing TOML key parses as the zero
+		// toml.LocalDate (Year == 0). Reject loudly with the offending
+		// slug so an operator can fix the seed file without grep.
+		if entry.AddedAt.Year == 0 {
+			return nil, fmt.Errorf("seedfiles: org %q: missing required added_at", entry.Slug)
+		}
 		o := entry.Org
 		o.ID = nextOrgID
 		// added_at parses as a date-only toml.LocalDate on the entry
 		// wrapper (atlas.Org.AddedAt is toml:"-"); pin it to midnight
-		// UTC. Phase 4 makes this a required field — until then a
-		// missing date yields a near-year-zero sentinel and the bundle
-		// still loads (every org ties, so ListRecent falls back to its
-		// ID DESC tiebreak, unchanged from before this field existed).
+		// UTC.
 		o.AddedAt = time.Date(entry.AddedAt.Year, time.Month(entry.AddedAt.Month), entry.AddedAt.Day, 0, 0, 0, 0, time.UTC)
 		store.AddOrg(o, ids)
 		nextOrgID++
