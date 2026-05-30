@@ -18,6 +18,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
@@ -126,6 +127,13 @@ func BuildMemStore(logger *slog.Logger, seedFS fs.FS) (*atlas.MemStore, error) {
 		}
 		o := entry.Org
 		o.ID = nextOrgID
+		// added_at parses as a date-only toml.LocalDate on the entry
+		// wrapper (atlas.Org.AddedAt is toml:"-"); pin it to midnight
+		// UTC. Phase 4 makes this a required field — until then a
+		// missing date yields a near-year-zero sentinel and the bundle
+		// still loads (every org ties, so ListRecent falls back to its
+		// ID DESC tiebreak, unchanged from before this field existed).
+		o.AddedAt = time.Date(entry.AddedAt.Year, time.Month(entry.AddedAt.Month), entry.AddedAt.Day, 0, 0, 0, 0, time.UTC)
 		store.AddOrg(o, ids)
 		nextOrgID++
 	}

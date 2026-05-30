@@ -31,17 +31,23 @@ const (
 )
 
 // OrgEntry is one [[org]] in orgs.toml. It embeds atlas.Org for the
-// shared wire-shape fields and adds the load-time RegionSlugs list
-// — the latter is the only field that doesn't have a home on the
-// runtime Org type (Org.Regions carries hydrated Region structs, not
-// slugs).
+// shared wire-shape fields and adds the two load-time fields that
+// don't unmarshal directly onto the runtime Org type:
+//
+//   - RegionSlugs: Org.Regions carries hydrated Region structs, not
+//     slugs, so the slug list has no home on atlas.Org.
+//   - AddedAt: atlas.Org.AddedAt is a time.Time tagged toml:"-", so
+//     the raw date-only value is parsed here as a toml.LocalDate and
+//     converted to a midnight-UTC time.Time in BuildMemStore. This
+//     direct field shadows the embedded Org.AddedAt during decode.
 //
 // go-toml/v2 walks anonymous embedded fields the same way it walks
 // inline ones, so the toml tags on atlas.Org's exported fields are
 // honored at the outer-table level.
 type OrgEntry struct {
 	atlas.Org
-	RegionSlugs []string `toml:"region_slugs"`
+	RegionSlugs []string       `toml:"region_slugs"`
+	AddedAt     toml.LocalDate `toml:"added_at"`
 }
 
 type orgsFile struct {
