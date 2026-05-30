@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 
@@ -12,21 +13,28 @@ import (
 
 // RenderOrgBlock returns the `[[org]]` table block to append to
 // api/seed/orgs.toml for an approved submission. The function is
-// pure: same submission → byte-identical output. That matters
-// because git diffs on the seed file are the editorial-review
-// surface; consistent formatting keeps them signal-rich.
+// pure: same submission + same addedAt → byte-identical output.
+// That matters because git diffs on the seed file are the editorial-
+// review surface; consistent formatting keeps them signal-rich.
 //
 // Slug is derived from the submitted website hostname's last
 // path-safe label; the maintainer can rewrite it during PR review
 // without surprises (the slug isn't carried by the submission
 // payload — see CLAUDE.md / spec for why moderators own that
 // decision).
-func RenderOrgBlock(sub atlas.Submission, slug string) (string, error) {
+//
+// addedAt is the approval date, sourced from the server clock at
+// approval time (typically sub.ProcessedAt). It's deliberately
+// distinct from sub.CreatedAt (the submission time) so the seed's
+// added_at semantics match the rest of the bundle: the date the org
+// joined the atlas, not the date a user filed the form.
+func RenderOrgBlock(sub atlas.Submission, slug string, addedAt time.Time) (string, error) {
 	if slug == "" {
 		return "", fmt.Errorf("githubpr: empty slug for submission %s", sub.PublicID)
 	}
 	entry := orgTOMLEntry{
 		Slug:        slug,
+		AddedAt:     toml.LocalDate{Year: addedAt.Year(), Month: int(addedAt.Month()), Day: addedAt.Day()},
 		Name:        sub.Payload.Name,
 		ShortDesc:   sub.Payload.ShortDesc,
 		WebsiteURL:  sub.Payload.WebsiteURL,
@@ -73,13 +81,14 @@ func DeriveSlug(name string) string {
 // loader stamps after parsing — fresh entries don't need it; the
 // FileStore assigns runtime IDs at boot.
 type orgTOMLEntry struct {
-	Slug        string   `toml:"slug"`
-	Name        string   `toml:"name"`
-	ShortDesc   string   `toml:"short_desc"`
-	WebsiteURL  string   `toml:"website_url"`
-	ContactURL  string   `toml:"contact_url,omitempty"`
-	Tags        []string `toml:"tags"`
-	RegionSlugs []string `toml:"region_slugs"`
+	Slug        string         `toml:"slug"`
+	AddedAt     toml.LocalDate `toml:"added_at"`
+	Name        string         `toml:"name"`
+	ShortDesc   string         `toml:"short_desc"`
+	WebsiteURL  string         `toml:"website_url"`
+	ContactURL  string         `toml:"contact_url,omitempty"`
+	Tags        []string       `toml:"tags"`
+	RegionSlugs []string       `toml:"region_slugs"`
 }
 
 type orgTOMLDoc struct {

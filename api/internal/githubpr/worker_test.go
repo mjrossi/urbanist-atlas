@@ -371,11 +371,12 @@ func TestWorker_Stop_DrainsBuffer(t *testing.T) {
 
 func TestRenderOrgBlock_Deterministic(t *testing.T) {
 	sub := sampleSubmission()
-	a, err := RenderOrgBlock(sub, "brooklyn-greenways")
+	addedAt := time.Date(2026, 5, 28, 14, 30, 0, 0, time.UTC)
+	a, err := RenderOrgBlock(sub, "brooklyn-greenways", addedAt)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	b, err := RenderOrgBlock(sub, "brooklyn-greenways")
+	b, err := RenderOrgBlock(sub, "brooklyn-greenways", addedAt)
 	if err != nil {
 		t.Fatalf("render again: %v", err)
 	}
@@ -394,6 +395,38 @@ func TestRenderOrgBlock_Deterministic(t *testing.T) {
 	}
 	if !strings.HasPrefix(strings.TrimSpace(a), "[[org]]") {
 		t.Fatalf("rendered output does not start with [[org]] header: %s", a)
+	}
+}
+
+// TestRenderOrgBlock_AddedAt asserts the rendered block carries a
+// date-only added_at line matching the approval date passed in. This
+// is the single line that lets a moderator's "approve" click flow
+// through to the homepage "Recently indexed" strip with the right
+// date — without it, the next deploy of the merged PR would fail
+// the Phase 4 required-field check at boot and the whole bundle
+// would refuse to load.
+func TestRenderOrgBlock_AddedAt(t *testing.T) {
+	sub := sampleSubmission()
+	// CreatedAt is May 28 (submission time); approval is later.
+	// The plan explicitly forbids reusing sub.CreatedAt, so pick a
+	// distinct date and assert THAT one — proves the field is sourced
+	// from the caller's clock, not the submission row.
+	addedAt := time.Date(2026, 6, 1, 9, 15, 0, 0, time.UTC)
+	out, err := RenderOrgBlock(sub, "brooklyn-greenways", addedAt)
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	// Unquoted ISO date — matches the seed convention (see Phase 3
+	// backfill diff) and parses as toml.LocalDate, which is what the
+	// loader's required-field check expects.
+	const want = "added_at = 2026-06-01"
+	if !strings.Contains(out, want) {
+		t.Fatalf("rendered block missing %q line; got:\n%s", want, out)
+	}
+	// And NOT the submission date — guard against a future refactor
+	// that accidentally reroutes the field through sub.CreatedAt.
+	if strings.Contains(out, "added_at = 2026-05-28") {
+		t.Fatalf("rendered block used sub.CreatedAt (2026-05-28) instead of approval date:\n%s", out)
 	}
 }
 
