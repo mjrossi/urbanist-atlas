@@ -217,22 +217,33 @@ See the Federal Register notice and the Census relationship-files /
 - https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.html
 - https://www.census.gov/programs-surveys/geography/technical-documentation/records-layout/2024-connecticut-record-layout.html
 
-**Current mitigation (shipped).** A scoped `zipAnchorOverride`
-(`internal/etl/us/mappings.go`) re-anchors the lower-Fairfield "Gold
-Coast" residential ZIPs (Greenwich, Stamford, Darien, New Canaan,
-Norwalk, Westport, Weston, Wilton) at `bridgeport-ct-metro`, which is
-parented under `nyc-tristate` + `ct`. This fixes the originally-reported
-Stamford case but is a per-ZIP patch, not the systemic fix.
-
-**Recommended follow-up (not yet implemented): HUD fallback for retired
-CT FIPS.** The repo already vendors a current-vintage, ZIP-level,
-authoritative source — the HUD ZIP→County crosswalk — that maps every CT
-ZIP to the correct planning region. The clean systemic fix is: in the
-ZCTA crosswalk, when a ZCTA would resolve to the bare state *because its
-county GEOID is a retired CT legacy code* (`09001`–`09015`), re-resolve
-that ZIP via HUD's current county-equivalent. That fixes all ~267 ZIPs
+**Fix (implemented): HUD fallback for retired CT FIPS.** The repo
+already vendors a current-vintage, ZIP-level, authoritative source — the
+HUD ZIP→County crosswalk — that maps every CT ZIP to the correct
+planning region. `ReconcileCTLegacyCounties`
+(`internal/etl/us/crosswalk.go`) runs between the ZCTA pass and the HUD
+backfill: for each ZCTA anchor that fell through to the bare state
+*because its source county is a retired CT legacy code* (`09001`–`09015`,
+the `ctLegacyCounties` set), it re-resolves the ZIP through HUD's current
+planning-region county and the standard county fallback chain. A more
+specific result (metro, county-leaf) replaces the anchor, tagged
+`ct-reconciled:<tier>`; anchors that already won a finer tier (the
+bridgeport city-leaf) and rural ZIPs HUD can't improve are left at their
+existing anchor. This fixes all ~267 stranded CT ZIPs
 (Hartford/New Haven/New London included), needs no new download, and
-self-heals future county-vintage skew — at the cost of a deliberate,
-documented exception to the "HUD is additive-only, never overrides a
-ZCTA row" rule. When implemented, the `zipAnchorOverride` patch above
-can be removed.
+self-heals future county-vintage skew. It is a deliberate, documented
+exception to the otherwise-strict "HUD is additive-only, never overrides
+a ZCTA row" rule — scoped narrowly to retired CT legacy counties so it
+can't silently reshape anchors elsewhere. The earlier per-ZIP
+`zipAnchorOverride` patch has been removed.
+
+> **Seed note.** The fix lives in the ETL code; the committed
+> `api/seed/postal_codes_us.csv` is regenerated from the (gitignored)
+> staged sources. The snapshot in this repo carries the lower-Fairfield
+> subset already (from the original Stamford slice, a subset of what
+> reconcile produces); an operator `etl regenerate --country=US` with the
+> HUD source staged propagates the reconciliation to the remaining CT
+> ZIPs and writes byte-identical complete output. The
+> `bridgeport-ct-metro → [nyc-tristate, ct]` parent edge needed for the
+> Tri-State result is already in `regions_us_msa_overrides.toml` and
+> `regions_us_msas.toml`.

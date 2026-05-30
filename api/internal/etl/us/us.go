@@ -175,6 +175,19 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 			return err
 		}
 		logger.Info("etl us: parsed HUD ZIP-County", "rows", len(huds), "path", hudPath)
+
+		// Repair the CT county-vintage gap before backfill: re-anchor CT
+		// ZCTA ZIPs stranded at the bare state (their 2020 legacy county
+		// isn't in the 2023 planning-region countyToMSA) using HUD's
+		// current-vintage county. Mutates `anchors` in place.
+		ctReasons := ReconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, cbsaToSlug)
+		logger.Info(fmt.Sprintf("etl us: ct legacy-county reconcile: %+v", ctReasons),
+			"reconciled_msa", ctReasons["ct-reconciled:msa"],
+			"reconciled_total", ctReasons["ct-reconciled:msa"]+ctReasons["ct-reconciled:county-leaf"],
+			"skip_no_hud", ctReasons["ct-skip:no-hud"],
+			"skip_hud_unresolved", ctReasons["ct-skip:hud-unresolved"],
+		)
+
 		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug)
 		logger.Info(fmt.Sprintf("etl us: hud backfill: added %d anchors across %+v", len(hudAnchors), hudReasons),
 			"added", len(hudAnchors),
@@ -268,5 +281,5 @@ func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {
 		return fmt.Errorf("etl us: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors, zipAnchorOverride)
+	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors)
 }

@@ -97,61 +97,32 @@ var statePostalToSlug = map[string]string{
 	"WY": "wy", "PR": "pr",
 }
 
-// zipAnchorOverride pins specific ZIPs to a curated anchor slug,
-// overriding whatever the ZCTA/HUD county crosswalk would otherwise
-// produce. It is applied last, in WritePostalCodesCSV, so it wins over
-// both the primary ZCTA pass and the HUD backfill. Editorial use only:
-// reserve it for ZIPs the upstream crosswalk mis-anchors, not as a
-// general substitute for the place/county tiers.
+// ctLegacyCounties is the set of Connecticut's 8 retired legacy county
+// FIPS (09001–09015). On 2022-06-06 the Census Bureau replaced these
+// with CT's 9 planning regions as county-equivalents (FIPS 09110–09190).
 //
-// Connecticut driver (slice: Stamford/Tri-State): Census adopted CT's
-// nine planning regions as county-equivalents starting with the 2022
-// vintage. The 2020 ZCTA-to-county relationship file still keys CT
-// ZCTAs by the *old* county FIPS (Fairfield County = 09001), but the
-// July-2023 CBSA delineation that builds countyToMSA references the new
-// planning-region GEOIDs instead. The old FIPS therefore isn't in
-// countyToMSA, so the residential (ZCTA-sourced) Fairfield ZIPs fell
-// through the county→MSA tier to the bare `ct` state anchor — while the
-// HUD-sourced P.O.-box ZIPs in the very same towns, keyed by the newer
-// FIPS, correctly resolved to bridgeport-ct-metro. That split is why
-// Stamford 06902 surfaced no Tri-State orgs.
+// The two ETL sources we join on county GEOID are now different
+// vintages: the July-2023 CBSA delineation (which builds countyToMSA)
+// keys CT metros by the *new* planning-region GEOIDs, while the 2020
+// ZCTA→county relationship file still keys CT ZCTAs by these *legacy*
+// codes. So countyToMSA[<legacy CT county>] always misses and every CT
+// ZCTA ZIP falls through the county→MSA tier to the bare `ct` state
+// anchor — e.g. Stamford 06902 surfaced no Bridgeport-Stamford / NY
+// Tri-State orgs.
 //
-// Re-anchoring these lower-Fairfield ("Gold Coast") residential ZIPs at
-// bridgeport-ct-metro restores the smallest-anchor invariant: the metro
-// is Census CBSA 14860 (Bridgeport-Stamford-Danbury) and parents under
-// nyc-tristate + ct (see regions_us_msa_overrides.toml), so these ZIPs
-// now surface both the Tri-State region and Connecticut state orgs.
-//
-// Scope is the towns squarely in the NY commuter shed — Greenwich,
-// Stamford, Darien, New Canaan, Norwalk, Westport, Weston, Wilton.
-// Mid/upper Fairfield (Danbury, Ridgefield, …) is intentionally left at
-// its current anchor; widen this map if that coverage is wanted.
-var zipAnchorOverride = map[string]string{
-	// Greenwich
-	"06807": "bridgeport-ct-metro", // Cos Cob
-	"06830": "bridgeport-ct-metro", // Greenwich
-	"06831": "bridgeport-ct-metro", // Greenwich (backcountry)
-	"06870": "bridgeport-ct-metro", // Old Greenwich
-	"06878": "bridgeport-ct-metro", // Riverside
-	// Stamford
-	"06901": "bridgeport-ct-metro",
-	"06902": "bridgeport-ct-metro",
-	"06903": "bridgeport-ct-metro",
-	"06905": "bridgeport-ct-metro",
-	"06906": "bridgeport-ct-metro",
-	"06907": "bridgeport-ct-metro",
-	// Darien
-	"06820": "bridgeport-ct-metro",
-	// New Canaan
-	"06840": "bridgeport-ct-metro",
-	// Norwalk
-	"06850": "bridgeport-ct-metro",
-	"06851": "bridgeport-ct-metro",
-	"06853": "bridgeport-ct-metro",
-	"06854": "bridgeport-ct-metro",
-	"06855": "bridgeport-ct-metro",
-	// Westport / Weston / Wilton
-	"06880": "bridgeport-ct-metro", // Westport
-	"06883": "bridgeport-ct-metro", // Weston
-	"06897": "bridgeport-ct-metro", // Wilton
+// The 2020 ZCTA→county file is a frozen decennial product with no
+// drop-in planning-region successor (next ZCTA refresh is 2030), so the
+// fix can't be a source bump. Instead ReconcileCTLegacyCounties
+// (crosswalk.go) re-resolves these ZIPs through the current-vintage HUD
+// crosswalk, which already uses the planning-region FIPS. See
+// etl/SOURCES.md §"Known data-vintage gaps".
+var ctLegacyCounties = map[string]struct{}{
+	"09001": {}, // Fairfield
+	"09003": {}, // Hartford
+	"09005": {}, // Litchfield
+	"09007": {}, // Middlesex
+	"09009": {}, // New Haven
+	"09011": {}, // New London
+	"09013": {}, // Tolland
+	"09015": {}, // Windham
 }

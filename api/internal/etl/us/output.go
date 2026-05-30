@@ -284,11 +284,7 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 // Pass nil or an empty slice for hudAnchors when running without HUD
 // data; the output reduces to ZCTA-only in that case, matching the
 // pre-#7.5.5 behavior.
-//
-// overrides is an optional ZIP→anchor-slug map applied last, after the
-// ZCTA∪HUD merge, so editorial pins win over both crosswalk passes (see
-// zipAnchorOverride in mappings.go). Pass nil to disable.
-func WritePostalCodesCSV(w io.Writer, zctaAnchors, hudAnchors []PostalAnchor, overrides map[string]string) error {
+func WritePostalCodesCSV(w io.Writer, zctaAnchors, hudAnchors []PostalAnchor) error {
 	// Build a dedup map keyed by postal code; ZCTA inserted first so
 	// HUD rows with the same key are silently dropped at insertion.
 	merged := make(map[string]PostalAnchor, len(zctaAnchors)+len(hudAnchors))
@@ -300,15 +296,6 @@ func WritePostalCodesCSV(w io.Writer, zctaAnchors, hudAnchors []PostalAnchor, ov
 			continue
 		}
 		merged[a.ZCTA] = a
-	}
-
-	// Editorial per-ZIP overrides win over both crosswalk passes. See
-	// zipAnchorOverride (mappings.go) for the rationale — currently the
-	// lower-Fairfield, CT ZIPs that county-vintage skew left stranded at
-	// the bare `ct` state anchor. Iteration order doesn't matter: the
-	// output is sorted by ZIP below.
-	for zip, slug := range overrides {
-		merged[zip] = PostalAnchor{ZCTA: zip, AnchorSlug: slug, Reason: "editorial-override"}
 	}
 
 	zips := make([]string, 0, len(merged))
