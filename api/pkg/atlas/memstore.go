@@ -55,7 +55,7 @@ func (s *MemStore) AddRegion(r Region) {
 }
 
 // AddOrg registers an organization with the IDs of the regions it
-// serves. The org's Regions field is overwritten on read; CreatedAt is
+// serves. The org's Regions field is overwritten on read; AddedAt is
 // preserved (it powers newest-first ordering in ListRecent and
 // OrgsForRegions). Callers that don't care about ordering may leave it zero.
 func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
@@ -308,13 +308,13 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 		out.MatchedRegionSlugs = nil
 		candidates = append(candidates, out)
 	}
-	// Sort newest-first with ID DESC as tiebreak so a tied CreatedAt
-	// doesn't drift between MemStore and Postgres (Postgres uses
-	// "ORDER BY created_at DESC, id DESC" — see browse.sql).
+	// Sort newest-first; ID DESC breaks ties so same-day orgs order
+	// deterministically. Backfill yields only a handful of distinct
+	// AddedAt dates, so the ID tiebreak does real work.
 	sort.Slice(candidates, func(i, j int) bool {
 		a, b := candidates[i], candidates[j]
-		if !a.CreatedAt.Equal(b.CreatedAt) {
-			return a.CreatedAt.After(b.CreatedAt)
+		if !a.AddedAt.Equal(b.AddedAt) {
+			return a.AddedAt.After(b.AddedAt)
 		}
 		return a.ID > b.ID
 	})

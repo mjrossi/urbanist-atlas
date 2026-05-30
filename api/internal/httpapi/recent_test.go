@@ -79,14 +79,14 @@ func TestListRecent_ExcludesNationalTier(t *testing.T) {
 	s.AddOrg(atlas.Org{
 		ID: 1, Slug: "plain-org", Name: "Plain",
 		ShortDesc: "x", WebsiteURL: "https://x",
-		CreatedAt: t0,
+		AddedAt: t0,
 	}, []int64{1})
 	s.AddOrg(atlas.Org{
 		ID: 2, Slug: "mubi-nacional", Name: "MUBi (national)",
 		ShortDesc: "x", WebsiteURL: "https://x",
 		// Newer than the plain org — a forgotten filter would surface
 		// this one at the top.
-		CreatedAt: t0.Add(48 * time.Hour),
+		AddedAt: t0.Add(48 * time.Hour),
 	}, []int64{99})
 
 	handler := New(Config{
