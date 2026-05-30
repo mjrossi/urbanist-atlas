@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -68,11 +69,28 @@ func NewMetrics() *Metrics {
 }
 
 // incLookup records a lookup outcome. result is "hit" or "miss".
+//
+// country is caller-supplied query input (the handler does not gate on a
+// known-country list), so it is bucketed to a bounded set here — only the
+// shipping countries get their own series; everything else collapses to
+// "other". Without this, a client looping unknown country codes would
+// create an unbounded number of label series in the registry.
 func (m *Metrics) incLookup(country, result string) {
 	if m == nil {
 		return
 	}
-	m.lookupTotal.WithLabelValues(country, result).Inc()
+	m.lookupTotal.WithLabelValues(metricCountry(country), result).Inc()
+}
+
+// metricCountry clamps a raw country string to a bounded label set so the
+// lookup_total cardinality can't be inflated by arbitrary input.
+func metricCountry(country string) string {
+	switch atlas.Country(country) {
+	case atlas.CountryUS, atlas.CountryCA:
+		return country
+	default:
+		return "other"
+	}
 }
 
 // incSubmissions records a submission outcome by status.

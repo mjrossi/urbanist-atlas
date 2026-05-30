@@ -51,6 +51,46 @@ func TestMetrics_LookupCounters(t *testing.T) {
 	}
 }
 
+func TestMetricCountry(t *testing.T) {
+	cases := map[string]string{
+		"US":  "US",
+		"CA":  "CA",
+		"ZZ":  "other",
+		"":    "other",
+		"FOO": "other",
+		"us":  "other", // already upper-cased at the handler boundary
+	}
+	for in, want := range cases {
+		if got := metricCountry(in); got != want {
+			t.Errorf("metricCountry(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestMetrics_UnknownCountryBucketed guards the cardinality bound: a
+// miss for an unrecognized country must land under country="other"
+// rather than minting a new label series per arbitrary input.
+func TestMetrics_UnknownCountryBucketed(t *testing.T) {
+	srv, m := newMetricsTestServer(t)
+
+	// Two distinct unknown country codes, both misses.
+	for _, country := range []string{"ZZ", "XX"} {
+		resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=00000&country=" + country)
+		if err != nil {
+			t.Fatalf("GET %s: %v", country, err)
+		}
+		resp.Body.Close()
+	}
+
+	if got := testutil.ToFloat64(m.lookupTotal.WithLabelValues("other", "miss")); got != 2 {
+		t.Errorf("atlas_lookup_total{country=other,result=miss} = %v, want 2", got)
+	}
+	// The raw inputs must not have created their own series.
+	if got := testutil.ToFloat64(m.lookupTotal.WithLabelValues("ZZ", "miss")); got != 0 {
+		t.Errorf("atlas_lookup_total{country=ZZ,result=miss} = %v, want 0 (should bucket to other)", got)
+	}
+}
+
 func TestMetrics_HTTPRequestsUseRoutePattern(t *testing.T) {
 	srv, m := newMetricsTestServer(t)
 

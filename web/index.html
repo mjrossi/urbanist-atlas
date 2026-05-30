@@ -48,24 +48,13 @@
     <script type="module" src="/src/main.tsx"></script>
 
     <!--
-      Cloudflare Web Analytics — privacy-first, cookieless, no consent
-      banner. The beacon's SPA mode auto-tracks React Router navigations
-      via the History API, so client-side route changes are recorded
-      without per-route code. The token is public (it only identifies
-      the site in the CF dashboard), so hardcoding it here is fine —
-      and Vite doesn't substitute import.meta.env into index.html
-      anyway. The beacon loads from static.cloudflareinsights.com and
-      POSTs RUM data to cloudflareinsights.com; both are allow-listed in
-      web/public/_headers (script-src / connect-src).
-
-      TODO: replace <BEACON_TOKEN> with the token from the Cloudflare
-      dashboard (Web Analytics → urbanistatlas.com) before deploying.
+      Cloudflare Web Analytics (privacy-first, cookieless) is NOT shipped
+      here. It is injected at the edge by Cloudflare (Web Analytics →
+      automatic injection, enabled in the dashboard), so no beacon tag and
+      no token live in this repo. The browser still enforces CSP against
+      the injected tag, so its origins (static.cloudflareinsights.com /
+      cloudflareinsights.com) are allow-listed in web/public/_headers.
     -->
-    <script
-      defer
-      src="https://static.cloudflareinsights.com/beacon.min.js"
-      data-cf-beacon='{"token":"<BEACON_TOKEN>"}'
-    ></script>
   </head>
   <body>
     <div id="root"></div>
