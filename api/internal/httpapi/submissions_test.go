@@ -92,7 +92,7 @@ func buildSubmissionRoutes(subs atlas.SubmissionStore, store atlas.Store, enq Pr
 	r := chi.NewRouter()
 	r.Use(requestIDMiddleware)
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/submissions", createSubmissionHandler(subs, store, limiter, logger))
+		r.Post("/submissions", createSubmissionHandler(subs, store, limiter, logger, NewMetrics()))
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(bearerAuthMiddleware(testAdminToken))
 			r.Get("/submissions", listSubmissionsHandler(subs, logger))

@@ -57,6 +57,14 @@ primary_region = 'iad'
   # GITHUB_TOKEN, approval still flips status but the PR worker
   # records promotion_error="worker disabled (no token configured)".
 
+# Fly's managed Prometheus scrapes this over the private 6PN network. The
+# port is intentionally NOT in [http_service], so it is never
+# internet-routable. Managed-Prometheus retention is ~30 days; longer
+# history would mean remote-write to Grafana Cloud (out of scope for v1).
+[metrics]
+  port = 9091
+  path = "/metrics"
+
 [http_service]
   internal_port = 8080
   force_https = true
