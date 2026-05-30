@@ -1,5 +1,29 @@
 # Org `added_at` Implementation Plan
 
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps
+> use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Sort the homepage "Recently indexed" strip on a real,
+seed-sourced `added_at` date instead of file position.
+
+**Architecture:** Rename the unpopulated `atlas.Org.CreatedAt` →
+`AddedAt`, source it from a required date-only `added_at` field in the
+seed TOML, backfill the 202 existing orgs (+ PT fixture) from
+slice-section evidence, expose it on the wire (`format: date`), and stamp
+it from the submission approval path.
+
+**Tech Stack:** Go (`pkg/atlas`, `go-toml/v2`, `oapi-codegen`),
+OpenAPI, React/TypeScript (`openapi-typescript`).
+
+**Branch & PR:** Do this work on a **new branch `org-added-at` cut from
+`main`**, and open a **PR into `main`** when complete. Do NOT build on
+`mr-weekend-edits` (reserved for small pre-launch copy edits). This plan
+and its spec already live on `org-added-at`.
+
+---
+
 ## Overview
 
 Give every org a real, honest "added" date so the homepage "Recently
@@ -24,7 +48,7 @@ grep -rn 'Org.*CreatedAt\|CreatedAt:.*t0\|CreatedAt:.*stamp' api/pkg/atlas/ api/
 grep -n 'AddedAt\|added_at' api/internal/seedfiles/orgs.go || echo "P2 not done"
 # Phase 3 (backfill)? every org should have added_at:
 echo "orgs: $(grep -c '^\[\[org\]\]' api/seed/orgs.toml)  added_at lines: $(grep -c 'added_at' api/seed/orgs.toml)"
-ls docs/plans/org-added-at-backfill.md 2>/dev/null || echo "mapping table not written"
+ls docs/superpowers/plans/2026-05-29-org-added-at-backfill.md 2>/dev/null || echo "mapping table not written"
 # Phase 4 (required enforcement)?:
 grep -n 'added_at.*required\|missing added_at\|IsZero' api/internal/seedfiles/build.go || echo "P4 not done"
 # Phase 5 (wire)?:
@@ -43,7 +67,9 @@ cd api && go build ./... && go test ./... 2>&1 | tail -20
 1. Run the state-check commands above.
 2. Find the first uncompleted phase below and continue from its first
    unchecked task.
-3. Each phase ends in its own commit (signed — never bypass signing; see
+3. Confirm you are on the `org-added-at` branch (off `main`), not
+   `mr-weekend-edits`: `git branch --show-current`.
+4. Each phase ends in its own commit (signed — never bypass signing; see
    `feedback_never_bypass_signing`). The wire-contract change (Phase 5
    openapi.yaml + regen) is committed separately from feature code, per
    the repo's wire-contract rule in CLAUDE.md.
@@ -66,8 +92,8 @@ cd api && go build ./... && go test ./... 2>&1 | tail -20
   fails on drift).
 - **No new dependencies.** `go-toml/v2`, `oapi-codegen`,
   `openapi-typescript` are already vendored/used.
-- Current branch: `mr-weekend-edits` (continue here unless told to
-  branch).
+- **Branch:** `org-added-at`, cut from `main`. All work and the final PR
+  target `main`. Never commit this work onto `mr-weekend-edits`.
 
 ## Success Criteria
 
@@ -197,7 +223,7 @@ mapping table committed alongside.
 ### Tasks
 
 - [ ] Task 3.1: Produce the slug → date → source mapping table.
-  - **Files:** new `docs/plans/org-added-at-backfill.md`
+  - **Files:** new `docs/superpowers/plans/2026-05-29-org-added-at-backfill.md`
   - Build the table by applying the spec §4 rules in priority order:
     1. Per-org inline date if the org's own comment cites one.
     2. Org under a `=== Slice 7.8 … ===` marker → that section's date:
