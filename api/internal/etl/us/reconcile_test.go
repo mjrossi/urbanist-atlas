@@ -97,6 +97,31 @@ func TestReconcileCTLegacyCounties_RuralStaysAtState(t *testing.T) {
 	}
 }
 
+// TestReconcileCTLegacyCounties_HUDUnresolvedSkipped covers the branch
+// where HUD's primary county can't be resolved at all (e.g. an APO/FPO
+// 999xx FIPS whose 2-digit prefix isn't a state). The anchor must stay
+// at state and the skip must be counted.
+func TestReconcileCTLegacyCounties_HUDUnresolvedSkipped(t *testing.T) {
+	anchors := []PostalAnchor{
+		{ZCTA: "06902", AnchorSlug: "ct", Reason: "state"},
+	}
+	zctaCounty := map[string]ZCTACounty{
+		"06902": {CountyGEOID: "09001"}, // legacy Fairfield County
+	}
+	huds := []HUDZipCounty{
+		{ZIP: "06902", County: "99999", TotRatio: 1.0}, // unresolvable FIPS
+	}
+
+	counts := ReconcileCTLegacyCounties(anchors, zctaCounty, huds, map[string]string{}, map[string]string{})
+
+	if got := anchors[0]; got.AnchorSlug != "ct" || got.Reason != "state" {
+		t.Errorf("06902 = %+v, want unchanged {ct, state}", got)
+	}
+	if counts["ct-skip:hud-unresolved"] != 1 {
+		t.Errorf("ct-skip:hud-unresolved = %d, want 1; counts = %+v", counts["ct-skip:hud-unresolved"], counts)
+	}
+}
+
 // TestReconcileCTLegacyCounties_NonLegacyAndNoHUDAndEmpty covers the
 // guard rails: a current-FIPS CT ZCTA is skipped (not a legacy county),
 // a legacy ZIP absent from HUD is counted as a skip, and an empty HUD

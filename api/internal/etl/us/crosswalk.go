@@ -259,7 +259,10 @@ func ReconcileCTLegacyCounties(
 		}
 		if slug == a.AnchorSlug {
 			// HUD's current county also resolves to the state (rural CT
-			// with no MSA) — nothing gained.
+			// with no MSA) — nothing gained. Comparing slugs is sufficient
+			// here because a candidate is always at the bare state anchor
+			// (Reason == "state" above), whose slug is invariably `ct`; a
+			// slug match therefore means HUD landed on the same state.
 			counts["ct-unchanged:"+reason]++
 			continue
 		}

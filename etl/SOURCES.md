@@ -229,23 +229,39 @@ planning-region county and the standard county fallback chain. A more
 specific result (metro, county-leaf) replaces the anchor, tagged
 `ct-reconciled:<tier>`; anchors that already won a finer tier (the
 bridgeport city-leaf) and rural ZIPs HUD can't improve are left at their
-existing anchor. This fixes all ~267 stranded CT ZIPs
-(Hartford/New Haven/New London included), needs no new download, and
-self-heals future county-vintage skew. It is a deliberate, documented
-exception to the otherwise-strict "HUD is additive-only, never overrides
-a ZCTA row" rule — scoped narrowly to retired CT legacy counties so it
-can't silently reshape anchors elsewhere. The earlier per-ZIP
-`zipAnchorOverride` patch has been removed.
+existing anchor. On a full `etl regenerate` this repairs **all ~267
+stranded CT ZIPs** (Hartford/New Haven/New London included), needs no new
+download, and self-heals future county-vintage skew. It is a deliberate,
+documented exception to the otherwise-strict "HUD is additive-only, never
+overrides a ZCTA row" rule — scoped narrowly to retired CT legacy
+counties so it can't silently reshape anchors elsewhere. The earlier
+per-ZIP `zipAnchorOverride` patch has been removed.
 
-> **Seed note.** The fix lives in the ETL code; the committed
-> `api/seed/postal_codes_us.csv` is regenerated from the (gitignored)
-> staged sources. The snapshot in this repo carries the lower-Fairfield
-> subset already (from the original Stamford slice, a subset of what
-> reconcile produces); an operator `etl regenerate --country=US` with the
-> HUD source staged propagates the reconciliation to the remaining CT
-> ZIPs and writes byte-identical complete output. The
-> `bridgeport-ct-metro → [nyc-tristate, ct]` parent edge needed for the
-> Tri-State result is already in `regions_us_msa_overrides.toml` and
+> **Seed note — what ships now vs. on regenerate.** The fix lives in the
+> ETL *code*; `api/seed/postal_codes_us.csv` is a generated artifact, and
+> the runtime serves whatever that committed CSV says. The sources are
+> gitignored and weren't staged in the slice that introduced this fix, so
+> the committed snapshot was **not** regenerated — it still carries only
+> the ~21 lower-Fairfield rows hand-pointed at `bridgeport-ct-metro` in
+> the original Stamford slice. So **as committed, only lower Fairfield
+> (Stamford, Greenwich, Norwalk, …) resolves to its metro; the rest of CT
+> — most Hartford/New Haven/New London residential ZIPs — still anchors at
+> bare `ct`** until an operator runs `etl regenerate --country=US` with
+> the HUD source staged. That regenerate is what propagates the
+> reconciliation to the full ~267 and brings the committed seed back in
+> line with generator output.
+>
+> This intentionally leaves the repo in a committed-seed ≠
+> regenerate-output state, bending the "same vintage → byte-identical
+> output" determinism invariant (CLAUDE.md / above): a regenerate with HUD
+> staged would add ~246 more CT rows. CI doesn't gate on `etl regenerate`
+> (sources are gitignored), so this won't break the build — but the next
+> regenerate will show a large, expected CT diff. Closing the gap is a
+> one-command operator step; it just couldn't run in this environment.
+>
+> The `bridgeport-ct-metro → [nyc-tristate, ct]` parent edge needed for
+> the Tri-State result is independent of the seed regeneration and is
+> already committed in `regions_us_msa_overrides.toml` and
 > `regions_us_msas.toml`.
 
 **Generalizing beyond CT (when, not now).** The reconcile is scoped to

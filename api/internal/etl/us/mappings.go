@@ -114,27 +114,14 @@ var statePostalToSlug = map[string]string{
 // drop-in planning-region successor (next ZCTA refresh is 2030), so the
 // fix can't be a source bump. Instead ReconcileCTLegacyCounties
 // (crosswalk.go) re-resolves these ZIPs through the current-vintage HUD
-// crosswalk, which already uses the planning-region FIPS. See
-// etl/SOURCES.md §"Known data-vintage gaps".
+// crosswalk, which already uses the planning-region FIPS.
 //
-// Generalizing beyond CT (future): the underlying failure is not
-// CT-specific — it's "a frozen-2020 ZCTA county GEOID is no longer valid
-// in the current CBSA vintage." CT (June 2022) is the only county recode
-// in the 2020→2023 window, so this set IS the whole problem today. But
-// the ZCTA file stays pinned to 2020 counties until the 2030 census
-// while CBSA delineations keep advancing, so every future county recode
-// (e.g. an Alaska borough split) silently joins this class. The
-// principled generalization triggers on the symptom rather than this
-// hardcoded set: ZCTA-at-state AND its source county GEOID absent from
-// the *current national county universe* → stale → reconcile via HUD.
-// That needs one extra vendored source (a current county gazetteer) to
-// distinguish a stale county from a legitimately non-metro rural county
-// — countyToMSA can't serve as that universe since rural counties are
-// validly absent from it. Do NOT broaden to a blanket
-// "ZCTA-at-state → prefer HUD": that re-litigates the deliberate
-// ZCTA-over-HUD primacy (postal-coverage-design.md) and would pull
-// genuinely-rural ZIPs into adjacent metros. Generalize for real only
-// when a second state actually trips this.
+// CT is the only county recode in the 2020→2023 source-vintage gap, so
+// this hardcoded set is the whole problem today; future recodes will
+// join the class as the frozen ZCTA file ages toward 2030. The rationale
+// for keeping the trigger scoped (and why NOT to broaden it to a blanket
+// "ZCTA-at-state → prefer HUD") lives in etl/SOURCES.md §"Known
+// data-vintage gaps" — the single source of truth for this decision.
 var ctLegacyCounties = map[string]struct{}{
 	"09001": {}, // Fairfield
 	"09003": {}, // Hartford

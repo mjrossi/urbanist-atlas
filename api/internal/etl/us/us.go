@@ -36,6 +36,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
@@ -181,9 +182,15 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 		// isn't in the 2023 planning-region countyToMSA) using HUD's
 		// current-vintage county. Mutates `anchors` in place.
 		ctReasons := ReconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, cbsaToSlug)
+		ctReconciled := 0
+		for k, n := range ctReasons {
+			if strings.HasPrefix(k, "ct-reconciled:") {
+				ctReconciled += n
+			}
+		}
 		logger.Info(fmt.Sprintf("etl us: ct legacy-county reconcile: %+v", ctReasons),
+			"reconciled_total", ctReconciled,
 			"reconciled_msa", ctReasons["ct-reconciled:msa"],
-			"reconciled_total", ctReasons["ct-reconciled:msa"]+ctReasons["ct-reconciled:county-leaf"],
 			"skip_no_hud", ctReasons["ct-skip:no-hud"],
 			"skip_hud_unresolved", ctReasons["ct-skip:hud-unresolved"],
 		)
