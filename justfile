@@ -370,6 +370,12 @@ smoke secret='' host='api.urbanistatlas.com':
 
 # ── ci-equivalent ─────────────────────────────────────
 
-# run every check CI would run today against the current tree
+# run the offline, side-effect-free checks CI would run against the tree.
+# `seed-check` is deliberately NOT in here: it needs network (census.gov,
+# statcan.gc.ca) and mutates the tree (downloads into etl/sources/,
+# rewrites api/seed/regions_*.toml in place), so it would break `just ci`
+# for an offline maintainer or clobber custom-staged sources. CI runs it
+# as its own `data` job regardless; run `just seed-check` by hand when you
+# want the drift gate locally.
 [group('ci')]
-ci: api-check web-check seed-check
+ci: api-check web-check
