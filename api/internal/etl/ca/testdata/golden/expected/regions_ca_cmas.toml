@@ -1,0 +1,53 @@
+# Canadian Census Metropolitan Areas (CMAs), generated from the
+# Statistics Canada CMA boundary file by api/cmd/server etl
+# regenerate --country=CA.
+#
+# Edit policy: do NOT hand-edit this file. Editorial overrides for
+# slug/name/kind live in api/internal/etl/ca/mappings.go (cmaOverrides,
+# keyed by StatsCan CMA UID); change those and re-run etl regenerate.
+#
+# Filtering: only CMATYPE='B' rows from the StatsCan boundary file
+# (true Census Metropolitan Areas, population ≥100k) are emitted.
+# Census Agglomerations (CMATYPE='D') are dropped.
+#
+# Slug convention:
+#   - Override-supplied for the well-known CMAs (toronto-cma,
+#     montreal-cma, metro-vancouver). See ca/mappings.go.
+#   - Auto-generated otherwise as "<slugified-name>-cma".
+#
+# Parents:
+#   - Single-province CMAs parent under their province slug.
+#   - Multi-province CMAs (Ottawa-Gatineau) parent under all their
+#     constituent provinces so MSA-anchored FSAs surface
+#     province-tier orgs through the ancestor walk.
+#
+# Loaded by just loaddata BETWEEN regions_ca_provinces.toml (parents:
+# provinces) and regions_ca.toml (children: curated cities). Cross-file
+# parent resolution lives in internal/seedfiles/regions.go.
+
+[[region]]
+slug = "metro-vancouver"
+kind = "ca:regional-district"
+name = "Metro Vancouver"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["bc"]
+# StatsCan CMA 933 — Metro Vancouver
+
+[[region]]
+slug = "sherbrooke-cma"
+kind = "ca:cma"
+name = "Sherbrooke"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc"]
+# StatsCan CMA 421 — Sherbrooke
+
+[[region]]
+slug = "toronto-cma"
+kind = "ca:cma"
+name = "Greater Toronto Area"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on"]
+# StatsCan CMA 535 — Greater Toronto Area
