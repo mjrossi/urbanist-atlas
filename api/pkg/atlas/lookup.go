@@ -13,9 +13,10 @@ import (
 //  2. AncestorRegions(leafID) → []Region (leaf + all transitive parents).
 //  3. OrgsForRegions(ancestorIDs) → []Org with each org's full
 //     attachment list populated.
-//  4. bucketOrgsByScope splits orgs into Local / Regional by the
-//     scope_tier of the matched attachment region (shared with
-//     GetRegion, which walks both directions instead of just up).
+//  4. BucketOrgsByScope splits orgs into Local / Regional / Statewide
+//     by the scope_tier and kind of the matched attachment region
+//     (shared with GetRegion, which walks both directions instead of
+//     just up).
 func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, error) {
 	leaf, err := store.ResolveLeafRegion(ctx, query.Country, query.PostalCode)
 	if err != nil {
@@ -43,7 +44,7 @@ func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, 
 		return LookupResult{}, fmt.Errorf("atlas: orgs lookup: %w", err)
 	}
 
-	local, regional := BucketOrgsByScope(inScope, orgs)
+	local, regional, statewide := BucketOrgsByScope(inScope, orgs)
 
 	return LookupResult{
 		Query:              query,
@@ -51,6 +52,7 @@ func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, 
 		ResolvedAncestry:   ancestry,
 		Local:              local,
 		Regional:           regional,
+		Statewide:          statewide,
 	}, nil
 }
 

@@ -72,6 +72,7 @@ function makeDetail(overrides: Partial<RegionDetail> = {}): RegionDetail {
         matched_region_slugs: ['nyc-metro'],
       }),
     ],
+    statewide: [],
     ancestry: [],
     descendant_region_names: {},
     ...overrides,
@@ -193,6 +194,54 @@ describe('Region', () => {
     ).toBeDefined();
   });
 
+  it('renders the State / Provincial section for state-attached orgs', async () => {
+    getRegionMock.mockResolvedValueOnce(
+      makeDetail({
+        region: makeRegion({
+          id: 70,
+          kind: 'us:state',
+          name: 'Michigan',
+          slug: 'mi',
+          scope_tier: 'regional',
+          parent_slugs: [],
+        }),
+        local: [],
+        regional: [
+          makeOrg({
+            id: 20,
+            slug: 'detroit-greenways',
+            name: 'Detroit Greenways Coalition',
+            matched_region_slugs: ['detroit-mi-metro'],
+          }),
+        ],
+        statewide: [
+          makeOrg({
+            id: 21,
+            slug: 'league-of-michigan-bicyclists',
+            name: 'League of Michigan Bicyclists',
+            matched_region_slugs: ['mi'],
+          }),
+        ],
+      }),
+    );
+    renderAt('/region/mi');
+
+    await waitFor(() => {
+      const h1 = screen.getByRole('heading', { level: 1 });
+      expect(h1.textContent).toMatch(/michigan/i);
+    });
+
+    // Regional and State / Provincial sections both render.
+    expect(screen.getByText('Regional')).toBeDefined();
+    expect(screen.getByText('State / Provincial')).toBeDefined();
+    expect(
+      screen.getByRole('link', { name: 'Detroit Greenways Coalition' }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole('link', { name: 'League of Michigan Bicyclists' }),
+    ).toBeDefined();
+  });
+
   it('renders a state-kind region with a "State report" eyebrow', async () => {
     getRegionMock.mockResolvedValueOnce(
       makeDetail({
@@ -300,9 +349,9 @@ describe('Region', () => {
     expect(browseLinks.length).toBeGreaterThan(0);
   });
 
-  it('renders a friendly empty state when both buckets are empty', async () => {
+  it('renders a friendly empty state when all three buckets are empty', async () => {
     getRegionMock.mockResolvedValueOnce(
-      makeDetail({ local: [], regional: [] }),
+      makeDetail({ local: [], regional: [], statewide: [] }),
     );
     renderAt('/region/nyc-metro');
 

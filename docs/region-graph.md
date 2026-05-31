@@ -544,11 +544,31 @@ displaying `name`.
 
 `scope_tier` is a closed enum on the wire: exactly `'local'`,
 `'regional'`, or `'national'`. The default `/lookup` surface buckets
-results into Local + Regional; `national` regions are filtered out of
-the ancestor walk so they don't surface for postal-code queries. A
-future opt-in path (query param or separate endpoint) is anticipated
-for the national tier; until then, national-tier orgs exist in the
-schema but are not visible through the default API.
+results into **three presentational tiers** — Local, Regional, and
+State / Provincial — even though `scope_tier` itself stays a closed
+three-value enum. The split is derived, not a fourth enum value:
+
+- **Local** — any matched region with `scope_tier='local'` (cities,
+  counties, boroughs, and editorial city-state overrides like Berlin).
+- **State / Provincial** — matched regions of a *state-equivalent kind*
+  (`IsStateKind`: `us:state`, `ca:province` today; `de:land`,
+  `uk:nation`, `pt:nuts-ii`, `pt:regiao-autonoma`, `au:state` when
+  those markets ship) with no local match. Multi-state coalitions
+  (`us:multi-state`) are deliberately *not* state-equivalent — they're
+  advocacy federations, not a top-admin tier, so they stay in Regional.
+- **Regional** — everything in between (metro/CMA/regional-district/
+  transit-federation and multi-state coalitions) with no local or
+  state/province match.
+
+Local precedence means city-states (Berlin: `kind='de:land'` but
+`scope_tier='local'`, `sort_priority=15`) correctly land in Local and
+never reach the state-kind test. The set is the editorial source of
+truth — see `api/pkg/atlas/state_kinds.go` (mirrors `metro_kinds.go`).
+`national` regions are filtered out of the ancestor walk so they don't
+surface for postal-code queries. A future opt-in path (query param or
+separate endpoint) is anticipated for the national tier; until then,
+national-tier orgs exist in the schema but are not visible through the
+default API.
 
 ---
 

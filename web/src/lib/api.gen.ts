@@ -494,8 +494,15 @@ export interface components {
             country: components["schemas"]["Country"];
         };
         /**
-         * @description Response shape of `GET /api/v1/lookup`. `local` and `regional`
-         *     are always present (possibly empty arrays).
+         * @description Response shape of `GET /api/v1/lookup`. `local`, `regional`,
+         *     and `statewide` are always present (possibly empty arrays).
+         *     Orgs are bucketed by the scope_tier and kind of the attachment
+         *     region they matched on: `local` for city/county-tier
+         *     attachments; `statewide` for state/province-tier attachments
+         *     (`us:state`, `ca:province`); `regional` for everything in
+         *     between (metro/CMA/regional-district/transit-federation and
+         *     multi-state coalitions). `national`-tier attachments are always
+         *     filtered.
          *     `resolved_ancestry` is the postal code's leaf region followed
          *     by all ancestors, ordered most-specific first — clients can use
          *     it to render breadcrumbs without walking the graph themselves.
@@ -505,8 +512,26 @@ export interface components {
             /** @example Brooklyn, NYC — New York Metro */
             resolved_place_label: string;
             resolved_ancestry: components["schemas"]["Region"][];
+            /**
+             * @description Orgs with at least one matched attachment region of
+             *     `scope_tier='local'` (cities, counties, boroughs).
+             */
             local: components["schemas"]["LookupOrg"][];
+            /**
+             * @description Orgs whose matched attachment regions are sub-state
+             *     `scope_tier='regional'` (metros, CMAs, regional districts,
+             *     transit federations, multi-state coalitions) with no
+             *     local or state/province match.
+             */
             regional: components["schemas"]["LookupOrg"][];
+            /**
+             * @description Orgs whose matched attachment regions include a
+             *     state/province-tier region (`us:state`, `ca:province`)
+             *     and no `local` match. Surfaced as a distinct "State /
+             *     Provincial" section so statewide coalitions don't blur
+             *     into metro-level groups.
+             */
+            statewide: components["schemas"]["LookupOrg"][];
         };
         /**
          * @description A region (any non-national kind) plus its approved-org counts.
@@ -566,9 +591,11 @@ export interface components {
          *     the count delivered by this endpoint — no surprises when a
          *     user clicks through.
          *
-         *     Orgs are bucketed by the `scope_tier` of the attachment
-         *     region they matched on — `local` for city/county-tier
-         *     attachments, `regional` for metro/state/multi-state.
+         *     Orgs are bucketed by the `scope_tier` and kind of the
+         *     attachment region they matched on — `local` for city/county-tier
+         *     attachments, `statewide` for state/province-tier attachments
+         *     (`us:state`, `ca:province`), `regional` for the sub-state middle
+         *     (metro/CMA/regional-district/transit-federation/multi-state).
          *     `national`-tier attachments are always filtered.
          *
          *     Each `LookupOrg.matched_region_slugs` names the
@@ -600,11 +627,18 @@ export interface components {
              */
             local: components["schemas"]["LookupOrg"][];
             /**
-             * @description Orgs in scope whose only matched attachment regions
-             *     are `scope_tier='regional'` (metros, states,
-             *     provinces, multi-state coalitions).
+             * @description Orgs in scope whose matched attachment regions are
+             *     sub-state `scope_tier='regional'` (metros, CMAs, regional
+             *     districts, transit federations, multi-state coalitions),
+             *     with no local or state/province match.
              */
             regional: components["schemas"]["LookupOrg"][];
+            /**
+             * @description Orgs in scope whose matched attachment regions include a
+             *     state/province-tier region (`us:state`, `ca:province`)
+             *     and no `local` match.
+             */
+            statewide: components["schemas"]["LookupOrg"][];
             /**
              * @description Ancestors of `region`, ordered closest-first (the
              *     region's direct parent at index 0, then the
@@ -614,8 +648,8 @@ export interface components {
             ancestry: components["schemas"]["Region"][];
             /**
              * @description Slug → display-name lookup for descendant regions
-             *     referenced by `matched_region_slugs` in `local` or
-             *     `regional`. Excludes the focus region and its
+             *     referenced by `matched_region_slugs` in `local`,
+             *     `regional`, or `statewide`. Excludes the focus region and its
              *     ancestors (clients seed those from `region` and
              *     `ancestry`). Empty object when no descendants need
              *     resolving.

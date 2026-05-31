@@ -41,9 +41,10 @@ type RegionSummary struct {
 // set symmetric with ListRegions' descendant-walk org_count means
 // the count on the browse card matches the count on the detail page.
 //
-// Local + Regional buckets are decided by the scope_tier of the org's
-// matched attachment regions — same rule Lookup uses. National-tier
-// attachments are always filtered.
+// Local + Regional + Statewide buckets are decided by the scope_tier
+// and kind of the org's matched attachment regions — same rule Lookup
+// uses (see BucketOrgsByScope). National-tier attachments are always
+// filtered.
 //
 // Ancestry is ordered closest-first (direct parent at index 0, then
 // grandparent, …) and excludes the region itself plus any
@@ -60,6 +61,7 @@ type RegionDetail struct {
 	Region                Region
 	Local                 []Org
 	Regional              []Org
+	Statewide             []Org
 	Ancestry              []Region
 	DescendantRegionNames map[string]string
 }

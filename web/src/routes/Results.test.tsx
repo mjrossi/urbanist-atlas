@@ -55,6 +55,19 @@ function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {
         added_at: '2026-05-17',
       },
     ],
+    statewide: [
+      {
+        id: 3,
+        slug: 'ny-lcv',
+        name: 'NY League of Conservation Voters',
+        short_desc: 'Statewide transportation policy.',
+        website_url: 'https://www.nylcv.org',
+        tags: ['policy'],
+        regions: [],
+        matched_region_slugs: [],
+        added_at: '2026-05-17',
+      },
+    ],
     ...overrides,
   };
 }
@@ -89,16 +102,20 @@ describe('Results', () => {
     const h1 = screen.getByRole('heading', { level: 1 });
     expect(h1.textContent).toMatch(/11217/);
     expect(screen.getByRole('link', { name: 'Riders Alliance' })).toBeDefined();
-    // Local + Regional section h2s.
+    expect(
+      screen.getByRole('link', { name: 'NY League of Conservation Voters' }),
+    ).toBeDefined();
+    // Local + Regional + State / Provincial section h2s.
     const h2s = screen.getAllByRole('heading', { level: 2 });
     const h2Text = h2s.map((h) => h.textContent ?? '').join(' | ');
     expect(h2Text).toMatch(/local/i);
     expect(h2Text).toMatch(/regional/i);
+    expect(h2Text).toMatch(/state \/ provincial/i);
   });
 
-  it('renders the empty prose when both tiers come back empty', async () => {
+  it('renders the empty prose when all three tiers come back empty', async () => {
     lookupMock.mockResolvedValueOnce(
-      makeResult({ local: [], regional: [] }),
+      makeResult({ local: [], regional: [], statewide: [] }),
     );
     renderAt('/r/99999?country=US');
 

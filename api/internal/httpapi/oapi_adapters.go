@@ -89,6 +89,7 @@ func toOAPILookupResult(in atlas.LookupResult) oapi.LookupResult {
 		ResolvedAncestry:   ancestry,
 		Local:              toOAPILookupOrgs(in.Local),
 		Regional:           toOAPILookupOrgs(in.Regional),
+		Statewide:          toOAPILookupOrgs(in.Statewide),
 	}
 }
 
@@ -169,6 +170,7 @@ func toOAPIRegionDetail(in atlas.RegionDetail) oapi.RegionDetail {
 		Region:                toOAPIRegion(in.Region),
 		Local:                 toOAPILookupOrgs(in.Local),
 		Regional:              toOAPILookupOrgs(in.Regional),
+		Statewide:             toOAPILookupOrgs(in.Statewide),
 		Ancestry:              ancestry,
 		DescendantRegionNames: names,
 	}
