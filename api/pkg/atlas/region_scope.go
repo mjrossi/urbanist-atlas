@@ -9,7 +9,8 @@ import "sort"
 //   - if any of an org's matched attachment regions has
 //     scope_tier='local', the org is Local;
 //   - else if any matched region is a state-equivalent kind
-//     (IsStateKind: us:state, ca:province), the org is Statewide;
+//     (IsStateKind: us:state, us:territory, ca:province, ca:territory),
+//     the org is Statewide;
 //   - else (only sub-state regional matches: metro/CMA/regional-
 //     district/transit-federation/multi-state) it's Regional.
 //

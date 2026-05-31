@@ -531,8 +531,8 @@ recommended vocabulary uses country-prefixed values:
 
 | Country | Recommended kinds |
 |---|---|
-| US | `us:borough`, `us:city`, `us:county`, `us:metro`, `us:state`, `us:multi-state`, `us:transit-federation` |
-| CA | `ca:city`, `ca:regional-district`, `ca:cma`, `ca:province` |
+| US | `us:borough`, `us:city`, `us:county`, `us:metro`, `us:state`, `us:territory`, `us:federal-district`, `us:multi-state`, `us:transit-federation` |
+| CA | `ca:city`, `ca:regional-district`, `ca:cma`, `ca:province`, `ca:territory` |
 | PT | `pt:freguesia`, `pt:municipio`, `pt:cim`, `pt:area-metropolitana`, `pt:distrito`, `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional` |
 | DE | `de:bezirk`, `de:kreisfreie-stadt`, `de:kreis`, `de:land`, `de:transit-federation` |
 | FR | `fr:commune`, `fr:departement`, `fr:region`, `fr:metropole` |
@@ -551,11 +551,20 @@ three-value enum. The split is derived, not a fourth enum value:
 - **Local** — any matched region with `scope_tier='local'` (cities,
   counties, boroughs, and editorial city-state overrides like Berlin).
 - **State / Provincial** — matched regions of a *state-equivalent kind*
-  (`IsStateKind`: `us:state`, `ca:province` today; `de:land`,
-  `uk:nation`, `pt:nuts-ii`, `pt:regiao-autonoma`, `au:state` when
-  those markets ship) with no local match. Multi-state coalitions
-  (`us:multi-state`) are deliberately *not* state-equivalent — they're
-  advocacy federations, not a top-admin tier, so they stay in Regional.
+  (`IsStateKind`: `us:state`, `us:territory`, `ca:province`,
+  `ca:territory` today; `de:land`, `uk:nation`, `pt:nuts-ii`,
+  `pt:regiao-autonoma`, `au:state` when those markets ship) with no
+  local match. Territories are included because they're the top-admin
+  tier of their country and carry internal regional structure (PR is
+  the parent of its own metros), so a territory-wide org sits above any
+  single metro. Two kinds are deliberately *not* state-equivalent:
+  multi-state coalitions (`us:multi-state`) are advocacy federations,
+  not a top-admin tier; and `us:federal-district` (DC) is a city-state
+  — coextensive with one city and one metro, already split across the
+  `washington-dc` local leaf and the `dc` district node, so DC orgs
+  bucket Local (city-scale, tagged to the leaf) or Regional (DMV-scale,
+  tagged to the metro) rather than "State / Provincial". Both stay in
+  Regional.
 - **Regional** — everything in between (metro/CMA/regional-district/
   transit-federation and multi-state coalitions) with no local or
   state/province match.

@@ -34,12 +34,16 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
   conventions.
 - Results return three presentational tiers: **local** (city/county),
   **regional** (metro/CMA/transit-federation/multi-state), and
-  **state / provincial** (`us:state`/`ca:province`). The state/provincial
+  **state / provincial** (state/province/territory *kinds* — `us:state`,
+  `us:territory`, `ca:province`, `ca:territory`). The state/provincial
   split is derived from region *kind* (`atlas.IsStateKind`), not a new
   `scope_tier` value — the wire enum stays `{local, regional, national}`;
   the `/lookup` and region-detail responses carry a `statewide` array
   alongside `local` and `regional`. Multi-state coalitions stay in
-  regional. The schema supports a third
+  regional. DC (`us:federal-district`) is treated as a city-state and
+  stays regional, not statewide — it's coextensive with one city/metro
+  and is split across the `washington-dc` local leaf and the `dc`
+  district node, so its orgs bucket local or regional by slug choice. The schema supports a third
   `scope_tier='national'` tier (slice #4.6) for country-wide umbrellas
   (e.g. Portugal's MUBi in the validation fixture, or future Living
   Streets / MUBi-equivalent national orgs when other countries

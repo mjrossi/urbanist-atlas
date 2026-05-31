@@ -14,6 +14,13 @@ func TestIsStateKind(t *testing.T) {
 	in := []RegionKind{
 		"us:state",
 		"ca:province",
+		// Territories are the top-admin tier of their country and carry
+		// internal regional structure (PR is the parent of six metros),
+		// so a territory-wide org belongs in the Statewide tier, above
+		// any single metro. Canada colloquially groups these with
+		// provinces ("provinces and territories").
+		"us:territory",
+		"ca:territory",
 	}
 	out := []RegionKind{
 		// Sub-state regional kinds — stay in Regional.
@@ -27,6 +34,14 @@ func TestIsStateKind(t *testing.T) {
 		// federation, not a top-admin tier; editorial ruling keeps them
 		// in Regional.
 		"us:multi-state",
+		// DC (us:federal-district) is a city-state: the district is
+		// coextensive with one city and one metro, and the seed already
+		// splits it across two nodes (washington-dc, a us:city local
+		// leaf, and dc, the district). City-scale DC orgs tag the local
+		// leaf; DMV-scale orgs tag the metro. Promoting the kind here
+		// would yank DMV-tagged orgs (e.g. Greater Greater Washington)
+		// into "State / Provincial", so it's deliberately excluded.
+		"us:federal-district",
 		// Local-tier kinds.
 		"us:city",
 		"us:county",
@@ -61,7 +76,9 @@ func TestIsStateKind(t *testing.T) {
 func TestStateKinds_Deterministic(t *testing.T) {
 	want := []RegionKind{
 		"ca:province",
+		"ca:territory",
 		"us:state",
+		"us:territory",
 	}
 	got := StateKinds()
 	if diff := cmp.Diff(want, got); diff != "" {

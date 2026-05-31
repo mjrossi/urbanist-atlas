@@ -217,3 +217,71 @@ func TestLookup_Michigan_StateVsMetro(t *testing.T) {
 		t.Errorf("48624 Statewide (-want +got):\n%s", diff)
 	}
 }
+
+// TestLookup_TopAdminTiers pins the editorial split between DC (a
+// city-state that stays Regional) and territories (PR, Canadian
+// territories — province-scale, promoted to Statewide). It is the
+// regression guard against folding us:federal-district into the
+// state-equivalent set, which would mis-promote DMV-tagged orgs.
+func TestLookup_TopAdminTiers(t *testing.T) {
+	s := NewMemStore()
+	addRegions(s,
+		// DC: a federal district that is its own state-equivalent
+		// administratively, but coextensive with one city and one metro.
+		// The seed splits it across washington-dc (local city leaf) and
+		// dc (the district); DC ZIPs anchor at the city leaf.
+		Region{ID: 1, Slug: "dc", Kind: "us:federal-district", Name: "District of Columbia", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60},
+		Region{ID: 2, Slug: "washington-dc-metro", Kind: "us:metro", Name: "Washington Metro", Country: "US", ScopeTier: ScopeRegional, SortPriority: 40, ParentSlugs: []string{"dc"}},
+		Region{ID: 3, Slug: "washington-dc", Kind: "us:city", Name: "Washington", Country: "US", ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"washington-dc-metro", "dc"}},
+		// PR: a territory that is the parent of its own metros — a
+		// territory-wide org sits above any single metro → Statewide.
+		Region{ID: 4, Slug: "pr", Kind: "us:territory", Name: "Puerto Rico", Country: "US", ScopeTier: ScopeRegional, SortPriority: 60},
+		Region{ID: 5, Slug: "san-juan-pr-metro", Kind: "us:metro", Name: "San Juan Metro", Country: "US", ScopeTier: ScopeRegional, SortPriority: 40, ParentSlugs: []string{"pr"}},
+		// Canadian territory: province-equivalent top-admin tier.
+		Region{ID: 6, Slug: "yt", Kind: "ca:territory", Name: "Yukon", Country: "CA", ScopeTier: ScopeRegional, SortPriority: 60},
+	)
+	s.AddPostalCode("US", "20001", 3) // DC ZIP anchors at the city leaf
+	s.AddPostalCode("US", "00901", 5) // San Juan ZIP anchors at the metro
+	s.AddPostalCode("CA", "Y1A1A1", 6)
+
+	// A DMV-scale org tagged to both the metro and the district must
+	// stay Regional — promoting us:federal-district would pull it into
+	// Statewide, which is the regression this guards.
+	s.AddOrg(Org{ID: 10, Slug: "ggwash", Name: "Greater Greater Washington", ShortDesc: "DMV urbanism.", WebsiteURL: "https://ggwash.org"}, []int64{2, 1})
+	// A city-scale DC org tags the local leaf → Local.
+	s.AddOrg(Org{ID: 11, Slug: "dc-ward-bikes", Name: "DC Ward Bikes", ShortDesc: "Neighborhood cycling.", WebsiteURL: "https://example.org/dcwb"}, []int64{3})
+	// A territory-wide PR org tags the territory → Statewide.
+	s.AddOrg(Org{ID: 12, Slug: "bicipr", Name: "Bicicultura PR", ShortDesc: "Territory-wide cycling.", WebsiteURL: "https://example.org/bicipr"}, []int64{4})
+	// A Yukon-wide org → Statewide.
+	s.AddOrg(Org{ID: 13, Slug: "yukon-active", Name: "Yukon Active Transport", ShortDesc: "Territory-wide.", WebsiteURL: "https://example.org/yat"}, []int64{6})
+
+	dc, err := Lookup(context.Background(), s, LookupQuery{PostalCode: "20001", Country: "US"})
+	if err != nil {
+		t.Fatalf("Lookup 20001: %v", err)
+	}
+	if diff := cmp.Diff([]string{"dc-ward-bikes"}, slugs(dc.Local)); diff != "" {
+		t.Errorf("20001 Local (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"ggwash"}, slugs(dc.Regional)); diff != "" {
+		t.Errorf("20001 Regional (-want +got):\n%s", diff)
+	}
+	if len(dc.Statewide) != 0 {
+		t.Errorf("20001 Statewide = %v, want empty (DC is a city-state)", slugs(dc.Statewide))
+	}
+
+	pr, err := Lookup(context.Background(), s, LookupQuery{PostalCode: "00901", Country: "US"})
+	if err != nil {
+		t.Fatalf("Lookup 00901: %v", err)
+	}
+	if diff := cmp.Diff([]string{"bicipr"}, slugs(pr.Statewide)); diff != "" {
+		t.Errorf("00901 Statewide (-want +got):\n%s", diff)
+	}
+
+	yt, err := Lookup(context.Background(), s, LookupQuery{PostalCode: "Y1A1A1", Country: "CA"})
+	if err != nil {
+		t.Fatalf("Lookup Y1A1A1: %v", err)
+	}
+	if diff := cmp.Diff([]string{"yukon-active"}, slugs(yt.Statewide)); diff != "" {
+		t.Errorf("Y1A1A1 Statewide (-want +got):\n%s", diff)
+	}
+}

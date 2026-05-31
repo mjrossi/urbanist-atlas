@@ -10,10 +10,15 @@ import { Entry } from './Entry.tsx';
  * by the shared `Entry` component.
  *
  * Empty sections render nothing — the section label only appears
- * when there's at least one entry. The Results page's empty-state
- * copy lives outside this component (the page renders an
- * editors-note card when ALL THREE buckets are empty).
+ * when there's at least one entry. Roman numerals track the *visible*
+ * sections in order (a results page with only Regional + Statewide
+ * reads "I. Regional", "II. State / Provincial"), not a fixed
+ * tier-to-numeral mapping. The Results page's empty-state copy lives
+ * outside this component (the page renders an editors-note card when
+ * ALL THREE buckets are empty).
  */
+const ROMAN = ['I.', 'II.', 'III.'];
+
 export function EntryList({
   local,
   regional,
@@ -25,26 +30,23 @@ export function EntryList({
   statewide: LookupOrg[];
   regionNameBySlug: Map<string, string>;
 }) {
+  const sections = [
+    { title: 'Local', orgs: local },
+    { title: 'Regional', orgs: regional },
+    { title: 'State / Provincial', orgs: statewide },
+  ].filter((s) => s.orgs.length > 0);
+
   return (
     <>
-      <Section
-        roman="I."
-        title="Local"
-        orgs={local}
-        regionNameBySlug={regionNameBySlug}
-      />
-      <Section
-        roman="II."
-        title="Regional"
-        orgs={regional}
-        regionNameBySlug={regionNameBySlug}
-      />
-      <Section
-        roman="III."
-        title="State / Provincial"
-        orgs={statewide}
-        regionNameBySlug={regionNameBySlug}
-      />
+      {sections.map((s, i) => (
+        <Section
+          key={s.title}
+          roman={ROMAN[i]}
+          title={s.title}
+          orgs={s.orgs}
+          regionNameBySlug={regionNameBySlug}
+        />
+      ))}
     </>
   );
 }
@@ -60,7 +62,6 @@ function Section({
   orgs: LookupOrg[];
   regionNameBySlug: Map<string, string>;
 }) {
-  if (orgs.length === 0) return null;
   return (
     <section className="org-section mt-32">
       <header className="section-break mt-0">

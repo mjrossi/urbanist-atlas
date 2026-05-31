@@ -65,9 +65,7 @@ describe('EntryList', () => {
     expect(screen.queryByText('Local')).toBeNull();
     expect(screen.queryByText('Regional')).toBeNull();
     expect(screen.getByText('State / Provincial')).toBeDefined();
-    expect(
-      screen.getByRole('link', { name: 'Statewide Coalition' }),
-    ).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Statewide Coalition' })).toBeDefined();
   });
 
   it('renders entries inside the matching section', () => {
@@ -87,16 +85,44 @@ describe('EntryList', () => {
 
   it('renders nothing when all three sections are empty', () => {
     const { container } = renderList(
-      <EntryList
-        local={[]}
-        regional={[]}
-        statewide={[]}
-        regionNameBySlug={emptyMap}
-      />,
+      <EntryList local={[]} regional={[]} statewide={[]} regionNameBySlug={emptyMap} />,
     );
     // No section headers, no entries.
     expect(container.querySelector('.section-break')).toBeNull();
     expect(container.querySelector('.org-entry')).toBeNull();
+  });
+
+  it('numbers visible sections sequentially, skipping empty ones', () => {
+    // Local is empty: Regional becomes "I." and State / Provincial "II.",
+    // not "II."/"III." — the numerals track visible sections, not a fixed
+    // tier-to-numeral mapping.
+    const { container } = renderList(
+      <EntryList
+        local={[]}
+        regional={[makeOrg(3, 'Regional Org C')]}
+        statewide={[makeOrg(4, 'Statewide Org D')]}
+        regionNameBySlug={emptyMap}
+      />,
+    );
+    const numerals = Array.from(container.querySelectorAll('.num')).map(
+      (el) => el.textContent,
+    );
+    expect(numerals).toEqual(['I.', 'II.']);
+  });
+
+  it('numbers a lone visible section as "I." regardless of tier', () => {
+    const { container } = renderList(
+      <EntryList
+        local={[]}
+        regional={[]}
+        statewide={[makeOrg(5, 'Statewide Coalition')]}
+        regionNameBySlug={emptyMap}
+      />,
+    );
+    const numerals = Array.from(container.querySelectorAll('.num')).map(
+      (el) => el.textContent,
+    );
+    expect(numerals).toEqual(['I.']);
   });
 
   it('shows the entry count in the section header', () => {

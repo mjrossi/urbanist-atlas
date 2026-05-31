@@ -16,12 +16,28 @@ import "sort"
 // hint; a kind set is self-documenting and immune to band reshuffles.
 //
 // In (v1, US + CA only):
-//   - us:state    — the 50 states + DC + PR territory rows
-//   - ca:province — the 10 provinces + 3 territories
+//   - us:state     — the 50 states
+//   - us:territory — Puerto Rico (parent of its own metros; a
+//     territory-wide org sits above any single metro)
+//   - ca:province  — the 10 provinces
+//   - ca:territory — Yukon, NWT, Nunavut (Canada groups these with
+//     provinces: "provinces and territories")
 //
 // Future markets add their top-admin kind here when they ship with
-// data: ca:territory (if split out), de:land, uk:nation, pt:nuts-ii,
-// pt:regiao-autonoma, au:state. NOT included by design:
+// data: de:land, uk:nation, pt:nuts-ii, pt:regiao-autonoma, au:state.
+// NOT included by design:
+//   - us:federal-district — DC is a city-state: the district is
+//     coextensive with one city and one metro, and colloquially DC
+//     advocacy is either city-scale ("local") or DMV-scale ("the
+//     DMV" — the regional framing locals use), never "statewide": DC
+//     is emphatically not a state. The seed already splits it across two
+//     nodes: washington-dc (a us:city local leaf, where DC ZIPs
+//     anchor) and dc (the district, parent of washington-dc-metro). A
+//     city-scale DC org tags the local leaf → Local; a DMV org tags
+//     the metro → Regional. Promoting the kind here would yank every
+//     DMV-tagged org (e.g. Greater Greater Washington) into "State /
+//     Provincial", so the district stays Regional and the slug choice
+//     does the local/regional split.
 //   - us:multi-state — multi-state coalitions (NYC Tri-State,
 //     Chicagoland) are broader than a single state but are advocacy
 //     federations, not a top-admin tier; they stay in Regional
@@ -34,8 +50,10 @@ import "sort"
 //     statewide test. Local precedence shields them.
 //   - metros, counties, boroughs, transit federations, national tier.
 var stateKinds = map[RegionKind]bool{
-	"us:state":    true,
-	"ca:province": true,
+	"us:state":     true,
+	"us:territory": true,
+	"ca:province":  true,
+	"ca:territory": true,
 }
 
 // IsStateKind reports whether k is one of the state-equivalent (top
