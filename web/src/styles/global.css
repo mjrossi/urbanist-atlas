@@ -2269,7 +2269,7 @@ a.tag:hover::before {
 
 .index-letter-row {
   display: grid;
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: 56px minmax(0, 1fr);
   gap: 20px;
   padding: 18px 0 22px;
   border-bottom: 1px solid var(--rule);
@@ -2291,6 +2291,7 @@ a.tag:hover::before {
   line-height: 0.9;
   color: var(--amber);
   letter-spacing: -0.02em;
+  min-width: 0;
 }
 
 .index-letter .meta {
@@ -2302,7 +2303,15 @@ a.tag:hover::before {
   text-transform: uppercase;
   color: var(--muted);
   margin-top: 4px;
-  white-space: nowrap;
+  /* Wraps within the 56px gutter on mobile so the uppercase caption
+     ("6 REGIONS") can't overflow the fixed first column and collide
+     with the entries; restored to a single line at >=900px below. */
+}
+
+@media (min-width: 900px) {
+  .index-letter .meta {
+    white-space: nowrap;
+  }
 }
 
 .index-rows {
