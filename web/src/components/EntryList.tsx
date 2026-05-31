@@ -41,7 +41,8 @@ export function EntryList({
       {sections.map((s, i) => (
         <Section
           key={s.title}
-          roman={ROMAN[i]}
+          // sections is a filter of 3 entries, so i < ROMAN.length always.
+          roman={ROMAN[i]!}
           title={s.title}
           orgs={s.orgs}
           regionNameBySlug={regionNameBySlug}
