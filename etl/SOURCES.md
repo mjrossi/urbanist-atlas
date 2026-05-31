@@ -75,6 +75,23 @@ public URL the way Census files allow. On the first download:
 Subsequent vintage upgrades follow the same recipe — see *Vintage
 upgrade workflow* below.
 
+### Download targeting & the `Optional` flag
+
+`etl download` and `etl regenerate` both take `--target=all|regions|postal`
+(default `all`). Each `SourceDescriptor` (in `internal/etl/{us,ca}`)
+carries two fields that shape what a targeted run touches:
+
+- **`Optional: true`** — download skips the source with a notice instead
+  of failing. Used for HUD, whose URL is an account-gated landing page,
+  not a direct file; `etl download US` therefore succeeds fetching only
+  the public Census files. `regenerate` already tolerates a missing HUD
+  file (it logs and skips the backfill).
+- **`Targets: [...]`** — which outputs the source feeds (empty ⇒ all). The
+  CA FSA boundary is tagged `[postal]`, so `etl download CA --target
+  regions` skips the 155 MB download and `regenerate --country CA
+  --target regions` never parses it. The `seed-check` gate relies on
+  both: `--target regions` fetches only Census + the 13 MB CA CMA.
+
 License: HUD USPS Crosswalk files are public-domain US-government
 data (HUD is a federal agency; works of the US government are not
 subject to copyright under 17 U.S.C. § 105). See `LICENSE-DATA` for
@@ -257,11 +274,17 @@ per-ZIP `zipAnchorOverride` patch has been removed.
 >
 > The "same vintage → byte-identical output" determinism invariant
 > (CLAUDE.md / above) therefore holds again for the pinned HUD 2025-Q4
-> vintage. CI still does **not** gate on `etl regenerate` — HUD is
-> account-gated and can't be fetched from a clean checkout — so the
-> invariant remains honor-system. See #67 for the proposed `seed-check`
-> drift gate that would make "committed == regenerated" a checked
-> invariant.
+> vintage, and as of #67 it is **checked, not honor-system**. The
+> `seed-check` CI gate (`just seed-check`) regenerates the HUD-free
+> region files (`regions_us_msas.toml`, `regions_ca_cmas.toml`) from the
+> pinned public sources and fails the build on drift — mirroring
+> `api-gen-check` / `web-gen-check`. The HUD-dependent US postal CSV and
+> the 155 MB-FSA-dependent CA postal CSV can't run in CI (HUD is
+> account-gated; the FSA is too large to fetch each run), so their
+> generator logic is instead locked by golden-determinism tests
+> (`TestRegenerate_GoldenDeterminism` in `internal/etl/{us,ca}`), which
+> push tiny synthetic sources — including a synthetic HUD — through the
+> full pipeline and assert byte-for-byte output under `just api-test`.
 >
 > The `bridgeport-ct-metro → [nyc-tristate, ct]` parent edge needed for
 > the Tri-State result is independent of the seed regeneration and is
