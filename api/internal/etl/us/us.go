@@ -62,12 +62,17 @@ func init() {
 				URL:      "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_place20_natl.txt",
 				SHA256:   "698a5dad71ed419411677d0ffd8ecd9331067f59c472cdd239b92c12f698285d",
 				Vintage:  "Census ZCTA-to-place relationship, 2020 vintage",
+				// ZCTA crosswalks feed only the postal pass (Regenerate
+				// parses them after the regions early-return), so a
+				// --target=regions download skips them.
+				Targets: []etl.Target{etl.TargetPostal},
 			},
 			{
 				Filename: "tab20_zcta520_county20_natl.txt",
 				URL:      "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt",
 				SHA256:   "3ed41278d637dc249e0323306f68be8a6c234e3090f4de88ef328dee71aeaaaf",
 				Vintage:  "Census ZCTA-to-county relationship, 2020 vintage",
+				Targets:  []etl.Target{etl.TargetPostal},
 			},
 			{
 				// HUD USPS ZIP-to-County crosswalk (slice #7.5.5). The
@@ -125,26 +130,12 @@ func init() {
 // county-leaf, msa, state) so the maintainer can spot coverage gaps.
 func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, logger *slog.Logger) error {
 	cbsaPath := filepath.Join(srcDir, "list1_2023.csv")
-	zctaPlacePath := filepath.Join(srcDir, "tab20_zcta520_place20_natl.txt")
-	zctaCountyPath := filepath.Join(srcDir, "tab20_zcta520_county20_natl.txt")
 
 	msas, countyToMSA, err := loadCBSA(cbsaPath)
 	if err != nil {
 		return err
 	}
 	logger.Info("etl us: parsed CBSA delineation", "msas", len(msas), "county_to_msa", len(countyToMSA))
-
-	zctaPlace, err := loadZCTAPlace(zctaPlacePath)
-	if err != nil {
-		return err
-	}
-	logger.Info("etl us: parsed ZCTA-to-place", "rows", len(zctaPlace))
-
-	zctaCounty, err := loadZCTACounty(zctaCountyPath)
-	if err != nil {
-		return err
-	}
-	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounty))
 
 	overridesPath := filepath.Join(outDir, "regions_us_msa_overrides.toml")
 	overrides, err := ReadMSAOverrides(overridesPath)
@@ -170,6 +161,21 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	if !target.Postal() {
 		return nil
 	}
+
+	// ZCTA crosswalks feed only the postal pass, so they're parsed here
+	// rather than above the region write — a --target=regions run needs
+	// just CBSA + overrides and skips ~20 MB of ZCTA download/parse.
+	zctaPlace, err := loadZCTAPlace(filepath.Join(srcDir, "tab20_zcta520_place20_natl.txt"))
+	if err != nil {
+		return err
+	}
+	logger.Info("etl us: parsed ZCTA-to-place", "rows", len(zctaPlace))
+
+	zctaCounty, err := loadZCTACounty(filepath.Join(srcDir, "tab20_zcta520_county20_natl.txt"))
+	if err != nil {
+		return err
+	}
+	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounty))
 
 	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, cbsaToSlug)
 
