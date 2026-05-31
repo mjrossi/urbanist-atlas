@@ -46,6 +46,15 @@
     -->
 
     <script type="module" src="/src/main.tsx"></script>
+
+    <!--
+      Cloudflare Web Analytics (privacy-first, cookieless) is NOT shipped
+      here. It is injected at the edge by Cloudflare (Web Analytics →
+      automatic injection, enabled in the dashboard), so no beacon tag and
+      no token live in this repo. The browser still enforces CSP against
+      the injected tag, so its origins (static.cloudflareinsights.com /
+      cloudflareinsights.com) are allow-listed in web/public/_headers.
+    -->
   </head>
   <body>
     <div id="root"></div>

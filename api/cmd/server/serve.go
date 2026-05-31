@@ -40,6 +40,12 @@ func serveCommand() *cli.Command {
 				Sources: cli.EnvVars("URBANIST_PORT"),
 			},
 			&cli.StringFlag{
+				Name:    "metrics-port",
+				Usage:   "TCP port for the private Prometheus /metrics listener; empty or 0 disables it",
+				Value:   "9091",
+				Sources: cli.EnvVars("URBANIST_METRICS_PORT"),
+			},
+			&cli.StringFlag{
 				Name:    "log-format",
 				Usage:   "log output format: json or text",
 				Value:   "json",
@@ -129,6 +135,8 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		enqueuer = worker
 	}
 
+	metrics := httpapi.NewMetrics()
+
 	origins := splitCSV(c.String("cors-origins"))
 	handler := httpapi.New(httpapi.Config{
 		Store:                  store,
@@ -140,6 +148,7 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		PromotionEnqueuer:      enqueuer,
 		AdminToken:             c.String("admin-token"),
 		SubmissionsRatePerHour: c.Int("submissions-rate-per-hour"),
+		Metrics:                metrics,
 	})
 
 	addr := net.JoinHostPort("", c.String("port"))
@@ -150,6 +159,22 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
+	}
+
+	// Private Prometheus listener. Bound to the Fly 6PN private address
+	// (FLY_PRIVATE_IP) when present so /metrics is never internet-routable
+	// — Fly's managed Prometheus scrapes it over that private network. Off
+	// the main mux on purpose; nil when disabled. ListenAndServe errors on
+	// this listener are logged, never fatal: losing metrics must not take
+	// the request path down.
+	metricsSrv := newMetricsServer(c.String("metrics-port"), metrics, logger)
+	if metricsSrv != nil {
+		go func() {
+			logger.Info("metrics listening", "addr", metricsSrv.Addr)
+			if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Error("metrics server error", "err", err)
+			}
+		}()
 	}
 
 	serverErr := make(chan error, 1)
@@ -175,6 +200,11 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		// hits it first wins.
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("graceful shutdown: %w", err)
+		}
+		if metricsSrv != nil {
+			if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+				logger.Warn("metrics graceful shutdown incomplete", "err", err)
+			}
 		}
 		if worker != nil {
 			dropped, stopErr := worker.Stop(shutdownCtx)
@@ -321,4 +351,27 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+// newMetricsServer builds the private Prometheus listener for the given
+// port, or returns nil when metrics are disabled (empty port or "0").
+// It binds to the Fly private IP when available so the endpoint stays
+// off the public internet, falling back to loopback for local dev.
+func newMetricsServer(port string, metrics *httpapi.Metrics, logger *slog.Logger) *http.Server {
+	port = strings.TrimSpace(port)
+	if port == "" || port == "0" {
+		logger.Info("metrics server disabled")
+		return nil
+	}
+	host := os.Getenv("FLY_PRIVATE_IP")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", metrics.Handler())
+	return &http.Server{
+		Addr:              net.JoinHostPort(host, port),
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 }

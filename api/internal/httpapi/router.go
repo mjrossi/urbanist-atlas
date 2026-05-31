@@ -46,6 +46,11 @@ type Config struct {
 	// SubmissionsRatePerHour caps POST /api/v1/submissions per source
 	// IP. Zero or negative falls back to a default (5/hour).
 	SubmissionsRatePerHour int
+
+	// Metrics, when non-nil, enables the Prometheus request middleware
+	// and product counters. The /metrics endpoint itself is served on a
+	// separate private listener (see cmd/server), not on this mux.
+	Metrics *Metrics
 }
 
 // New builds the full middleware stack and route table.
@@ -74,6 +79,13 @@ func New(cfg Config) http.Handler {
 	if len(cfg.CORSOrigins) > 0 {
 		r.Use(corsMiddleware(cfg.CORSOrigins))
 	}
+	// metricsMiddleware sits inside corsMiddleware so the preflight
+	// OPTIONS that CORS short-circuits with a 204 aren't recorded as
+	// "unmatched" request noise. It reuses loggingMiddleware's status
+	// recorder rather than wrapping the writer a second time.
+	if cfg.Metrics != nil {
+		r.Use(metricsMiddleware(cfg.Metrics))
+	}
 
 	getHead(r, "/healthz", healthHandler())
 	getHead(r, "/readyz", readyHandler(cfg.Store, logger))
@@ -86,7 +98,7 @@ func New(cfg Config) http.Handler {
 		getHead(r, "/openapi.yaml", openapiHandler())
 		r.Group(func(r chi.Router) {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
-			getHead(r, "/lookup", lookupHandler(cfg.Store, logger))
+			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics))
 			getHead(r, "/regions", listRegionsHandler(cfg.Store, logger))
 			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger))
 			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger))
@@ -94,7 +106,7 @@ func New(cfg Config) http.Handler {
 
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
-				r.Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger))
+				r.Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger, cfg.Metrics))
 				r.Route("/admin", func(r chi.Router) {
 					r.Use(bearerAuthMiddleware(cfg.AdminToken))
 					r.Get("/submissions", listSubmissionsHandler(cfg.Submissions, logger))

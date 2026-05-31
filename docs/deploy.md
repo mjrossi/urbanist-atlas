@@ -173,11 +173,11 @@ every static asset Cloudflare serves. The Content-Security-Policy is:
 
 ```
 default-src 'self';
-script-src  'self';
+script-src  'self' https://static.cloudflareinsights.com;
 style-src   'self';
 font-src    'self';
 img-src     'self' data:;
-connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com;
+connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com https://cloudflareinsights.com;
 frame-ancestors 'none';
 base-uri    'self';
 form-action 'self';
@@ -185,8 +185,13 @@ form-action 'self';
 
 Notes on the directives:
 
-- `script-src 'self'` — the SPA has no inline `<script>`; everything
-  goes through Vite's bundled module graph.
+- `script-src 'self' https://static.cloudflareinsights.com` — the SPA
+  has no inline `<script>`; our own code goes through Vite's bundled
+  module graph, and the one external script is the Cloudflare Web
+  Analytics beacon (cookieless RUM). The beacon is **injected at the
+  edge** by Cloudflare (Web Analytics automatic injection), not shipped
+  in our HTML — but the browser enforces CSP against the injected tag,
+  so the origin must be allow-listed here regardless.
 - `style-src 'self'` — Vite's production build emits all CSS as
   external `<link rel="stylesheet">` assets. There are no inline
   `<style>` blocks in `dist/index.html`. Dev mode (HMR) uses inline
@@ -195,11 +200,12 @@ Notes on the directives:
   CSS, add `'unsafe-inline'` back with a one-line justification.
 - `font-src 'self'` — all four families ship via
   `@fontsource-variable/*` and are bundled with the build.
-- `connect-src` — the only outbound fetches are to the Atlas API.
-  `qa-api.urbanistatlas.com` stays in the list through the apex
-  verification window; it comes out alongside the qa cert, Workers
-  custom domain, and CORS origin in the qa-teardown follow-up
-  (see § QA hostname retirement).
+- `connect-src` — outbound fetches go to the Atlas API plus
+  `cloudflareinsights.com`, where the Web Analytics beacon POSTs its
+  cookieless RUM data. `qa-api.urbanistatlas.com` stays in the list
+  through the apex verification window; it comes out alongside the qa
+  cert, Workers custom domain, and CORS origin in the qa-teardown
+  follow-up (see § QA hostname retirement).
 - `frame-ancestors 'none'` — the Atlas is never embedded in an
   iframe.
 
