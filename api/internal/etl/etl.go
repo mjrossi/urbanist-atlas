@@ -35,8 +35,38 @@ package etl
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"slices"
 )
+
+// Target selects which seed outputs a regenerate (or download) operates
+// on. The default is TargetAll. TargetRegions exists so CI can refresh
+// the HUD-free region files without touching the HUD-dependent postal
+// CSV (US) or needing the 155 MB CA FSA source.
+type Target string
+
+const (
+	TargetAll     Target = "all"
+	TargetRegions Target = "regions"
+	TargetPostal  Target = "postal"
+)
+
+// Regions reports whether this target includes the region (TOML) outputs.
+func (t Target) Regions() bool { return t == TargetAll || t == TargetRegions }
+
+// Postal reports whether this target includes the postal-code (CSV) outputs.
+func (t Target) Postal() bool { return t == TargetAll || t == TargetPostal }
+
+// ParseTarget validates a CLI --target value.
+func ParseTarget(s string) (Target, error) {
+	switch Target(s) {
+	case TargetAll, TargetRegions, TargetPostal:
+		return Target(s), nil
+	default:
+		return "", fmt.Errorf("invalid target %q (want one of: all, regions, postal)", s)
+	}
+}
 
 // SourceDescriptor names an upstream file the ETL pipeline expects to
 // find in etl/sources/<country>/. Concrete instances live in per-country
@@ -56,6 +86,24 @@ type SourceDescriptor struct {
 	// (e.g., "Census 2020", "StatsCan 2025-Q1"). Logged when the
 	// download step writes the file.
 	Vintage string
+	// Optional marks a source the download step must NOT fail on — e.g.
+	// HUD, whose canonical URL is an account-gated landing page, not a
+	// direct file. Download skips Optional sources with a notice; the
+	// operator fetches them by hand. Regenerate already tolerates their
+	// absence.
+	Optional bool
+	// Targets lists which output Targets this source feeds. Empty means
+	// it feeds every target. Download uses this to fetch only what a
+	// given --target needs (e.g. --target=regions skips the CA FSA).
+	Targets []Target
+}
+
+// FeedsTarget reports whether this source is needed to produce target.
+func (s SourceDescriptor) FeedsTarget(target Target) bool {
+	if len(s.Targets) == 0 || target == TargetAll {
+		return true
+	}
+	return slices.Contains(s.Targets, target)
 }
 
 // OutputTarget names a file the regenerate step writes under
@@ -98,7 +146,7 @@ type Country struct {
 	// nil for plans whose regenerate flow isn't implemented yet — in
 	// that case the cli stub returns an error indicating which slice
 	// is expected to land it.
-	Regenerate func(ctx context.Context, srcDir, outDir string, logger *slog.Logger) error
+	Regenerate func(ctx context.Context, srcDir, outDir string, target Target, logger *slog.Logger) error
 }
 
 // Plans is the registered set of country plans the ETL subcommand

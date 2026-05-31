@@ -1,0 +1,46 @@
+# US Metropolitan Statistical Areas (MSAs), generated from the
+# Census Bureau's CBSA delineation file by api/cmd/server etl
+# regenerate --country=US.
+#
+# Edit policy: do NOT hand-edit this file. Editorial overrides for
+# slug, name, and parents live in regions_us_msa_overrides.toml and
+# are applied by the ETL run. To change a metro's slug/name/parents,
+# add or update an override and re-run etl regenerate.
+#
+# Slug convention:
+#   - Override-supplied for the well-known metros (nyc-metro,
+#     chicago-metro, etc.). See regions_us_msa_overrides.toml.
+#   - Auto-generated otherwise as "<first-city>-<primary-state>-metro"
+#     (the state suffix keeps slugs stable across Census revisions
+#     that may shuffle MSAs sharing a first-city name).
+#
+# Parents:
+#   - Single-state MSAs parent under their state slug.
+#   - Multi-state MSAs without an override parent under all their
+#     constituent states (so MSA-anchored ZCTAs surface state-tier
+#     orgs through the ancestor walk). Curated multi-state regions
+#     in regions_us.toml (nyc-tristate, chicagoland) are
+#     plumbed in via the override file.
+#
+# Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
+# states) and regions_us.toml (children: curated city/borough leaves
+# that may reference these metros). Cross-file parent resolution lives
+# in internal/seedfiles/regions.go.
+
+[[region]]
+slug = "hartford-ct-metro"
+kind = "us:metro"
+name = "Hartford Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ct"]
+# Census CBSA 25540 — Hartford-East Hartford-Middletown, CT
+
+[[region]]
+slug = "new-york-ny-metro"
+kind = "us:metro"
+name = "New York Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny", "nj"]
+# Census CBSA 35620 — New York-Newark-Jersey City, NY-NJ

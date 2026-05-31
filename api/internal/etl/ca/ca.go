@@ -50,6 +50,9 @@ func init() {
 				URL:      "https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip",
 				SHA256:   "9fd2b6adf66e5716d06f91ebdcdb5d8a4e8b9eeb520f8b4285030d34319959db",
 				Vintage:  "Statistics Canada FSA boundary file, 2021 census",
+				// The 155 MB FSA source feeds only the postal pass, so a
+				// --target=regions download/regenerate skips it.
+				Targets: []etl.Target{etl.TargetPostal},
 			},
 			{
 				Filename: "lcma000b21a_e.zip",
@@ -67,8 +70,7 @@ func init() {
 }
 
 // Regenerate runs the full CA ETL pipeline.
-func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger) error {
-	fsaZipPath := filepath.Join(srcDir, "lfsa000b21a_e.zip")
+func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, logger *slog.Logger) error {
 	cmaZipPath := filepath.Join(srcDir, "lcma000b21a_e.zip")
 
 	cmas, err := ParseCMAs(cmaZipPath)
@@ -77,23 +79,32 @@ func Regenerate(ctx context.Context, srcDir, outDir string, logger *slog.Logger)
 	}
 	logger.Info("etl ca: parsed CMA boundary", "cmas", len(cmas), "path", cmaZipPath)
 
-	fsas, err := ParseFSAs(fsaZipPath)
-	if err != nil {
-		return err
-	}
-	logger.Info("etl ca: parsed FSA boundary", "fsas", len(fsas), "path", fsaZipPath)
-
 	assignments := assignCMAs(cmas)
 	knownCMASlugs := make(map[string]bool, len(assignments))
 	for _, a := range assignments {
 		knownCMASlugs[a.Slug] = true
 	}
 
-	tomlPath := filepath.Join(outDir, "regions_ca_cmas.toml")
-	if err := writeCMAsToFile(tomlPath, assignments); err != nil {
+	if target.Regions() {
+		tomlPath := filepath.Join(outDir, "regions_ca_cmas.toml")
+		if err := writeCMAsToFile(tomlPath, assignments); err != nil {
+			return err
+		}
+		logger.Info("etl ca: wrote CMAs", "path", tomlPath, "count", len(assignments))
+	}
+
+	if !target.Postal() {
+		return nil
+	}
+
+	// The FSA boundary is the 155 MB source; parse it only for the postal
+	// pass so a --target=regions run needs just the CMA file.
+	fsaZipPath := filepath.Join(srcDir, "lfsa000b21a_e.zip")
+	fsas, err := ParseFSAs(fsaZipPath)
+	if err != nil {
 		return err
 	}
-	logger.Info("etl ca: wrote CMAs", "path", tomlPath, "count", len(assignments))
+	logger.Info("etl ca: parsed FSA boundary", "fsas", len(fsas), "path", fsaZipPath)
 
 	anchors, reasons := Crosswalk(fsas, knownCMASlugs)
 	csvPath := filepath.Join(outDir, "postal_codes_ca.csv")

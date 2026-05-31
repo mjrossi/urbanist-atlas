@@ -66,6 +66,11 @@ func etlCommand() *cli.Command {
 			Value: "./seed",
 		},
 		&cli.StringFlag{
+			Name:  "target",
+			Usage: "which outputs to operate on: all, regions, or postal",
+			Value: "all",
+		},
+		&cli.StringFlag{
 			Name:    "log-format",
 			Usage:   "log output format: json or text",
 			Value:   "text",
@@ -115,15 +120,30 @@ func runEtlDownload(ctx context.Context, c *cli.Command) error {
 	if err := os.MkdirAll(srcDir, 0o755); err != nil {
 		return fmt.Errorf("etl download: create %s: %w", srcDir, err)
 	}
+	target, err := etl.ParseTarget(c.String("target"))
+	if err != nil {
+		return fmt.Errorf("etl download: %w", err)
+	}
 
 	logger.Info("etl download: start",
 		"country", country,
 		"sources", len(plan.Sources),
+		"target", target,
 		"src_dir", srcDir,
 	)
 
 	client := &http.Client{Timeout: 5 * time.Minute}
 	for _, src := range plan.Sources {
+		if src.Optional {
+			logger.Info("etl download: skipping account-gated source (fetch manually)",
+				"filename", src.Filename, "url", src.URL)
+			continue
+		}
+		if !src.FeedsTarget(target) {
+			logger.Info("etl download: skipping source not needed for target",
+				"filename", src.Filename, "target", target)
+			continue
+		}
 		dst := filepath.Join(srcDir, src.Filename)
 		if err := downloadSource(ctx, client, src, dst, logger); err != nil {
 			return fmt.Errorf("etl download %s: %w", src.Filename, err)
@@ -215,15 +235,20 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 
 	srcDir := filepath.Join(c.String("src"), plan.SourcesDir)
 	outDir := c.String("out")
+	target, err := etl.ParseTarget(c.String("target"))
+	if err != nil {
+		return fmt.Errorf("etl regenerate: %w", err)
+	}
 
 	logger.Info("etl regenerate: start",
 		"country", country,
 		"sources", len(plan.Sources),
 		"targets", len(plan.Targets),
+		"target", target,
 		"src_dir", srcDir,
 		"out_dir", outDir,
 	)
-	if err := plan.Regenerate(ctx, srcDir, outDir, logger); err != nil {
+	if err := plan.Regenerate(ctx, srcDir, outDir, target, logger); err != nil {
 		return fmt.Errorf("etl regenerate %s: %w", country, err)
 	}
 	logger.Info("etl regenerate: complete", "country", country)

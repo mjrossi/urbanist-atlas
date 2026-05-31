@@ -130,6 +130,26 @@ etl-download country:
 etl-regenerate country:
     cd api && go run ./cmd/server etl regenerate --country {{country}} --src ../etl/sources --out seed
 
+# Fail if the committed HUD-free seed (US/CA region files) drifts from a
+# fresh regenerate of the pinned public sources. Mirrors api-gen-check /
+# web-gen-check. HUD-dependent US postal + CA postal are covered by the
+# golden determinism tests under `just api-test`, not here (HUD is
+# account-gated; the CA FSA source is 155 MB). Downloads with
+# --target=regions so only the public Census files + 13 MB CA CMA are
+# fetched (HUD skipped as Optional; CA FSA skipped as off-target). The
+# Census ships the CBSA file as xlsx only, so a conversion step sits
+# between download and regenerate.
+[group('data')]
+[doc('fail if committed region seed drifts from a regen of public sources')]
+seed-check:
+    @cd api && go run ./cmd/server etl download --country US --target regions --src ../etl/sources
+    @python3 etl/scripts/xlsx_to_csv.py etl/sources/us/list1_2023.xlsx etl/sources/us/list1_2023.csv
+    @cd api && go run ./cmd/server etl download --country CA --target regions --src ../etl/sources
+    @cd api && go run ./cmd/server etl regenerate --country US --target regions --src ../etl/sources --out seed
+    @cd api && go run ./cmd/server etl regenerate --country CA --target regions --src ../etl/sources --out seed
+    @git diff --exit-code -- api/seed/regions_us_msas.toml api/seed/regions_ca_cmas.toml \
+        || (echo "seed drift: region files differ from a fresh regen. Stage sources, run \`just etl-regenerate US\` / \`CA\`, and commit." && exit 1)
+
 # ── verify: out-of-band data hygiene checks ───────────
 # These probe third-party URLs from the seed data. Because a handful
 # of advocacy-org domains have lapsed and now resolve to parked
@@ -350,6 +370,12 @@ smoke secret='' host='api.urbanistatlas.com':
 
 # ── ci-equivalent ─────────────────────────────────────
 
-# run every check CI would run today against the current tree
+# run the offline, side-effect-free checks CI would run against the tree.
+# `seed-check` is deliberately NOT in here: it needs network (census.gov,
+# statcan.gc.ca) and mutates the tree (downloads into etl/sources/,
+# rewrites api/seed/regions_*.toml in place), so it would break `just ci`
+# for an offline maintainer or clobber custom-staged sources. CI runs it
+# as its own `data` job regardless; run `just seed-check` by hand when you
+# want the drift gate locally.
 [group('ci')]
 ci: api-check web-check

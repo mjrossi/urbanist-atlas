@@ -239,6 +239,37 @@ deploy with a 5×5s retry, so a transient cutover blip won't fail CI.
 
 There is no live data store, so a deploy *is* the data refresh.
 
+### Regenerating ETL-generated seed (regions + postal codes)
+
+`regions_us_msas.toml`, `regions_ca_cmas.toml`, `postal_codes_us.csv`,
+and `postal_codes_ca.csv` are **generated** from upstream Census /
+StatsCan data + HUD — never hand-edit them. To refresh after an ETL code
+change or a vintage bump, on a maintainer machine with the sources staged
+(see [`etl/SOURCES.md`](../etl/SOURCES.md), incl. the account-gated HUD
+file for US postal):
+
+```sh
+just etl-regenerate US        # full: regions + postal (needs HUD staged)
+just etl-regenerate CA        # full: regions + postal (needs the 155 MB FSA staged)
+just seed-check               # verify committed region files == a fresh regen
+cd api && go test ./internal/etl/... -run GoldenDeterminism   # lock generator logic
+git add api/seed/ && git commit -m "seed: regenerate <CC>"
+git push                      # → PR → merge → deploy-api ships the new image
+```
+
+CI enforces the first verify step: the `data` job runs `just seed-check`
+on every PR and `deploy-api` won't run if it fails (#67). Sharp edges the
+gate is built around:
+
+- **Sources must match the `SOURCES.md` vintages** (download validates
+  sha256). `etl regenerate` rewrites the *whole* file, so a stale local
+  vintage smuggles an unrelated diff into the commit.
+- **HUD must be staged for a full US regenerate**, or the CT legacy-county
+  reconcile silently no-ops *and* reverts those ZIPs to bare `ct` — a
+  `--target=regions` run avoids touching the postal CSV at all.
+- **The diff should be country-scoped.** Churn outside the country you
+  regenerated ⇒ stop and investigate (the signal-rich-diff property).
+
 ## Backups (SQLite submission queue)
 
 [`.github/workflows/backup-sqlite.yml`](../.github/workflows/backup-sqlite.yml)
