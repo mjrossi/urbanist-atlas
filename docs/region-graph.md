@@ -531,8 +531,8 @@ recommended vocabulary uses country-prefixed values:
 
 | Country | Recommended kinds |
 |---|---|
-| US | `us:borough`, `us:city`, `us:county`, `us:metro`, `us:state`, `us:multi-state`, `us:transit-federation` |
-| CA | `ca:city`, `ca:regional-district`, `ca:cma`, `ca:province` |
+| US | `us:borough`, `us:city`, `us:county`, `us:metro`, `us:state`, `us:territory`, `us:federal-district`, `us:multi-state`, `us:transit-federation` |
+| CA | `ca:city`, `ca:regional-district`, `ca:cma`, `ca:province`, `ca:territory` |
 | PT | `pt:freguesia`, `pt:municipio`, `pt:cim`, `pt:area-metropolitana`, `pt:distrito`, `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional` |
 | DE | `de:bezirk`, `de:kreisfreie-stadt`, `de:kreis`, `de:land`, `de:transit-federation` |
 | FR | `fr:commune`, `fr:departement`, `fr:region`, `fr:metropole` |
@@ -544,11 +544,40 @@ displaying `name`.
 
 `scope_tier` is a closed enum on the wire: exactly `'local'`,
 `'regional'`, or `'national'`. The default `/lookup` surface buckets
-results into Local + Regional; `national` regions are filtered out of
-the ancestor walk so they don't surface for postal-code queries. A
-future opt-in path (query param or separate endpoint) is anticipated
-for the national tier; until then, national-tier orgs exist in the
-schema but are not visible through the default API.
+results into **three presentational tiers** — Local, Regional, and
+State / Provincial — even though `scope_tier` itself stays a closed
+three-value enum. The split is derived, not a fourth enum value:
+
+- **Local** — any matched region with `scope_tier='local'` (cities,
+  counties, boroughs, and editorial city-state overrides like Berlin).
+- **State / Provincial** — matched regions of a *state-equivalent kind*
+  (`IsStateKind`: `us:state`, `us:territory`, `ca:province`,
+  `ca:territory` today; `de:land`, `uk:nation`, `pt:nuts-ii`,
+  `pt:regiao-autonoma`, `au:state` when those markets ship) with no
+  local match. Territories are included because they're the top-admin
+  tier of their country and carry internal regional structure (PR is
+  the parent of its own metros), so a territory-wide org sits above any
+  single metro. Two kinds are deliberately *not* state-equivalent:
+  multi-state coalitions (`us:multi-state`) are advocacy federations,
+  not a top-admin tier; and `us:federal-district` (DC) is a city-state
+  — coextensive with one city and one metro, already split across the
+  `washington-dc` local leaf and the `dc` district node, so DC orgs
+  bucket Local (city-scale, tagged to the leaf) or Regional (DMV-scale,
+  tagged to the metro) rather than "State / Provincial". Both stay in
+  Regional.
+- **Regional** — everything in between (metro/CMA/regional-district/
+  transit-federation and multi-state coalitions) with no local or
+  state/province match.
+
+Local precedence means city-states (Berlin: `kind='de:land'` but
+`scope_tier='local'`, `sort_priority=15`) correctly land in Local and
+never reach the state-kind test. The set is the editorial source of
+truth — see `api/pkg/atlas/state_kinds.go` (mirrors `metro_kinds.go`).
+`national` regions are filtered out of the ancestor walk so they don't
+surface for postal-code queries. A future opt-in path (query param or
+separate endpoint) is anticipated for the national tier; until then,
+national-tier orgs exist in the schema but are not visible through the
+default API.
 
 ---
 

@@ -20,9 +20,9 @@ import (
 // (ListRegions), so the card's promised count and the detail page's
 // delivered count agree.
 //
-// Local + Regional buckets are decided by the scope_tier of the org's
-// matched attachment regions — same rule Lookup uses for its own
-// in-scope set.
+// Local + Regional + Statewide buckets are decided by the scope_tier
+// and kind of the org's matched attachment regions — same rule Lookup
+// uses for its own in-scope set (see BucketOrgsByScope).
 //
 // Sibling to Lookup, not a clone of it: Lookup answers "what works at
 // this postal-code address?" and walks ancestors upward (a Brooklyn
@@ -40,7 +40,7 @@ import (
 //  3. AncestorRegions(focusID) → []Region, leaf-first, national-filtered.
 //     Used only for the SPA breadcrumb (Ancestry) — never for org scope.
 //  4. OrgsForRegions(focus ∪ descendants) → []Org.
-//  5. BucketOrgsByScope splits into Local / Regional.
+//  5. BucketOrgsByScope splits into Local / Regional / Statewide.
 //  6. Build the breadcrumb-friendly ancestry slice (closest-first,
 //     excluding the focus itself).
 func GetRegion(ctx context.Context, store Store, slug string) (*RegionDetail, error) {
@@ -76,7 +76,7 @@ func GetRegion(ctx context.Context, store Store, slug string) (*RegionDetail, er
 		return nil, fmt.Errorf("atlas: orgs for regions: %w", err)
 	}
 
-	local, regional := BucketOrgsByScope(inScope, orgs)
+	local, regional, statewide := BucketOrgsByScope(inScope, orgs)
 
 	// Ancestry for the SPA breadcrumb: closest-first, excluding the
 	// focus itself. AncestorRegions returns focus at [0]; the slice
@@ -108,6 +108,7 @@ func GetRegion(ctx context.Context, store Store, slug string) (*RegionDetail, er
 		Region:                region,
 		Local:                 local,
 		Regional:              regional,
+		Statewide:             statewide,
 		Ancestry:              ancestry,
 		DescendantRegionNames: descendantNames,
 	}, nil

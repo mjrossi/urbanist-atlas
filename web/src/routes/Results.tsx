@@ -132,8 +132,9 @@ function ResultsContent({
   postalCode: string;
 }) {
   const placeLabel = data.resolved_place_label ?? postalCode;
-  const { local, regional, resolved_ancestry } = data;
-  const empty = local.length === 0 && regional.length === 0;
+  const { local, regional, statewide, resolved_ancestry } = data;
+  const empty =
+    local.length === 0 && regional.length === 0 && statewide.length === 0;
 
   // EntryList needs a slug -> display name map for its "Matched
   // via X" footer. Build it from the resolved-ancestry walk; this
@@ -156,7 +157,7 @@ function ResultsContent({
         <p className="deck">
           {empty
             ? `No entries for ${placeLabel} yet. The map fills in metro by metro, as the leads turn up — this corner just hasn't been reached.`
-            : `Groups working in or around ${placeLabel}. Local entries are nearest; regional entries cover wider footprints that include this postal code.`}
+            : `Groups working in or around ${placeLabel}. Local entries are nearest; regional and state / provincial entries cover wider footprints that include this postal code.`}
         </p>
       </div>
 
@@ -174,7 +175,12 @@ function ResultsContent({
         />
       ) : (
         <div className="mt-24">
-          <EntryList local={local} regional={regional} regionNameBySlug={regionNameBySlug} />
+          <EntryList
+            local={local}
+            regional={regional}
+            statewide={statewide}
+            regionNameBySlug={regionNameBySlug}
+          />
         </div>
       )}
     </>

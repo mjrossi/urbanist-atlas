@@ -42,7 +42,9 @@ export function Region() {
     : [];
   const currentLabel = query.data ? query.data.region.name : 'Region';
   const totalOrgs = query.data
-    ? query.data.local.length + query.data.regional.length
+    ? query.data.local.length +
+      query.data.regional.length +
+      query.data.statewide.length
     : 0;
   const metaRight = query.data
     ? `${totalOrgs} ${totalOrgs === 1 ? 'org' : 'orgs'} indexed`
@@ -90,9 +92,10 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
 }
 
 function RegionContent({ data }: { data: RegionDetail }) {
-  const { region, local, regional, ancestry, descendant_region_names } = data;
+  const { region, local, regional, statewide, ancestry, descendant_region_names } =
+    data;
   const kindLabel = regionKindLabel(region.kind);
-  const totalOrgs = local.length + regional.length;
+  const totalOrgs = local.length + regional.length + statewide.length;
 
   // Build a slug → display-name map so Entry can render "Matched
   // via Brooklyn" instead of "Matched via brooklyn-ny". Seeded from
@@ -155,6 +158,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
               <EntryList
                 local={local}
                 regional={regional}
+                statewide={statewide}
                 regionNameBySlug={regionNameBySlug}
               />
             </div>
@@ -200,7 +204,11 @@ function RegionContent({ data }: { data: RegionDetail }) {
                   {regional.length === 1 ? 'entry' : 'entries'}
                 </li>
                 <li>
-                  <strong>{countTags([...local, ...regional])}</strong> distinct editorial tags
+                  <strong>{statewide.length}</strong> state / provincial{' '}
+                  {statewide.length === 1 ? 'entry' : 'entries'}
+                </li>
+                <li>
+                  <strong>{countTags([...local, ...regional, ...statewide])}</strong> distinct editorial tags
                 </li>
                 <li>
                   Region kind{' '}

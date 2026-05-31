@@ -111,14 +111,16 @@ type LookupQuery struct {
 	Country    Country `json:"country"`
 }
 
-// LookupResult is what the API returns. Local and Regional are always
-// non-nil slices (possibly empty); see Lookup for the bucketing rules.
-// ResolvedAncestry is the leaf region followed by all ancestors,
-// ordered most-specific first, so the client can render breadcrumbs.
+// LookupResult is what the API returns. Local, Regional, and Statewide
+// are always non-nil slices (possibly empty); see Lookup and
+// BucketOrgsByScope for the bucketing rules. ResolvedAncestry is the
+// leaf region followed by all ancestors, ordered most-specific first,
+// so the client can render breadcrumbs.
 type LookupResult struct {
 	Query              LookupQuery `json:"query"`
 	ResolvedPlaceLabel string      `json:"resolved_place_label"`
 	ResolvedAncestry   []Region    `json:"resolved_ancestry"`
 	Local              []Org       `json:"local"`
 	Regional           []Org       `json:"regional"`
+	Statewide          []Org       `json:"statewide"`
 }

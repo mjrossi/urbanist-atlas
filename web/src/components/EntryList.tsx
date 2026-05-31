@@ -2,40 +2,52 @@ import type { LookupOrg } from '../lib/api.ts';
 import { Entry } from './Entry.tsx';
 
 /**
- * Classified-section list grouped into Local (city / county) and
- * Regional (metro / state / province / multi-state) blocks. Each
- * section renders the broadsheet `.section-break` header (roman
- * numeral + title + entry count) and an inline org-entry list
- * driven by the shared `Entry` component.
+ * Classified-section list grouped into Local (city / county),
+ * Regional (metro / CMA / regional-district / transit-federation /
+ * multi-state), and State / Provincial (state / province) blocks.
+ * Each section renders the broadsheet `.section-break` header (roman
+ * numeral + title + entry count) and an inline org-entry list driven
+ * by the shared `Entry` component.
  *
  * Empty sections render nothing — the section label only appears
- * when there's at least one entry. The Results page's empty-state
- * copy lives outside this component (the page renders an
- * editors-note card when BOTH buckets are empty).
+ * when there's at least one entry. Roman numerals track the *visible*
+ * sections in order (a results page with only Regional + Statewide
+ * reads "I. Regional", "II. State / Provincial"), not a fixed
+ * tier-to-numeral mapping. The Results page's empty-state copy lives
+ * outside this component (the page renders an editors-note card when
+ * ALL THREE buckets are empty).
  */
+const ROMAN = ['I.', 'II.', 'III.'];
+
 export function EntryList({
   local,
   regional,
+  statewide,
   regionNameBySlug,
 }: {
   local: LookupOrg[];
   regional: LookupOrg[];
+  statewide: LookupOrg[];
   regionNameBySlug: Map<string, string>;
 }) {
+  const sections = [
+    { title: 'Local', orgs: local },
+    { title: 'Regional', orgs: regional },
+    { title: 'State / Provincial', orgs: statewide },
+  ].filter((s) => s.orgs.length > 0);
+
   return (
     <>
-      <Section
-        roman="I."
-        title="Local"
-        orgs={local}
-        regionNameBySlug={regionNameBySlug}
-      />
-      <Section
-        roman="II."
-        title="Regional"
-        orgs={regional}
-        regionNameBySlug={regionNameBySlug}
-      />
+      {sections.map((s, i) => (
+        <Section
+          key={s.title}
+          // sections is a filter of 3 entries, so i < ROMAN.length always.
+          roman={ROMAN[i]!}
+          title={s.title}
+          orgs={s.orgs}
+          regionNameBySlug={regionNameBySlug}
+        />
+      ))}
     </>
   );
 }
@@ -51,7 +63,6 @@ function Section({
   orgs: LookupOrg[];
   regionNameBySlug: Map<string, string>;
 }) {
-  if (orgs.length === 0) return null;
   return (
     <section className="org-section mt-32">
       <header className="section-break mt-0">

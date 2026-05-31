@@ -333,12 +333,16 @@ func TestMemStore_GetRegion_AnyNonNationalKind_Resolves(t *testing.T) {
 		t.Fatal("nil result for ny (state)")
 	}
 	// transalt-brooklyn (brooklyn, local) -> Local.
-	// riders-alliance (nyc-metro, regional) + ny-state-org (ny, regional) -> Regional.
+	// riders-alliance (nyc-metro, regional sub-state) -> Regional.
+	// ny-state-org (ny, us:state) -> Statewide.
 	if diff := cmp.Diff([]string{"transalt-brooklyn"}, sortedOrgSlugs(got.Local)); diff != "" {
 		t.Errorf("ny local (-want +got):\n%s", diff)
 	}
-	if diff := cmp.Diff([]string{"ny-state-org", "riders-alliance"}, sortedOrgSlugs(got.Regional)); diff != "" {
+	if diff := cmp.Diff([]string{"riders-alliance"}, sortedOrgSlugs(got.Regional)); diff != "" {
 		t.Errorf("ny regional (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"ny-state-org"}, sortedOrgSlugs(got.Statewide)); diff != "" {
+		t.Errorf("ny statewide (-want +got):\n%s", diff)
 	}
 
 	// County slug — descendants are kings-county-ny + brooklyn-ny.
