@@ -10,6 +10,16 @@ on:
   # a push to main would.
   workflow_dispatch:
 
+# Least-privilege default for every job: all of them only read the repo
+# (checkout, cache, build, test, seed-validate). None writes to the repo,
+# comments on PRs, or pushes packages, so contents: read suffices — and
+# it pins the scope even if the org/repo default is read-write. Jobs may
+# restate it locally (deploy-api does); the Fly deploy authenticates with
+# the scoped FLY_API_TOKEN secret, not GITHUB_TOKEN. Resolves CodeQL
+# actions/missing-workflow-permissions.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
