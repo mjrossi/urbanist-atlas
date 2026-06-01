@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -82,10 +83,11 @@ func validateRegions(rs []atlas.Region) error {
 // already-loaded file (cross-file parent edges from leaves up into
 // the state tier are the canonical use case).
 //
-// Cross-file cycle detection is intentionally out of scope: the only
-// cross-file parent edges in practice point from leaves up into a
-// state/province tier whose files have no parents themselves, so
-// they can't introduce cycles when loaded in order.
+// This is the per-file FAST EARLY SIGNAL: it catches a cycle wholly
+// contained in one file at the moment that file parses, before the
+// rest of the bundle loads. It deliberately skips cross-file parent
+// edges (those are validated globally after Stage 1 by
+// DetectCyclesGraph over the fully-assembled graph — see build.go).
 func DetectCycles(rs []atlas.Region) error {
 	parents := map[string][]string{}
 	inFile := map[string]bool{}
@@ -94,15 +96,42 @@ func DetectCycles(rs []atlas.Region) error {
 		inFile[r.Slug] = true
 	}
 
+	// Skip cross-file parents: they resolve in an already-loaded file
+	// and are covered by the global DetectCyclesGraph pass.
+	keep := func(slug, parent string) bool { return inFile[parent] }
+	return detectCycles3Color(slugs(rs), parents, keep)
+}
+
+// DetectCyclesGraph runs the IDENTICAL 3-color DFS as DetectCycles but
+// over the fully-assembled parents map (slug -> parent slugs across
+// ALL seed files), with NO cross-file skip. It is the global
+// acyclicity proof BuildMemStore runs after Stage 1: a back-edge that
+// only closes a cycle once two files are combined (the RGN-02a gap the
+// per-file DetectCycles cannot see) fails here.
+func DetectCyclesGraph(parents map[string][]string) error {
+	all := make([]string, 0, len(parents))
+	for slug := range parents {
+		all = append(all, slug)
+	}
+	// Sort so the walk order — and therefore the reported cycle path —
+	// is deterministic across runs.
+	slices.Sort(all)
+	keep := func(slug, parent string) bool { return true }
+	return detectCycles3Color(all, parents, keep)
+}
+
+// detectCycles3Color is the shared 3-color (white/gray/black) DFS body.
+// order is the deterministic slug iteration order; parents maps a slug
+// to its parent slugs; keep reports whether a given (slug, parent)
+// edge should be walked (the per-file variant skips cross-file edges,
+// the global variant walks everything).
+func detectCycles3Color(order []string, parents map[string][]string, keep func(slug, parent string) bool) error {
 	const (
 		white = 0
 		gray  = 1
 		black = 2
 	)
 	color := map[string]int{}
-	for _, r := range rs {
-		color[r.Slug] = white
-	}
 
 	var dfs func(slug string, path []string) error
 	dfs = func(slug string, path []string) error {
@@ -114,8 +143,8 @@ func DetectCycles(rs []atlas.Region) error {
 		}
 		color[slug] = gray
 		for _, p := range parents[slug] {
-			if !inFile[p] {
-				continue // cross-file parent, resolved at load time
+			if !keep(slug, p) {
+				continue
 			}
 			if err := dfs(p, append(path, slug)); err != nil {
 				return err
@@ -124,10 +153,19 @@ func DetectCycles(rs []atlas.Region) error {
 		color[slug] = black
 		return nil
 	}
-	for _, r := range rs {
-		if err := dfs(r.Slug, nil); err != nil {
+	for _, slug := range order {
+		if err := dfs(slug, nil); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// slugs returns the slug of each region, preserving order.
+func slugs(rs []atlas.Region) []string {
+	out := make([]string, len(rs))
+	for i, r := range rs {
+		out[i] = r.Slug
+	}
+	return out
 }

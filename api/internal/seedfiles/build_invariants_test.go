@@ -6,10 +6,10 @@ import (
 	"testing/fstest"
 )
 
-// countrySpec is a copy of the unexported per-country loader entry,
-// re-declared in the test so fixtures can drive buildMemStore over a
-// tiny synthetic country set instead of the production US/CA bundle.
-// (The production struct is anonymous, so the test mirrors its fields.)
+// These tests live in the white-box seedfiles package so they can call
+// the unexported buildMemStore core with a tiny synthetic countrySpec
+// set, exercising the global cross-file acyclicity (RGN-02a) and
+// orphan/zero-anchor (RGN-02b) checks without the full US/CA bundle.
 
 // fixtureFS assembles an in-memory seed bundle: one region TOML per
 // suffix, one postal CSV per country code, and orgs.toml. Each value
@@ -26,7 +26,21 @@ func fixtureFS(regionTOML map[string]string, postalCSV map[string]string, orgsTO
 	return fs
 }
 
-const emptyOrgs = "" // orgs.toml may be empty (zero [[org]] tables)
+// orgFor renders a minimal valid orgs.toml attaching one org to the
+// given region slug. ParseOrgs requires at least one org, so every
+// fixture needs one; pointing it at an already-anchored region keeps
+// it out of the way of the orphan-leaf assertions.
+func orgFor(regionSlug string) string {
+	return `[[org]]
+slug = "advocates"
+name = "Advocates"
+short_desc = "x"
+website_url = "https://example.org"
+tags = ["transit"]
+region_slugs = ["` + regionSlug + `"]
+added_at = 2026-01-01
+`
+}
 
 // TestDetectCyclesGraph_CrossFileCycle proves RGN-02a at the algorithm
 // level: the generalized detector walks EVERY parent edge in an
@@ -75,7 +89,7 @@ func TestBuildMemStore_CleanFixtureLoads(t *testing.T) {
 		"u_leaf": region("City", "u:leaf", "local", []string{"Metro"}),
 	}
 	postal := postalHeaderCSV() + "10001,U,city\n"
-	fs := fixtureFS(regionTOML, map[string]string{"u": postal}, emptyOrgs)
+	fs := fixtureFS(regionTOML, map[string]string{"u": postal}, orgFor("city"))
 
 	cs := []countrySpec{{Code: "U", RegionFiles: []string{"u_top", "u_mid", "u_leaf"}, Postal: "u"}}
 	if _, err := buildMemStore(nil, fs, cs); err != nil {
@@ -94,7 +108,7 @@ func TestBuildMemStore_OrphanLeaf(t *testing.T) {
 			region("Orphan", "y:leaf", "local", []string{"State"}),
 	}
 	postal := postalHeaderCSV() + "10001,Y,anchored\n"
-	fs := fixtureFS(regionTOML, map[string]string{"y": postal}, emptyOrgs)
+	fs := fixtureFS(regionTOML, map[string]string{"y": postal}, orgFor("anchored"))
 
 	cs := []countrySpec{{Code: "Y", RegionFiles: []string{"y_top", "y_leaves"}, Postal: "y"}}
 	_, err := buildMemStore(nil, fs, cs)
@@ -116,16 +130,7 @@ func TestBuildMemStore_OrphanAnchoredByOrg(t *testing.T) {
 			region("ByOrg", "z:leaf", "local", []string{"State"}),
 	}
 	postal := postalHeaderCSV() + "10001,Z,bypostal\n"
-	orgs := `[[org]]
-slug = "advocates"
-name = "Advocates"
-short_desc = "x"
-website_url = "https://example.org"
-tags = ["transit"]
-region_slugs = ["byorg"]
-added_at = 2026-01-01
-`
-	fs := fixtureFS(regionTOML, map[string]string{"z": postal}, orgs)
+	fs := fixtureFS(regionTOML, map[string]string{"z": postal}, orgFor("byorg"))
 
 	cs := []countrySpec{{Code: "Z", RegionFiles: []string{"z_top", "z_leaves"}, Postal: "z"}}
 	if _, err := buildMemStore(nil, fs, cs); err != nil {
@@ -146,7 +151,7 @@ func TestBuildMemStore_OrphanAnchoredByDescendant(t *testing.T) {
 		"w_leaf": region("City", "w:leaf", "local", []string{"Metro"}),
 	}
 	postal := postalHeaderCSV() + "10001,W,city\n"
-	fs := fixtureFS(regionTOML, map[string]string{"w": postal}, emptyOrgs)
+	fs := fixtureFS(regionTOML, map[string]string{"w": postal}, orgFor("city"))
 
 	cs := []countrySpec{{Code: "W", RegionFiles: []string{"w_top", "w_mid", "w_leaf"}, Postal: "w"}}
 	if _, err := buildMemStore(nil, fs, cs); err != nil {

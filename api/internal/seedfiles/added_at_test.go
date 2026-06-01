@@ -21,11 +21,16 @@ func region(slug, kind, tier string) *fstest.MapFile {
 }
 
 // minimalSeedFS builds the smallest bundle BuildMemStore will accept:
-// one region per file it reads for US + CA, header-only postal CSVs,
+// one region per file it reads for US + CA, postal CSVs anchoring the
+// local-tier leaves (so the RGN-02b orphan/zero-anchor check passes),
 // and a single org (in regions_us.toml's "testville") carrying the
 // added_at under test.
 func minimalSeedFS(orgsTOML string) fstest.MapFS {
 	const csvHeader = "postal_code,country,leaf_region_slug\n"
+	// Anchor the two local-tier leaves (testville, xt) with a postal
+	// row each so the local-leaf reachability invariant is satisfied.
+	usPostal := csvHeader + "10001,US,testville\n"
+	caPostal := csvHeader + "H3A 0G4,CA,xt\n"
 	return fstest.MapFS{
 		"regions_us_states.toml":     region("xs", "us:state", "regional"),
 		"regions_us_multistate.toml": region("xm", "us:multistate", "regional"),
@@ -34,8 +39,8 @@ func minimalSeedFS(orgsTOML string) fstest.MapFS {
 		"regions_ca_provinces.toml":  region("xp", "ca:province", "regional"),
 		"regions_ca_cmas.toml":       region("xc", "ca:cma", "regional"),
 		"regions_ca.toml":            region("xt", "ca:city", "local"),
-		"postal_codes_us.csv":        {Data: []byte(csvHeader)},
-		"postal_codes_ca.csv":        {Data: []byte(csvHeader)},
+		"postal_codes_us.csv":        {Data: []byte(usPostal)},
+		"postal_codes_ca.csv":        {Data: []byte(caPostal)},
 		"orgs.toml":                  {Data: []byte(orgsTOML)},
 	}
 }
