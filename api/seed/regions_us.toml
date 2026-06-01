@@ -57,6 +57,55 @@ scope_tier = "local"
 sort_priority = 20
 parents = ["chicago-metro", "in"]
 
+# RTA collar counties (the five Illinois counties that, with Cook,
+# make up the Regional Transportation Authority service area). Seeding
+# them as leaves completes `rta-service-area` ("Cook + 5 collar") and
+# lets collar-county suburbs reach Illinois statewide orgs via
+# `<county> → rta-service-area → il`. They mirror `cook-county`: no
+# direct `il` edge (the metro must not carry one — docs/region-graph.md
+# §1 — and the state reach comes through rta-service-area). The IL Lake
+# County is slug-suffixed to avoid colliding with Lake County, IN.
+
+[[region]]
+slug = "dupage-county"
+kind = "us:county"
+name = "DuPage County"
+scope_tier = "local"
+sort_priority = 20
+parents = ["chicago-metro", "rta-service-area"]
+
+[[region]]
+slug = "kane-county"
+kind = "us:county"
+name = "Kane County"
+scope_tier = "local"
+sort_priority = 20
+parents = ["chicago-metro", "rta-service-area"]
+
+[[region]]
+slug = "lake-county-il"
+kind = "us:county"
+name = "Lake County, IL"
+scope_tier = "local"
+sort_priority = 20
+parents = ["chicago-metro", "rta-service-area"]
+
+[[region]]
+slug = "mchenry-county"
+kind = "us:county"
+name = "McHenry County"
+scope_tier = "local"
+sort_priority = 20
+parents = ["chicago-metro", "rta-service-area"]
+
+[[region]]
+slug = "will-county"
+kind = "us:county"
+name = "Will County"
+scope_tier = "local"
+sort_priority = 20
+parents = ["chicago-metro", "rta-service-area"]
+
 # --- NYC: borough split (slice #7.5.2) ---
 #
 # `nyc` is the only US city we model sub-municipally at v1 — its

@@ -103,17 +103,27 @@ wrong.
 
 ### 3. Transit federations are siblings of states, parented under the leaves they serve
 
-Chicago's RTA service area covers Cook + 5 collar counties — all in
-Illinois. Model it as a top-level region; parent each RTA county
-under it. A Cook County lookup walks `cook-county → rta-service-area`;
-a Gary IN lookup never touches RTA because Gary's county is parented
-under IN, not RTA.
+Chicago's RTA service area covers **Cook + 5 collar counties (DuPage,
+Kane, Lake-IL, McHenry, Will) — all in Illinois**. Model it as a
+top-level region and parent each of the six RTA counties under it. A
+Cook County lookup walks `cook-county → rta-service-area`; a collar
+suburb walks `dupage-county → rta-service-area → il`.
+
+This is also the **only** way a collar suburb reaches Illinois
+statewide orgs: the state edge lives on the county leaf's ancestry (via
+the RTA federation), **not** on the metro. That's mandatory here
+because `chicago-metro` spans IL+IN, so per [rule
+§1](#1-state-edges-live-on-the-leaf-not-on-the-metro) it must carry no
+state edge. A Gary IN lookup never touches RTA or Illinois, because
+Gary's county is parented under IN, not RTA — the bi-state metro tier
+never leaks IL into Indiana or vice versa.
 
 ```mermaid
 graph BT
   chicago[Chicago]
   oakpark[Oak Park]
   gary[Gary]
+  dupage[DuPage County]
   cook[Cook County]
   lakein[Lake County IN]
   chimetro[Chicago Metro]
@@ -127,14 +137,40 @@ graph BT
   gary --> lakein
   cook --> chimetro
   cook --> rta
+  dupage --> chimetro
+  dupage --> rta
   lakein --> chimetro
   lakein --> in
   rta --> il
   chimetro --> chimulti
 ```
 
+(DuPage stands in for the five collar counties — each parents under
+both `chicago-metro` and `rta-service-area`, mirroring `cook-county`.
+Collar ZIPs anchor at the county leaf, since none have a curated city
+leaf.)
+
 Berlin's VBB similarly: a top-level region; both `berlin` and
 `brandenburg` have it as a parent.
+
+> **Why `chicagoland` and `chicago-metro` are two nodes (and stay
+> two).** `chicago-metro` is the ETL-regenerated Census MSA (CBSA
+> 16980); `chicagoland` is the hand-curated `us:multi-state` advocacy
+> node above it — the same split as `nyc-metro` / `nyc-tristate`. Both
+> are `scope_tier=regional`, so they render in a single "Regional"
+> section; the split is structural (the ETL boundary, plus a stable
+> home for cross-state coalitions), not presentational. Merging them
+> was evaluated and declined — it would buy nothing in the UI while
+> breaking the NYC parallel and forcing an ETL CBSA suppression.
+> `rta-service-area` is likewise retained: it's the IL-only transit
+> district (Cook + 5 collar), a genuinely distinct entity from the
+> broader bi-state Census metro.
+>
+> **Residual (deferred).** Census CBSA 16980 nominally includes Kenosha
+> County, WI, but Kenosha is modeled as a standalone `kenosha-wi-metro`
+> under `wi`, so it does not reach `chicagoland`. Reconnecting it — and
+> seeding the outlying non-RTA metro counties (Kendall, Grundy, DeKalb)
+> that still anchor at the bare metro — is left to a future slice.
 
 ### 4. `scope_tier` is editorial, not derived
 
@@ -341,9 +377,12 @@ graph BT
 
 ### Chicago (transit federation IL-only)
 
-See above; the RTA pattern. A Chicago ZIP surfaces RTA-attached orgs;
-a Gary IN ZIP doesn't, because Gary's county is parented under IN,
-not RTA.
+See above; the RTA pattern. A Chicago ZIP *and* a collar-county ZIP
+(DuPage, Kane, Lake-IL, McHenry, Will) surface RTA-attached orgs and
+Illinois statewide orgs, both via `<county> → rta-service-area → il`. A
+Gary IN ZIP gets neither, because Gary's county is parented under IN,
+not RTA — `chicago-metro` carries no state edge, so the bi-state metro
+tier never leaks IL into Indiana.
 
 ### Vancouver (no county layer)
 
