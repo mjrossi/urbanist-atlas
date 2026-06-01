@@ -122,12 +122,21 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 		}
 	}
 
-	// RGN-02a: prove the FULLY-ASSEMBLED graph is acyclic. The
-	// per-file DetectCycles above skips cross-file parent edges
-	// (528/536 edges in the real seed), so a back-edge that only closes
-	// once two files combine is invisible until this global 3-color DFS
-	// over every parent edge. A cycle would make the ancestor/descendant
-	// walk for every postal code through it loop forever at runtime.
+	// RGN-02a: redundant global acyclicity proof over the
+	// FULLY-ASSEMBLED parent graph. NOTE: the load-order guard above
+	// (every parent slug must already be registered before a region's
+	// own slug — build.go :107) is what actually guarantees acyclicity.
+	// It forces every parent edge to point backward in registration
+	// order, and a graph whose edges all respect a single total order is
+	// acyclic by construction — so this DFS cannot fire on any input
+	// BuildMemStore accepts (a cross-file back-edge is rejected earlier
+	// at :107 with "references unknown parent slug"). It is retained as
+	// defense-in-depth, NOT as the primary proof: if the unknown-parent
+	// guard is ever loosened to permit forward references / out-of-order
+	// files, this DFS becomes the real backstop against an infinite
+	// ancestor/descendant walk at runtime. Do not weaken :107 on the
+	// assumption that this check is the cycle backstop — it only fires
+	// once :107 stops forcing backward edges.
 	if err := DetectCyclesGraph(parentSlugs); err != nil {
 		return nil, fmt.Errorf("seedfiles: global region graph: %w", err)
 	}

@@ -104,10 +104,16 @@ func DetectCycles(rs []atlas.Region) error {
 
 // DetectCyclesGraph runs the IDENTICAL 3-color DFS as DetectCycles but
 // over the fully-assembled parents map (slug -> parent slugs across
-// ALL seed files), with NO cross-file skip. It is the global
-// acyclicity proof BuildMemStore runs after Stage 1: a back-edge that
-// only closes a cycle once two files are combined (the RGN-02a gap the
-// per-file DetectCycles cannot see) fails here.
+// ALL seed files), with NO cross-file skip. It is BuildMemStore's
+// REDUNDANT global acyclicity backstop, run after Stage 1. NOTE: under
+// BuildMemStore this is defense-in-depth, not the primary proof — the
+// load-order unknown-parent guard (build.go :107) already forces every
+// parent edge to point backward in registration order, which is acyclic
+// by construction, so a would-be cross-file back-edge is rejected there
+// before this DFS ever sees a cyclic graph. This pass becomes the real
+// backstop only if that guard is loosened to allow forward references.
+// It is also exported (alongside DetectCycles) for callers that assemble
+// a parents map directly, for which it is a genuine cycle detector.
 func DetectCyclesGraph(parents map[string][]string) error {
 	all := make([]string, 0, len(parents))
 	for slug := range parents {
