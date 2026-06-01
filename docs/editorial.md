@@ -95,22 +95,27 @@ regenerated on the next ETL run and your edit will vanish.
 4. Commit both the override edit and the regenerated outputs in
    the same PR. Merge — the next deploy ships the new bundle.
 
-**CA (kind + slug overrides in code):**
+**CA (CMA-UID-keyed editorial overrides):**
 
-1. Edit the mapping table at
-   [`api/internal/etl/ca/mappings.go`](../api/internal/etl/ca/mappings.go).
-   This is Go code, not TOML — slug + kind + parent edges for the
-   well-known CMAs (`toronto-cma`, `montreal-cma`, `metro-vancouver`,
-   `ottawa-gatineau-cma`).
-2. Regenerate:
+1. Edit
+   [`api/seed/regions_ca_cma_overrides.toml`](../api/seed/regions_ca_cma_overrides.toml).
+   Each row pins a friendly slug + name (and optionally a kind, e.g.
+   Metro Vancouver → `ca:regional-district`) to a StatsCan CMA UID.
+   Parent edges are not editable here — every CMA's parents are
+   derived from its province(s) by the ETL.
+2. Regenerate the canonical CMA file from the staged upstream
+   sources:
 
    ```sh
-   just etl-regenerate CA
+   urbanist-atlas-server etl regenerate --country=CA
+   # or via just: just etl-regenerate CA
    ```
 
-3. Review and commit the regenerated `regions_ca_cmas.toml` +
-   `postal_codes_ca.csv` outputs alongside the code change. Merge —
-   the next deploy ships the new bundle.
+3. Review the diff in `api/seed/regions_ca_cmas.toml` (and any
+   postal-code re-anchoring in `api/seed/postal_codes_ca.csv`).
+   Diffs should be small and signal-rich.
+4. Commit both the override edit and the regenerated outputs in
+   the same PR. Merge — the next deploy ships the new bundle.
 
 ETL is deterministic — same upstream vintage produces byte-identical
 output. If you see noise in the diff that you didn't expect, the

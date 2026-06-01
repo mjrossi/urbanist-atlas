@@ -78,6 +78,54 @@ func TestDetectCyclesGraph_Acyclic(t *testing.T) {
 	}
 }
 
+// TestDetectCyclesGraph_DiamondCyclePathFidelity pins the human-readable
+// cycle path on a multi-parent (diamond) graph: the reported chain names
+// only the genuine cycle plus its lead-in, never a slug from an unrelated
+// sibling branch.
+//
+// This locks the error-path FORMAT — the contract the defensive path
+// copy in detectCycles3Color protects. It is deliberately NOT a WR-02
+// regression repro: the slice aliasing WR-02 guards against is not
+// observable through this DFS (it formats the error immediately on the
+// gray-revisit and overwrites shared tail indices on descent first), so
+// this test passes with or without the copy — verified by reverting the
+// copy and sweeping 17 diamond+cycle shapes (0 leaks). Its value is
+// catching a FUTURE refactor that genuinely corrupts the reported path
+// (e.g. retaining path slices to collect every cycle rather than
+// returning on the first).
+func TestDetectCyclesGraph_DiamondCyclePathFidelity(t *testing.T) {
+	// metro is the diamond node. One parent leads to an acyclic sibling
+	// branch (sibling-region → sibling-parent); the other (state) closes
+	// the cycle metro → state → metro. city is an acyclic lead-in. The
+	// sibling branch is explored first (slice order), so a path-aliasing
+	// bug would be most likely to leak one of its slugs here.
+	parents := map[string][]string{
+		"city":           {"metro"},
+		"metro":          {"sibling-region", "state"},
+		"sibling-region": {"sibling-parent"},
+		"sibling-parent": nil,
+		"state":          {"metro"},
+	}
+	err := DetectCyclesGraph(parents)
+	if err == nil {
+		t.Fatal("expected diamond cycle error, got nil")
+	}
+	got := err.Error()
+	if !strings.Contains(strings.ToLower(got), "cycle") {
+		t.Fatalf("error %q does not mention a cycle", got)
+	}
+	// The genuine cycle members appear, in order.
+	if !strings.Contains(got, "metro → state → metro") {
+		t.Errorf("reported path missing the genuine cycle chain:\n%s", got)
+	}
+	// No slug from the unrelated sibling branch leaks into the path.
+	for _, foreign := range []string{"sibling-region", "sibling-parent"} {
+		if strings.Contains(got, foreign) {
+			t.Errorf("sibling-branch slug %q leaked into cycle path:\n%s", foreign, got)
+		}
+	}
+}
+
 // TestBuildMemStore_CleanFixtureLoads confirms buildMemStore wires the
 // global cycle + orphan checks WITHOUT false-positiving on a valid
 // acyclic, fully-anchored fixture: every leaf has a postal anchor and

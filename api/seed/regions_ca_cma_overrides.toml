@@ -1,8 +1,8 @@
 # CA CMA editorial overrides applied by etl regenerate --country=CA.
 #
-# Each [[override]] block pins the slug, display name, kind, and parent
-# edges for a specific StatsCan Census Metropolitan Area, keyed by its
-# 3-digit CMA UID. The ETL replaces the auto-generated
+# Each [[override]] block pins the slug, display name, and kind for a
+# specific StatsCan Census Metropolitan Area, keyed by its 3-digit
+# CMA UID. The ETL replaces the auto-generated
 # "<slugified-name>-cma" / "ca:cma" defaults with these values when
 # writing regions_ca_cmas.toml.
 #

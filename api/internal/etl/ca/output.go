@@ -14,20 +14,29 @@ import (
 
 // CMAOverride is one editorial override read from
 // api/seed/regions_ca_cma_overrides.toml. It pins the slug, display
-// name, kind, and parent edges for a specific StatsCan CMA (keyed by
-// its 3-digit UID) so the auto-generated values can be replaced with
-// the curated form (e.g., "metro-vancouver" / "ca:regional-district").
+// name, and kind for a specific StatsCan CMA (keyed by its 3-digit
+// UID) so the auto-generated values can be replaced with the curated
+// form (e.g., "metro-vancouver" / "ca:regional-district").
+//
+// Parent edges are deliberately NOT override-able: every CA CMA's
+// parents are derived from its StatsCan ProvinceUIDs (see assignCMAs).
+// The US side carries a parents override because multi-state metros
+// reroute into intermediate colloquial regions (nyc-metro →
+// nyc-tristate); Canada has no such multi-province intermediate-region
+// layer in v1, so province derivation is always correct
+// (Ottawa-Gatineau → [on, qc]). Rather than ship an unused knob, we
+// omit the field — a future country (or CA itself) can add it the day
+// a concrete editorial need appears.
 //
 // It mirrors the US MSAOverride struct (api/internal/etl/us/output.go)
-// — both countries now drive editorial overrides from data, not
-// compiled Go — with an added Kind field (Metro Vancouver overrides
-// the "ca:cma" default to "ca:regional-district").
+// for slug/name/kind — both countries drive those editorial overrides
+// from data, not compiled Go — with an added Kind field (Metro
+// Vancouver overrides the "ca:cma" default to "ca:regional-district").
 type CMAOverride struct {
-	UID     string   `toml:"cma_uid"`
-	Slug    string   `toml:"slug"`
-	Name    string   `toml:"name"`
-	Kind    string   `toml:"kind"`
-	Parents []string `toml:"parents"`
+	UID  string `toml:"cma_uid"`
+	Slug string `toml:"slug"`
+	Name string `toml:"name"`
+	Kind string `toml:"kind"`
 }
 
 type overrideFile struct {
@@ -247,8 +256,8 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 # regenerate --country=CA.
 #
 # Edit policy: do NOT hand-edit this file. Editorial overrides for
-# slug/name/kind/parents live in regions_ca_cma_overrides.toml (keyed
-# by StatsCan CMA UID); change those and re-run etl regenerate.
+# slug/name/kind live in regions_ca_cma_overrides.toml (keyed by
+# StatsCan CMA UID); change those and re-run etl regenerate.
 #
 # Filtering: only CMATYPE='B' rows from the StatsCan boundary file
 # (true Census Metropolitan Areas, population ≥100k) are emitted.

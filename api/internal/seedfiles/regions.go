@@ -154,12 +154,20 @@ func detectCycles3Color(order []string, parents map[string][]string, keep func(s
 			}
 			// Copy the path on descent so each branch owns its slice. A
 			// bare append(path, slug) reuses path's backing array when
-			// capacity allows, letting sibling parent edges in this loop
-			// overwrite each other's path — which would interleave slugs
-			// from a sibling branch into the reported cycle path on a
-			// multi-parent (diamond) graph. Detection itself is carried by
-			// the color map and is unaffected; this only protects the
-			// human-readable error path.
+			// capacity allows, so sibling parent edges in this loop would
+			// share and overwrite each other's backing array on a
+			// multi-parent (diamond) graph. Today that aliasing is NOT
+			// observable: the gray-revisit above formats the error string
+			// immediately, and the reporting branch overwrites every shared
+			// tail index on its own sequential descent before it prints —
+			// so the reported path is correct with or without this copy
+			// (confirmed by a diamond-graph sweep; see
+			// TestDetectCyclesGraph_DiamondCyclePathFidelity). The copy is
+			// defensive: it preserves path fidelity for any future change
+			// that retains path slices beyond the immediate format (e.g.
+			// collecting every cycle path instead of returning on the
+			// first). Detection itself is carried by the color map and is
+			// unaffected regardless.
 			child := append(append([]string(nil), path...), slug)
 			if err := dfs(p, child); err != nil {
 				return err

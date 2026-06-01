@@ -27,7 +27,7 @@ var fsaToLeaf = map[string]string{
 }
 
 // CMA editorial overrides (3-digit StatsCan CMA UID → curated
-// slug/name/kind/parents) used to live here as a compiled
+// slug/name/kind) used to live here as a compiled
 // `cmaOverrides` map. They were lifted into data —
 // api/seed/regions_ca_cma_overrides.toml, read by ReadCMAOverrides in
 // output.go and applied by assignCMAs — so a CA metro slug correction
