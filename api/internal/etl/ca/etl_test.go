@@ -95,7 +95,17 @@ func TestAssignCMAs_OverrideAndParents(t *testing.T) {
 		// Defensive: duplicate-province within ProvinceUIDs must dedupe.
 		{UID: "950", Name: "Test Dedupe", ProvinceUIDs: []string{"35", "35"}},
 	}
-	got := assignCMAs(cmas)
+	// Overrides now arrive as data (regions_ca_cma_overrides.toml) rather
+	// than the compiled cmaOverrides map; supply the canonical set here so
+	// the assignment logic (slug/name/kind override + per-field fallback)
+	// is exercised the same way the ETL run applies them.
+	overrides := []CMAOverride{
+		{UID: "535", Slug: "toronto-cma", Name: "Greater Toronto Area"},
+		{UID: "462", Slug: "montreal-cma", Name: "Greater Montréal"},
+		{UID: "933", Slug: "metro-vancouver", Name: "Metro Vancouver", Kind: "ca:regional-district"},
+		{UID: "505", Slug: "ottawa-gatineau-cma", Name: "Ottawa-Gatineau"},
+	}
+	got := assignCMAs(cmas, overrides)
 
 	byUID := map[string]CMAAssignment{}
 	for _, a := range got {

@@ -100,3 +100,75 @@ func TestCORS_VaryOriginAlwaysSetWhenOriginPresent(t *testing.T) {
 		})
 	}
 }
+
+// TestCORS_WildcardSuffixEnforcesHTTPSScheme pins HOST-03b: the
+// `*.`-suffix allowlist form must require the `https://` scheme, so a
+// credentialed cross-origin request from a spoofed `http://…` origin
+// is rejected while the genuine `https://…` preview origin is allowed.
+// The middleware is configured exactly as production fly.toml does
+// (`https://urbanistatlas.com,*.link00seven.workers.dev`) plus the dev
+// localhost exact entry, so this also locks in that the scheme-pinned
+// exact entries stay scheme-sensitive.
+func TestCORS_WildcardSuffixEnforcesHTTPSScheme(t *testing.T) {
+	mw := corsMiddleware([]string{
+		"https://urbanistatlas.com",
+		"*.link00seven.workers.dev",
+		"http://localhost:5173",
+	})
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := mw(next)
+
+	cases := []struct {
+		name     string
+		origin   string
+		wantACAO bool
+	}{
+		{
+			name:     "https workers.dev preview allowed",
+			origin:   "https://preview.link00seven.workers.dev",
+			wantACAO: true,
+		},
+		{
+			name:     "http workers.dev preview REJECTED (HOST-03b)",
+			origin:   "http://preview.link00seven.workers.dev",
+			wantACAO: false,
+		},
+		{
+			name:     "https apex allowed",
+			origin:   "https://urbanistatlas.com",
+			wantACAO: true,
+		},
+		{
+			name:     "http apex REJECTED",
+			origin:   "http://urbanistatlas.com",
+			wantACAO: false,
+		},
+		{
+			name:     "localhost dev origin unchanged (http allowed)",
+			origin:   "http://localhost:5173",
+			wantACAO: true,
+		},
+		{
+			name:     "bare suffix without scheme REJECTED",
+			origin:   "preview.link00seven.workers.dev",
+			wantACAO: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("Origin", tc.origin)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			gotACAO := rr.Header().Get("Access-Control-Allow-Origin") != ""
+			if gotACAO != tc.wantACAO {
+				t.Errorf("Access-Control-Allow-Origin presence for %q: want %v, got %v (value: %q)",
+					tc.origin, tc.wantACAO, gotACAO, rr.Header().Get("Access-Control-Allow-Origin"))
+			}
+		})
+	}
+}

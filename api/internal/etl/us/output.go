@@ -19,12 +19,12 @@ import (
 // values (which produce verbose "city-state-metro" slugs) can be
 // replaced with the curated form (e.g., "nyc-metro").
 //
-// Asymmetry note: CA's CMA override (ca/mappings.go's cmaOverride) also
-// supports a Kind field — Metro Vancouver uses it to switch from the
-// auto-default "ca:cma" to "ca:regional-district". US MSAs don't need
-// that today (every CBSA is editorially a us:metro), so no Kind field
-// here. If a future CBSA wants a different kind, add Kind here and
-// pass it through WriteMSAsTOML's hardcoded "us:metro" literal.
+// There is no kind override: every US CBSA is editorially a us:metro,
+// which WriteMSAsTOML emits as a literal. If a future CBSA ever needs a
+// different kind, add a Kind field here then — until that concrete need
+// exists, the symmetry with CA's CMAOverride (which does carry Kind, for
+// Metro Vancouver → ca:regional-district) is deliberately left unbuilt
+// per the project's no-preemptive-abstraction convention.
 type MSAOverride struct {
 	CBSACode string   `toml:"cbsa_code"`
 	Slug     string   `toml:"slug"`

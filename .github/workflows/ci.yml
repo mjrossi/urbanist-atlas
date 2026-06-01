@@ -10,6 +10,16 @@ on:
   # a push to main would.
   workflow_dispatch:
 
+# Least-privilege default for every job: all of them only read the repo
+# (checkout, cache, build, test, seed-validate). None writes to the repo,
+# comments on PRs, or pushes packages, so contents: read suffices — and
+# it pins the scope even if the org/repo default is read-write. Jobs may
+# restate it locally (deploy-api does); the Fly deploy authenticates with
+# the scoped FLY_API_TOKEN secret, not GITHUB_TOKEN. Resolves CodeQL
+# actions/missing-workflow-permissions.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -148,9 +158,38 @@ jobs:
         run: python3 -m pip install -r etl/scripts/requirements.txt
       - run: just seed-check
 
+  seed-validate:
+    name: seed validate (pre-deploy gate)
+    needs: detect
+    # The validator lives in api/, so gate on the same scaffolding flag.
+    if: needs.detect.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache Go modules + build cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('api/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - uses: jdx/mise-action@v4
+      - name: Export mise [env] to GITHUB_ENV
+        run: mise env --dotenv >> "$GITHUB_ENV"
+      # HOST-01b pre-deploy gate: load the EMBEDDED seed bundle via the
+      # same BuildMemStore loader the server boots from and fail closed
+      # (non-zero exit) on any malformed seed BEFORE the Fly deploy. This
+      # is a distinct gate from the `api` unit tests and from the
+      # network-gated `data` (seed-check) job: it is offline, mutates
+      # nothing, and validates the hand-curated orgs.toml + leaves that
+      # seed-check never loads. deploy-api needs it (below).
+      - run: cd api && go run ./cmd/server seed validate
+
   deploy-api:
     name: deploy api → Fly
-    needs: [api, web, data]
+    needs: [api, web, data, seed-validate]
     # Only deploy on merges to main (and on the workflow_dispatch
     # re-deploy escape hatch, also restricted to main). PR runs
     # validate but never deploy. The ref check on the dispatch arm

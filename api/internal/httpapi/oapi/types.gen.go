@@ -79,9 +79,16 @@ type LookupOrg struct {
 	// explainability and debugging.
 	MatchedRegionSlugs []string `json:"matched_region_slugs"`
 	Name               string   `json:"name"`
-	Regions            []Region `json:"regions"`
-	ShortDesc          string   `json:"short_desc"`
-	Slug               string   `json:"slug"`
+
+	// Regions Every region this org serves, denormalized. Unordered —
+	// address regions by `slug`, not by position. Any apparent
+	// ordering is a process-internal handle (the loader sorts by
+	// a synthetic, load-order-assigned ID that is not stable
+	// across deploys), not a stable identifier; do not depend on
+	// it.
+	Regions   []Region `json:"regions"`
+	ShortDesc string   `json:"short_desc"`
+	Slug      string   `json:"slug"`
 
 	// Tags Open-ended labels. The canonical set is documented in
 	// `CLAUDE.md` (transit, safe-streets, cycling, walking,
@@ -150,6 +157,15 @@ type Meta struct {
 	// License SPDX identifier of the data license. Stable for the
 	// lifetime of v1 (`ODbL-1.0`).
 	License string `json:"license"`
+
+	// NextCursor Reserved for future pagination. Optional and absent in v1:
+	// collection endpoints return the whole list in a single
+	// response today. When present (a future additive change), it
+	// mirrors the `X-Next-Cursor` response header — an opaque
+	// token to pass back as `?cursor=` for the next page. Treat as
+	// opaque; the format may change without notice. Its absence
+	// always means there are no further rows.
+	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
 // NewSubmissionRequest Request body for `POST /api/v1/submissions`.
@@ -180,12 +196,19 @@ type Org struct {
 	AddedAt openapi_types.Date `json:"added_at"`
 
 	// ContactUrl Optional. URL of the org's contact page.
-	ContactUrl *string  `json:"contact_url,omitempty"`
-	Id         int64    `json:"id"`
-	Name       string   `json:"name"`
-	Regions    []Region `json:"regions"`
-	ShortDesc  string   `json:"short_desc"`
-	Slug       string   `json:"slug"`
+	ContactUrl *string `json:"contact_url,omitempty"`
+	Id         int64   `json:"id"`
+	Name       string  `json:"name"`
+
+	// Regions Every region this org serves, denormalized. Unordered —
+	// address regions by `slug`, not by position. Any apparent
+	// ordering is a process-internal handle (the loader sorts by
+	// a synthetic, load-order-assigned ID that is not stable
+	// across deploys), not a stable identifier; do not depend on
+	// it.
+	Regions   []Region `json:"regions"`
+	ShortDesc string   `json:"short_desc"`
+	Slug      string   `json:"slug"`
 
 	// Tags Open-ended labels. The canonical set is documented in
 	// `CLAUDE.md` (transit, safe-streets, cycling, walking,
@@ -319,6 +342,12 @@ type Region struct {
 	// See `docs/region-graph.md` for the per-country editorial
 	// policy on when to use `national` vs modeling state/regional
 	// chapters instead.
+	//
+	// Treat this as an open enum: although v1 ships exactly
+	// `local`, `regional`, and `national`, consumers should ignore
+	// unknown values rather than failing if a future tier is added
+	// (do not exhaustively switch and error on the default case).
+	// The enumerated set may grow without a breaking-change bump.
 	ScopeTier ScopeTier `json:"scope_tier"`
 
 	// Slug Globally unique across countries.
@@ -490,6 +519,12 @@ type RejectSubmissionRequest struct {
 // See `docs/region-graph.md` for the per-country editorial
 // policy on when to use `national` vs modeling state/regional
 // chapters instead.
+//
+// Treat this as an open enum: although v1 ships exactly
+// `local`, `regional`, and `national`, consumers should ignore
+// unknown values rather than failing if a future tier is added
+// (do not exhaustively switch and error on the default case).
+// The enumerated set may grow without a breaking-change bump.
 type ScopeTier string
 
 // Submission A queued or processed public submission.

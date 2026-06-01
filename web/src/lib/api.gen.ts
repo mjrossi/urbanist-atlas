@@ -99,6 +99,13 @@ export interface paths {
          *     Canadian postal codes are normalized to the 3-character FSA
          *     (e.g. `M5V 3A8` → `M5V`) server-side; clients may pass either
          *     form.
+         *
+         *     This is a single-object response — the body is a bare
+         *     `LookupResult` with no `{meta, data}` envelope. ODbL
+         *     attribution travels via the `X-Data-License` and
+         *     `X-Data-Attribution` response headers (set on every
+         *     `/api/v1/**` response), not an in-band `meta.license` field;
+         *     the `meta` envelope is reserved for collection responses.
          */
         get: operations["lookup"];
         put?: never;
@@ -139,6 +146,18 @@ export interface paths {
          *     parameters; the right filter axis (taxonomy via `kind`, DAG
          *     via `ancestor`, etc.) will be designed when a concrete browse
          *     UI use case appears.
+         *
+         *     Pagination: v1 returns the whole list in a single response and
+         *     will never default-truncate a today-complete result — a
+         *     response without a cursor means you have every row. When
+         *     pagination is introduced it will be additive and follow the
+         *     same opaque-cursor convention as the admin `listSubmissions`
+         *     endpoint: the response carries an `X-Next-Cursor` header (and
+         *     an optional `meta.next_cursor`) when more rows exist beyond the
+         *     current page; pass that value back as `?cursor=` to fetch the
+         *     next page. The cursor format is undocumented and may change
+         *     without notice — treat it as opaque. No `cursor` parameter is
+         *     accepted yet.
          */
         get: operations["listRegions"];
         put?: never;
@@ -178,6 +197,17 @@ export interface paths {
          *     referenced by an org's `matched_region_slugs`, so clients can
          *     render "Matched via Brooklyn" instead of "matched via
          *     brooklyn-ny" without a second request.
+         *
+         *     This is a single-object response — the body is a bare
+         *     `RegionDetail` with no `{meta, data}` envelope. ODbL
+         *     attribution travels via the `X-Data-License` and
+         *     `X-Data-Attribution` response headers (set on every
+         *     `/api/v1/**` response), not an in-band `meta.license` field;
+         *     the `meta` envelope is reserved for collection responses.
+         *
+         *     The `slug` you address here is a stable public identifier —
+         *     once published it is appended-to, never renamed (see the
+         *     `RegionSlug` parameter and `docs/region-graph.md`).
          */
         get: operations["getRegion"];
         put?: never;
@@ -223,6 +253,18 @@ export interface paths {
          * @description Feeds the "Recently added" strip on the home page. Returns the
          *     most-recently-approved organizations across the whole atlas,
          *     newest first.
+         *
+         *     Pagination: v1 returns the whole list in a single response and
+         *     will never default-truncate a today-complete result — a
+         *     response without a cursor means you have every row. When
+         *     pagination is introduced it will be additive and follow the
+         *     same opaque-cursor convention as the admin `listSubmissions`
+         *     endpoint: the response carries an `X-Next-Cursor` header (and
+         *     an optional `meta.next_cursor`) when more rows exist beyond the
+         *     current page; pass that value back as `?cursor=` to fetch the
+         *     next page. The cursor format is undocumented and may change
+         *     without notice — treat it as opaque. No `cursor` parameter is
+         *     accepted yet.
          */
         get: operations["listRecent"];
         put?: never;
@@ -365,6 +407,16 @@ export interface components {
              * @example 2026-05-18T12:34:56Z
              */
             generated_at: string;
+            /**
+             * @description Reserved for future pagination. Optional and absent in v1:
+             *     collection endpoints return the whole list in a single
+             *     response today. When present (a future additive change), it
+             *     mirrors the `X-Next-Cursor` response header — an opaque
+             *     token to pass back as `?cursor=` for the next page. Treat as
+             *     opaque; the format may change without notice. Its absence
+             *     always means there are no further rows.
+             */
+            next_cursor?: string;
         };
         /**
          * @description Drives result grouping in `/lookup`. `local` for city/county
@@ -382,6 +434,12 @@ export interface components {
          *     See `docs/region-graph.md` for the per-country editorial
          *     policy on when to use `national` vs modeling state/regional
          *     chapters instead.
+         *
+         *     Treat this as an open enum: although v1 ships exactly
+         *     `local`, `regional`, and `national`, consumers should ignore
+         *     unknown values rather than failing if a future tier is added
+         *     (do not exhaustively switch and error on the default case).
+         *     The enumerated set may grow without a breaking-change bump.
          * @enum {string}
          */
         ScopeTier: "local" | "regional" | "national";
@@ -462,6 +520,14 @@ export interface components {
              *     new labels may be introduced via seed data.
              */
             tags: string[];
+            /**
+             * @description Every region this org serves, denormalized. Unordered —
+             *     address regions by `slug`, not by position. Any apparent
+             *     ordering is a process-internal handle (the loader sorts by
+             *     a synthetic, load-order-assigned ID that is not stable
+             *     across deploys), not a stable identifier; do not depend on
+             *     it.
+             */
             regions: components["schemas"]["Region"][];
             /**
              * Format: date
@@ -947,6 +1013,15 @@ export interface components {
          *     `chicago` (city), `cook-county` (county), `chicagoland`
          *     (multi-state region), `ny` (state), `toronto-cma`
          *     (Canadian CMA), `metro-vancouver` (regional district).
+         *
+         *     Slugs are stable public identifiers. Once a slug is published
+         *     it is appended-to, never renamed — a published slug will not
+         *     change out from under a bookmark or an external consumer.
+         *     Curated and override-pinned slugs are fully stable;
+         *     auto-generated MSA/CMA slugs can in principle shift on an
+         *     upstream-vintage bump and are pinned via the override file when
+         *     that matters. See `docs/region-graph.md` for the contributor
+         *     append-not-rename rule and the stable-vs-volatile split.
          */
         RegionSlug: string;
         /**
@@ -1114,6 +1189,15 @@ export interface operations {
                  *     `chicago` (city), `cook-county` (county), `chicagoland`
                  *     (multi-state region), `ny` (state), `toronto-cma`
                  *     (Canadian CMA), `metro-vancouver` (regional district).
+                 *
+                 *     Slugs are stable public identifiers. Once a slug is published
+                 *     it is appended-to, never renamed — a published slug will not
+                 *     change out from under a bookmark or an external consumer.
+                 *     Curated and override-pinned slugs are fully stable;
+                 *     auto-generated MSA/CMA slugs can in principle shift on an
+                 *     upstream-vintage bump and are pinned via the override file when
+                 *     that matters. See `docs/region-graph.md` for the contributor
+                 *     append-not-rename rule and the stable-vs-volatile split.
                  */
                 slug: components["parameters"]["RegionSlug"];
             };

@@ -10,8 +10,16 @@ import (
 // allowlist entry forms:
 //
 //   - Exact origin match: "http://localhost:5173"
-//   - Suffix match (one leading "*"): "*.pages.dev" matches
-//     "https://branch-x.urbanist-atlas.pages.dev"
+//   - Suffix match (one leading "*"): "*.link00seven.workers.dev" matches
+//     "https://branch-x.link00seven.workers.dev"
+//
+// The suffix form pins the scheme to https://: the wildcard only
+// matches an origin that BOTH starts with "https://" and ends with the
+// configured domain suffix (HOST-03b). A scheme-blind suffix would let
+// a spoofed "http://anything.link00seven.workers.dev" satisfy the
+// allowlist; requiring the "https://" prefix before the HasSuffix check
+// rejects the plaintext variant while still matching any https
+// subdomain under the configured domain.
 //
 // Anything else (regex, header allowlisting beyond the defaults,
 // per-route policies) is out of scope for v1. When we need more, we
@@ -22,7 +30,7 @@ func corsMiddleware(allowed []string) func(http.Handler) http.Handler {
 	for _, a := range allowed {
 		switch {
 		case strings.HasPrefix(a, "*."):
-			suffixes = append(suffixes, a[1:]) // ".pages.dev"
+			suffixes = append(suffixes, a[1:]) // ".link00seven.workers.dev"
 		default:
 			exact[a] = struct{}{}
 		}
@@ -31,6 +39,13 @@ func corsMiddleware(allowed []string) func(http.Handler) http.Handler {
 	allow := func(origin string) bool {
 		if _, ok := exact[origin]; ok {
 			return true
+		}
+		// Wildcard suffixes only match https origins (HOST-03b):
+		// require the scheme before testing the domain suffix so a
+		// spoofed http://…workers.dev (or a bare, scheme-less value)
+		// can never satisfy the allowlist.
+		if !strings.HasPrefix(origin, "https://") {
+			return false
 		}
 		for _, suf := range suffixes {
 			if strings.HasSuffix(origin, suf) {

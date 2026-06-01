@@ -79,7 +79,14 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl ca: parsed CMA boundary", "cmas", len(cmas), "path", cmaZipPath)
 
-	assignments := assignCMAs(cmas)
+	overridesPath := filepath.Join(outDir, "regions_ca_cma_overrides.toml")
+	overrides, err := ReadCMAOverrides(overridesPath)
+	if err != nil {
+		return err
+	}
+	logger.Info("etl ca: read overrides", "count", len(overrides), "path", overridesPath)
+
+	assignments := assignCMAs(cmas, overrides)
 	knownCMASlugs := make(map[string]bool, len(assignments))
 	for _, a := range assignments {
 		knownCMASlugs[a.Slug] = true

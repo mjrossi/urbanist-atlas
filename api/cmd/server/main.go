@@ -51,6 +51,7 @@ func newRootCommand() *cli.Command {
 			serveCommand(),
 			linkcheckCommand(),
 			etlCommand(),
+			seedCommand(),
 			submissionsCommand(),
 		},
 	}

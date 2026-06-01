@@ -2,8 +2,9 @@ package atlas
 
 // LoadDevFixtures populates a MemStore with a small set of seeded
 // organizations across three urban areas (NYC, SF Bay, Toronto). It
-// exists so `cmd/server serve` can render a working /api/v1/lookup
-// before the Postgres store is wired up.
+// exists so `cmd/server serve --store=memory` can render a working
+// /api/v1/lookup without a seed bundle on disk — handy for demos and
+// ad-hoc CLI testing.
 //
 // The fixture data here is illustrative — not authoritative. Real
 // seed data lives in api/seed/orgs.yaml once that pipeline lands.
