@@ -301,6 +301,17 @@ export function About() {
               .
             </p>
           </div>
+          <div className="rail-block">
+            <div className="rail-kicker">Companion publication</div>
+            <p className="mb-0">
+              The Atlas began as a companion to{' '}
+              <a href="https://mjrossi.com/blog">
+                <em>Urbanist Lexicon</em>
+              </a>
+              , a record of systems, movement, and the transition from bits to
+              bricks.
+            </p>
+          </div>
           <div className="rail-block muted">
             <div className="rail-kicker">Colophon</div>
             <p className="text-sm">
