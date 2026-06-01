@@ -39,56 +39,38 @@ jobs:
     name: detect changes
     runs-on: ubuntu-latest
     outputs:
-      api: ${{ steps.filter.outputs.api }}
-      web: ${{ steps.filter.outputs.web }}
-      data: ${{ steps.filter.outputs.data }}
+      api: ${{ steps.paths.outputs.api }}
+      web: ${{ steps.paths.outputs.web }}
+      data: ${{ steps.paths.outputs.data }}
     steps:
       - uses: actions/checkout@v6
+      # The `global` anchor is folded into every filter: a change to the
+      # workflow itself, the justfile, a mise config, or the Dockerfile
+      # flips all three true, so a build/tooling change can never silently
+      # under-run CI. dorny/paths-filter uses the GitHub API for the
+      # PR-base diff, so the shallow checkout above is sufficient — no
+      # fetch-depth tweak needed. (The action is on the repo's Actions
+      # allowlist.)
+      - uses: dorny/paths-filter@v3
+        id: paths
         with:
-          # Full history (all branches) so the merge-base diff below can
-          # resolve both the PR base and head SHAs. Only the detect job
-          # pays this cost; the heavy jobs keep the default shallow clone.
-          fetch-depth: 0
-      # Changed-path detection in plain git/bash — no third-party action,
-      # so nothing new to add to the repo's Actions allowlist (which only
-      # permits GitHub-owned actions plus a short pinned list). The
-      # `global` catch-all (workflow file, justfile, mise config,
-      # Dockerfile) forces every filter true so a build/tooling change can
-      # never silently under-run CI. Only meaningful on pull_request; the
-      # heavy jobs bypass the gate on push/dispatch (see their `if:`), so
-      # we short-circuit to true on those events and skip the diff.
-      - id: filter
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-            { echo "api=true"; echo "web=true"; echo "data=true"; } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Three-dot diff = changes on the PR head since it diverged from
-          # base (the merge-base), i.e. exactly what this PR touched.
-          changed="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
-          echo "changed files:"; echo "$changed"
-
-          # Here-strings (not pipes) so grep -q exiting early on a match
-          # can't SIGPIPE an upstream process and trip pipefail.
-          if grep -qE '^(\.github/workflows/ci\.yml|justfile|mise[^/]*\.toml|Dockerfile)$' <<<"$changed"; then
-            global=true
-          else
-            global=false
-          fi
-          # match REGEX -> true if global tripped or any changed file matches.
-          match() {
-            [ "$global" = true ] && return 0
-            grep -qE "$1" <<<"$changed"
-          }
-
-          { match '^api/'                      && echo "api=true"  || echo "api=false";  } >> "$GITHUB_OUTPUT"
-          { match '^(web/|api/openapi\.yaml$)' && echo "web=true"  || echo "web=false";  } >> "$GITHUB_OUTPUT"
-          { match '^(api/|etl/)'               && echo "data=true" || echo "data=false"; } >> "$GITHUB_OUTPUT"
+          filters: |
+            global: &global
+              - '.github/workflows/ci.yml'
+              - 'justfile'
+              - 'mise*.toml'
+              - 'Dockerfile'
+            api:
+              - *global
+              - 'api/**'
+            web:
+              - *global
+              - 'web/**'
+              - 'api/openapi.yaml'
+            data:
+              - *global
+              - 'api/**'
+              - 'etl/**'
 
   api:
     name: api (go)
