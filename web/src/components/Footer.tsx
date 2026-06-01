@@ -89,6 +89,13 @@ export function Footer() {
         <p className="colophon-tag">
           A directory of the people fighting for better streets, where you live.
         </p>
+        <p className="colophon-note">
+          A companion to{' '}
+          <a href="https://mjrossi.com/blog">
+            <em>Urbanist Lexicon</em>
+          </a>
+          .
+        </p>
         <ul className="site-foot-links">
           <li>
             <Link to="/about">About</Link>
