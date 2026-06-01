@@ -96,7 +96,7 @@ func TestPublishedSlugs_AppendOnlyDirection(t *testing.T) {
 
 	// Simulated REMOVAL: a golden carrying a slug not in current must
 	// be detected as missing (the guard would fail).
-	removed := golddiff(current, "definitely-not-a-real-slug-xyz")
+	removed := append(slices.Clone(current), "definitely-not-a-real-slug-xyz")
 	missing := missingFromCurrent(removed, currentSet)
 	if len(missing) != 1 || missing[0] != "definitely-not-a-real-slug-xyz" {
 		t.Errorf("removal not detected: missing=%v", missing)
@@ -121,13 +121,6 @@ func nonEmptyLines(s string) []string {
 		}
 	}
 	return out
-}
-
-// golddiff returns a copy of base with extra appended — a stand-in for
-// a golden that carries a since-removed slug.
-func golddiff(base []string, extra string) []string {
-	out := append([]string(nil), base...)
-	return append(out, extra)
 }
 
 // missingFromCurrent returns the golden slugs absent from currentSet —

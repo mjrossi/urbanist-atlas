@@ -132,9 +132,9 @@ func TestDetectCyclesGraph_DiamondCyclePathFidelity(t *testing.T) {
 // the graph is a clean DAG.
 func TestBuildMemStore_CleanFixtureLoads(t *testing.T) {
 	regionTOML := map[string]string{
-		"u_top":  region("State", "u:state", "regional", nil),
-		"u_mid":  region("Metro", "u:metro", "regional", []string{"State"}),
-		"u_leaf": region("City", "u:leaf", "local", []string{"Metro"}),
+		"u_top":  regionTable("State", "u:state", "regional", nil),
+		"u_mid":  regionTable("Metro", "u:metro", "regional", []string{"State"}),
+		"u_leaf": regionTable("City", "u:leaf", "local", []string{"Metro"}),
 	}
 	postal := postalHeaderCSV() + "10001,U,city\n"
 	fs := fixtureFS(regionTOML, map[string]string{"u": postal}, orgFor("city"))
@@ -150,10 +150,10 @@ func TestBuildMemStore_CleanFixtureLoads(t *testing.T) {
 // build, and the error names the orphan slug.
 func TestBuildMemStore_OrphanLeaf(t *testing.T) {
 	regionTOML := map[string]string{
-		"y_top": region("State", "y:state", "regional", nil),
+		"y_top": regionTable("State", "y:state", "regional", nil),
 		// anchored has a postal row → fine. orphan has nothing.
-		"y_leaves": region("Anchored", "y:leaf", "local", []string{"State"}) +
-			region("Orphan", "y:leaf", "local", []string{"State"}),
+		"y_leaves": regionTable("Anchored", "y:leaf", "local", []string{"State"}) +
+			regionTable("Orphan", "y:leaf", "local", []string{"State"}),
 	}
 	postal := postalHeaderCSV() + "10001,Y,anchored\n"
 	fs := fixtureFS(regionTOML, map[string]string{"y": postal}, orgFor("anchored"))
@@ -173,9 +173,9 @@ func TestBuildMemStore_OrphanLeaf(t *testing.T) {
 // an attached org is NOT an orphan.
 func TestBuildMemStore_OrphanAnchoredByOrg(t *testing.T) {
 	regionTOML := map[string]string{
-		"z_top": region("State", "z:state", "regional", nil),
-		"z_leaves": region("ByPostal", "z:leaf", "local", []string{"State"}) +
-			region("ByOrg", "z:leaf", "local", []string{"State"}),
+		"z_top": regionTable("State", "z:state", "regional", nil),
+		"z_leaves": regionTable("ByPostal", "z:leaf", "local", []string{"State"}) +
+			regionTable("ByOrg", "z:leaf", "local", []string{"State"}),
 	}
 	postal := postalHeaderCSV() + "10001,Z,bypostal\n"
 	fs := fixtureFS(regionTOML, map[string]string{"z": postal}, orgFor("byorg"))
@@ -191,12 +191,12 @@ func TestBuildMemStore_OrphanAnchoredByOrg(t *testing.T) {
 // descendant's postal row is fine, and only true leaves are checked.
 func TestBuildMemStore_OrphanAnchoredByDescendant(t *testing.T) {
 	regionTOML := map[string]string{
-		"w_top": region("State", "w:state", "regional", nil),
+		"w_top": regionTable("State", "w:state", "regional", nil),
 		// metro is a non-leaf (city is its child); city carries the
 		// postal anchor. metro itself has no postal row but is anchored
 		// transitively, and is not a leaf so isn't directly checked.
-		"w_mid":  region("Metro", "w:metro", "regional", []string{"State"}),
-		"w_leaf": region("City", "w:leaf", "local", []string{"Metro"}),
+		"w_mid":  regionTable("Metro", "w:metro", "regional", []string{"State"}),
+		"w_leaf": regionTable("City", "w:leaf", "local", []string{"Metro"}),
 	}
 	postal := postalHeaderCSV() + "10001,W,city\n"
 	fs := fixtureFS(regionTOML, map[string]string{"w": postal}, orgFor("city"))
@@ -211,8 +211,8 @@ func TestBuildMemStore_OrphanAnchoredByDescendant(t *testing.T) {
 // early signal is retained: a cycle entirely within one file is caught
 // by DetectCycles before the global pass even runs.
 func TestDetectCycles_WithinFileEarlySignal(t *testing.T) {
-	body := region("A", "x:leaf", "local", []string{"b"}) +
-		region("B", "x:leaf", "local", []string{"a"})
+	body := regionTable("A", "x:leaf", "local", []string{"b"}) +
+		regionTable("B", "x:leaf", "local", []string{"a"})
 	regions, err := ParseRegions(strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("parse fixture: %v", err)
@@ -222,8 +222,10 @@ func TestDetectCycles_WithinFileEarlySignal(t *testing.T) {
 	}
 }
 
-// region renders a single [[region]] TOML table body for a fixture.
-func region(name, kind, scope string, parents []string) string {
+// regionTable renders a single [[region]] TOML table body for a
+// fixture. (Distinct from the black-box seedfiles_test `region` helper
+// in added_at_test.go, which returns a one-row *fstest.MapFile.)
+func regionTable(name, kind, scope string, parents []string) string {
 	var b strings.Builder
 	slug := strings.ToLower(name)
 	b.WriteString("[[region]]\n")

@@ -91,15 +91,17 @@ func validateRegions(rs []atlas.Region) error {
 func DetectCycles(rs []atlas.Region) error {
 	parents := map[string][]string{}
 	inFile := map[string]bool{}
-	for _, r := range rs {
+	order := make([]string, len(rs))
+	for i, r := range rs {
 		parents[r.Slug] = r.ParentSlugs
 		inFile[r.Slug] = true
+		order[i] = r.Slug
 	}
 
 	// Skip cross-file parents: they resolve in an already-loaded file
 	// and are covered by the global DetectCyclesGraph pass.
-	keep := func(slug, parent string) bool { return inFile[parent] }
-	return detectCycles3Color(slugs(rs), parents, keep)
+	keep := func(parent string) bool { return inFile[parent] }
+	return detectCycles3Color(order, parents, keep)
 }
 
 // DetectCyclesGraph runs the IDENTICAL 3-color DFS as DetectCycles but
@@ -122,16 +124,16 @@ func DetectCyclesGraph(parents map[string][]string) error {
 	// Sort so the walk order — and therefore the reported cycle path —
 	// is deterministic across runs.
 	slices.Sort(all)
-	keep := func(slug, parent string) bool { return true }
+	keep := func(parent string) bool { return true }
 	return detectCycles3Color(all, parents, keep)
 }
 
 // detectCycles3Color is the shared 3-color (white/gray/black) DFS body.
 // order is the deterministic slug iteration order; parents maps a slug
-// to its parent slugs; keep reports whether a given (slug, parent)
-// edge should be walked (the per-file variant skips cross-file edges,
-// the global variant walks everything).
-func detectCycles3Color(order []string, parents map[string][]string, keep func(slug, parent string) bool) error {
+// to its parent slugs; keep reports whether a given parent edge should
+// be walked (the per-file variant skips cross-file edges, the global
+// variant walks everything).
+func detectCycles3Color(order []string, parents map[string][]string, keep func(parent string) bool) error {
 	const (
 		white = 0
 		gray  = 1
@@ -149,7 +151,7 @@ func detectCycles3Color(order []string, parents map[string][]string, keep func(s
 		}
 		color[slug] = gray
 		for _, p := range parents[slug] {
-			if !keep(slug, p) {
+			if !keep(p) {
 				continue
 			}
 			// Copy the path on descent so each branch owns its slice. A
@@ -182,13 +184,4 @@ func detectCycles3Color(order []string, parents map[string][]string, keep func(s
 		}
 	}
 	return nil
-}
-
-// slugs returns the slug of each region, preserving order.
-func slugs(rs []atlas.Region) []string {
-	out := make([]string, len(rs))
-	for i, r := range rs {
-		out[i] = r.Slug
-	}
-	return out
 }

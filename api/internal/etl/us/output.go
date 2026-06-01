@@ -15,21 +15,20 @@ import (
 
 // MSAOverride is one editorial override read from
 // api/seed/regions_us_msa_overrides.toml. It pins the slug, display
-// name, kind, and parent edges for a specific CBSA so the auto-generated
+// name, and parent edges for a specific CBSA so the auto-generated
 // values (which produce verbose "city-state-metro" slugs) can be
 // replaced with the curated form (e.g., "nyc-metro").
 //
-// Kind defaults to "us:metro" when empty (every US CBSA is editorially a
-// us:metro today, so the existing override file carries no kind column
-// and the default keeps regions_us_msas.toml byte-identical). The field
-// exists for symmetry with CA's CMAOverride (ca/output.go), which uses
-// Kind to switch Metro Vancouver from "ca:cma" to "ca:regional-district"
-// — both countries now share the same data-driven override shape.
+// There is no kind override: every US CBSA is editorially a us:metro,
+// which WriteMSAsTOML emits as a literal. If a future CBSA ever needs a
+// different kind, add a Kind field here then — until that concrete need
+// exists, the symmetry with CA's CMAOverride (which does carry Kind, for
+// Metro Vancouver → ca:regional-district) is deliberately left unbuilt
+// per the project's no-preemptive-abstraction convention.
 type MSAOverride struct {
 	CBSACode string   `toml:"cbsa_code"`
 	Slug     string   `toml:"slug"`
 	Name     string   `toml:"name"`
-	Kind     string   `toml:"kind"`
 	Parents  []string `toml:"parents"`
 }
 
@@ -224,11 +223,7 @@ func WriteMSAsTOML(w io.Writer, msas []MSA, assignments map[string]MSAOverride) 
 		if a.Slug == "" {
 			return fmt.Errorf("write msas: empty slug for cbsa %s (%s)", m.CBSACode, m.Title)
 		}
-		kind := a.Kind
-		if kind == "" {
-			kind = "us:metro"
-		}
-		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %q\nkind = %q\nname = %q\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [", a.Slug, kind, a.Name); err != nil {
+		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %q\nkind = \"us:metro\"\nname = %q\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [", a.Slug, a.Name); err != nil {
 			return err
 		}
 		for i, p := range a.Parents {
