@@ -3248,6 +3248,22 @@ a.tag:hover::before {
   line-height: 1.4;
 }
 
+.site-foot-compact .colophon-note {
+  font-family: var(--serif-text);
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 36ch;
+  margin: 0 0 18px;
+}
+
+.site-foot-compact .colophon-note a {
+  color: var(--amber);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+
 .site-foot-links {
   list-style: none;
   padding: 0;
