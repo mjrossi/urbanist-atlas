@@ -43,6 +43,10 @@ SQLite submission store are live (workflow at
 - Docker-based dev Postgres on `:55432` via `just pg-up` / `pg-down`
   / `pg-reset` / `pg-shell` / `pg-logs`. Same `postgres:17-alpine`
   image as the integration suite.
+  *(Historical: Postgres and these `pg-*` recipes were retired in the
+  slice-α file-store cutover — see Bring-up below. Reads now come from
+  the in-memory file store; the only DB is the SQLite submissions
+  queue.)*
 - **Wire contract:** `api/openapi.yaml` covers every v1 endpoint and
   schema. Errors use RFC 9457 `application/problem+json` with stable
   `type` URIs under `https://urbanistatlas.com/problems/{slug}` and
@@ -53,12 +57,19 @@ SQLite submission store are live (workflow at
     `LoadDevFixtures`, tests.
   - Postgres-backed `atlas.Store` (sqlc + pgx) behind
     `serve --store=memory|postgres` (postgres default).
+    *(Retired in the slice-α cutover: the read path is now the
+    in-memory file store; `serve --store=file|memory`, file default.)*
   - `migrate up|down|status` backed by embedded goose;
     `migrations/0001_init.sql` creates all five tables.
+    *(The standalone `migrate` subcommand was retired; goose now runs
+    automatically on the SQLite submissions store at boot, from
+    `api/migrations-sqlite/`.)*
   - `oapi-codegen` generates Go types from `openapi.yaml`; the
     `/lookup` handler returns the generated type; the recoverer
     middleware's 500 path emits problem+json too.
   - Testcontainers integration tests under `//go:build integration`.
+    *(Retired with Postgres; the SQLite submissions store is now
+    tested in-process under the default `just api-test`.)*
 - **Frontend foundation** (slices #8 + #9 + #10 + OpenAPI codegen):
   - Vite + React + TS SPA, strict tsconfig, flat ESLint config,
     Prettier inline in `package.json`, Vitest + RTL.
@@ -390,18 +401,20 @@ SQLite submission store are live (workflow at
   `http://localhost:8080`, and an empty `URBANIST_CLIENT_SECRET`
   no-ops the `X-Atlas-Client` middleware on the API side.
 - **R2 backups (workflow + runbook + live bucket):**
-  `.github/workflows/backup.yml` runs nightly against QA Postgres
-  and uploads `pg_dump | gzip` to the `urbanist-atlas-backups` R2
-  bucket (30-day lifecycle). `docs/runbooks/r2-backups.md` covers
-  enablement (nine numbered steps from Fly token generation through
-  verifying the first manual run), the restore path
-  (`just db-restore`), rotation + maintenance cadence (6–12 month
-  token rotation, quarterly retention audit, half-yearly restore
-  drill), and troubleshooting for the common failure modes (SSH
-  permission errors, R2 403s on PutObject, endpoint URL typos,
-  partial dumps, stragglers past 30 days). `docs/deploy.md` §7
-  collapses to a pointer at the runbook so the deep content has
-  one home.
+  `.github/workflows/backup-sqlite.yml` runs nightly against the
+  `urbanist-atlas` machine and uploads `sqlite3 /data/atlas.db .dump
+  | gzip` to the `urbanist-atlas-backups` R2 bucket via rclone
+  (30-day lifecycle). `docs/runbooks/r2-backups.md` covers enablement
+  (nine numbered steps from the Fly token through verifying the first
+  manual run), the restore path (stop machine → sftp the rebuilt DB
+  onto the volume), rotation + maintenance cadence (6–12 month token
+  rotation, quarterly retention audit, half-yearly restore drill),
+  and troubleshooting for the common failure modes (SSH permission
+  errors, R2 403s on upload, endpoint URL typos, partial dumps,
+  stragglers past 30 days). `docs/deploy.md` §Backups is the
+  authoritative dump/restore reference. *(Originally shipped against
+  the QA Postgres app with `pg_dump`; rewritten for SQLite with the
+  file-store cutover when Postgres was retired.)*
 
 ## Deferred from this milestone
 

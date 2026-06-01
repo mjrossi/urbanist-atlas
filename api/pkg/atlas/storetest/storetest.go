@@ -1,8 +1,8 @@
 // Package storetest is a shared behavioral-contract test suite for
-// atlas.Store implementations. MemStore (unit tests) and the Postgres
-// adapter (integration tests, behind //go:build integration) both run
-// the same assertions against the same fixtures so the two stores
-// can't drift quietly.
+// atlas.Store implementations. MemStore is the only implementation
+// today and runs the suite via MemStoreFactory; the suite is kept
+// implementation-agnostic so any future store can run the same
+// assertions against the same fixtures and can't drift from MemStore.
 //
 // Each contract corresponds to a doc-comment claim on the Store
 // interface (see api/pkg/atlas/store.go). A failure means the
@@ -13,8 +13,8 @@
 //
 //	storetest.RunContractSuite(t, storetest.MemStoreFactory)
 //
-// or, for the Postgres adapter, a factory that boots a testcontainer
-// and returns a Seeder wired to the pool.
+// A future store provides its own Factory, which builds a fresh store
+// and returns a Seeder wired to it.
 package storetest
 
 import (
@@ -27,7 +27,7 @@ import (
 
 // Seeder writes test fixtures into a Store implementation. Each
 // backing store provides its own Seeder; the contract tests call
-// these methods in a deterministic order so MemStore and Postgres see
+// these methods in a deterministic order so every implementation sees
 // the same rows.
 type Seeder interface {
 	// SeedRegion registers a region. Parent slugs in r.ParentSlugs
