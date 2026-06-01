@@ -75,6 +75,23 @@ func (s *MemStore) AddPostalCode(country Country, code string, leafRegionID int6
 	s.postalToLeaf[postalKey(country, code)] = leafRegionID
 }
 
+// Slugs returns every registered region slug — the FULL set across all
+// tiers and kinds (states/provinces, hand-curated leaves, generated
+// MSA/CMA, and national umbrellas), unlike ListRegions which returns
+// only the browseable, org-bearing subset. The order is unspecified;
+// callers that need determinism should sort. Backs the published-slug
+// append-only guard (the slug→consumer permanence contract), which
+// must see every slug a /regions/{slug} consumer could address.
+func (s *MemStore) Slugs() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.regionsBySlug))
+	for slug := range s.regionsBySlug {
+		out = append(out, slug)
+	}
+	return out
+}
+
 // ResolveLeafRegion implements Store.
 func (s *MemStore) ResolveLeafRegion(_ context.Context, country Country, postalCode string) (Region, error) {
 	s.mu.RLock()
