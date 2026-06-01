@@ -5,9 +5,52 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
+
+// CMAOverride is one editorial override read from
+// api/seed/regions_ca_cma_overrides.toml. It pins the slug, display
+// name, kind, and parent edges for a specific StatsCan CMA (keyed by
+// its 3-digit UID) so the auto-generated values can be replaced with
+// the curated form (e.g., "metro-vancouver" / "ca:regional-district").
+//
+// It mirrors the US MSAOverride struct (api/internal/etl/us/output.go)
+// — both countries now drive editorial overrides from data, not
+// compiled Go — with an added Kind field (Metro Vancouver overrides
+// the "ca:cma" default to "ca:regional-district").
+type CMAOverride struct {
+	UID     string   `toml:"cma_uid"`
+	Slug    string   `toml:"slug"`
+	Name    string   `toml:"name"`
+	Kind    string   `toml:"kind"`
+	Parents []string `toml:"parents"`
+}
+
+type overrideFile struct {
+	Overrides []CMAOverride `toml:"override"`
+}
+
+// ReadCMAOverrides parses the overrides TOML file. Missing file is
+// not an error — the file is optional, and the auto-gen flow has a
+// sensible default for every CMA. Mirrors us.ReadMSAOverrides.
+func ReadCMAOverrides(path string) ([]CMAOverride, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read overrides: %w", err)
+	}
+	var f overrideFile
+	if err := toml.Unmarshal(data, &f); err != nil {
+		return nil, fmt.Errorf("parse overrides: %w", err)
+	}
+	return f.Overrides, nil
+}
 
 // CMAAssignment captures the per-CMA slug + kind + parents that the
 // output writer emits to regions_ca_cmas.toml. Overrides take effect
@@ -21,16 +64,21 @@ type CMAAssignment struct {
 }
 
 // assignCMAs produces one assignment per CMA in canonical order
-// (sorted by slug). Entries in cmaOverrides (keyed by CMA UID)
-// supply slug/name/kind overrides; missing fields fall back to
-// auto-generated values (slug = "<slugified-name>-cma", kind =
-// "ca:cma", name = StatsCan name). Parents are derived from
-// ProvinceUIDs (single-province → [province slug]; multi-province
-// like Ottawa-Gatineau → [primary, secondary]).
-func assignCMAs(cmas []CMA) []CMAAssignment {
+// (sorted by slug). Override entries (keyed by CMA UID, read from
+// api/seed/regions_ca_cma_overrides.toml) supply slug/name/kind
+// overrides; missing fields fall back to auto-generated values
+// (slug = "<slugified-name>-cma", kind = "ca:cma", name = StatsCan
+// name). Parents are derived from ProvinceUIDs (single-province →
+// [province slug]; multi-province like Ottawa-Gatineau → [primary,
+// secondary]).
+func assignCMAs(cmas []CMA, overrides []CMAOverride) []CMAAssignment {
+	overrideByUID := make(map[string]CMAOverride, len(overrides))
+	for _, o := range overrides {
+		overrideByUID[o.UID] = o
+	}
 	out := make([]CMAAssignment, 0, len(cmas))
 	for _, c := range cmas {
-		override := cmaOverrides[c.UID]
+		override := overrideByUID[c.UID]
 		slug := override.Slug
 		if slug == "" {
 			slug = slugify(c.Name) + "-cma"
@@ -199,8 +247,8 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 # regenerate --country=CA.
 #
 # Edit policy: do NOT hand-edit this file. Editorial overrides for
-# slug/name/kind live in api/internal/etl/ca/mappings.go (cmaOverrides,
-# keyed by StatsCan CMA UID); change those and re-run etl regenerate.
+# slug/name/kind/parents live in regions_ca_cma_overrides.toml (keyed
+# by StatsCan CMA UID); change those and re-run etl regenerate.
 #
 # Filtering: only CMATYPE='B' rows from the StatsCan boundary file
 # (true Census Metropolitan Areas, population ≥100k) are emitted.
@@ -208,7 +256,7 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 #
 # Slug convention:
 #   - Override-supplied for the well-known CMAs (toronto-cma,
-#     montreal-cma, metro-vancouver). See ca/mappings.go.
+#     montreal-cma, metro-vancouver). See regions_ca_cma_overrides.toml.
 #   - Auto-generated otherwise as "<slugified-name>-cma".
 #
 # Parents:

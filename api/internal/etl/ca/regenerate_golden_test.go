@@ -56,6 +56,27 @@ func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 	writeZipWithDBF(t, filepath.Join(srcDir, "lcma000b21a_e.zip"), "lcma000b21a_e.dbf", cmaDBF)
 	writeZipWithDBF(t, filepath.Join(srcDir, "lfsa000b21a_e.zip"), "lfsa000b21a_e.dbf", fsaDBF)
 
+	// Overrides are read from outDir (regions_ca_cma_overrides.toml), now
+	// data rather than the compiled cmaOverrides map. Stage the canonical
+	// overrides the fixture exercises so the golden output is unchanged:
+	// CMA 535 → toronto-cma override slug+name; 933 → metro-vancouver
+	// override slug+kind. CMA 421 (Sherbrooke) has no override and
+	// auto-generates, exercising the no-override region writer path.
+	overridesTOML := `[[override]]
+cma_uid = "535"
+slug = "toronto-cma"
+name = "Greater Toronto Area"
+
+[[override]]
+cma_uid = "933"
+slug = "metro-vancouver"
+name = "Metro Vancouver"
+kind = "ca:regional-district"
+`
+	if err := os.WriteFile(filepath.Join(outDir, "regions_ca_cma_overrides.toml"), []byte(overridesTOML), 0o644); err != nil {
+		t.Fatalf("stage overrides: %v", err)
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	if err := Regenerate(context.Background(), srcDir, outDir, etl.TargetAll, logger); err != nil {
 		t.Fatalf("Regenerate: %v", err)

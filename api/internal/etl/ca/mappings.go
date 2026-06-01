@@ -26,33 +26,13 @@ var fsaToLeaf = map[string]string{
 	"H3A": "montreal",
 }
 
-// cmaOverrides maps the 3-digit StatsCan CMA UID to a curated
-// slug + name + kind for well-known Canadian metros we want to pin
-// over the auto-generated defaults. CBSA-style fields:
-//
-//   - Slug — preserves existing seed slugs (toronto-cma,
-//     montreal-cma, metro-vancouver) and shortens long ones
-//     (ottawa-gatineau-cma vs. the raw "Ottawa - Gatineau" slugify).
-//   - Name — display name on metros pages. Defaults to the cleaned
-//     CMA name from the DBF; overrides give nicer "Greater Toronto
-//     Area"-style labels.
-//   - Kind — defaults to "ca:cma". Override to "ca:regional-district"
-//     for Metro Vancouver (matches StatsCan's regional-district
-//     vocabulary the existing curated record used).
-//
-// Empty fields fall back to the auto-generated values.
-type cmaOverride struct {
-	Slug string
-	Name string
-	Kind string
-}
-
-var cmaOverrides = map[string]cmaOverride{
-	"535": {Slug: "toronto-cma", Name: "Greater Toronto Area"},
-	"462": {Slug: "montreal-cma", Name: "Greater Montréal"},
-	"933": {Slug: "metro-vancouver", Name: "Metro Vancouver", Kind: "ca:regional-district"},
-	"505": {Slug: "ottawa-gatineau-cma", Name: "Ottawa-Gatineau"},
-}
+// CMA editorial overrides (3-digit StatsCan CMA UID → curated
+// slug/name/kind/parents) used to live here as a compiled
+// `cmaOverrides` map. They were lifted into data —
+// api/seed/regions_ca_cma_overrides.toml, read by ReadCMAOverrides in
+// output.go and applied by assignCMAs — so a CA metro slug correction
+// is a data edit (no Go change + recompile), symmetric with the US
+// side's regions_us_msa_overrides.toml. See ETL-04b / plan 03-04.
 
 // provinceUIDToSlug maps 2-digit Statistics Canada province/territory
 // codes to the province region slugs in api/seed/regions_ca_provinces.toml.

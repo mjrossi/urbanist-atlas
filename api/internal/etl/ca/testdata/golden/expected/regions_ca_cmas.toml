@@ -3,8 +3,8 @@
 # regenerate --country=CA.
 #
 # Edit policy: do NOT hand-edit this file. Editorial overrides for
-# slug/name/kind live in api/internal/etl/ca/mappings.go (cmaOverrides,
-# keyed by StatsCan CMA UID); change those and re-run etl regenerate.
+# slug/name/kind/parents live in regions_ca_cma_overrides.toml (keyed
+# by StatsCan CMA UID); change those and re-run etl regenerate.
 #
 # Filtering: only CMATYPE='B' rows from the StatsCan boundary file
 # (true Census Metropolitan Areas, population ≥100k) are emitted.
@@ -12,7 +12,7 @@
 #
 # Slug convention:
 #   - Override-supplied for the well-known CMAs (toronto-cma,
-#     montreal-cma, metro-vancouver). See ca/mappings.go.
+#     montreal-cma, metro-vancouver). See regions_ca_cma_overrides.toml.
 #   - Auto-generated otherwise as "<slugified-name>-cma".
 #
 # Parents:

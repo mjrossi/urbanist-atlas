@@ -1,0 +1,50 @@
+# CA CMA editorial overrides applied by etl regenerate --country=CA.
+#
+# Each [[override]] block pins the slug, display name, kind, and parent
+# edges for a specific StatsCan Census Metropolitan Area, keyed by its
+# 3-digit CMA UID. The ETL replaces the auto-generated
+# "<slugified-name>-cma" / "ca:cma" defaults with these values when
+# writing regions_ca_cmas.toml.
+#
+# Use overrides for:
+#   - well-known CMAs whose curated slug should be friendly (e.g.,
+#     "metro-vancouver" rather than the raw "metro-vancouver-cma", or
+#     "toronto-cma" with a nicer "Greater Toronto Area" display name)
+#   - CMAs whose kind differs from the "ca:cma" default (Metro
+#     Vancouver uses StatsCan's "ca:regional-district" vocabulary)
+#   - any future editorial cleanup of auto-generated names
+#
+# Empty/omitted fields fall back to the auto-generated values:
+#   - slug → "<slugified-name>-cma"
+#   - name → the cleaned StatsCan CMA name
+#   - kind → "ca:cma"
+#
+# CMA UIDs are stable identifiers across StatsCan vintages; using them
+# as the override key is more robust than keying by current slug.
+#
+# This file mirrors regions_us_msa_overrides.toml (the US side) — both
+# countries now drive editorial overrides from data, not compiled Go.
+
+[[override]]
+cma_uid = "535"
+slug = "toronto-cma"
+name = "Greater Toronto Area"
+# kind omitted → defaults to "ca:cma"
+
+[[override]]
+cma_uid = "462"
+slug = "montreal-cma"
+name = "Greater Montréal"
+# kind omitted → defaults to "ca:cma"
+
+[[override]]
+cma_uid = "933"
+slug = "metro-vancouver"
+name = "Metro Vancouver"
+kind = "ca:regional-district"
+
+[[override]]
+cma_uid = "505"
+slug = "ottawa-gatineau-cma"
+name = "Ottawa-Gatineau"
+# kind omitted → defaults to "ca:cma"
