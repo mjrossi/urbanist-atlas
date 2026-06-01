@@ -87,6 +87,30 @@ func New(cfg Config) http.Handler {
 		r.Use(metricsMiddleware(cfg.Metrics))
 	}
 
+	// chi's defaults answer an unmatched route with a stdlib text/plain
+	// 404 and an unmatched method with an empty 405 — both violate the
+	// spec's "all error responses use application/problem+json" contract
+	// (openapi.yaml ProblemDetails / RFC 9457). Route them through the
+	// same writeProblem emitter every handled error uses. The handlers
+	// stay thin (pull rid from ctx → writeProblem); writeProblem owns the
+	// RFC-9457 body, so there is no second encoder.
+	//
+	// Both reuse an EXISTING catalog type URI (problemNotFound) — no new
+	// problemMethodNotAllowed const, which would force an openapi.yaml
+	// mirror edit (D-09 keeps the spec exclusive to plan 03-01). The 405's
+	// status code + title carry the method-not-allowed semantics; the type
+	// URI is a stable, already-published catalog entry.
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		writeProblem(w, r, http.StatusNotFound, problemNotFound,
+			"Not Found", "The requested resource does not exist.",
+			requestIDFromContext(r.Context()))
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		writeProblem(w, r, http.StatusMethodNotAllowed, problemNotFound,
+			"Method Not Allowed", "This method is not supported for the requested resource.",
+			requestIDFromContext(r.Context()))
+	})
+
 	getHead(r, "/healthz", healthHandler())
 	getHead(r, "/readyz", readyHandler(cfg.Store, logger))
 
