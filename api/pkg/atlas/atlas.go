@@ -4,8 +4,9 @@
 // internal/httpapi and internal/store packages, which compose atlas.
 //
 // The public types and the Lookup function are stable contracts. The
-// MemStore implementation is suitable for tests, fixtures, and CLI use;
-// a Postgres-backed Store lives in internal/store/postgres.
+// MemStore implementation backs the runtime read path (the seed bundle
+// is loaded into a MemStore at boot) and is also used directly for
+// tests, fixtures, and CLI tooling.
 package atlas
 
 import "time"
@@ -25,8 +26,8 @@ const (
 // "local" cause their orgs to appear in the Local bucket; "regional"
 // regions cause their orgs to appear in the Regional bucket;
 // "national" regions are filtered from the default Lookup ancestor
-// walk (see internal/store/postgres/queries/lookup.sql) so their orgs
-// don't surface in default results. The national tier exists so that
+// walk (see MemStore.AncestorRegions) so their orgs don't surface in
+// default results. The national tier exists so that
 // national-scope advocacy orgs (e.g. MUBi for PT, Living Streets for
 // UK, Fietsersbond for NL) can be modeled without distorting the
 // local-first defaults; surfacing them is a future opt-in.

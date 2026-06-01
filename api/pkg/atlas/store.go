@@ -26,8 +26,10 @@ var ErrRegionNotFound = errors.New("atlas: region not found")
 // system. Higher-level orchestrators in pkg/atlas (Lookup, GetRegion)
 // compose Store primitives; implementations stay free of business
 // logic. The package-level storetest harness exercises every contract
-// below against both MemStore and the Postgres adapter so the two
-// can't drift quietly.
+// below against MemStore so its behavior can't drift quietly from the
+// documented contracts. (The seam stays implementation-agnostic so a
+// future downstream-backed Store can be slotted in behind the same
+// suite.)
 //
 // All implementations must be safe for concurrent use.
 //
@@ -90,7 +92,7 @@ type Store interface {
 	//
 	// Each RegionSummary.BrowseParentSlug carries the slug of the
 	// nearest browseable-kind ancestor. Ties at min depth are
-	// resolved by slug ASC so MemStore and Postgres agree.
+	// resolved by slug ASC so the choice is deterministic.
 	ListRegions(ctx context.Context) ([]RegionSummary, error)
 
 	// GetOrgBySlug returns the approved organization identified by slug,

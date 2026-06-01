@@ -7,9 +7,9 @@ import (
 )
 
 // TestMemStore_Contract runs the shared Store contract suite against
-// MemStore. The same suite runs against the Postgres adapter under
-// //go:build integration in internal/store/postgres/contract_test.go.
-// Any failure here is a divergence between the docstring contract on
+// MemStore. The suite is implementation-agnostic, so a future
+// downstream-backed Store can reuse it via the same factory shape. Any
+// failure here is a divergence between the docstring contract on
 // atlas.Store and what MemStore actually does.
 func TestMemStore_Contract(t *testing.T) {
 	storetest.RunContractSuite(t, storetest.MemStoreFactory)

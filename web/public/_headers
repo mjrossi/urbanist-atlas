@@ -37,11 +37,9 @@
 #
 # `img-src 'self' data:`: SVG icons inlined as data: URIs.
 #
-# `connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com https://cloudflareinsights.com`:
-# outbound fetches go to the Atlas API (the QA host stays in the list
-# until Phase 2 cutover collapses qa/prod onto a single origin) plus
-# `cloudflareinsights.com`, where the Web Analytics beacon POSTs its
-# cookieless RUM data.
+# `connect-src 'self' https://api.urbanistatlas.com https://cloudflareinsights.com`:
+# outbound fetches go to the Atlas API plus `cloudflareinsights.com`,
+# where the Web Analytics beacon POSTs its cookieless RUM data.
 #
 # `frame-ancestors 'none'`: nobody embeds the Atlas in an iframe.
 #
@@ -59,7 +57,7 @@
 # Adjust this file when adding a new origin (e.g. a future analytics
 # endpoint) — and document the change in `docs/deploy.md`.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://api.urbanistatlas.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff

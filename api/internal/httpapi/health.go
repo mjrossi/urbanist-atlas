@@ -20,13 +20,13 @@ func healthHandler() http.HandlerFunc {
 	}
 }
 
-// pinger is the (optional) interface the store implements when it
-// can be health-pinged. Historically backed by the Postgres adapter
-// (since retired); kept on the read-side Store interface so a future
-// downstream-bound store implementation can opt in. The bundled
-// in-memory FileStore does not implement it. Defined here (not in
-// pkg/atlas) because the contract exists for the HTTP readiness
-// layer's benefit, not for orchestrators in pkg/atlas.
+// pinger is the (optional) interface a store implements when it has a
+// downstream dependency that can be health-pinged. The bundled
+// in-memory MemStore has no downstream and does not implement it, so
+// /readyz collapses to a process-up check today; the interface is kept
+// so a future downstream-bound store implementation can opt in.
+// Defined here (not in pkg/atlas) because the contract exists for the
+// HTTP readiness layer's benefit, not for orchestrators in pkg/atlas.
 type pinger interface {
 	Ping(ctx context.Context) error
 }
