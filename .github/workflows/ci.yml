@@ -30,51 +30,26 @@ env:
   MISE_ENV: ci
 
 jobs:
-  # api/ and web/ each gate on their own scaffolding state so CI passes
-  # cleanly on the initial bones commit (when neither half has real code
-  # yet) and lights up automatically as each side is filled in.
+  # Per-half changed-path detection so each heavy job runs only when a PR
+  # touches files relevant to it (an API-only PR skips the web job, and
+  # vice-versa). Consulted on pull_request events only; on push to main /
+  # workflow_dispatch the path gate is bypassed so the full suite runs.
 
   detect:
-    name: detect scaffolding + changes
+    name: detect changes
     runs-on: ubuntu-latest
     outputs:
-      # Scaffolding flags: is each half filled in yet? (initial-bones gate)
-      api: ${{ steps.check.outputs.api }}
-      web: ${{ steps.check.outputs.web }}
-      # Changed-path flags: did this PR touch files relevant to each job?
-      # Only consulted on pull_request events (see each job's `if:`); on
-      # push to main / workflow_dispatch the path gate is bypassed so the
-      # full suite runs and deploy-api's `needs` stay satisfied.
-      api_changed: ${{ steps.paths.outputs.api }}
-      web_changed: ${{ steps.paths.outputs.web }}
-      data_changed: ${{ steps.paths.outputs.data }}
+      api: ${{ steps.paths.outputs.api }}
+      web: ${{ steps.paths.outputs.web }}
+      data: ${{ steps.paths.outputs.data }}
     steps:
       - uses: actions/checkout@v6
-      - id: check
-        shell: bash
-        run: |
-          set -euo pipefail
-          # `find -print -quit` exits on the first match, so this is
-          # fast even as the tree grows. compgen's "**" globbing
-          # needs `shopt -s globstar`, which isn't on by default in
-          # Actions' bash — find sidesteps the issue.
-          if [ -n "$(find api -name '*.go' -type f -print -quit 2>/dev/null)" ]; then
-            echo "api=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "api=false" >> "$GITHUB_OUTPUT"
-          fi
-          if [ -f web/package.json ]; then
-            echo "web=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "web=false" >> "$GITHUB_OUTPUT"
-          fi
-      # Per-half changed-path detection so an API-only PR skips the web
-      # job (and vice-versa). The `global` anchor is folded into every
-      # filter: a change to the workflow itself, the justfile, a mise
-      # config, or the Dockerfile flips all three true, so a build/tooling
-      # change can never silently under-run CI. dorny/paths-filter uses
-      # the GitHub API for the PR-base diff, so the shallow checkout above
-      # is sufficient — no fetch-depth tweak needed.
+      # The `global` anchor is folded into every filter: a change to the
+      # workflow itself, the justfile, a mise config, or the Dockerfile
+      # flips all three true, so a build/tooling change can never silently
+      # under-run CI. dorny/paths-filter uses the GitHub API for the
+      # PR-base diff, so the shallow checkout above is sufficient — no
+      # fetch-depth tweak needed.
       - uses: dorny/paths-filter@v3
         id: paths
         with:
@@ -99,11 +74,9 @@ jobs:
   api:
     name: api (go)
     needs: detect
-    # Run when the api half is scaffolded AND (it's not a PR — so main /
-    # dispatch always run the full suite — OR the PR touched api/**).
-    if: |
-      needs.detect.outputs.api == 'true'
-      && (github.event_name != 'pull_request' || needs.detect.outputs.api_changed == 'true')
+    # Run on non-PR events (push to main / dispatch always run the full
+    # suite) OR when the PR touched api/**.
+    if: github.event_name != 'pull_request' || needs.detect.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -151,12 +124,10 @@ jobs:
   web:
     name: web (vite)
     needs: detect
-    # web half scaffolded AND (non-PR OR the PR touched web/** or the
-    # OpenAPI spec — a spec change must re-run web-gen-check to catch
-    # api.gen.ts drift even when no web/ file moved).
-    if: |
-      needs.detect.outputs.web == 'true'
-      && (github.event_name != 'pull_request' || needs.detect.outputs.web_changed == 'true')
+    # Non-PR OR the PR touched web/** or the OpenAPI spec — a spec change
+    # must re-run web-gen-check to catch api.gen.ts drift even when no
+    # web/ file moved.
+    if: github.event_name != 'pull_request' || needs.detect.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -174,12 +145,9 @@ jobs:
   data:
     name: seed determinism
     needs: detect
-    # The ETL binary lives in api/, so gate on the same scaffolding flag.
     # Path gate (PRs only): api/** or etl/** — the regen pulls from ETL
     # code and staged sources.
-    if: |
-      needs.detect.outputs.api == 'true'
-      && (github.event_name != 'pull_request' || needs.detect.outputs.data_changed == 'true')
+    if: github.event_name != 'pull_request' || needs.detect.outputs.data == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -209,11 +177,8 @@ jobs:
   seed-validate:
     name: seed validate (pre-deploy gate)
     needs: detect
-    # The validator lives in api/, so gate on the same scaffolding flag.
     # Path gate (PRs only): the api filter — api/seed/** ⊂ api/**.
-    if: |
-      needs.detect.outputs.api == 'true'
-      && (github.event_name != 'pull_request' || needs.detect.outputs.api_changed == 'true')
+    if: github.event_name != 'pull_request' || needs.detect.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
