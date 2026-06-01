@@ -130,6 +130,18 @@ etl-download country:
 etl-regenerate country:
     cd api && go run ./cmd/server etl regenerate --country {{country}} --src ../etl/sources --out seed
 
+# Pre-deploy gate (HOST-01b): load the EMBEDDED seed bundle via the same
+# BuildMemStore loader the server boots from and fail on any error — a
+# dangling org region_slug, a cross-file DAG cycle, an orphan leaf. Unlike
+# seed-check (region files only, network + tree mutation) this is offline
+# and side-effect-free, so it CAN run in `just ci` and as its own CI job
+# that deploy-api depends on. Covers the hand-curated orgs.toml + leaves
+# seed-check never loads.
+[group('data')]
+[doc('fail if the embedded seed bundle does not load cleanly (pre-deploy gate)')]
+seed-validate:
+    cd api && go run ./cmd/server seed validate
+
 # Fail if the committed HUD-free seed (US/CA region files) drifts from a
 # fresh regenerate of the pinned public sources. Mirrors api-gen-check /
 # web-gen-check. HUD-dependent US postal + CA postal are covered by the
