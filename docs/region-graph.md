@@ -636,6 +636,45 @@ contributors don't need to re-decide them.
    regional = region/metro/state; national = country-wide umbrella per
    the per-country policy in §5).
 
+### Slug permanence — append, never rename
+
+A slug is a **permanent public identifier**. The
+`/api/v1/regions/{slug}` endpoint exposes it to external consumers,
+who bookmark and hard-code it; the runtime-served `openapi.yaml`
+publishes the same promise (`RegionSlug` parameter / `GET
+/regions/{slug}` description). The contributor rule that backs that
+promise:
+
+- **Append, never rename.** Once a slug has been published you may
+  *add* new region slugs freely, but you must not rename or remove an
+  existing one. To correct a collision, add a new suffixed slug
+  alongside the old one rather than renaming the bare slug in place.
+  (This is the forward rule; the existing live bare leaves
+  `richmond`/`vancouver` and the four ad-hoc collision suffixes
+  `ca-state`/`de-state`/`la-state`/`nl-province` stay exactly as they
+  are — they are grandfathered, not retroactively restructured.)
+
+- **Stable vs. volatile slugs.** Two classes of slug exist:
+  - **Stable** — curated leaves (hand-written in `regions_<cc>.toml`),
+    states/provinces, and any metro pinned in the override file
+    (`regions_us_msa_overrides.toml`, `regions_ca_cma_overrides.toml`).
+    These are authored by hand and never move on their own.
+  - **Volatile** — auto-generated MSA/CMA slugs derived from the
+    Census/StatsCan upstreams by `etl regenerate`. An auto-slug is a
+    function of the upstream title + primary state, so an upstream
+    *vintage bump* can shift one. The **override file is the pinning
+    mechanism**: pin a high-traffic metro's slug there and it becomes
+    stable. Don't pre-pin a speculative "top metros" list — pin a slug
+    the first time a vintage bump threatens to move it.
+
+- **Escape hatch (legitimate retire/rename).** A maintainer who must
+  genuinely retire or change a published slug updates the
+  `published_slugs.golden` snapshot in the **same PR** as the slug
+  change. The append-only guard test then surfaces exactly which
+  public slug changed in the diff, making it a deliberate, reviewable
+  act rather than a silent break — the same stage-regenerate-commit
+  flow used to resolve `seed-check` drift.
+
 The full validation report for the PT model probe (which exercised
 each of these conventions against a non-US/CA admin geography) lives
 at
