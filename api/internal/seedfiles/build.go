@@ -165,7 +165,7 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 	}
 
 	// Stage 3: orgs. orgSlugs records every slug an org attaches to for
-	// the RGN-02b reachability check.
+	// the RGN-02b reachability check — but ONLY slugs that resolved.
 	orgs, err := readOrgs(seedFS, "orgs.toml")
 	if err != nil {
 		return nil, fmt.Errorf("seedfiles: orgs: %w", err)
@@ -183,6 +183,14 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 		if entry.AddedAt.Year == 0 {
 			return nil, fmt.Errorf("seedfiles: org %q: missing required added_at", entry.Slug)
 		}
+		// INVARIANT: only an org slug that resolved to a region ID may
+		// anchor a leaf for the RGN-02b reachability check. resolveOrgRegions
+		// above hard-errors on any slug missing from regionIDBySlug, so by
+		// the time we reach here every slug in entry.RegionSlugs is known to
+		// resolve. Keep this loop AFTER the resolve check (do not hoist it):
+		// recording an unresolved slug would let a typo'd org slug mark a
+		// real, differently-owned leaf as "anchoring" and suppress a genuine
+		// orphan-leaf error for it.
 		for _, slug := range entry.RegionSlugs {
 			orgSlugs[slug] = true
 		}
