@@ -232,8 +232,10 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 // with no postal anchor are the editorially-known coarse-coverage
 // condition (e.g. the CA CMAs whose finer postal data is PCCF-pending,
 // deferred under ETL-03) — a deliberate fallback to the province, not
-// an orphan, so they are out of scope here. The slug list is sorted so
-// the first reported orphan is deterministic across runs.
+// an orphan, so they are out of scope here. The slug list is sorted and
+// the full count is reported (with a capped sample) so a bulk ETL change
+// that orphans many leaves at once surfaces all of them in one run,
+// deterministically across runs.
 func assertReachableLeaves(localTier map[string]bool, childCount map[string]int, anchoredSlugs, orgSlugs map[string]bool) error {
 	candidates := make([]string, 0, len(localTier))
 	for slug := range localTier {
@@ -249,7 +251,18 @@ func assertReachableLeaves(localTier map[string]bool, childCount map[string]int,
 		return nil
 	}
 	slices.Sort(candidates)
-	return fmt.Errorf("seedfiles: orphan leaf region %q has no postal anchor, no attached org, and no anchoring descendant (add a postal row, attach an org, or remove the region)", candidates[0])
+	// Report all orphans (capped sample) so a bulk regression that
+	// orphans N leaves surfaces in one build instead of forcing N
+	// fix-rerun cycles. cap is a builtin, so the limit is maxShown.
+	const maxShown = 20
+	shown := candidates
+	if len(shown) > maxShown {
+		shown = shown[:maxShown]
+	}
+	return fmt.Errorf("seedfiles: %d orphan leaf region(s) with no postal anchor, "+
+		"no attached org, and no anchoring descendant: %v "+
+		"(add a postal row, attach an org, or remove the region)",
+		len(candidates), shown)
 }
 
 // resolveOrgRegions returns the int64 region IDs for an org's
