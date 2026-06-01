@@ -152,7 +152,16 @@ func detectCycles3Color(order []string, parents map[string][]string, keep func(s
 			if !keep(slug, p) {
 				continue
 			}
-			if err := dfs(p, append(path, slug)); err != nil {
+			// Copy the path on descent so each branch owns its slice. A
+			// bare append(path, slug) reuses path's backing array when
+			// capacity allows, letting sibling parent edges in this loop
+			// overwrite each other's path — which would interleave slugs
+			// from a sibling branch into the reported cycle path on a
+			// multi-parent (diamond) graph. Detection itself is carried by
+			// the color map and is unaffected; this only protects the
+			// human-readable error path.
+			child := append(append([]string(nil), path...), slug)
+			if err := dfs(p, child); err != nil {
 				return err
 			}
 		}
