@@ -308,7 +308,8 @@ export function About() {
               <a href="https://mjrossi.com/blog">
                 <em>Urbanist Lexicon</em>
               </a>
-              , a publication on cities, transit, and the politics of streets.
+              , a record of systems, movement, and the transition from bits to
+              bricks.
             </p>
           </div>
           <div className="rail-block muted">
