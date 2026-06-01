@@ -222,7 +222,7 @@ After the split:
 - `nyc`'s `scope_tier` flips from `local` to `regional`. Its only
   parent is `nyc-metro`. The `nyc → ny` edge is dropped — the
   boroughs now carry the `ny` state edge per
-  [region-graph rule §1](../region-graph.md) ("state edges live on
+  [region-graph rule §1](../../region-graph.md) ("state edges live on
   the leaf, not on the metro").
 - The 5 borough leaves already exist; their `parents` array gets `ny`
   added alongside `nyc`.
@@ -774,7 +774,7 @@ when access improves.
   the underlying DAG model + lookup algorithm
 - [Region-graph PT validation (slice #4.6)](./2026-05-17-region-graph-pt-validation-design.md) —
   multi-parent DAG validation + national-tier introduction
-- [Region-graph reference](../region-graph.md) — user-facing curator docs
+- [Region-graph reference](../../region-graph.md) — user-facing curator docs
 - [Census CBSA delineation files](https://www.census.gov/geographies/reference-files.html)
 - [Census ZCTA relationship files](https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.html)
 - [Statistics Canada PCCF](https://www150.statcan.gc.ca/n1/en/catalogue/92-154-X)

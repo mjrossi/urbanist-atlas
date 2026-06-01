@@ -21,7 +21,7 @@ The atlas's seed data splits cleanly:
 | `orgs.toml` | ✅ | |
 | `regions_us_msas.toml` (393 MSAs) | | ✅ |
 | `regions_ca_cmas.toml` (41 CMAs) | | ✅ |
-| `postal_codes_us.csv` (~38k ZIPs) | | ✅ |
+| `postal_codes_us.csv` (~39.5k ZIPs) | | ✅ |
 | `postal_codes_ca.csv` (~1.6k FSAs) | | ✅ |
 
 Hand-curated files express editorial decisions (which cities,
@@ -38,15 +38,20 @@ non-determinism.
 ## Top-level flow
 
 ```
-upstream files       ETL pipeline                seed/                dev DB
-─────────────        ────────────                ─────                ──────
-etl/sources/us/  →  etl regenerate --country=US  →  postal_codes_us.csv  →  just loaddata
-etl/sources/ca/  →  etl regenerate --country=CA  →  postal_codes_ca.csv  →
-                                                   regions_us_msas.toml
-                                                   regions_ca_cmas.toml
+upstream files       ETL pipeline                 seed/ (committed)
+─────────────        ────────────                 ────────────────
+etl/sources/us/  →  etl regenerate --country=US  →  postal_codes_us.csv
+etl/sources/ca/  →  etl regenerate --country=CA  →  postal_codes_ca.csv
+                                                    regions_us_msas.toml
+                                                    regions_ca_cmas.toml
 ```
 
-Three subcommands on the `urbanist-atlas-server` binary:
+The generated seed files are the end of the line: the API bakes
+`api/seed/` into its image via `//go:embed` and loads it into the
+in-memory store at boot, so there is no separate load step or dev
+database to refresh — restart the server and the new bundle is live.
+
+Two `etl` subcommands on the `urbanist-atlas-server` binary:
 
 - **`etl download --country=<cc>`** — fetches the upstream files,
   verifies sha256, stages them under `etl/sources/<cc>/`. Run only
@@ -56,8 +61,6 @@ Three subcommands on the `urbanist-atlas-server` binary:
   pipeline; writes the deterministic outputs under `api/seed/`.
   The committed seed files are the canonical "what shipped"
   artifact.
-- **`loaddata`** (not under `etl`) — reloads the dev DB from the
-  committed seed files. Idempotent.
 
 Operator loop when bumping a vintage:
 
@@ -69,7 +72,7 @@ urbanist-atlas-server etl download --country=US
 urbanist-atlas-server etl regenerate --country=US
 
 git diff api/seed/postal_codes_us.csv         # review the delta
-just pg-reset && just pg-up && just loaddata  # reload dev DB
+just api-run                                  # restart; no DB to reload
 ```
 
 ## Source pinning + determinism
@@ -106,7 +109,8 @@ If you bump a vintage, update both files in the same commit.
 
 The `Targets` row bands are sanity rails: `etl regenerate` fails
 loudly if the output row count falls outside the band, catching
-parser bugs and upstream-format drift before they reach `loaddata`.
+parser bugs and upstream-format drift before the bad output is
+committed to the seed bundle.
 
 ## US pipeline
 
@@ -133,11 +137,11 @@ ZIP 60601 → no curated place → county "Cook"   → MSA "chicago-metro"
 ZIP 99950 → no place, no county-MSA match     → state "ak"      (final fallback)
 ```
 
-The recursive CTE in
-[`api/internal/store/postgres/queries/lookup.sql`](../api/internal/store/postgres/queries/lookup.sql)
-walks the region DAG upward from whatever the ZIP points at, so a
-ZIP anchored at a borough surfaces NYC, the metro, the state, and
-any multi-state federations without app-level fallback logic.
+The in-memory ancestor walk (`MemStore.AncestorRegions`, in
+[`api/pkg/atlas/memstore.go`](../api/pkg/atlas/memstore.go)) walks
+the region DAG upward from whatever the ZIP points at, so a ZIP
+anchored at a borough surfaces NYC, the metro, the state, and any
+multi-state federations without app-level fallback logic.
 
 ### HUD (additive backfill, ~5–10k operational ZIPs)
 
@@ -243,21 +247,24 @@ mostly source selection + parser. Checklist:
 5. **Implement the crosswalk.** Walk each postal code through:
    curated city leaf (if any) → curated intermediate (borough,
    district) → metro/CMA equivalent → state/province. The
-   recursive CTE in the Postgres store walks upward from
-   whatever the row points at, so app-level fallback logic is
-   not needed.
-6. **Wire `loaddata`.** Add the new `loadregions` + `loadpostal`
-   calls to whichever script `just loaddata` invokes (currently
-   `api/cmd/server/loaddata.go`).
+   in-memory `MemStore.AncestorRegions` walk surfaces the ancestors
+   upward from whatever the row points at, so app-level fallback
+   logic is not needed.
+6. **Register the outputs.** Add the new country's generated files to
+   the `Targets` list in `api/internal/etl/<cc>/<cc>.go` so
+   `etl regenerate` writes them under `api/seed/`, and add the country
+   to the `countries` list in `api/internal/seedfiles/build.go` so the
+   boot-time loader picks up its region + postal files. There is no
+   load step to wire — the bundle is read into memory at boot.
 7. **Editorial policy.** Append a row to
    [`docs/region-graph.md`](./region-graph.md) §5 documenting the
    per-country `scope_tier` rules (does this country have a
    `national` tier? US/CA deliberately don't; PT/UK/NL do).
 8. **Tests.** Add a regression for at least one anchor per tier
    (city-leaf, intermediate, metro, state) in the per-country ETL
-   test file; add an integration test that loads the generated
-   seed against testcontainers Postgres and runs a sample
-   `/lookup`.
+   test file; add a `seedfiles` loader test that builds a MemStore
+   from the generated seed (via `BuildMemStore`) and runs a sample
+   `atlas.Lookup` to confirm the anchors resolve end-to-end.
 
 The CA pipeline (`api/internal/etl/ca/`) is a small worked example
 to copy from. The US pipeline is a more complex one — read it

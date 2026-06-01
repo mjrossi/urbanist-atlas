@@ -24,8 +24,9 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
 - **US + Canada are the only shipping countries in v1.** Slice #4.6
   loaded Portugal as a region-graph validation fixture to stress the
   multi-parent DAG model; slice #25 dropped PT from the user-facing
-  seed pipeline (loaddata) once the validation had served its
-  purpose. The PT seed files (`api/seed/regions_pt.toml`,
+  seed loader (the default `countries` set in
+  `api/internal/seedfiles/build.go`) once the validation had served
+  its purpose. The PT seed files (`api/seed/regions_pt.toml`,
   `postal_codes_pt.csv`) stay in the repo as a reference and for the
   integration suite (which loads them explicitly), and a future
   v1.1+ slice can reintroduce PT — or ES, MX, NL, UK — when the

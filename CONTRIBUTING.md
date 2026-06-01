@@ -81,7 +81,7 @@ Pull requests welcome. A few things to know first:
    - [`docs/region-graph.md`](./docs/region-graph.md) — region
      DAG modeling rules
    - [`docs/testing-strategy.md`](./docs/testing-strategy.md) —
-     when to write unit / handler / integration tests
+     when to write unit / handler / store tests
 3. **Run the dev loop** to make sure your change actually works.
    The repo's [`README.md`](./README.md) has the quick-start steps.
 4. **Open an issue first** for anything beyond a small fix — saves

@@ -29,7 +29,7 @@ reasoning behind tech choices.
 
 ## Status
 
-Most of v1.0 is wired. The API serves `/lookup`, `/regions`,
+v1.0 is live. The API serves `/lookup`, `/regions`,
 `/regions/{slug}`, `/recent`, and `/orgs/{slug}` from an in-memory
 FileStore populated at boot from `api/seed/`; the v1 wire contract
 is committed at [`api/openapi.yaml`](./api/openapi.yaml) and embedded
@@ -44,9 +44,10 @@ per-region + per-org + about + 404 against the live API. Errors on both halves u
 [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 `application/problem+json`.
 
-Remaining work to v1.0 — editorial drip of orgs, then the Phase 2
-public launch (slices #26–#28: API keys, rate limiting, prod-hostname
-cutover) — is tracked in [`docs/roadmap.md`](./docs/roadmap.md).
+What's next — continued editorial growth of the directory, then the
+Phase 2 public opening (slices #26–#28: self-serve API keys and tiered
+rate limiting that lift the `X-Atlas-Client` gate) — is tracked in
+[`docs/roadmap.md`](./docs/roadmap.md).
 Public submissions are live: `POST /api/v1/submissions` lands new
 orgs in a small SQLite queue on the Fly volume, and approving a
 submission opens a GitHub PR appending it to `api/seed/orgs.toml`.

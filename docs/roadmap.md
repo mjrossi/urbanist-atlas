@@ -26,8 +26,8 @@ Workers + Pages) + `api.urbanistatlas.com` (API on Fly.io, region
 `iad`, behind the `X-Atlas-Client` shared-secret gate). The runtime
 is now stateless: `api/seed/` is baked into the API image and read
 into an in-memory FileStore at boot; submissions land in a SQLite
-DB at `/data/atlas.db` on a 1 GiB Fly volume. 130 orgs and 35,417
-postal codes ship with the bundle. Nightly R2 backups of the
+DB at `/data/atlas.db` on a 1 GiB Fly volume. 202 orgs and 41,179
+postal codes (39,536 US + 1,643 CA) ship with the bundle. Nightly R2 backups of the
 SQLite submission store are live (workflow at
 `.github/workflows/backup-sqlite.yml`, bucket
 `urbanist-atlas-backups` with a 30-day lifecycle).
@@ -516,19 +516,13 @@ Not blocking launch:
   detail endpoint's slug-based resolution covers the directory.
   Resolving `national`-tier slugs is a separate deferred decision
   about national-org browse experience.
-- **`loaddata --prune` flag** — `seed.LoadFile` is upsert-only:
-  removing an `[[org]]` block from `orgs.toml` does NOT delete the
-  corresponding row in production (the slug just stops being touched).
-  Surfaced 2026-05-23 during the pre-launch URL audit when STAR
-  (`sacramento-transit-advocates-and-riders`) had to be dropped after
-  its domain got hijacked — required a manual `DELETE FROM
-  organizations WHERE slug=...` against the prod DB on top of
-  `just fly-loaddata`. The slice: add an opt-in `--prune` flag to
-  the `loaddata` subcommand that deletes any org whose slug isn't in
-  the loaded file, inside the same transaction; default off so a
-  malformed file can't wipe prod data. FK cascades
-  (`organization_regions ON DELETE CASCADE`,
-  `submissions.promoted_org_id ON DELETE SET NULL`) make the DELETE
-  safe. Forward the flag through `just fly-loaddata` and document the
-  workflow in `docs/deploy.md`. Small, single-package change
-  (`api/internal/loaddata/`).
+- **~~`loaddata --prune` flag~~ — obsolete after the file-store
+  cutover.** This slice addressed a Postgres-era problem: `seed.LoadFile`
+  was upsert-only, so removing an `[[org]]` block from `orgs.toml` left
+  the row in the prod DB (surfaced 2026-05-23 when STAR,
+  `sacramento-transit-advocates-and-riders`, had to be dropped after its
+  domain got hijacked and needed a manual `DELETE` against prod). The
+  stateless file-store read path eliminated the problem entirely: there
+  is no persistent read DB, so deleting an org is now just removing its
+  `[[org]]` block from `orgs.toml` and redeploying — the next image ships
+  a bundle without it. No `--prune` flag, no `loaddata`, no DELETE.
