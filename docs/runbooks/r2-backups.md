@@ -1,16 +1,25 @@
-# Runbook: nightly Postgres backups → Cloudflare R2
+# Runbook: nightly SQLite backups → Cloudflare R2
 
 Step-by-step for enabling
-[`.github/workflows/backup.yml`](../../.github/workflows/backup.yml).
+[`.github/workflows/backup-sqlite.yml`](../../.github/workflows/backup-sqlite.yml).
 After this runs end-to-end once, the cron takes over and nightly
-`pg_dump`s land in R2 with a 30-day retention window.
+SQLite dumps land in R2 with a 30-day retention window.
+
+This runbook covers the one-time R2 + secrets setup. The dump and
+restore mechanics are documented authoritatively in
+[`docs/deploy.md` §Backups](../deploy.md); this page and that section
+must stay in sync.
 
 Why R2: it's the existing Cloudflare account that already hosts the
 SPA, the egress cost is zero on Cloudflare's pricing, and an
-S3-compatible API plays nicely with `awscli v1` (which ships on
-`ubuntu-latest`). Combined with Fly's automatic 5-day volume
-snapshots on the sibling Postgres app, this gives off-Fly durability
-plus a deterministic `pg_restore` path.
+S3-compatible API plays nicely with `rclone` (which the workflow
+installs on `ubuntu-latest`). Combined with Fly's automatic volume
+snapshots on the `urbanist-atlas` app, this gives off-Fly durability
+plus a deterministic restore path.
+
+The submissions DB is the only writable state — reads are served
+from the `api/seed/` bundle baked into the image, so there is nothing
+else to back up.
 
 Estimated time: **15–20 minutes** of dashboard clicking once you
 have both accounts open.
@@ -22,26 +31,30 @@ have both accounts open.
 - Maintainer access to the `mjrossi/urbanist-atlas` GitHub repo
   (Settings → Secrets needs write).
 - `flyctl` installed and authenticated against an account with
-  read access to `urbanist-atlas-db` (the sibling Postgres app).
+  SSH-console access to `urbanist-atlas` (the API app that owns the
+  `atlas_data` volume).
 
-## Step 1 — Generate the Fly API token
+## Step 1 — Fly API token
 
 GitHub Actions needs a non-interactive credential to `flyctl ssh
-console` into the Postgres app.
+console` / `sftp` into the `urbanist-atlas` machine and read
+`/data/atlas.db`. The workflow reuses **`FLY_API_TOKEN_DEPLOY`** —
+the same secret `ci.yml` already uses for `flyctl deploy` — so if CI
+deploys are working, this secret is already set and you can skip
+ahead to step 2.
+
+If you need to (re)generate it:
 
 ```sh
 flyctl auth token
 ```
 
 The output is the token (single line, starts with `FlyV1 ` or
-similar). Copy it; you'll paste it into GitHub Secrets in step 6.
-Treat this like a password — anyone with it can run `flyctl deploy`
-against your apps.
-
-If you'd rather scope a narrower token, generate it from the Fly
-dashboard at <https://fly.io/user/personal_access_tokens> — the
-workflow only needs `read:apps` + `ssh:console` against
-`urbanist-atlas-db`.
+similar). Treat it like a password — anyone with it can run `flyctl
+deploy` against your apps. If you'd rather scope a narrower token,
+generate it from the Fly dashboard at
+<https://fly.io/user/personal_access_tokens>; the workflow needs
+`deploy` + `ssh:console` against `urbanist-atlas`.
 
 ## Step 2 — Find your Cloudflare account ID
 
@@ -64,9 +77,9 @@ if you'd rather not navigate via a zone.)
      the free tier.
 2. **Create bucket**.
 3. Settings:
-   - **Bucket name:** `urbanist-atlas-backups` *(must match the
-     workflow exactly; the value is hardcoded in `backup.yml` and
-     referenced in `just db-restore`)*
+   - **Bucket name:** `urbanist-atlas-backups` *(this is the value
+     you'll store in the `R2_BACKUP_BUCKET` secret in step 6; the
+     workflow reads the bucket from that secret)*
    - **Location:** Automatic (Cloudflare picks the closest hint
      region)
    - **Storage class:** Standard
@@ -78,7 +91,7 @@ adds a lifecycle rule from here.
 ## Step 4 — Add the 30-day expiration rule
 
 Without this rule, backups accumulate forever. Free tier R2 allows
-10 GB of storage; a ~5 MB nightly backup × 30 days = ~150 MB, well
+10 GB of storage; a small nightly `.sql.gz` × 30 days stays well
 under the cap. But R2 has no built-in expiry default, so we set it
 explicitly.
 
@@ -106,8 +119,10 @@ API token). Generate one scoped to just this bucket.
 3. Fill in:
    - **Token name:** `urbanist-atlas-backup-uploader`
    - **Permissions:** **Object Read & Write**
-     *(do NOT pick "Admin Read & Write" — uploader doesn't need
-     bucket-management or other-bucket access)*
+     *(do NOT pick "Admin Read & Write" — the uploader doesn't need
+     bucket-management or other-bucket access. The workflow already
+     sets `RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true` so rclone won't
+     attempt a HeadBucket the scoped token can't perform.)*
    - **Specify bucket(s):** **Apply to specific buckets only**
      → select `urbanist-atlas-backups`
    - **TTL:** Forever *(or set a calendar reminder to rotate; the
@@ -128,17 +143,18 @@ copying, you'll need to delete and recreate the token.
 ## Step 6 — Add the secrets to GitHub
 
 GitHub repo → **Settings** → **Secrets and variables** → **Actions**
-→ **New repository secret**. Add all four:
+→ **New repository secret**. The workflow reads these names:
 
 | Secret name | Value |
 |---|---|
-| `FLY_API_TOKEN` | From step 1 |
+| `FLY_API_TOKEN_DEPLOY` | From step 1 *(already set if CI deploys work)* |
 | `CF_ACCOUNT_ID` | From step 2 (32-char hex) |
 | `R2_ACCESS_KEY_ID` | From step 5 (Access Key ID) |
 | `R2_SECRET_ACCESS_KEY` | From step 5 (Secret Access Key) |
+| `R2_BACKUP_BUCKET` | `urbanist-atlas-backups` (from step 3) |
 
-Spelling matters — `backup.yml` references these exact names. After
-all four are saved, the Actions tab will show them as masked.
+Spelling matters — `backup-sqlite.yml` references these exact names.
+After they're saved, the Actions tab will show them as masked.
 
 > ⚠️ **Strip trailing newlines if you set secrets via `gh secret set`.**
 > The gh CLI stores stdin verbatim and does **not** trim the newline
@@ -149,7 +165,7 @@ all four are saved, the Actions tab will show them as masked.
 > it. Use `tr -d '\n'` or `printf '%s'` to strip:
 >
 > ```sh
-> flyctl auth token | tr -d '\n' | gh secret set FLY_API_TOKEN
+> flyctl auth token | tr -d '\n' | gh secret set FLY_API_TOKEN_DEPLOY
 > printf '%s' '<paste-account-id>' | gh secret set CF_ACCOUNT_ID
 > ```
 >
@@ -160,56 +176,58 @@ all four are saved, the Actions tab will show them as masked.
 ## Step 7 — Trigger the workflow manually
 
 1. GitHub repo → **Actions** tab.
-2. Left sidebar → **backup-postgres** workflow.
+2. Left sidebar → **SQLite nightly backup** workflow.
 3. **Run workflow** → branch `main` → **Run workflow**.
 4. Refresh; a new run appears within a few seconds.
 
-Expected timing: the run completes in **30–60 seconds**. The three
-steps you'll see:
+Expected timing: the run completes in **under a minute**. The steps
+you'll see:
 
-- *Install flyctl* — ~5 s
-- *Capture pg_dump from Fly Postgres* — ~10–30 s depending on data
-  size; streams the dump over the Fly SSH tunnel
-- *Upload to R2* — ~5 s for the current ~5 MB dump
+- *Set up flyctl* — ~5 s
+- *Snapshot SQLite via flyctl ssh* — writes
+  `sqlite3 /data/atlas.db .dump | gzip` to a temp file on the machine,
+  `sftp get`s it back as `atlas-<stamp>.sql.gz`, then `gunzip -t`s it
+  locally (the dump is streamed through an inner `sh -eu -o pipefail`
+  so a failed `sqlite3` propagates instead of leaving an empty gzip)
+- *Set up rclone* + *Upload to R2* — ~5 s for the small dump
 
-The Summary at the bottom of a successful run shows the filename
-(`YYYY-MM-DD.sql.gz`), the bucket, and the retention policy. Save
-this run URL — you'll reference it in step 8.
+Save the run URL — you'll reference it in step 8.
 
 ## Step 8 — Verify the backup actually landed
 
 1. Cloudflare dashboard → **R2** → **urbanist-atlas-backups**.
-2. You should see one object: `2026-MM-DD.sql.gz` (today's date in
-   UTC, since the workflow uses `date -u`).
+2. You should see one object: `atlas-YYYY-MM-DD-HHMM.sql.gz` (today's
+   UTC date + time, since the workflow uses `date -u`).
 3. Click the object → **Download** → save locally.
 4. Quick integrity check:
 
    ```sh
-   gunzip -t 2026-MM-DD.sql.gz && echo "gzip OK"
+   gunzip -t atlas-2026-MM-DD-HHMM.sql.gz && echo "gzip OK"
    ```
 
-5. Optional: peek at the dump's schema/content without restoring:
+5. Optional: peek at the dump without restoring. A SQLite `.dump` is
+   plain SQL text — `PRAGMA`/`BEGIN`/`CREATE TABLE`/`INSERT`:
 
    ```sh
-   gunzip -c 2026-MM-DD.sql.gz | head -50
-   gunzip -c 2026-MM-DD.sql.gz | wc -l       # ~1k–10k lines for a healthy dump
-   gunzip -c 2026-MM-DD.sql.gz | grep -c '^COPY '   # number of tables dumped
+   gunzip -c atlas-2026-MM-DD-HHMM.sql.gz | head -30
+   gunzip -c atlas-2026-MM-DD-HHMM.sql.gz | grep -c 'CREATE TABLE'    # ≥1 (submissions)
+   gunzip -c atlas-2026-MM-DD-HHMM.sql.gz | grep -c 'INSERT INTO submissions'  # row count
    ```
 
-   You should see ≥5 `COPY` statements (regions, region_parents,
-   postal_codes, organizations, organization_regions) plus the
-   submissions table.
+   On a fresh DB with no submissions yet, expect the schema lines
+   (`CREATE TABLE submissions`, its index, the goose version table)
+   and zero `INSERT`s — that's still a valid backup.
 
-If the file is suspiciously small (< 100 KB) the dump likely failed
-silently — the workflow's `test -s` check catches an empty file but
-not a partial one. Spot-check the line count.
+The workflow's `test "$(wc -c < ...)" -ge 100` guard rejects an empty
+dump (a SQLite `.dump` always emits PRAGMA + BEGIN/COMMIT, so anything
+under ~100 bytes means the ssh step itself failed), but it can't catch
+a partial dump — spot-check the schema lines are present.
 
 ## Step 9 — Confirm the cron is scheduled
 
-GitHub repo → **Actions** → **backup-postgres** → top right corner
-should now show a "next run at" timestamp. Default schedule is
-`0 7 * * *` UTC, which is 02:00 America/New_York (EST) or 03:00
-during EDT.
+GitHub repo → **Actions** → **SQLite nightly backup** → top right
+corner should now show a "next run at" timestamp. The schedule is
+`17 9 * * *` UTC (09:17 — off-peak for `iad`, off the cron herd).
 
 GitHub Actions cron has a known quirk: it doesn't fire on a public
 repo that's seen no activity for 60+ days. Not a concern for active
@@ -217,35 +235,30 @@ projects, but worth knowing.
 
 ## Restoring from a backup
 
-The restore path is the inverse: download from R2, stream into the
-sibling Postgres app's `psql`.
+The full restore procedure — stopping the machine so SQLite releases
+its file handle, pushing the rebuilt DB onto the volume via `sftp`,
+and smoke-testing — lives in
+[`docs/deploy.md` §Backups → Restore](../deploy.md). The shape:
 
 ```sh
-# 1. Download a specific date from R2. The aws CLI uses the same
-#    credentials you stored in GitHub Secrets — set them locally:
-export AWS_ACCESS_KEY_ID=...       # R2_ACCESS_KEY_ID
-export AWS_SECRET_ACCESS_KEY=...   # R2_SECRET_ACCESS_KEY
-export AWS_DEFAULT_REGION=auto
-export CF_ACCOUNT_ID=...
+# 1. Pull the snapshot from R2 and confirm the gzip stream is intact.
+rclone copy r2:urbanist-atlas-backups/atlas-2026-05-28-0917.sql.gz .
+gunzip -t atlas-2026-05-28-0917.sql.gz
 
-aws s3 cp \
-    "s3://urbanist-atlas-backups/2026-05-15.sql.gz" ./ \
-    --endpoint-url "https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+# 2. Reconstruct a fresh DB from the SQL dump.
+gunzip -c atlas-2026-05-28-0917.sql.gz | sqlite3 /tmp/atlas.db.new
 
-# 2. Confirm the file integrity locally.
-gunzip -t 2026-05-15.sql.gz
-
-# 3. Restore into the Fly Postgres app. The `just db-restore` recipe
-#    wraps the flyctl ssh + psql plumbing.
-just db-restore 2026-05-15.sql.gz
+# 3. Stop the machine, sftp the file onto /data, swap it in, restart.
+#    (see deploy.md for the exact flyctl machines stop / sftp / mv steps)
 ```
 
 **Before restoring into production:** this is a destructive
 operation. Confirm you're operating against the right app
-(`flyctl status -a urbanist-atlas-db`) and consider running against
-a fresh ephemeral app first if the dataset is large or the change
-isn't easily reversible. The 5-day Fly volume snapshot is your
-last-resort rollback.
+(`flyctl status -a urbanist-atlas`) and that the machine is stopped
+before you swap the file — moving `/data/atlas.db` under a running
+binary leaves the kernel holding the old inode, so submissions
+written in between land in the old file and disappear. The Fly volume
+snapshot is your last-resort rollback.
 
 ## Rotation + maintenance
 
@@ -254,37 +267,41 @@ last-resort rollback.
   GitHub Secrets (step 6), then delete the old token from the R2
   dashboard.
 - **Rotate the Fly token** if a maintainer leaves the project, or
-  on the same 6–12 month cadence as the R2 token.
+  on the same 6–12 month cadence as the R2 token. Since the backup
+  reuses `FLY_API_TOKEN_DEPLOY`, coordinate the rotation with CI.
 - **Audit retention** quarterly: spot-check that the R2 bucket has
   ~30 dated objects and no stragglers older than 31 days. If
   stragglers appear, re-check the lifecycle rule (step 4).
-- **Test restore** every 6 months against an ephemeral Fly app
-  (`flyctl apps create urbanist-atlas-restore-test --org personal`
-  + `flyctl postgres create` + restore). Untested backups are
-  half-backups.
+- **Test restore** every 6 months against a throwaway DB (restore the
+  latest dump into a local `sqlite3` file and run a few queries).
+  Untested backups are half-backups.
 
 ## Troubleshooting
 
-**Workflow fails at "Capture pg_dump" with `Error: SSH error`.** The
-Fly token doesn't have SSH console permission for
-`urbanist-atlas-db`. Regenerate with `flyctl auth token` from an
-account that does, or scope the dashboard token to include
-`ssh:console`.
+**Workflow fails at "Snapshot SQLite via flyctl ssh" with `Error: SSH
+error`.** The Fly token doesn't have SSH console permission for
+`urbanist-atlas`. Regenerate with `flyctl auth token` from an account
+that does, or scope the dashboard token to include `ssh:console`.
 
-**Workflow fails at "Upload to R2" with `An error occurred (403)
-when calling the PutObject operation: Access Denied`.** Either the
-R2 API token is scoped to a different bucket, or the permissions
-were set to "Object Read" instead of "Object Read & Write". Recreate
-the token (step 5) and update both secrets.
+**Snapshot step fails with `sqlite3: not found` or the dump is
+empty.** The inner `sh -eu -o pipefail` is there precisely to surface
+this — a non-zero exit propagates instead of producing a well-formed
+empty gzip. Check that `/data/atlas.db` exists on the machine
+(`flyctl ssh console -a urbanist-atlas -C 'ls -l /data'`); if the
+volume isn't mounted, the app didn't boot with submissions enabled.
 
-**Workflow fails at "Upload to R2" with `Could not connect to the
-endpoint URL`.** `CF_ACCOUNT_ID` is wrong or has stray whitespace.
-Re-copy from the dashboard (step 2) and update the secret.
+**Workflow fails at "Upload to R2" with `403` / `Access Denied`.**
+Either the R2 API token is scoped to a different bucket, or the
+permissions were set to "Object Read" instead of "Object Read &
+Write". Recreate the token (step 5) and update both secrets.
 
-**Backup file is suspiciously small (< 100 KB).** `pg_dump` partially
-succeeded but the Fly SSH tunnel dropped. Re-run the workflow; if it
-fails again, run `just db-backup` locally to bisect (that recipe
-uses the same `flyctl ssh` plumbing without the R2 upload).
+**Upload fails with `Could not connect to the endpoint URL`.**
+`CF_ACCOUNT_ID` is wrong or has stray whitespace. Re-copy from the
+dashboard (step 2) and update the secret.
+
+**Backup file is suspiciously small.** The `test -s` / `≥100 byte`
+guard catches a fully-empty dump but not a partial one. Spot-check
+that the expected `CREATE TABLE submissions` line is present (step 8).
 
 **Bucket has objects older than 30 days.** The lifecycle rule didn't
 apply — re-check step 4. Cloudflare's lifecycle sweep runs daily, so

@@ -1,12 +1,12 @@
 # Portugal orgs — slice #4.6 validation fixture.
 #
 # These four entries used to live in orgs.toml. Slice #25 (hygiene)
-# moved them out so the production seed pipeline (loaddata.LoadAll)
-# loads only US + CA orgs while the PT region-graph validation
-# work the slice-#4.6 spec describes stays exercisable by the
-# integration suite, which loads this file explicitly via
-# `seed.LoadFile` after the main `orgs.toml` (see
-# api/internal/store/postgres/pipeline_test.go's PT block).
+# moved them out so the default seed loader (seedfiles.BuildMemStore)
+# loads only the US + CA orgs listed in
+# api/internal/seedfiles/build.go, while the PT region-graph
+# validation work the slice-#4.6 spec describes stays exercisable by
+# tests that load these fixtures explicitly via the seedfiles parse
+# functions (ParseRegions / ParseOrgs / ParsePostal).
 #
 # Local chapters of national federations are modeled separately
 # from their national umbrella per the editorial policy in

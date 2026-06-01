@@ -92,6 +92,13 @@ permissions" → Contents (Read and write) + Pull requests (Read and
 write); leave everything else at "No access". A 1-year expiry is
 the default; rotate on schedule.
 
+Non-secret runtime config lives in `fly.toml`'s `[env]` block (where
+each var carries an explanatory comment), not in Fly secrets:
+`URBANIST_DB_PATH` (`/data/atlas.db`), `URBANIST_SUBMISSIONS_RATE_PER_HOUR`
+(per-IP submission cap), `URBANIST_METRICS_PORT` (private Prometheus
+port), `URBANIST_CORS_ORIGINS`, `URBANIST_PORT`, and `URBANIST_LOG_FORMAT`.
+Edit them there and redeploy.
+
 ## Prerequisites
 
 - [flyctl](https://fly.io/docs/flyctl/install/) installed and
@@ -177,7 +184,7 @@ script-src  'self' https://static.cloudflareinsights.com;
 style-src   'self';
 font-src    'self';
 img-src     'self' data:;
-connect-src 'self' https://api.urbanistatlas.com https://qa-api.urbanistatlas.com https://cloudflareinsights.com;
+connect-src 'self' https://api.urbanistatlas.com https://cloudflareinsights.com;
 frame-ancestors 'none';
 base-uri    'self';
 form-action 'self';
@@ -202,10 +209,10 @@ Notes on the directives:
   `@fontsource-variable/*` and are bundled with the build.
 - `connect-src` — outbound fetches go to the Atlas API plus
   `cloudflareinsights.com`, where the Web Analytics beacon POSTs its
-  cookieless RUM data. `qa-api.urbanistatlas.com` stays in the list
-  through the apex verification window; it comes out alongside the qa
-  cert, Workers custom domain, and CORS origin in the qa-teardown
-  follow-up (see § QA hostname retirement).
+  cookieless RUM data. (The pre-launch `qa-api.urbanistatlas.com`
+  origin was removed from this list in the 2026-05-27 qa-teardown,
+  alongside the qa cert, Workers custom domain, and CORS origin — see
+  § QA hostname retirement.)
 - `frame-ancestors 'none'` — the Atlas is never embedded in an
   iframe.
 

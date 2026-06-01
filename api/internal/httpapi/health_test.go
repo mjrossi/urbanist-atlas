@@ -26,10 +26,11 @@ func TestHealthz_ReturnsPlainOk(t *testing.T) {
 	}
 }
 
-// TestReadyz_WithoutPingerReturnsOk pins the test-mode contract: a
-// store that doesn't implement pinger (MemStore in unit tests)
-// collapses readiness to "200 ok" — the production /readyz path
-// requires the postgres adapter's Ping().
+// TestReadyz_WithoutPingerReturnsOk pins the contract: a store that
+// doesn't implement pinger collapses readiness to "200 ok". The
+// production file-backed MemStore has no downstream to ping, so
+// /readyz behaves the same as in this test; the pinger hook stays in
+// place for a future network-bound store (see readyHandler).
 func TestReadyz_WithoutPingerReturnsOk(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h := readyHandler(struct{}{}, logger) // not a pinger

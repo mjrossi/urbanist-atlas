@@ -1,10 +1,14 @@
 # Submissions on SQLite + GitHub-PR auto-promote (slice β)
 
-**Status:** Planned. Not yet started. Follows the slice α file-store
-cutover (PR #52 / branch `slice-alpha-file-store-cutover`), which
-makes `api/seed/` the runtime source of truth and retires Postgres
-for reads. This slice adds the only writable surface the project
-needs in the foreseeable future.
+**Status:** Shipped (2026-05-27). The design below is preserved as the
+original snapshot; the SQLite submissions store, GitHub-PR worker, and
+nightly R2 backup are all live. The current operator runbook is
+[`docs/deploy.md`](../../deploy.md); the Go-side wiring is in
+[`docs/api-architecture.md`](../../api-architecture.md). Followed the
+slice α file-store cutover (PR #52 / branch
+`slice-alpha-file-store-cutover`), which makes `api/seed/` the runtime
+source of truth and retires Postgres for reads. This slice adds the
+only writable surface the project needs in the foreseeable future.
 
 **Related:**
 - [`../../../CLAUDE.md`](../../../CLAUDE.md) §Hosting — current

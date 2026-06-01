@@ -16,7 +16,9 @@ Three packages, in dependency order:
 
 ```
 api/pkg/atlas/          ← importable library. No HTTP, no chi, no env vars.
-api/internal/store/     ← Store implementations (MemStore in pkg, Postgres here).
+                          Owns the read Store interface + the MemStore impl.
+api/internal/seedfiles/ ← loads the TOML/CSV bundle into a MemStore (the "FileStore").
+api/internal/store/     ← the SQLite submissions store (write path only).
 api/internal/httpapi/   ← chi handlers + middleware. Thin wrappers.
 api/cmd/server/         ← urfave/cli main. Wires flags → Config → New(...).
 ```
@@ -35,10 +37,15 @@ Rules:
   ten lines: parse the request → call a `pkg/atlas` function →
   encode the result. No business logic here.
 - **`cmd/server`** is the urfave/cli entry. Subcommands: `serve`,
-  `migrate {up|down|status}`, `loadregions`, `loadpostal`, `seed`,
-  `loaddata`, `etl {download|regenerate}`. Each subcommand is a
-  thin assembly: read flags + env → build a `Config` → call into
-  `pkg/atlas` or `internal/httpapi`.
+  `seed` (validate the bundle), `etl {download|regenerate}`,
+  `linkcheck`, and `submissions` (admin/ops on the SQLite queue).
+  Each subcommand is a thin assembly: read flags + env → build a
+  `Config` → call into `pkg/atlas` or `internal/httpapi`. The old
+  `loadregions` / `loadpostal` / `loaddata` / `migrate` subcommands
+  were retired with the file-store cutover — the bundle is now the
+  runtime source of truth (loaded at boot, no load step) and the
+  submissions store applies its goose migrations automatically on
+  open.
 
 The split lets the same business logic back the JSON API, an
 offline CLI (loaders, ETL, the planned `cmd/atlas`), and any
@@ -100,23 +107,35 @@ between "Chicago Metro" (4) and "Chicago" (3) on the index. The
 expanded lookup-style scope only kicks in when a user lands on the
 detail page.
 
-Two implementations:
+There is a single read implementation, fed two ways:
 
 - **`atlas.MemStore`** ([`api/pkg/atlas/memstore.go`](../api/pkg/atlas/memstore.go)) —
-  in-process fixtures. Used by handler tests, the
-  `--store=memory` runtime flag, and any offline `pkg/atlas`
-  exploration. Loaded via `atlas.LoadDevFixtures(store)`.
-- **`postgres.Store`** ([`api/internal/store/postgres/`](../api/internal/store/postgres/)) —
-  the production store. Queries are written in SQL under
-  `queries/`, code-generated to Go via sqlc (regenerate with
-  `just api-gen`), driven by pgx. `serve --store=postgres`
-  (the default) selects it; `DATABASE_URL` configures it.
+  the concurrent-safe in-memory store that satisfies the whole
+  `Store` interface. Every read endpoint is served from it.
+- **`--store=file`** (the production default) builds that MemStore
+  from the seed bundle at boot via
+  `seedfiles.BuildMemStore` ([`api/internal/seedfiles/build.go`](../api/internal/seedfiles/build.go)) —
+  this file-backed variant is what the docs call the "FileStore".
+  The bundle is embedded into the binary via `//go:embed`, so reads
+  are stateless: there's no database, no load step, and no migrations
+  on the read path.
+- **`--store=memory`** loads the same MemStore with the small
+  built-in dev fixtures (`atlas.LoadDevFixtures(store)`) for handler
+  tests, demos, and offline `pkg/atlas` exploration.
 
-Postgres-backed implementations can optimize internally — e.g. fold
-`AncestorRegions` + `OrgsForRegions` into a single recursive CTE —
-without changing the interface contract. Tests against MemStore
-verify behavior; integration tests against testcontainers Postgres
-verify the SQL.
+Because everything reads from one in-process implementation, the
+ancestor/descendant DAG walks are plain Go loops — there's no SQL
+layer or recursive CTE to keep in sync behind the interface.
+
+The **write path is separate**: public submissions persist in a
+small SQLite store
+([`api/internal/store/sqlite/`](../api/internal/store/sqlite/)) on a
+Fly volume — driver `modernc.org/sqlite` (pure Go, no CGO), queries
+in `queries/submissions.sql` code-generated via sqlc (regenerate with
+`just api-gen`), goose migrations embedded from `api/migrations-sqlite/`
+and applied automatically when the store opens. It backs the
+`/submissions` endpoints only, not the read interface above. See
+[`docs/superpowers/specs/2026-05-27-submissions-sqlite-design.md`](./superpowers/specs/2026-05-27-submissions-sqlite-design.md).
 
 ## Wire contract
 
@@ -306,13 +325,16 @@ Two ordering rules to preserve when extending:
 5. Add the handler to `internal/httpapi/` — parse → call atlas →
    encode. Keep it ~10 lines. Write an httptest+MemStore handler
    test asserting the wire shape and status codes.
-6. Add the Postgres-side query in `internal/store/postgres/queries/`,
-   regenerate with `just api-gen`, and write a testcontainers
-   integration test under `//go:build integration`.
-7. Wire the handler in `router.go`. Inside the gated group unless
+6. Wire the handler in `router.go`. Inside the gated group unless
    it's a discovery endpoint like `/openapi.yaml`.
-8. If it's a collection, use `respondCollection[T]` so the meta
+7. If it's a collection, use `respondCollection[T]` so the meta
    envelope lands consistently.
+
+Read endpoints have no SQL layer — the new `Store` method and its
+`MemStore` implementation from step 4 are the whole data path. Only
+the submissions write path touches SQLite; a new submissions query
+goes in `internal/store/sqlite/queries/submissions.sql`, regenerated
+with `just api-gen` and covered by `internal/store/sqlite/store_test.go`.
 
 For testing conventions across the three tiers, see
 [`docs/testing-strategy.md`](./testing-strategy.md).

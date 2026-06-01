@@ -7,13 +7,17 @@ wrong kind by default).
 ## API: three tiers
 
 ```
-unit tests           handler tests              integration tests
-──────────           ─────────────              ─────────────────
-pkg/atlas/*_test.go  internal/httpapi/*_test.go internal/store/postgres/*_test.go
-                                                (//go:build integration)
-fast, no Docker      fast, no Docker            slow, Docker required
-just api-test        just api-test              just api-test-integration
+unit tests           handler tests              store tests
+──────────           ─────────────              ───────────
+pkg/atlas/*_test.go  internal/httpapi/*_test.go internal/store/sqlite/*_test.go
+fast, no Docker      fast, no Docker            fast, no Docker
+just api-test        just api-test              just api-test
 ```
+
+All three tiers run under the single `just api-test` (`go test ./...`).
+There's no Docker-gated tier: the read path is in-process (MemStore) and
+the only persistence is the submissions SQLite store, which tests exercise
+in-process via `modernc.org/sqlite` against an in-memory / temp-file DB.
 
 ### Unit tests — `pkg/atlas/*_test.go`
 
@@ -36,8 +40,8 @@ What unit tests should *not* do:
 
 - Touch chi, net/http, or `httptest`. If you find yourself
   spinning up an HTTP server, it's a handler test.
-- Touch `database/sql`, `pgx`, or testcontainers. If you find
-  yourself opening a connection, it's an integration test.
+- Touch `database/sql` or the SQLite submissions store. If you find
+  yourself opening a DB connection, it's a store test.
 
 ### Handler tests — `internal/httpapi/*_test.go`
 
@@ -77,19 +81,20 @@ What handler tests should *not* do:
 
 - Verify business algorithms. That belongs in unit tests against
   `pkg/atlas`. Handler tests confirm the wire-up, not the math.
-- Connect to Postgres. The `MemStore` is the test double.
+- Open the submissions DB. The `MemStore` is the test double; the
+  SQLite store has its own tests.
 
-### Integration tests — `internal/store/postgres/*_test.go`
+### Store tests — `internal/store/sqlite/*_test.go`
 
-Test SQL queries, migrations, and the sqlc-generated bindings
-against a real `postgres:17-alpine` container — the same image
-production runs. Gated by `//go:build integration` so the default
-`go test ./...` stays fast and Docker-free:
+Test the SQLite submissions store: the goose migrations, the
+sqlc-generated bindings, and the store methods that the
+`/submissions` endpoints call. These run in-process against
+`modernc.org/sqlite` (pure Go, no CGO) using an in-memory or
+temp-file DB, so they're fast and need **no Docker** — they run
+under the default `go test ./...`:
 
 ```go
-//go:build integration
-
-package postgres_test
+package sqlite_test
 
 import "testing"
 ```
@@ -97,28 +102,25 @@ import "testing"
 Run with:
 
 ```sh
-just api-test-integration
+just api-test    # store tests run alongside unit + handler tests
 ```
 
-Requires a running Docker daemon. CI does not run these tests
-today (they need Docker-in-Docker config); the maintainer runs
-them locally before opening PRs that touch SQL.
+When to add a store test:
 
-When to add an integration test:
+- New submissions query (added to
+  `internal/store/sqlite/queries/submissions.sql` and regenerated
+  via `just api-gen`).
+- New migration in `api/migrations-sqlite/` — verify it applies
+  cleanly via goose on top of the previous schema and that the
+  data shape works.
+- Status transitions and constraints (pending → approved/rejected,
+  the `status` CHECK, unique `public_id`, promotion-result writes).
+- Anything where the generated bindings × real SQLite behavior
+  matters (NULL handling, the WAL/`busy_timeout` pragmas, ordering).
 
-- New SQL query (added to `internal/store/postgres/queries/` and
-  regenerated via `just api-gen`).
-- New migration in `api/migrations/` — verify it applies cleanly
-  on top of the previous schema and that the data shape works.
-- Recursive CTEs or any SQL where the postgres-specific behavior
-  matters (window functions, JSONB, full-text). Postgres-fork
-  bugs are real; testcontainers is how we catch them.
-- Performance-sensitive paths where `MemStore`'s in-process loop
-  doesn't represent reality (large IN lists, joins).
-
-The integration suite double-checks the `Store` contract — every
-method that has a `MemStore` test should have a Postgres test
-that exercises the same shape against the real DB.
+The read path has no store-test tier: it's the in-process MemStore,
+fully covered by the unit and handler tiers above. There is no
+external database to stand up for any tier.
 
 ## Choosing a tier
 
@@ -126,12 +128,13 @@ that exercises the same shape against the real DB.
 |---|---|---|
 | Bucketing sorts orgs wrong | unit | Pure logic in `pkg/atlas`. |
 | `/lookup` returns 500 instead of 404 | handler | Domain-error → HTTP mapping is in the handler. |
-| Migration drops a needed column | integration | Real schema, real Postgres. |
+| `AncestorRegions` returns wrong ancestors | unit | In-process DAG walk in `pkg/atlas`. |
+| Submissions migration drops a needed column | store | Real goose migration against SQLite. |
 | `X-Atlas-Client` gate lets a bad header through | handler | Middleware behavior is HTTP-shape. |
-| Recursive CTE returns wrong ancestors | integration | Postgres-specific SQL. |
+| Approving a submission skips the status transition | store | Real query × SQLite store. |
 | `NormalizePostalCode` mangles PT 7-digit codes | unit | Pure function. |
 | ODbL headers missing on `/recent` | handler | Middleware composition. |
-| sqlc-generated code panics on NULL | integration | Generated bindings × real DB. |
+| sqlc-generated submissions binding panics on NULL | store | Generated bindings × real DB. |
 
 ## Web
 
@@ -182,14 +185,14 @@ What to skip:
 `just ci` is the union of the two halves and is what CI runs:
 
 ```sh
-just api-check   # api-vet + api-test + api-gen-check
+just api-check   # api-fmt-check + api-vet + api-staticcheck + api-test + api-gen-check
 just web-check   # web-deps + web-lint + web-test + web-build + web-gen-check
 ```
 
-Neither half runs the integration suite. Both halves run their
-type-gen no-diff check (`api-gen-check`, `web-gen-check`) so spec
-edits without regenerated artifacts fail at PR time, not deploy
-time.
+`api-test` is the whole API suite — all three tiers run together with
+no Docker-gated step to opt into. Both halves run their type-gen
+no-diff check (`api-gen-check`, `web-gen-check`) so spec edits without
+regenerated artifacts fail at PR time, not deploy time.
 
 Local quick-check before pushing: `just api-test && just web-test`
 catches the common regressions in under a minute. Use `just ci`

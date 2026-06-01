@@ -44,13 +44,14 @@ direct parents; the lookup walks transitively.
 | Table | Role |
 |---|---|
 | `regions` | One row per region. `kind` is free-form (`us:city`, `de:land`, `fr:metropole`, …). `scope_tier ∈ {local, regional}` is explicit (not derived from kind). `sort_priority` is a server-side hint for ordering within the Regional bucket. |
-| `region_parents` | The DAG edges. Multi-parent allowed; `CHECK` blocks self-loops; longer cycles are caught at `loadregions` time. |
+| `region_parents` | The DAG edges (the `parents` array on each region in the seed TOML). Multi-parent allowed; self-loops are rejected and longer cycles are caught by the loader at seed-load (boot) time. |
 | `postal_codes` | Three columns: `(country, postal_code, leaf_region_id)`. The leaf is the most-specific region a postal code falls under. |
 | `organization_regions` | Many-to-many between orgs and regions. Orgs can attach to any node in the graph (leaf city, intermediate metro, multi-state region, transit federation). |
 
-The lookup algorithm: `postal_code → leaf region → recursive CTE up
-`region_parents` → set of ancestor region IDs → orgs joined to any of
-those IDs → bucket each org by `scope_tier` of its matched regions.
+The lookup algorithm: `postal_code → leaf region → in-memory ancestor
+walk up the parent edges` (`MemStore.AncestorRegions`) → set of
+ancestor region IDs → orgs attached to any of those IDs → bucket each
+org by `scope_tier` of its matched regions.
 
 ---
 
