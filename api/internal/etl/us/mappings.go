@@ -49,10 +49,23 @@ var nycBoroughCounty = map[string]string{
 }
 
 // countyToLeaf maps non-NYC county GEOIDs to curated county leaves in
-// regions_us.toml (currently `cook-county` and `lake-county-in`).
-// Used as a fallback when no curated city-place leaf matches a ZCTA.
+// regions_us.toml. Used as a fallback when no curated city-place leaf
+// matches a ZCTA; consulted before the MSA tier, so a ZIP in one of
+// these counties anchors at the county leaf rather than at the metro.
+//
+// The six Illinois entries are the RTA service area (Cook + the five
+// collar counties). Seeding them as leaves is what lets collar-county
+// suburbs reach Illinois statewide orgs through `rta-service-area → il`
+// instead of through the metro — per docs/region-graph.md §1, a
+// multi-state metro (Chicago spans IL+IN) must not carry a state edge,
+// so the state reach lives on the county leaf's own ancestry.
 var countyToLeaf = map[string]string{
 	"17031": "cook-county",    // Cook County, IL (contains Chicago)
+	"17043": "dupage-county",  // DuPage County, IL (RTA collar)
+	"17089": "kane-county",    // Kane County, IL (RTA collar)
+	"17097": "lake-county-il", // Lake County, IL (RTA collar)
+	"17111": "mchenry-county", // McHenry County, IL (RTA collar)
+	"17197": "will-county",    // Will County, IL (RTA collar)
 	"18089": "lake-county-in", // Lake County, IN (contains Gary)
 }
 
