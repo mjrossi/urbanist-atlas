@@ -2483,10 +2483,12 @@ a.tag:hover::before {
 }
 
 /* Each field keeps its inset margin + padding so the labels, radios, and
-   inputs sit where they do, but draws no border of its own — the only
-   frame on the form is the outer .slip box. The slip's warm background
-   shows in the gaps; the masthead (.slip-head) and footer (.slip-foot)
-   keep their full-bleed double rules. */
+   inputs sit where they do. On mobile it draws no border of its own — the
+   only frame is the outer .slip box, which reads cleaner on a narrow
+   screen. On desktop (≥720px) each field gets its own framed card (see the
+   media query), where the extra width makes the boxes look intentional.
+   The masthead (.slip-head) and footer (.slip-foot) keep their full-bleed
+   double rules at every width. */
 .field {
   display: grid;
   grid-template-columns: 1fr;
@@ -2503,6 +2505,7 @@ a.tag:hover::before {
     gap: 28px;
     margin: 12px 24px;
     padding: 18px 24px;
+    border: 1px solid var(--rule);
   }
 }
 
@@ -2514,12 +2517,19 @@ a.tag:hover::before {
 
 /* The Type-of-submission and Disclosure sections are real <fieldset>s, so
    they carry the browser's default 2px groove border and a min-content
-   intrinsic width. Drop the native border (the form's only frame is the
-   outer .slip box) and cancel the min-width so they match the text-field
-   layout exactly. */
+   intrinsic width. Cancel the min-width and drop the native border so they
+   match the borderless text-field layout on mobile; the desktop card
+   border is re-applied below (a plain `.field` rule can't win against this
+   selector's higher specificity, so it must be restated here). */
 fieldset.field {
   min-inline-size: 0;
   border: none;
+}
+
+@media (min-width: 720px) {
+  fieldset.field {
+    border: 1px solid var(--rule);
+  }
 }
 
 .field-label {
