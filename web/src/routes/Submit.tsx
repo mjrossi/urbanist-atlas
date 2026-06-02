@@ -99,10 +99,10 @@ export function Submit() {
       ? 'Shut down, merged, domain hijacked — what happened, and roughly when?'
       : 'What have they worked on recently? Who do they organize? Who do they push? Concrete examples help us more than superlatives.';
   const editorialPlaceholder = isCorrection
-    ? 'The entry describes them as rail-focused, but in 2025 they pivoted to bus rapid transit and a fare-equity push. The leadership listed is also two years out of date.'
+    ? 'Listed as rail-focused, but they pivoted to bus rapid transit in 2025.'
     : isRemoval
-      ? 'Their domain expired in March 2025 and is now parked. Last social-media post was October 2024. The 2023 990 was their last filing.'
-      : 'In 2025 they organized riders to defend the 60-cent fare against a council proposal to double it; ran a candidate forum that 4 of 9 councilmembers attended; testified at every transit board meeting since 2022.';
+      ? 'Domain expired in March 2025; last post was October 2024.'
+      : 'Defended the local fare against a hike; runs candidate forums.';
   const sourcesHint = isCorrection
     ? "Anything that shows what's changed: a press release, an organizational chart, a recent article."
     : isRemoval
@@ -386,7 +386,7 @@ export function Submit() {
                     id="submit-oneline"
                     className="textarea"
                     rows={2}
-                    placeholder="Pushes for bus service expansion and rider-led transit policy."
+                    placeholder="Campaigns for better bus service."
                     {...register('oneLineDesc', { required: 'Required' })}
                   />
                   {errors.oneLineDesc ? (
@@ -425,8 +425,8 @@ export function Submit() {
                 id="submit-sources"
                 className="textarea"
                 rows={3}
-                placeholder="https://seattletimes.com/...
-https://kuow.org/stories/..."
+                placeholder="https://newspaper.com/article
+https://group.org/about"
                 {...register('sources')}
               />
             </div>
