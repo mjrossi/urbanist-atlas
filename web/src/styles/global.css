@@ -2482,12 +2482,11 @@ a.tag:hover::before {
   letter-spacing: -0.01em;
 }
 
-/* Every field is a self-contained framed card. Insetting each one with a
-   margin lets the slip's warm patterned background read between the cards
-   and keeps adjacent hairline borders from doubling up, while the masthead
-   (.slip-head) and footer (.slip-foot) keep their full-bleed double rules.
-   The two radio <fieldset>s (see fieldset.field below) share this exact
-   treatment so the whole form is one consistent stack of cards. */
+/* Each field keeps its inset margin + padding so the labels, radios, and
+   inputs sit where they do, but draws no border of its own — the only
+   frame on the form is the outer .slip box. The slip's warm background
+   shows in the gaps; the masthead (.slip-head) and footer (.slip-foot)
+   keep their full-bleed double rules. */
 .field {
   display: grid;
   grid-template-columns: 1fr;
@@ -2495,7 +2494,6 @@ a.tag:hover::before {
   align-items: baseline;
   margin: 10px 16px;
   padding: 16px 18px;
-  border: 1px solid var(--rule);
   background: var(--paper);
 }
 
@@ -2514,13 +2512,14 @@ a.tag:hover::before {
   gap: 14px;
 }
 
-/* The Type-of-submission and Disclosure sections are real <fieldset>s,
-   so they inherit the browser's default 2px groove border and a
-   min-content intrinsic width. Cancel the min-width; the framed-card
-   border, padding, and inset all come from .field above so each fieldset
-   renders identically to the text-field cards. */
+/* The Type-of-submission and Disclosure sections are real <fieldset>s, so
+   they carry the browser's default 2px groove border and a min-content
+   intrinsic width. Drop the native border (the form's only frame is the
+   outer .slip box) and cancel the min-width so they match the text-field
+   layout exactly. */
 fieldset.field {
   min-inline-size: 0;
+  border: none;
 }
 
 .field-label {
