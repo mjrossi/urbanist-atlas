@@ -31,19 +31,20 @@ type pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// readyHandler answers GET /readyz with 200 only when the store's
-// downstream dependency is reachable. Returns 503 with an RFC 9457
-// problem document otherwise. The 1-second deadline keeps Fly's
-// readiness check predictable; a store that takes longer than 1s to
-// acknowledge a ping is effectively unavailable for handling a burst
-// of /lookup requests.
+// readyHandler answers GET /readyz with 200 only when the pingable
+// dependency is reachable. Returns 503 with an RFC 9457 problem
+// document otherwise. The 1-second deadline keeps Fly's readiness check
+// predictable; a dependency that takes longer than 1s to acknowledge a
+// ping is effectively unavailable for handling a burst of requests.
 //
-// In the current deployment the file-backed in-memory FileStore does
-// not implement pinger, so /readyz collapses to "200 ok" — same
-// shape as /healthz. The hook stays in place for a future
-// network-bound store.
-func readyHandler(store any, logger *slog.Logger) http.HandlerFunc {
-	p, _ := store.(pinger)
+// The pingable dependency is the SQLite submission store (the only
+// out-of-process surface that can fail at runtime while the process
+// stays up). The read-path MemStore is immutable in-memory and loaded
+// at boot, so it does not implement pinger. When submissions are
+// disabled (no --db-path), the passed-in value is a nil interface and
+// /readyz resolves to "200 ok" — same shape as /healthz.
+func readyHandler(pingable any, logger *slog.Logger) http.HandlerFunc {
+	p, _ := pingable.(pinger)
 	return func(w http.ResponseWriter, r *http.Request) {
 		if p != nil {
 			ctx, cancel := context.WithTimeout(r.Context(), time.Second)

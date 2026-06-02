@@ -1,7 +1,10 @@
 package seedfiles_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,6 +37,51 @@ func TestBuildMemStore_FromEmbed(t *testing.T) {
 		t.Fatalf("BuildMemStore embed: %v", err)
 	}
 	exerciseStore(t, store)
+}
+
+// TestBuildMemStore_LogsSeedCounts confirms the boot summary line carries
+// the loaded-data counts an operator relies on at startup — regions,
+// orgs, and the postal-code total (the largest dataset, previously only
+// logged per-country at DEBUG).
+func TestBuildMemStore_LogsSeedCounts(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil)) // default level: INFO
+
+	if _, err := seedfiles.BuildMemStore(logger, seedfs.FS); err != nil {
+		t.Fatalf("BuildMemStore: %v", err)
+	}
+
+	rec := findLogRecord(t, buf.Bytes(), "seedfiles: filestore built")
+	for _, key := range []string{"regions", "orgs", "postal_codes"} {
+		v, ok := rec[key]
+		if !ok {
+			t.Errorf("summary line missing %q field; line: %v", key, rec)
+			continue
+		}
+		if n, ok := v.(float64); !ok || n <= 0 {
+			t.Errorf("%q = %v; want a positive count", key, v)
+		}
+	}
+}
+
+// findLogRecord scans newline-delimited JSON log output for the first
+// record whose "msg" equals want and returns it decoded.
+func findLogRecord(t *testing.T, out []byte, want string) map[string]any {
+	t.Helper()
+	for _, line := range bytes.Split(bytes.TrimSpace(out), []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal(line, &rec); err != nil {
+			t.Fatalf("unmarshal log line %q: %v", line, err)
+		}
+		if rec["msg"] == want {
+			return rec
+		}
+	}
+	t.Fatalf("no log record with msg=%q in output:\n%s", want, out)
+	return nil
 }
 
 // TestBuildMemStore_DiskAndEmbedAgree pins the production guarantee

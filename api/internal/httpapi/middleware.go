@@ -106,14 +106,37 @@ func recovererMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
+// Health-check endpoint paths. Defined here (not just as string
+// literals in router.go) so the access-log filter below can't drift
+// from the routes actually registered.
+const (
+	healthzPath = "/healthz"
+	readyzPath  = "/readyz"
+)
+
+// isHealthCheckPath reports whether p is an orchestrator probe endpoint
+// whose successful access logs are demoted to DEBUG to keep the
+// steady-state access log readable (Fly hits these every 15-30s).
+func isHealthCheckPath(p string) bool {
+	return p == healthzPath || p == readyzPath
+}
+
 // loggingMiddleware emits one structured access-log line per request.
+// Successful (2xx/3xx) liveness/readiness probes are logged at DEBUG so
+// they don't drown the access log at the default INFO level; a failing
+// probe (>=400, e.g. a /readyz 503) stays at INFO so outages are
+// visible without raising the log level.
 func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			sw := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(sw, r)
-			logger.InfoContext(r.Context(), "http",
+			level := slog.LevelInfo
+			if sw.status < 400 && isHealthCheckPath(r.URL.Path) {
+				level = slog.LevelDebug
+			}
+			logger.Log(r.Context(), level, "http",
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", sw.status,

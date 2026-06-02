@@ -138,6 +138,25 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	metrics := httpapi.NewMetrics()
 
 	origins := splitCSV(c.String("cors-origins"))
+
+	// One consolidated boot line so an operator can confirm the effective
+	// non-secret config from the first lines of the log. Secrets are
+	// reported as presence booleans only — never their values.
+	logger.Info("startup config",
+		"port", c.String("port"),
+		"store", c.String("store"),
+		"seed_source", seedSourceLabel(c.String("seed-dir")),
+		"cors_origins", origins,
+		"log_format", c.String("log-format"),
+		"log_level", c.String("log-level"),
+		"metrics_port", c.String("metrics-port"),
+		"submissions_enabled", subs != nil,
+		"submissions_rate_per_hour", c.Int("submissions-rate-per-hour"),
+		"client_secret_set", c.String("client-secret") != "",
+		"admin_token_set", c.String("admin-token") != "",
+		"github_token_set", c.String("github-token") != "",
+	)
+
 	handler := httpapi.New(httpapi.Config{
 		Store:                  store,
 		Logger:                 logger,
@@ -266,6 +285,17 @@ func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.S
 	default:
 		return nil, nil, fmt.Errorf("serve: unknown --store value %q (want %q or %q)", kind, storeKindFile, storeKindMemory)
 	}
+}
+
+// seedSourceLabel describes where the file store reads its seed bundle
+// from for the startup-config log line: "embed" (the binary-baked
+// seedfs.FS, the production default) when --seed-dir is empty, otherwise
+// the directory path. Mirrors the source resolution in buildStore.
+func seedSourceLabel(seedDir string) string {
+	if strings.TrimSpace(seedDir) == "" {
+		return "embed"
+	}
+	return seedDir
 }
 
 // buildSubmissionStore opens the SQLite submission database and runs
