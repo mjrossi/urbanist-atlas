@@ -248,6 +248,73 @@ func TestLogging_RecordsStatusFromHandler(t *testing.T) {
 	}
 }
 
+// TestLogging_HealthCheckSuppressedAtInfo: a successful liveness/readiness
+// probe is demoted to DEBUG, so at the default INFO level it produces no
+// access-log line — that's the whole point of quieting Fly's 15-30s probe
+// traffic.
+func TestLogging_HealthCheckSuppressedAtInfo(t *testing.T) {
+	for _, path := range []string{healthzPath, readyzPath} {
+		var buf bytes.Buffer
+		logger := slog.New(slog.NewJSONHandler(&buf, nil)) // default level: INFO
+
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, "ok\n")
+		})
+		handler := loggingMiddleware(logger)(next)
+
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+
+		if got := buf.String(); got != "" {
+			t.Errorf("%s 200 at INFO: want no log line, got:\n%s", path, got)
+		}
+	}
+}
+
+// TestLogging_HealthCheckFailureStillLogged: a non-2xx probe (e.g. a
+// /readyz 503 when the store ping fails) stays at INFO so the outage is
+// visible without raising the log level.
+func TestLogging_HealthCheckFailureStillLogged(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil)) // default level: INFO
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+	handler := loggingMiddleware(logger)(next)
+
+	req := httptest.NewRequest(http.MethodGet, readyzPath, nil)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	line := buf.String()
+	for _, want := range []string{`"path":"/readyz"`, `"status":503`} {
+		if !strings.Contains(line, want) {
+			t.Errorf("failing probe log missing %s; full line:\n%s", want, line)
+		}
+	}
+}
+
+// TestLogging_HealthCheckVisibleAtDebug: the suppression is a downgrade,
+// not a drop — at DEBUG the successful probe line reappears so operators
+// can still inspect probe traffic when they ask for it.
+func TestLogging_HealthCheckVisibleAtDebug(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := loggingMiddleware(logger)(next)
+
+	req := httptest.NewRequest(http.MethodGet, healthzPath, nil)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	if !strings.Contains(buf.String(), `"path":"/healthz"`) {
+		t.Errorf("healthz 200 at DEBUG: want log line, got:\n%s", buf.String())
+	}
+}
+
 // --- statusRecorder ---
 
 // TestStatusRecorder_DefaultStatus: a handler that calls Write without

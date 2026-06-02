@@ -145,6 +145,7 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 	// every slug a postal row points at (its leaf anchor) for the
 	// RGN-02b reachability check.
 	anchoredSlugs := map[string]bool{}
+	var postalTotal int
 	for _, c := range countrySet {
 		path := "postal_codes_" + c.Postal + ".csv"
 		rows, err := readPostal(seedFS, path, atlas.Country(c.Code))
@@ -159,6 +160,7 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 			anchoredSlugs[row.LeafRegionSlug] = true
 			store.AddPostalCode(row.Country, row.PostalCode, leafID)
 		}
+		postalTotal += len(rows)
 		if logger != nil {
 			logger.Debug("seedfiles: postal loaded", "country", c.Code, "rows", len(rows))
 		}
@@ -221,6 +223,7 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 		logger.Info("seedfiles: filestore built",
 			"regions", len(regionIDBySlug),
 			"orgs", len(orgs),
+			"postal_codes", postalTotal,
 		)
 	}
 	return store, nil

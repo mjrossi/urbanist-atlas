@@ -98,6 +98,13 @@ func Open(path string) (*Store, error) {
 // Close releases the underlying *sql.DB.
 func (s *Store) Close() error { return s.db.Close() }
 
+// Ping verifies the underlying database connection is alive. It
+// satisfies the httpapi readiness pinger contract so /readyz can gate
+// traffic on the SQLite volume being reachable.
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
 // DB returns the underlying *sql.DB. Useful for callers that need to
 // run goose programmatically or for tests that want to inspect rows
 // directly.

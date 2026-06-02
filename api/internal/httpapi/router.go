@@ -111,8 +111,8 @@ func New(cfg Config) http.Handler {
 			requestIDFromContext(r.Context()))
 	})
 
-	getHead(r, "/healthz", healthHandler())
-	getHead(r, "/readyz", readyHandler(cfg.Store, logger))
+	getHead(r, healthzPath, healthHandler())
+	getHead(r, readyzPath, readyHandler(cfg.Submissions, logger))
 
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
 		r.Use(odblHeadersMiddleware)

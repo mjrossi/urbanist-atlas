@@ -28,6 +28,28 @@ func newTestStore(t *testing.T) *sqlite.Store {
 	return s
 }
 
+func TestStore_Ping(t *testing.T) {
+	// Alive connection pings cleanly. This is the readiness-probe path
+	// (/readyz) — *sqlite.Store satisfies the httpapi pinger contract.
+	s := newTestStore(t)
+	if err := s.Ping(context.Background()); err != nil {
+		t.Fatalf("Ping on open store: %v", err)
+	}
+
+	// A separately-opened store (not the t.Cleanup-managed one) so we can
+	// close it and confirm Ping reports the dead connection.
+	closed, err := sqlite.Open("file::memory:?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := closed.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if err := closed.Ping(context.Background()); err == nil {
+		t.Fatal("Ping on closed store: want error, got nil")
+	}
+}
+
 func samplePayload() atlas.SubmissionPayload {
 	return atlas.SubmissionPayload{
 		Name:        "Brooklyn Greenways",
