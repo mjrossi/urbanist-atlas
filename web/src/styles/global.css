@@ -2602,6 +2602,119 @@ fieldset.field {
   margin-top: 4px;
 }
 
+/* ── Region type-ahead (RegionCombobox) ──────────────────────────────
+   A multi-select combobox over the .input underline style. The popup
+   is a paper-colored listbox positioned under the input; selections
+   render as removable chips above it. */
+.combobox {
+  position: relative;
+}
+
+.combobox-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.combobox-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 6px 3px 10px;
+  border: 1px solid var(--rule-strong);
+  background: color-mix(in oklab, var(--amber) 8%, var(--paper));
+  font-family: var(--sans);
+  line-height: 1.2;
+}
+
+.combobox-chip-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.combobox-chip-context {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.combobox-chip-context::before {
+  content: '·';
+  margin-right: 4px;
+}
+
+.combobox-chip-remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted);
+  transition: color 100ms ease;
+}
+
+.combobox-chip-remove:hover,
+.combobox-chip-remove:focus-visible {
+  color: var(--amber);
+}
+
+.combobox-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 20;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  box-shadow: 0 6px 20px rgba(26, 22, 18, 0.12);
+}
+
+.combobox-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.combobox-option.is-active {
+  background: color-mix(in oklab, var(--amber) 12%, var(--paper));
+}
+
+.combobox-option-name {
+  font-family: var(--serif-text);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.combobox-option-context {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.combobox-option-context::before {
+  content: '·';
+  margin-right: 6px;
+}
+
+.combobox-status {
+  margin: 6px 0 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--amber);
+}
+
 .input,
 .textarea {
   width: 100%;

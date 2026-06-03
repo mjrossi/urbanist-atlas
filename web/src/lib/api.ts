@@ -22,6 +22,9 @@ export type LookupOrg = components['schemas']['LookupOrg'];
 export type LookupQuery = components['schemas']['LookupQuery'];
 export type LookupResult = components['schemas']['LookupResult'];
 export type RegionSummary = components['schemas']['RegionSummary'];
+export type RegionSearchResult = components['schemas']['RegionSearchResult'];
+export type RegionSearchResultsEnvelope =
+  components['schemas']['RegionSearchResultsEnvelope'];
 export type RegionDetail = components['schemas']['RegionDetail'];
 export type Meta = components['schemas']['Meta'];
 export type RegionSummariesEnvelope = components['schemas']['RegionSummariesEnvelope'];
@@ -245,6 +248,28 @@ export function listRegions(init?: RequestInit): Promise<RegionSummary[]> {
   return apiFetch<RegionSummariesEnvelope>('/api/v1/regions', init).then(
     (env) => env.data,
   );
+}
+
+/**
+ * `GET /api/v1/regions/search?q=…&limit=…` — type-ahead search over
+ * the full region graph (every kind, not just the browse set), ranked
+ * for relevance. Each result carries a `context_label` (the nearest
+ * state/province ancestor's name) for disambiguating same-named regions.
+ *
+ * The wire shape is `{ meta, data: RegionSearchResult[] }`; this helper
+ * unwraps `data`. A blank `q` returns an empty array.
+ */
+export function searchRegions(
+  q: string,
+  limit?: number,
+  init?: RequestInit,
+): Promise<RegionSearchResult[]> {
+  const params = new URLSearchParams({ q });
+  if (limit !== undefined) params.set('limit', String(limit));
+  return apiFetch<RegionSearchResultsEnvelope>(
+    `/api/v1/regions/search?${params.toString()}`,
+    init,
+  ).then((env) => env.data);
 }
 
 /**

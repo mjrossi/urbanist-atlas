@@ -18,6 +18,13 @@ export interface SubmitForm {
   type: SubmissionType;
   name: string;
   website: string;
+  /** Canonical region slugs picked from the type-ahead (the wire value). */
+  regionSlugs: string[];
+  /**
+   * Free-text fallback: when the type-ahead has no match the submitter
+   * describes the region here and it flows into `submitter_note` as a
+   * new-region request for the editor. Not sent as a slug.
+   */
   region: string;
   oneLineDesc: string;
   why: string;
@@ -30,6 +37,7 @@ export const SUBMIT_FORM_DEFAULTS: SubmitForm = {
   type: 'new',
   name: '',
   website: '',
+  regionSlugs: [],
   region: '',
   oneLineDesc: '',
   why: '',
@@ -118,12 +126,11 @@ export function buildIssueUrl(form: SubmitForm): string {
  * Markdown-formatted `submitter_note` so moderators see the same
  * structured context they would on the old GitHub-issue path.
  *
- * Region: `region_slugs` is optional on the wire. The form's region
- * input is free-form text — a typical submitter writes "Brooklyn, NY"
- * or "Seattle", not a canonical slug like `nyc-tri-state` — so we
- * always send an empty array and carry the raw text through in
- * `submitter_note`. Editors finalize the canonical slug during PR
- * review.
+ * Region: `regionSlugs` carries the canonical slugs the submitter
+ * picked from the type-ahead, sent as `region_slugs`. When they
+ * couldn't find their region the free-text `region` fallback is rolled
+ * into `submitter_note` as a new-region request for the editor (see
+ * buildSubmitterNote).
  */
 export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionRequest {
   const submitterNote = buildSubmitterNote(form);
@@ -132,7 +139,7 @@ export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionReques
       name: form.name.trim(),
       short_desc: shortDescForWire(form),
       website_url: form.website.trim(),
-      region_slugs: [],
+      region_slugs: form.regionSlugs ?? [],
     },
     submitter_note: submitterNote,
     ...(form.contact.trim() ? maybeContact(form.contact) : {}),
@@ -168,12 +175,16 @@ function maybeContact(raw: string): Partial<NewSubmissionRequest> {
 function buildSubmitterNote(form: SubmitForm): string {
   const lines: string[] = [];
   lines.push(`Submission type: ${labelForType(form.type)}.`);
-  // For correction/removal the Region input is hidden, so form.region
-  // is the SUBMIT_FORM_DEFAULTS empty-string and this line drops out
-  // automatically. New-org submissions surface the user's raw text
-  // here for editorial slug-finalization.
+  // Picked region slugs also ride on the wire in `region_slugs`; echo
+  // them here so the editor sees the full context in the PR body.
+  if (form.regionSlugs.length > 0) {
+    lines.push(`Regions (picked): ${form.regionSlugs.join(', ')}.`);
+  }
+  // The free-text fallback is the "couldn't find my region" path. For
+  // correction/removal the input is hidden, so form.region is the
+  // SUBMIT_FORM_DEFAULTS empty string and this line drops out.
   if (form.region.trim()) {
-    lines.push(`Region served (raw): ${form.region.trim()}`);
+    lines.push(`Region not found — new-region request: ${form.region.trim()}`);
   }
   if (form.why.trim()) {
     lines.push('', '### Why this org belongs', '', form.why.trim());

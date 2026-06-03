@@ -11,9 +11,9 @@ import {
 // Per-type wire-shape coverage for the public submissions endpoint.
 // The form's three submission types (`new` / `correction` / `removal`)
 // adapt the visible fields but must always produce a payload the
-// backend's `ValidateSubmissionPayload` accepts. `region_slugs` is
-// optional on the wire — the SPA always sends `[]` and carries the
-// raw region text in `submitter_note` for editor context.
+// backend's `ValidateSubmissionPayload` accepts. `region_slugs` carries
+// the slugs the submitter picked from the type-ahead; when none are
+// picked the free-text fallback rides along in `submitter_note`.
 
 function formFor(type: SubmitForm['type'], over: Partial<SubmitForm> = {}): SubmitForm {
   return {
@@ -54,7 +54,16 @@ describe('buildNewSubmissionRequest', () => {
     expect(req.payload.region_slugs).toEqual([]);
   });
 
-  it('every type rolls the region text into submitter_note for editor context', () => {
+  it('new: sends the picked region slugs and echoes them in the note', () => {
+    const req = buildNewSubmissionRequest(
+      formFor('new', { regionSlugs: ['queens', 'nyc'], region: '' }),
+    );
+    expect(req.payload.region_slugs).toEqual(['queens', 'nyc']);
+    expect(req.submitter_note).toMatch(/queens/i);
+    expect(req.submitter_note).toMatch(/nyc/i);
+  });
+
+  it('every type rolls the free-text region fallback into submitter_note', () => {
     for (const type of ['new', 'correction', 'removal'] as const) {
       const req = buildNewSubmissionRequest(
         formFor(type, { region: 'Brooklyn, NY' }),
