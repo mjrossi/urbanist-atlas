@@ -25,8 +25,12 @@ async function fillRequired(
     screen.getByLabelText(/primary website/i),
     overrides.website ?? 'https://example.org',
   );
+  // Use the free-text "can't find your region?" fallback so these
+  // baseline tests don't depend on the async type-ahead (which would
+  // consume the per-test `mockResolvedValueOnce` queue). The pick-a-slug
+  // path is covered by its own test below and by RegionCombobox.test.tsx.
   await user.type(
-    screen.getByLabelText(/region served/i),
+    screen.getByLabelText(/can.?t find your region/i),
     overrides.region ?? 'brooklyn-ny',
   );
   await user.type(
@@ -136,13 +140,75 @@ describe('Submit', () => {
     expect((init as RequestInit).method).toBe('POST');
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.payload.name).toBe('Sample Riders Alliance');
-    // region_slugs is optional on the wire (see openapi.yaml) — the
-    // SPA always sends an empty array. The user-typed Region text
-    // flows into submitter_note for editor context.
+    // This baseline path uses the free-text fallback (no slug picked),
+    // so region_slugs is empty and the typed text flows into
+    // submitter_note as a new-region request for the editor.
     expect(body.payload.region_slugs).toEqual([]);
     expect(typeof body.submitter_note).toBe('string');
     expect(body.submitter_note).toMatch(/new organization/i);
     expect(body.submitter_note).toMatch(/brooklyn-ny/);
+  });
+
+  it('picking a region from the type-ahead sends its canonical slug', async () => {
+    // Route search requests to a fixed result and submissions to 201.
+    const queens = {
+      region: {
+        id: 1,
+        kind: 'us:borough',
+        name: 'Queens',
+        slug: 'queens',
+        country: 'US',
+        scope_tier: 'local',
+        parent_slugs: ['ny'],
+      },
+      context_label: 'New York',
+    };
+    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/regions/search')) {
+        return Promise.resolve(jsonResponse({ data: [queens] }));
+      }
+      return Promise.resolve(jsonResponse(SUCCESS_BODY, { status: 201 }));
+    });
+
+    const user = userEvent.setup();
+    renderSubmit();
+    await user.type(screen.getByLabelText(/organization name/i), 'Queens Bus Riders');
+    await user.type(screen.getByLabelText(/primary website/i), 'https://example.org');
+    await user.type(
+      screen.getByLabelText(/one-line description/i),
+      'Better buses for Queens.',
+    );
+
+    // Type in the combobox, then pick the surfaced option.
+    await user.type(screen.getByLabelText(/region served/i), 'queens');
+    await user.click(await screen.findByRole('option', { name: /queens/i }));
+
+    // The picked region renders as a chip.
+    expect(screen.getByText('Queens')).toBeDefined();
+
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+    });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: /tip received/i }),
+      ).toBeDefined();
+    });
+
+    const submitCall = fetchSpy.mock.calls.find((call: unknown[]) => {
+      const url = String(call[0]);
+      const init = call[1] as RequestInit | undefined;
+      return url.includes('/api/v1/submissions') && init?.method === 'POST';
+    });
+    expect(submitCall).toBeDefined();
+    const body = JSON.parse((submitCall![1] as RequestInit).body as string);
+    expect(body.payload.region_slugs).toEqual(['queens']);
+    // The picked slug is also echoed in the editor note.
+    expect(body.submitter_note).toMatch(/queens/i);
   });
 
   it('correction submissions hide the new-org fields and POST a valid wire shape', async () => {

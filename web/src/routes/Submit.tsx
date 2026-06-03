@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useForm, useWatch, type FieldPath } from 'react-hook-form';
+import { Controller, useForm, useWatch, type FieldPath } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
+import { RegionCombobox } from '../components/RegionCombobox.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { ApiError, createSubmission, type Submission } from '../lib/api.ts';
 import {
@@ -34,7 +35,7 @@ const SUBMIT_COOLDOWN_MS = 1500;
 const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
   name: 'name',
   website_url: 'website',
-  region_slugs: 'region',
+  region_slugs: 'regionSlugs',
   short_desc: 'oneLineDesc',
   contact_url: 'contact',
   submitter_email: 'contact',
@@ -61,6 +62,7 @@ export function Submit() {
     formState: { isValid, errors },
     setError,
     control,
+    trigger,
   } = useForm<SubmitForm>({
     mode: 'onBlur',
     defaultValues: SUBMIT_FORM_DEFAULTS,
@@ -190,7 +192,7 @@ export function Submit() {
   // surface them instead of dropping them on the floor.
   const visibleFieldErrorSlots = new Set<FieldPath<SubmitForm>>(
     isNewOrg
-      ? ['name', 'website', 'region', 'oneLineDesc']
+      ? ['name', 'website', 'regionSlugs', 'oneLineDesc']
       : ['name', 'website'],
   );
   const unmappedFieldErrors = submitErr?.fieldErrors
@@ -348,27 +350,69 @@ export function Submit() {
                     <label htmlFor="submit-region" className="field-label">
                       Region served
                       <span className="required">*</span>
-                      <span className="hint">
-                        City or metro slug, e.g. <code>nyc</code> or{' '}
-                        <code>chicago</code>. Editors finalize the region in
-                        PR review.
+                      <span className="hint" id="submit-region-hint">
+                        Start typing a city, metro, or borough and pick from
+                        the list. Add more than one if they serve several.
                       </span>
                     </label>
                   </div>
                   <div>
-                    <input
-                      id="submit-region"
-                      type="text"
-                      className="input"
-                      placeholder="brooklyn-ny"
-                      {...register('region', { required: 'Required' })}
+                    <Controller
+                      control={control}
+                      name="regionSlugs"
+                      rules={{
+                        validate: (val, formValues) =>
+                          (val && val.length > 0) ||
+                          formValues.region.trim().length > 0 ||
+                          'Pick at least one region, or describe a new one below.',
+                      }}
+                      render={({ field, fieldState }) => (
+                        <RegionCombobox
+                          id="submit-region"
+                          value={field.value}
+                          onChange={(next) => {
+                            field.onChange(next);
+                            // Re-validate so the cross-field rule (and the
+                            // submit button's isValid gate) update the
+                            // instant a region is picked or cleared.
+                            void trigger('regionSlugs');
+                          }}
+                          onBlur={field.onBlur}
+                          describedById="submit-region-hint"
+                          invalid={!!fieldState.error}
+                        />
+                      )}
                     />
-                    {errors.region ? (
+                    {errors.regionSlugs ? (
                       <span className="field-error" role="alert">
-                        {errors.region.message}
+                        {errors.regionSlugs.message}
                       </span>
                     ) : null}
                   </div>
+                </div>
+
+                <div className="field stacked">
+                  <div>
+                    <label htmlFor="submit-region-new" className="field-label">
+                      Can&rsquo;t find your region?
+                      <span className="hint inline">
+                        Tell us the city or area and we&rsquo;ll add it. Skip
+                        this if you picked one above.
+                      </span>
+                    </label>
+                  </div>
+                  <input
+                    id="submit-region-new"
+                    type="text"
+                    className="input"
+                    placeholder="e.g. Ann Arbor, Michigan"
+                    {...register('region', {
+                      // Typing here satisfies the region requirement above
+                      // (pick OR describe), so keep that rule's isValid in
+                      // sync as they type the fallback.
+                      onChange: () => void trigger('regionSlugs'),
+                    })}
+                  />
                 </div>
 
                 <div className="field stacked">
