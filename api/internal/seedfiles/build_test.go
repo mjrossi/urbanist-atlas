@@ -80,6 +80,66 @@ func TestBuildMemStore_Embed_MetroRollupSurfacesOnState(t *testing.T) {
 	}
 }
 
+// TestBuildMemStore_Embed_FlagshipPortionsLeakFree is the end-to-end
+// guard for the unified metro model (GitHub #79): the curated multi-state
+// flagships (nyc-metro, chicago-metro, greater-boston) generate per-state
+// us:metro-portion leaves like every other multi-state metro, so a ZIP
+// that lacks a curated leaf re-anchors at its OWN state's portion and the
+// ancestor walk reaches that state + the umbrella (+ the advocacy
+// coalition where one exists) but NEVER the sibling state. Before the
+// fix these ZIPs anchored at the bare umbrella — reaching no state at all
+// (NYC/Chicago), or, for greater-boston whose override parent was ["ma"],
+// leaking NH ZIPs up into Massachusetts.
+func TestBuildMemStore_Embed_FlagshipPortionsLeakFree(t *testing.T) {
+	store, err := seedfiles.BuildMemStore(nil, seedfs.FS)
+	if err != nil {
+		t.Fatalf("BuildMemStore embed: %v", err)
+	}
+	cases := []struct {
+		zip       string // a ZIP without a curated leaf, re-anchored at the portion
+		ownState  string // must appear in the ancestor walk
+		umbrella  string // must appear in the ancestor walk
+		coalition string // must appear if non-empty (advocacy node)
+		sibling   string // must NOT appear — the leak check
+	}{
+		{zip: "07302", ownState: "nj", umbrella: "nyc-metro", coalition: "nyc-tristate", sibling: "ny"},    // Jersey City, NJ
+		{zip: "10501", ownState: "ny", umbrella: "nyc-metro", coalition: "nyc-tristate", sibling: "nj"},    // Amawalk, Westchester NY
+		{zip: "46301", ownState: "in", umbrella: "chicago-metro", coalition: "chicagoland", sibling: "il"}, // Chesterton, IN
+		{zip: "60115", ownState: "il", umbrella: "chicago-metro", coalition: "chicagoland", sibling: "in"}, // DeKalb, IL (the residual)
+		{zip: "03038", ownState: "nh", umbrella: "greater-boston", coalition: "", sibling: "ma"},           // Derry, NH (former leak)
+	}
+	for _, tc := range cases {
+		leaf, err := store.ResolveLeafRegion(context.Background(), "US", tc.zip)
+		if err != nil {
+			t.Errorf("ResolveLeafRegion(US, %s): %v", tc.zip, err)
+			continue
+		}
+		anc, err := store.AncestorRegions(context.Background(), leaf.ID)
+		if err != nil {
+			t.Errorf("AncestorRegions(%s): %v", tc.zip, err)
+			continue
+		}
+		got := make(map[string]bool, len(anc))
+		slugs := make([]string, 0, len(anc))
+		for _, r := range anc {
+			got[r.Slug] = true
+			slugs = append(slugs, r.Slug)
+		}
+		if !got[tc.ownState] {
+			t.Errorf("%s (→ %s): ancestor walk missing own state %q; got %v", tc.zip, leaf.Slug, tc.ownState, slugs)
+		}
+		if !got[tc.umbrella] {
+			t.Errorf("%s (→ %s): ancestor walk missing umbrella %q; got %v", tc.zip, leaf.Slug, tc.umbrella, slugs)
+		}
+		if tc.coalition != "" && !got[tc.coalition] {
+			t.Errorf("%s (→ %s): ancestor walk missing coalition %q; got %v", tc.zip, leaf.Slug, tc.coalition, slugs)
+		}
+		if got[tc.sibling] {
+			t.Errorf("LEAK: %s (→ %s) reached sibling state %q via the ancestor walk; got %v", tc.zip, leaf.Slug, tc.sibling, slugs)
+		}
+	}
+}
+
 // TestBuildMemStore_LogsSeedCounts confirms the boot summary line carries
 // the loaded-data counts an operator relies on at startup — regions,
 // orgs, and the postal-code total (the largest dataset, previously only

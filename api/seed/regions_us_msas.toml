@@ -16,18 +16,20 @@
 #
 # Parents:
 #   - Single-state MSAs parent under their state slug.
-#   - Multi-state MSAs (no override) are STATELESS umbrellas: parents = []
-#     plus rollup_states = [each spanned state], so the metro's own orgs
+#   - Multi-state MSAs are STATELESS umbrellas: parents = [] plus
+#     rollup_states = [each spanned state], so the metro's own orgs
 #     surface on each state's detail page (browse direction) WITHOUT
 #     leaking state-tier orgs across the line in postal lookups. Each
 #     spanned state also gets a us:metro-portion leaf
 #     (parents = [state, umbrella]) that its constituent ZCTAs anchor at,
 #     so a lookup reaches only its own state. The portion slug is
 #     "<umbrella>-<state>", which sorts right after the umbrella.
-#   - Curated multi-state metros (nyc-metro, chicago-metro) instead route
-#     via the override file to a multi-state region (nyc-tristate,
-#     chicagoland) with hand-curated county leaves, and carry their
-#     rollup_states in the override.
+#   - The curated multi-state flagships (nyc-metro, chicago-metro) follow
+#     the SAME portion model; their only override is the curated slug/name
+#     and an advocacy-node umbrella parent (nyc-tristate / chicagoland)
+#     in place of the empty parent. Hand-curated borough/county leaves
+#     still win as the smaller anchor, so only ZIPs lacking a curated leaf
+#     ride the portions.
 #
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves
@@ -738,8 +740,24 @@ name = "Chicago Metro"
 scope_tier = "regional"
 sort_priority = 40
 parents = ["chicagoland"]
-rollup_states = ["il"]
+rollup_states = ["il", "in"]
 # Census CBSA 16980 — Chicago-Naperville-Elgin, IL-IN
+
+[[region]]
+slug = "chicago-metro-il"
+kind = "us:metro-portion"
+name = "Chicago Metro (IL)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il", "chicago-metro"]
+
+[[region]]
+slug = "chicago-metro-in"
+kind = "us:metro-portion"
+name = "Chicago Metro (IN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in", "chicago-metro"]
 
 [[region]]
 slug = "chico-ca-metro"
@@ -1512,8 +1530,25 @@ kind = "us:metro"
 name = "Greater Boston"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ma"]
+parents = []
+rollup_states = ["ma", "nh"]
 # Census CBSA 14460 — Boston-Cambridge-Newton, MA-NH
+
+[[region]]
+slug = "greater-boston-ma"
+kind = "us:metro-portion"
+name = "Greater Boston (MA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ma", "greater-boston"]
+
+[[region]]
+slug = "greater-boston-nh"
+kind = "us:metro-portion"
+name = "Greater Boston (NH)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nh", "greater-boston"]
 
 [[region]]
 slug = "greater-la"
@@ -2778,8 +2813,24 @@ name = "New York Metro"
 scope_tier = "regional"
 sort_priority = 40
 parents = ["nyc-tristate"]
-rollup_states = ["ny"]
+rollup_states = ["nj", "ny"]
 # Census CBSA 35620 — New York-Newark-Jersey City, NY-NJ
+
+[[region]]
+slug = "nyc-metro-nj"
+kind = "us:metro-portion"
+name = "New York Metro (NJ)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nj", "nyc-metro"]
+
+[[region]]
+slug = "nyc-metro-ny"
+kind = "us:metro-portion"
+name = "New York Metro (NY)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ny", "nyc-metro"]
 
 [[region]]
 slug = "ocala-fl-metro"
