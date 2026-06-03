@@ -1,6 +1,7 @@
 package us
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -176,8 +177,10 @@ func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 	}
 	got := AssignMSASlugs(msas, overrides)
 
-	// Override wins verbatim — statelessness is NOT applied to overridden
-	// CBSAs (their multi-state routing is hand-curated via county leaves).
+	// Override wins verbatim — AssignMSASlugs takes the override's
+	// slug/name/parents as-is and does not recompute statelessness. Portion
+	// generation for overridden multi-state CBSAs happens in BuildRegionRows
+	// (see TestBuildRegionRows_OverriddenMultiStateGetsPortions), not here.
 	if got["35620"].Slug != "nyc-metro" {
 		t.Errorf("override slug = %q, want nyc-metro", got["35620"].Slug)
 	}
@@ -195,6 +198,78 @@ func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 	if diff := cmp.Diff([]string{"dc", "md", "va", "wv"}, got["47900"].RollupStates); diff != "" {
 		t.Errorf("multi-state rollup_states (-want +got):\n%s", diff)
 	}
+}
+
+// TestBuildRegionRows_OverriddenMultiStateGetsPortions locks the unified
+// metro model (GitHub #79): an overridden multi-state CBSA (here NYC,
+// spanning NY+NJ) generates one us:metro-portion per spanned state and the
+// portion anchor lookup, exactly like a non-overridden multi-state metro.
+// The override's curated slug/name and advocacy-node parent flow through
+// to the umbrella; the portions derive from the constituent county FIPS.
+// A regression that re-introduces a flagship skip would fail here.
+func TestBuildRegionRows_OverriddenMultiStateGetsPortions(t *testing.T) {
+	msas := []MSA{
+		{CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ", StateAbbrevs: []string{"NY", "NJ"},
+			Counties: []string{"34017", "36061"}}, // Hudson County NJ + Manhattan NY
+	}
+	overrides := []MSAOverride{
+		{CBSACode: "35620", Slug: "nyc-metro", Name: "New York Metro",
+			Parents: []string{"nyc-tristate"}, RollupStates: []string{"nj", "ny"}},
+	}
+	rows, portionSlugs := BuildRegionRows(msas, AssignMSASlugs(msas, overrides))
+
+	bySlug := make(map[string]RegionRow, len(rows))
+	for _, r := range rows {
+		bySlug[r.Slug] = r
+	}
+
+	// Umbrella keeps the curated slug/name, advocacy-node parent, and the
+	// full rollup_states from the override.
+	umbrella, ok := bySlug["nyc-metro"]
+	if !ok {
+		t.Fatalf("umbrella nyc-metro not emitted; got %v", keys(bySlug))
+	}
+	if umbrella.Kind != "us:metro" {
+		t.Errorf("umbrella kind = %q, want us:metro", umbrella.Kind)
+	}
+	if diff := cmp.Diff([]string{"nyc-tristate"}, umbrella.Parents); diff != "" {
+		t.Errorf("umbrella parents (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"nj", "ny"}, umbrella.RollupStates); diff != "" {
+		t.Errorf("umbrella rollup_states (-want +got):\n%s", diff)
+	}
+
+	// One portion per spanned state, parented under [state, umbrella].
+	for _, want := range []struct{ slug, state string }{{"nyc-metro-nj", "nj"}, {"nyc-metro-ny", "ny"}} {
+		p, ok := bySlug[want.slug]
+		if !ok {
+			t.Errorf("portion %q not emitted; got %v", want.slug, keys(bySlug))
+			continue
+		}
+		if p.Kind != "us:metro-portion" {
+			t.Errorf("%s kind = %q, want us:metro-portion", want.slug, p.Kind)
+		}
+		if diff := cmp.Diff([]string{want.state, "nyc-metro"}, p.Parents); diff != "" {
+			t.Errorf("%s parents (-want +got):\n%s", want.slug, diff)
+		}
+	}
+
+	// The portion anchor lookup routes each state's county FIPS to its own
+	// portion (cbsaCode+":"+stateFIPS → portion slug).
+	wantPortionSlugs := map[string]string{"35620:34": "nyc-metro-nj", "35620:36": "nyc-metro-ny"}
+	if diff := cmp.Diff(wantPortionSlugs, portionSlugs); diff != "" {
+		t.Errorf("portionSlugs (-want +got):\n%s", diff)
+	}
+}
+
+// keys returns the map keys, for readable failure messages.
+func keys(m map[string]RegionRow) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func TestCrosswalk_ReasonPriority(t *testing.T) {

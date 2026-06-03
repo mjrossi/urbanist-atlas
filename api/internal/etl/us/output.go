@@ -33,8 +33,10 @@ type MSAOverride struct {
 	// RollupStates is the directional rollup_states list emitted onto the
 	// region row (atlas.Region.RollupStates): the state slugs on whose
 	// detail pages this metro's OWN orgs should surface, browse-direction
-	// only. Empty for nearly every metro; set on the curated stateless
-	// multi-state metros (e.g. chicago-metro → ["il"], nyc-metro → ["ny"]).
+	// only. Empty for nearly every metro; set on the curated multi-state
+	// metros to the full spanned set (e.g. chicago-metro → ["il", "in"],
+	// nyc-metro → ["nj", "ny"]), matching what the auto-gen path computes
+	// for non-overridden multi-state metros.
 	RollupStates []string `toml:"rollup_states"`
 }
 
@@ -238,11 +240,14 @@ func autoName(m MSA) string {
 	return city + " Metro"
 }
 
-// autoParents returns the state-slug parents for a non-overridden MSA.
-// All states in the title contribute a parent edge so MSA-anchored
-// ZCTAs reach their state-tier orgs via the ancestor walk. For
-// well-known multi-state metros (NYC, Chicago) the override file
-// supersedes this with an intermediate multi-state region parent.
+// autoParents returns the state-slug parents for a single-state MSA
+// (the only case AssignMSASlugs calls it — multi-state MSAs are stateless
+// umbrellas). The state in the title contributes a parent edge so
+// MSA-anchored ZCTAs reach their state-tier orgs via the ancestor walk.
+// For the curated multi-state metros (NYC, Chicago) the override file
+// supersedes this with the advocacy-node parent (nyc-tristate /
+// chicagoland); their per-state reachability comes from the portions
+// BuildRegionRows generates, same as every other multi-state metro.
 func autoParents(m MSA) []string {
 	parents := make([]string, 0, len(m.StateAbbrevs))
 	seen := map[string]bool{}
@@ -272,19 +277,21 @@ type RegionRow struct {
 
 // BuildRegionRows expands per-CBSA assignments into the full set of
 // emitted region rows — one umbrella per MSA, plus one us:metro-portion
-// per spanned state for non-overridden multi-state MSAs — and the portion
-// anchor lookup (cbsaCode+":"+stateFIPS → portion slug) the crosswalk
-// uses to anchor each ZCTA to its OWN state's portion.
+// per spanned state for every multi-state MSA — and the portion anchor
+// lookup (cbsaCode+":"+stateFIPS → portion slug) the crosswalk uses to
+// anchor each ZCTA to its OWN state's portion.
 //
-// Overridden CBSAs (nyc-metro, chicago-metro, bridgeport-ct-metro) take
-// their override verbatim and never get portions: their per-state routing
-// is hand-curated via county leaves (docs/region-graph.md §3), and the
-// rollup_states they need is supplied by the override file.
-func BuildRegionRows(msas []MSA, assignments map[string]MSAOverride, overrides []MSAOverride) ([]RegionRow, map[string]string) {
-	overridden := make(map[string]bool, len(overrides))
-	for _, o := range overrides {
-		overridden[o.CBSACode] = true
-	}
+// There is no flagship special-case: the curated multi-state metros
+// (nyc-metro, chicago-metro, greater-boston) generate portions exactly
+// like every auto-generated multi-state metro (docs/region-graph.md §1).
+// Their override only supplies the curated slug/name and — for the
+// advocacy-node flagships — the umbrella parent (nyc-tristate /
+// chicagoland); the portions + rollup_states come from the spanned
+// states. Curated borough/county leaves still win as the smaller anchor
+// (county_resolver tiers 1-2), so only ZIPs lacking a curated leaf
+// re-anchor at a portion. Single-state MSAs (overridden or not) span <2
+// states and get no portion.
+func BuildRegionRows(msas []MSA, assignments map[string]MSAOverride) ([]RegionRow, map[string]string) {
 	var rows []RegionRow
 	portionSlugs := map[string]string{}
 	for _, m := range msas {
@@ -297,9 +304,6 @@ func BuildRegionRows(msas []MSA, assignments map[string]MSAOverride, overrides [
 			RollupStates: a.RollupStates,
 			Comment:      fmt.Sprintf("# Census CBSA %s — %s", m.CBSACode, m.Title),
 		})
-		if overridden[m.CBSACode] {
-			continue
-		}
 		states := spannedStates(m)
 		if len(states) < 2 {
 			continue
@@ -412,18 +416,20 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 #
 # Parents:
 #   - Single-state MSAs parent under their state slug.
-#   - Multi-state MSAs (no override) are STATELESS umbrellas: parents = []
-#     plus rollup_states = [each spanned state], so the metro's own orgs
+#   - Multi-state MSAs are STATELESS umbrellas: parents = [] plus
+#     rollup_states = [each spanned state], so the metro's own orgs
 #     surface on each state's detail page (browse direction) WITHOUT
 #     leaking state-tier orgs across the line in postal lookups. Each
 #     spanned state also gets a us:metro-portion leaf
 #     (parents = [state, umbrella]) that its constituent ZCTAs anchor at,
 #     so a lookup reaches only its own state. The portion slug is
 #     "<umbrella>-<state>", which sorts right after the umbrella.
-#   - Curated multi-state metros (nyc-metro, chicago-metro) instead route
-#     via the override file to a multi-state region (nyc-tristate,
-#     chicagoland) with hand-curated county leaves, and carry their
-#     rollup_states in the override.
+#   - The curated multi-state flagships (nyc-metro, chicago-metro) follow
+#     the SAME portion model; their only override is the curated slug/name
+#     and an advocacy-node umbrella parent (nyc-tristate / chicagoland)
+#     in place of the empty parent. Hand-curated borough/county leaves
+#     still win as the smaller anchor, so only ZIPs lacking a curated leaf
+#     ride the portions.
 #
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves

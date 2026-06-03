@@ -19,7 +19,7 @@ The atlas's seed data splits cleanly:
 | `regions_<cc>_multistate.toml` | ✅ | |
 | `regions_<cc>.toml` (city / borough / county leaves) | ✅ | |
 | `orgs.toml` | ✅ | |
-| `regions_us_msas.toml` (393 MSAs + 88 cross-state portions) | | ✅ |
+| `regions_us_msas.toml` (393 MSAs + 94 cross-state portions) | | ✅ |
 | `regions_ca_cmas.toml` (41 CMAs + 2 portions) | | ✅ |
 | `postal_codes_us.csv` (~39.5k ZIPs) | | ✅ |
 | `postal_codes_ca.csv` (~1.6k FSAs) | | ✅ |
@@ -158,13 +158,15 @@ browse direction, without the ancestor walk ever crossing the line. The
 CA pipeline applies the identical shape to the lone cross-province CMA
 (Ottawa-Gatineau → `ca:cma-portion`).
 
-The two hand-curated flagships (`nyc-metro`, `chicago-metro`) are
-excluded from portion generation: they route through curated
-borough/county leaves + the `nyc-tristate` / `chicagoland` advocacy
-nodes, and carry their `rollup_states` via the override file. ZIPs in
-those metros that lack a curated leaf currently anchor at the bare
-stateless umbrella (reaching the metro tier but not their own state) —
-the deferred residual noted in `region-graph.md` §3.
+The curated flagships (`nyc-metro`, `chicago-metro`, `greater-boston`)
+generate portions exactly like every other multi-state metro — there is
+no flagship special-case (GitHub #79). Their override only supplies the
+curated slug/name and, for the two advocacy-coalition flagships, an
+umbrella parent (`nyc-tristate` / `chicagoland`) in place of the empty
+one. The hand-curated borough/county leaves still win as the smaller
+anchor (`county_resolver` tiers 1–2), so only ZIPs lacking a curated
+leaf ride the portions and reach their own state — closing the former
+bare-umbrella residual noted in `region-graph.md` §3.
 
 ### HUD (additive backfill, ~5–10k operational ZIPs)
 

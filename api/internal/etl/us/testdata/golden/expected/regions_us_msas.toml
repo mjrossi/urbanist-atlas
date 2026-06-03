@@ -16,18 +16,20 @@
 #
 # Parents:
 #   - Single-state MSAs parent under their state slug.
-#   - Multi-state MSAs (no override) are STATELESS umbrellas: parents = []
-#     plus rollup_states = [each spanned state], so the metro's own orgs
+#   - Multi-state MSAs are STATELESS umbrellas: parents = [] plus
+#     rollup_states = [each spanned state], so the metro's own orgs
 #     surface on each state's detail page (browse direction) WITHOUT
 #     leaking state-tier orgs across the line in postal lookups. Each
 #     spanned state also gets a us:metro-portion leaf
 #     (parents = [state, umbrella]) that its constituent ZCTAs anchor at,
 #     so a lookup reaches only its own state. The portion slug is
 #     "<umbrella>-<state>", which sorts right after the umbrella.
-#   - Curated multi-state metros (nyc-metro, chicago-metro) instead route
-#     via the override file to a multi-state region (nyc-tristate,
-#     chicagoland) with hand-curated county leaves, and carry their
-#     rollup_states in the override.
+#   - The curated multi-state flagships (nyc-metro, chicago-metro) follow
+#     the SAME portion model; their only override is the curated slug/name
+#     and an advocacy-node umbrella parent (nyc-tristate / chicagoland)
+#     in place of the empty parent. Hand-curated borough/county leaves
+#     still win as the smaller anchor, so only ZIPs lacking a curated leaf
+#     ride the portions.
 #
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves

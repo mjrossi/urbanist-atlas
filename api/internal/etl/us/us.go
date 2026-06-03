@@ -151,7 +151,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	// Expand to the full emitted region set (umbrellas + per-state
 	// portions) and the portion anchor lookup the crosswalk routes through.
-	rows, portionSlugs := BuildRegionRows(msas, assignments, overrides)
+	rows, portionSlugs := BuildRegionRows(msas, assignments)
 
 	if target.Regions() {
 		msaTOMLPath := filepath.Join(outDir, "regions_us_msas.toml")

@@ -9,9 +9,16 @@
 #   - well-known metros whose curated slug should be short (e.g.,
 #     "nyc-metro" rather than "new-york-ny-metro")
 #   - multi-state metros that should parent under an intermediate
-#     multi-state region (nyc-tristate, chicagoland) rather
-#     than under each constituent state directly
+#     multi-state advocacy region (nyc-tristate, chicagoland) rather
+#     than the bare stateless umbrella the auto-gen path emits
 #   - any future editorial cleanup of auto-generated names
+#
+# An override does NOT suppress portion generation: a multi-state CBSA
+# still gets one us:metro-portion per spanned state (parents = [state,
+# umbrella]) and the umbrella carries rollup_states = [each spanned
+# state], exactly like an auto-generated multi-state metro. Set the full
+# spanned set in rollup_states here (e.g. nyc-metro → ["nj", "ny"]); the
+# ETL takes the override verbatim, so a partial list silently under-rolls.
 #
 # CBSA codes are stable identifiers across Census revisions; using
 # them as the override key is more robust than keying by current slug.
@@ -21,14 +28,29 @@ cbsa_code = "35620"
 slug = "nyc-metro"
 name = "New York Metro"
 parents = ["nyc-tristate"]
-rollup_states = ["ny"]
+rollup_states = ["nj", "ny"]
 
 [[override]]
 cbsa_code = "16980"
 slug = "chicago-metro"
 name = "Chicago Metro"
 parents = ["chicagoland"]
-rollup_states = ["il"]
+rollup_states = ["il", "in"]
+
+# Boston-Cambridge-Newton (CBSA 14460) spans MA + NH. Unlike NYC and
+# Chicago it has no advocacy-coalition node, so it is a plain STATELESS
+# umbrella (parents = []) with the full rollup_states and ETL-generated
+# greater-boston-ma / greater-boston-nh portions — exactly the auto-gen
+# multi-state shape. This override exists only to pin the curated short
+# slug/name ("greater-boston" rather than "boston-ma-metro"). Its former
+# parents = ["ma"] leaked Boston's NH ZIPs (03xxx) up into Massachusetts;
+# the stateless umbrella + portions fixes that (GitHub #79).
+[[override]]
+cbsa_code = "14460"
+slug = "greater-boston"
+name = "Greater Boston"
+parents = []
+rollup_states = ["ma", "nh"]
 
 # Single-state metros parent to their state, matching the
 # auto-generated MSA convention for every other US metro. The
@@ -45,12 +67,6 @@ cbsa_code = "41860"
 slug = "sf-bay-area"
 name = "San Francisco Bay Area"
 parents = ["ca-state"]
-
-[[override]]
-cbsa_code = "14460"
-slug = "greater-boston"
-name = "Greater Boston"
-parents = ["ma"]
 
 [[override]]
 cbsa_code = "33100"
