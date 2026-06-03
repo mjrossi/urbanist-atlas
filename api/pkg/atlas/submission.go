@@ -30,10 +30,15 @@ const (
 // finalize it when approving and the PR worker reuses the form
 // payload's website-derived default).
 type SubmissionPayload struct {
-	Name        string   `json:"name"`
-	ShortDesc   string   `json:"short_desc"`
-	WebsiteURL  string   `json:"website_url"`
-	ContactURL  string   `json:"contact_url,omitempty"`
+	Name       string `json:"name"`
+	ShortDesc  string `json:"short_desc"`
+	WebsiteURL string `json:"website_url"`
+	ContactURL string `json:"contact_url,omitempty"`
+	// Tags is no longer wire-sourced: the public form doesn't collect
+	// tags and `tags` was dropped from the SubmissionPayload schema, so
+	// this is always nil for public submissions. It's retained so the PR
+	// worker can render an empty `tags = []` placeholder in the generated
+	// org block for the editor to fill during review.
 	Tags        []string `json:"tags"`
 	RegionSlugs []string `json:"region_slugs"`
 }

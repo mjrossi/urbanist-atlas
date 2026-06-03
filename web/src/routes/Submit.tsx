@@ -21,9 +21,8 @@ const SUBMIT_COOLDOWN_MS = 1500;
 // API-side `errors` extension keys emitted by
 // seedfiles.ValidateSubmissionPayload) to the matching
 // react-hook-form field names in SubmitForm. Server fields the form
-// doesn't render (notably `tags`, which the SPA always sends as `[]`)
-// are intentionally absent — they fall through to the top-level
-// `detail` banner instead of being silently swallowed.
+// doesn't render are intentionally absent — they fall through to the
+// top-level `detail` banner instead of being silently swallowed.
 //
 // Caveat: `region_slugs` and `short_desc` map to inputs that the form
 // HIDES for correction/removal submissions. In practice both API

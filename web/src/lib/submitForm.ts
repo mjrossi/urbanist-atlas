@@ -132,7 +132,6 @@ export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionReques
       name: form.name.trim(),
       short_desc: shortDescForWire(form),
       website_url: form.website.trim(),
-      tags: [],
       region_slugs: [],
     },
     submitter_note: submitterNote,
