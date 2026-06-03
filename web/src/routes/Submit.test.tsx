@@ -146,6 +146,36 @@ describe('Submit', () => {
     expect(body.submitter_note).toMatch(/brooklyn-ny/);
   });
 
+  it('clears the form when "File another tip" is clicked after a submit', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user, { name: 'Sample Riders Alliance' });
+    await user.tab();
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+    });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: /tip received/i }),
+      ).toBeDefined();
+    });
+
+    await user.click(screen.getByRole('button', { name: /file another tip/i }));
+
+    // Back on the form: every field the submitter just typed is blank
+    // again, not carried over from the previous submission.
+    const nameInput = await screen.findByLabelText(/organization name/i);
+    expect((nameInput as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText(/primary website/i) as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText(/region served/i) as HTMLInputElement).value).toBe('');
+    expect(
+      (screen.getByLabelText(/one-line description/i) as HTMLInputElement).value,
+    ).toBe('');
+  });
+
   it('correction submissions hide the new-org fields and POST a valid wire shape', async () => {
     const user = userEvent.setup();
     renderSubmit();
