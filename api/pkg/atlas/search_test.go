@@ -73,6 +73,31 @@ func TestMemStore_SearchRegions_ContextLabelFromStateAncestor(t *testing.T) {
 	}
 }
 
+func TestMemStore_SearchRegions_ContextLabelFallsBackToDirectParent(t *testing.T) {
+	// A metro reachable only through multi-state coalitions has no state
+	// ancestor (us:multi-state is not a state kind), so regionContextLabel
+	// can't satisfy the BFS and falls back to firstParentName: the
+	// alphabetically-first (slug ASC) direct, non-national parent's name.
+	// Parents are wired in reverse slug order so a passing result proves
+	// the slug-ASC tiebreak, not insertion order.
+	s := NewMemStore()
+	addRegions(s,
+		Region{ID: 1, Slug: "beta-coalition", Kind: "us:multi-state", Name: "Beta Coalition", Country: CountryUS, ScopeTier: ScopeRegional},
+		Region{ID: 2, Slug: "alpha-coalition", Kind: "us:multi-state", Name: "Alpha Coalition", Country: CountryUS, ScopeTier: ScopeRegional},
+		Region{ID: 3, Slug: "orphan-metro", Kind: "us:metro", Name: "Orphan Metro", Country: CountryUS, ScopeTier: ScopeRegional, ParentSlugs: []string{"beta-coalition", "alpha-coalition"}},
+	)
+	got, err := s.SearchRegions(context.Background(), "orphan", 0)
+	if err != nil {
+		t.Fatalf("SearchRegions: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 result for 'orphan', got %d", len(got))
+	}
+	if got[0].ContextLabel != "Alpha Coalition" {
+		t.Errorf("fallback context label: want %q (slug-ASC-first direct parent), got %q", "Alpha Coalition", got[0].ContextLabel)
+	}
+}
+
 func TestMemStore_SearchRegions_DisambiguatesDuplicateNames(t *testing.T) {
 	s := newSearchFixture()
 	got, err := s.SearchRegions(context.Background(), "springfield", 0)
