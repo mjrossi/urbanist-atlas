@@ -63,6 +63,7 @@ export function Submit() {
     setError,
     control,
     trigger,
+    reset,
   } = useForm<SubmitForm>({
     mode: 'onBlur',
     defaultValues: SUBMIT_FORM_DEFAULTS,
@@ -172,7 +173,15 @@ export function Submit() {
     return (
       <SubmissionReceived
         submission={mutation.data}
-        onAnother={() => mutation.reset()}
+        onAnother={() => {
+          // Clear react-hook-form's field state back to
+          // SUBMIT_FORM_DEFAULTS, then reset the mutation so the form
+          // (not the receipt) re-renders. mutation.reset() alone leaves
+          // the previously-typed values behind — Submit stays mounted,
+          // so useForm is never re-initialized.
+          reset();
+          mutation.reset();
+        }}
       />
     );
   }

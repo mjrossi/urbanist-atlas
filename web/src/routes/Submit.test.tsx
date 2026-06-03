@@ -211,6 +211,67 @@ describe('Submit', () => {
     expect(body.submitter_note).toMatch(/queens/i);
   });
 
+  it('clears the form — including the region type-ahead — when "File another tip" is clicked', async () => {
+    // Search returns nothing: this test only needs leftover *typed*
+    // text in the combobox, not a committed selection. Submissions 201.
+    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/regions/search')) {
+        return Promise.resolve(jsonResponse({ data: [] }));
+      }
+      return Promise.resolve(jsonResponse(SUCCESS_BODY, { status: 201 }));
+    });
+
+    const user = userEvent.setup();
+    renderSubmit();
+    // fillRequired satisfies the region requirement via the free-text
+    // "can't find your region?" fallback, so the form is submittable
+    // without committing a slug from the type-ahead.
+    await fillRequired(user, { name: 'Queens Bus Riders' });
+
+    // Leave unselected search text behind in the combobox input. This
+    // lives in RegionCombobox's local useState, not the react-hook-form
+    // store — the receipt unmounts the whole form subtree, so the
+    // combobox remounts fresh and this clears on its own. The RHF
+    // register fields below are the ones that need reset(): Submit
+    // itself stays mounted, so useForm retains their values.
+    const combobox = screen.getByLabelText(/region served/i);
+    await user.type(combobox, 'brookl');
+    expect((combobox as HTMLInputElement).value).toBe('brookl');
+
+    await user.tab();
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(false);
+    });
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: /tip received/i }),
+      ).toBeDefined();
+    });
+
+    await user.click(screen.getByRole('button', { name: /file another tip/i }));
+
+    // Back on a pristine form: the react-hook-form inputs are blank…
+    const nameInput = await screen.findByLabelText(/organization name/i);
+    expect((nameInput as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText(/primary website/i) as HTMLInputElement).value).toBe('');
+    expect(
+      (screen.getByLabelText(/one-line description/i) as HTMLInputElement).value,
+    ).toBe('');
+    expect(
+      (screen.getByLabelText(/can.?t find your region/i) as HTMLInputElement).value,
+    ).toBe('');
+    // …and the combobox is pristine too: no leftover search text and no
+    // chips carried over from the previous submission. Guards against a
+    // future refactor that keeps the form mounted under the receipt
+    // (e.g. an overlay), which would let the combobox's local state
+    // survive the way the RHF fields do.
+    expect((screen.getByLabelText(/region served/i) as HTMLInputElement).value).toBe('');
+  });
+
   it('correction submissions hide the new-org fields and POST a valid wire shape', async () => {
     const user = userEvent.setup();
     renderSubmit();
