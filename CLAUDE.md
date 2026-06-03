@@ -181,7 +181,10 @@ See the plan for the full schema, but at a glance:
       Census CBSA + StatsCan CMA boundary data (US: 393, CA: 41).
       Editorial overrides for slug/name/parents live in
       `regions_us_msa_overrides.toml` (US) and
-      `api/internal/etl/ca/mappings.go` (CA).
+      `regions_ca_cma_overrides.toml` (CA), both keyed by the upstream
+      CBSA/CMA code. (CA overrides used to live in
+      `api/internal/etl/ca/mappings.go`; that file now holds only the
+      FSA→leaf and FIPS/PRUID→slug crosswalk maps.)
     - `regions_<cc>.toml` — hand-curated city/borough/county leaves.
 - Postal codes map to whatever the smallest curated region for that
   area is — a city leaf where one exists, an NYC borough leaf via

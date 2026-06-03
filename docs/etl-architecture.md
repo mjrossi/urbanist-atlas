@@ -19,8 +19,8 @@ The atlas's seed data splits cleanly:
 | `regions_<cc>_multistate.toml` | ✅ | |
 | `regions_<cc>.toml` (city / borough / county leaves) | ✅ | |
 | `orgs.toml` | ✅ | |
-| `regions_us_msas.toml` (393 MSAs) | | ✅ |
-| `regions_ca_cmas.toml` (41 CMAs) | | ✅ |
+| `regions_us_msas.toml` (393 MSAs + 88 cross-state portions) | | ✅ |
+| `regions_ca_cmas.toml` (41 CMAs + 2 portions) | | ✅ |
 | `postal_codes_us.csv` (~39.5k ZIPs) | | ✅ |
 | `postal_codes_ca.csv` (~1.6k FSAs) | | ✅ |
 
@@ -142,6 +142,29 @@ The in-memory ancestor walk (`MemStore.AncestorRegions`, in
 the region DAG upward from whatever the ZIP points at, so a ZIP
 anchored at a borough surfaces NYC, the metro, the state, and any
 multi-state federations without app-level fallback logic.
+
+### Cross-state metros (stateless umbrella + portions)
+
+A CBSA that spans multiple states can't parent under all of them — the
+ancestor walk would carry one state's ZIP up into its neighbours
+([`region-graph.md`](./region-graph.md) §1). So when a CBSA's
+constituent counties span ≥2 states, the generator emits the metro as a
+**stateless umbrella** (`parents = []`) plus one **`us:metro-portion`**
+leaf per spanned state (`parents = [state, umbrella]`), and routes each
+county to its own state's portion. The umbrella also carries a
+directional **`rollup_states`** list (the spanned states) so the metro's
+own orgs still surface on each state's `/region/{state}` page in the
+browse direction, without the ancestor walk ever crossing the line. The
+CA pipeline applies the identical shape to the lone cross-province CMA
+(Ottawa-Gatineau → `ca:cma-portion`).
+
+The two hand-curated flagships (`nyc-metro`, `chicago-metro`) are
+excluded from portion generation: they route through curated
+borough/county leaves + the `nyc-tristate` / `chicagoland` advocacy
+nodes, and carry their `rollup_states` via the override file. ZIPs in
+those metros that lack a curated leaf currently anchor at the bare
+stateless umbrella (reaching the metro tier but not their own state) —
+the deferred residual noted in `region-graph.md` §3.
 
 ### HUD (additive backfill, ~5–10k operational ZIPs)
 

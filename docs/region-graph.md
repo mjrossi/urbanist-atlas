@@ -79,8 +79,8 @@ graph BT
   tristate[Tri-State]
 
   brooklyn --> nyc
+  brooklyn --> ny
   nyc --> nycmetro
-  nyc --> ny
   newark --> nycmetro
   newark --> nj
   bridgeport --> nycmetro
@@ -114,6 +114,44 @@ cross-province CMA (`ottawa-gatineau-cma`) uses the same
 stateless-umbrella + `ca:cma-portion` shape. Portions are plumbing: they
 are excluded from the default browse list and are not state-equivalent
 for bucketing.
+
+The diagram above is the hand-curated NYC/Chicago variant. Every
+*auto-generated* multi-state metro instead uses the **portion shape** — a
+stateless umbrella, one portion leaf per spanned state, and a directional
+`rollup_states` list. Concretely, for the tri-state Cincinnati metro
+(Census CBSA 17140, OH-KY-IN):
+
+```mermaid
+graph BT
+  pky["Cincinnati Metro KY<br/>us:metro-portion"]
+  poh["Cincinnati Metro OH<br/>us:metro-portion"]
+  pin["Cincinnati Metro IN<br/>us:metro-portion"]
+  metro["Cincinnati Metro<br/>us:metro · stateless<br/>parents = empty"]
+  ky["Kentucky"]
+  oh["Ohio"]
+  in["Indiana"]
+
+  pky --> ky
+  pky --> metro
+  poh --> oh
+  poh --> metro
+  pin --> in
+  pin --> metro
+  metro -.->|rollup_states<br/>browse-only, not walked| ky
+  metro -.->|rollup_states| oh
+  metro -.->|rollup_states| in
+```
+
+Solid edges are parent edges — the DAG the ancestor walk follows. Dashed
+edges are `rollup_states`, which the walk **never** follows. A Covington
+KY ZIP (`41011`) anchors at `cincinnati-oh-metro-ky` (a *data* decision in
+`postal_codes_us.csv`) and walks `→ {ky, cincinnati-oh-metro}` — reaching
+Kentucky and the stateless umbrella, but never Ohio or Indiana (the
+umbrella has `parents = []`, so the walk stops there). The metro's own
+orgs still surface on `/region/oh`, `/region/in`, **and** `/region/ky`
+via the dashed `rollup_states` edges, consulted only in the
+browse/descendant direction. So a metro-tier org appears on all three
+state pages while no lookup leaks a neighbouring state across the line.
 
 ### 2. Multi-state / federation regions parent the metro or the leaf, not the state
 
@@ -382,15 +420,16 @@ numbers — only their relative order.
 graph BT
   brooklyn[Brooklyn<br/>local · 10]
   manhattan[Manhattan<br/>local · 10]
-  nyc[NYC<br/>local · 15]
+  nyc[NYC<br/>regional · 15]
   nycmetro[NYC Metro<br/>regional · 40]
   ny[New York<br/>regional · 60]
   tristate[Tri-State<br/>regional · 80]
 
   brooklyn --> nyc
   manhattan --> nyc
+  brooklyn --> ny
+  manhattan --> ny
   nyc --> nycmetro
-  nyc --> ny
   nycmetro --> tristate
 ```
 
@@ -594,8 +633,8 @@ recommended vocabulary uses country-prefixed values:
 
 | Country | Recommended kinds |
 |---|---|
-| US | `us:borough`, `us:city`, `us:county`, `us:metro`, `us:state`, `us:territory`, `us:federal-district`, `us:multi-state`, `us:transit-federation` |
-| CA | `ca:city`, `ca:regional-district`, `ca:cma`, `ca:province`, `ca:territory` |
+| US | `us:borough`, `us:city`, `us:county`, `us:metro`, `us:metro-portion`, `us:state`, `us:territory`, `us:federal-district`, `us:multi-state`, `us:transit-federation` |
+| CA | `ca:city`, `ca:regional-district`, `ca:cma`, `ca:cma-portion`, `ca:province`, `ca:territory` |
 | PT | `pt:freguesia`, `pt:municipio`, `pt:cim`, `pt:area-metropolitana`, `pt:distrito`, `pt:nuts-ii`, `pt:regiao-autonoma`, `pt:nacional` |
 | DE | `de:bezirk`, `de:kreisfreie-stadt`, `de:kreis`, `de:land`, `de:transit-federation` |
 | FR | `fr:commune`, `fr:departement`, `fr:region`, `fr:metropole` |
@@ -603,7 +642,10 @@ recommended vocabulary uses country-prefixed values:
 | AU | `au:suburb`, `au:lga`, `au:gccsa`, `au:state` |
 
 Clients should treat unknown kinds gracefully — fall back to
-displaying `name`.
+displaying `name`. The `*-portion` kinds (`us:metro-portion`,
+`ca:cma-portion`) are ETL-generated plumbing for cross-state metros
+(see §1): they are not state-equivalent for bucketing and are excluded
+from the default browse list, so editors never author them by hand.
 
 `scope_tier` is a closed enum on the wire: exactly `'local'`,
 `'regional'`, or `'national'`. The default `/lookup` surface buckets
