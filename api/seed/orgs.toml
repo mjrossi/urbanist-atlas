@@ -115,6 +115,16 @@ contact_url = "https://www.bike.nyc/about/contact-us/"
 tags = ["cycling", "education", "advocacy", "safe-streets"]
 region_slugs = ["nyc"]
 
+[[org]]
+slug = "off-ramp-nyc"
+added_at = 2026-06-03
+name = "Off-Ramp NYC"
+short_desc = "Highway-removal campaign that wants the city to decommission the crumbling Brooklyn-Queens Expressway rather than rebuild it, replacing the corridor with a surface boulevard, light rail and bus rapid transit, protected bike and micromobility lanes, housing, and green space. Argues teardown reclaims public land and redirects tens of billions in public funds to community needs."
+website_url = "https://www.offramp.nyc"
+contact_url = "https://www.offramp.nyc/about"
+tags = ["advocacy", "safe-streets", "transit", "urbanism", "land-use"]
+region_slugs = ["nyc"]
+
 # --- NYC boroughs ---
 # Transportation Alternatives' borough activist committees are
 # chapters of TA (listed citywide above) and are excluded per the
