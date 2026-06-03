@@ -105,20 +105,22 @@ only in the browse/descendant direction (region-detail + browse counts),
 **never in the ancestor walk** — so (a) holds without breaking (b). It is
 a server-side field (`atlas.Region.RollupStates`, `json:"-"`), resolved
 to a `state → metros` index at load and validated to point only at
-state-equivalent kinds (plus `us:federal-district`, for DC). The two
-flagship metros (`chicago-metro`, `nyc-metro`) keep the hand-curated
-variant — routed to a `us:multi-state` advocacy node
-(`chicagoland` / `nyc-tristate`) with curated county/borough leaves — and
-carry their `rollup_states` via the override file. Canada's lone
-cross-province CMA (`ottawa-gatineau-cma`) uses the same
-stateless-umbrella + `ca:cma-portion` shape. Portions are plumbing: they
-are excluded from the default browse list and are not state-equivalent
-for bucketing.
+state-equivalent kinds (plus `us:federal-district`, for DC). The
+curated flagships (`chicago-metro`, `nyc-metro`, `greater-boston`)
+follow the **same portion model** — their override only supplies the
+curated slug/name and, for the two advocacy-coalition flagships, an
+umbrella parent (`chicagoland` / `nyc-tristate`) in place of the empty
+parent; the per-state portions and `rollup_states` come from the spanned
+states like any auto-generated metro, and the curated county/borough
+leaves still win as the smaller anchor. Canada's lone cross-province CMA
+(`ottawa-gatineau-cma`) uses the same stateless-umbrella +
+`ca:cma-portion` shape. Portions are plumbing: they are excluded from the
+default browse list and are not state-equivalent for bucketing.
 
-The diagram above is the hand-curated NYC/Chicago variant. Every
-*auto-generated* multi-state metro instead uses the **portion shape** — a
-stateless umbrella, one portion leaf per spanned state, and a directional
-`rollup_states` list. Concretely, for the tri-state Cincinnati metro
+The diagram above adds the NYC/Chicago advocacy-node parent on top of the
+**portion shape** that *every* multi-state metro uses — a (stateless or
+advocacy-parented) umbrella, one portion leaf per spanned state, and a
+directional `rollup_states` list. Concretely, for the tri-state Cincinnati metro
 (Census CBSA 17140, OH-KY-IN):
 
 ```mermaid
@@ -228,11 +230,13 @@ Berlin's VBB similarly: a top-level region; both `berlin` and
 > district (Cook + 5 collar), a genuinely distinct entity from the
 > broader bi-state Census metro.
 >
-> **Residual (deferred).** Census CBSA 16980 nominally includes Kenosha
-> County, WI, but Kenosha is modeled as a standalone `kenosha-wi-metro`
-> under `wi`, so it does not reach `chicagoland`. Reconnecting it — and
-> seeding the outlying non-RTA metro counties (Kendall, Grundy, DeKalb)
-> that still anchor at the bare metro — is left to a future slice.
+> **Residual.** The outlying non-RTA Illinois metro counties (Kendall,
+> Grundy, DeKalb) that used to anchor at the bare `chicago-metro` umbrella
+> now anchor at the generated `chicago-metro-il` portion and reach `il`
+> (GitHub #79, the unified-portion slice). Census CBSA 16980 does **not**
+> include Kenosha County, WI — Kenosha is its own `kenosha-wi-metro` under
+> `wi` and stays there; reconnecting it to `chicagoland` is the one piece
+> left for a future slice.
 
 ### 4. `scope_tier` is editorial, not derived
 
