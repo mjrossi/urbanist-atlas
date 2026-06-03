@@ -39,6 +39,47 @@ func TestBuildMemStore_FromEmbed(t *testing.T) {
 	exerciseStore(t, store)
 }
 
+// TestBuildMemStore_Embed_MetroRollupSurfacesOnState is the end-to-end
+// guard for the rollup_states fix against the real seed bundle: the
+// Chicago-metro org (Active Transportation Alliance) and the NYC-metro
+// org (TransitCenter) surface in the Regional bucket of /region/il and
+// /region/ny, even though those bi-state metros carry no state parent
+// edge (they parent under chicagoland / nyc-tristate). Pins the original
+// "Chicago Metro missing on the IL page" report.
+func TestBuildMemStore_Embed_MetroRollupSurfacesOnState(t *testing.T) {
+	store, err := seedfiles.BuildMemStore(nil, seedfs.FS)
+	if err != nil {
+		t.Fatalf("BuildMemStore embed: %v", err)
+	}
+	cases := []struct {
+		state   string
+		orgSlug string
+	}{
+		{"il", "active-transportation-alliance"},
+		{"ny", "transitcenter"},
+	}
+	for _, tc := range cases {
+		detail, err := atlas.GetRegion(context.Background(), store, tc.state)
+		if err != nil {
+			t.Fatalf("GetRegion(%s): %v", tc.state, err)
+		}
+		if detail == nil {
+			t.Fatalf("GetRegion(%s) returned nil", tc.state)
+		}
+		found := false
+		got := make([]string, 0, len(detail.Regional))
+		for _, o := range detail.Regional {
+			got = append(got, o.Slug)
+			if o.Slug == tc.orgSlug {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("GetRegion(%s).Regional missing %q (rollup_states); got %v", tc.state, tc.orgSlug, got)
+		}
+	}
+}
+
 // TestBuildMemStore_LogsSeedCounts confirms the boot summary line carries
 // the loaded-data counts an operator relies on at startup — regions,
 // orgs, and the postal-code total (the largest dataset, previously only

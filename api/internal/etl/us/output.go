@@ -30,6 +30,12 @@ type MSAOverride struct {
 	Slug     string   `toml:"slug"`
 	Name     string   `toml:"name"`
 	Parents  []string `toml:"parents"`
+	// RollupStates is the directional rollup_states list emitted onto the
+	// region row (atlas.Region.RollupStates): the state slugs on whose
+	// detail pages this metro's OWN orgs should surface, browse-direction
+	// only. Empty for nearly every metro; set on the curated stateless
+	// multi-state metros (e.g. chicago-metro → ["il"], nyc-metro → ["ny"]).
+	RollupStates []string `toml:"rollup_states"`
 }
 
 type overrideFile struct {
@@ -239,11 +245,39 @@ func WriteMSAsTOML(w io.Writer, msas []MSA, assignments map[string]MSAOverride) 
 		if _, err := bw.WriteString("]\n"); err != nil {
 			return err
 		}
+		if err := writeStringList(bw, "rollup_states", a.RollupStates); err != nil {
+			return err
+		}
 		if _, err := fmt.Fprintf(bw, "# Census CBSA %s — %s\n", m.CBSACode, m.Title); err != nil {
 			return err
 		}
 	}
 	return bw.Flush()
+}
+
+// writeStringList writes a TOML `key = ["a", "b"]` line (plus newline),
+// but ONLY when items is non-empty — an empty list emits nothing, so
+// region rows without the field stay byte-identical. Used for the
+// optional rollup_states field.
+func writeStringList(w *bufio.Writer, key string, items []string) error {
+	if len(items) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "%s = [", key); err != nil {
+		return err
+	}
+	for i, it := range items {
+		if i > 0 {
+			if _, err := w.WriteString(", "); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprintf(w, "%q", it); err != nil {
+			return err
+		}
+	}
+	_, err := w.WriteString("]\n")
+	return err
 }
 
 const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated from the

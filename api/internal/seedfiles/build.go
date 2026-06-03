@@ -83,6 +83,10 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 	parentSlugs := map[string][]string{}
 	childCount := map[string]int{}
 	localTier := map[string]bool{}
+	// kindBySlug + rollupSources back the post-Stage-1 rollup_states
+	// resolution (a directional metro->state page edge, NOT a graph edge).
+	kindBySlug := map[string]atlas.RegionKind{}
+	var rollupSources []atlas.Region
 	var nextRegionID int64 = 1
 
 	// Stage 1: regions, in dependency order.
@@ -118,6 +122,10 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 				}
 				nextRegionID++
 				store.AddRegion(r)
+				kindBySlug[r.Slug] = r.Kind
+				if len(r.RollupStates) > 0 {
+					rollupSources = append(rollupSources, r)
+				}
 			}
 		}
 	}
@@ -139,6 +147,27 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 	// once :107 stops forcing backward edges.
 	if err := DetectCyclesGraph(parentSlugs); err != nil {
 		return nil, fmt.Errorf("seedfiles: global region graph: %w", err)
+	}
+
+	// rollup_states resolution: a directional metro->state edge that
+	// surfaces a (stateless) multi-state metro's OWN orgs on its
+	// constituent states' detail pages, in the browse/descendant direction
+	// ONLY. Resolved here, after every region is registered, so a metro may
+	// name a state defined in any already-loaded file. These are NOT graph
+	// edges — they never enter parentSlugs, DetectCyclesGraph, or the
+	// ancestor walk, which is what keeps the relation leak-free
+	// (docs/region-graph.md §1). Each target must exist and be a
+	// state-equivalent or us:federal-district kind (IsRollupTargetKind).
+	for _, r := range rollupSources {
+		for _, target := range r.RollupStates {
+			if _, ok := regionIDBySlug[target]; !ok {
+				return nil, fmt.Errorf("seedfiles: region %q rollup_states references unknown slug %q", r.Slug, target)
+			}
+			if !atlas.IsRollupTargetKind(kindBySlug[target]) {
+				return nil, fmt.Errorf("seedfiles: region %q rollup_states target %q must be a state-equivalent or us:federal-district kind (got %q)", r.Slug, target, kindBySlug[target])
+			}
+			store.AddRollupState(r.Slug, target)
+		}
 	}
 
 	// Stage 2: postal codes, country-by-country. anchoredSlugs records

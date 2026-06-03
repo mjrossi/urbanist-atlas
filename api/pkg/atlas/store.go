@@ -43,6 +43,9 @@ var ErrRegionNotFound = errors.New("atlas: region not found")
 //     and populates Org.AddedAt when the row carries one.
 //   - ListRegions' nearest-browseable-ancestor walk resolves ties
 //     (multiple browseable parents at min depth) by slug ASC.
+//   - RollupMetrosFor is browse/descendant direction only: it never feeds
+//     AncestorRegions or Lookup, so the rollup_states relation cannot leak
+//     orgs across a postal-code lookup.
 type Store interface {
 	// ResolveLeafRegion returns the leaf region a postal code points at.
 	// The code argument should be the user's raw input; implementations
@@ -69,6 +72,16 @@ type Store interface {
 	// the focus at index 0, deduplicates DAG diamonds, and excludes
 	// scope_tier='national' rows from both the seed and the recursion.
 	DescendantRegions(ctx context.Context, focusRegionID int64) ([]Region, error)
+
+	// RollupMetrosFor returns the metro NODES (not their descendants)
+	// whose OWN orgs should additionally surface on the given
+	// state-equivalent region's detail page — the directional
+	// rollup_states relation. Returns an empty slice for a region that is
+	// not a rollup target. National-tier metros are excluded. This
+	// relation is browse/descendant direction ONLY; it is never consulted
+	// by AncestorRegions, so a leaf under the metro cannot leak the state
+	// via the ancestor walk.
+	RollupMetrosFor(ctx context.Context, stateRegionID int64) ([]Region, error)
 
 	// OrgsForRegions returns all approved organizations attached to any
 	// of the given region IDs. Each returned Org has its full Regions

@@ -245,3 +245,66 @@ func regionTable(name, kind, scope string, parents []string) string {
 }
 
 func postalHeaderCSV() string { return "postal_code,country,leaf_region_slug\n" }
+
+// rollupFixture builds a two-file bundle: a top region (the rollup
+// target) and a stateless metro carrying `rollup_states = [target]`. The
+// metro is regional-tier so it never trips the local-leaf orphan check;
+// the org attaches to the metro so ParseOrgs is satisfied.
+func rollupFixture(targetSlug, targetKind, rollupTarget string) fstest.MapFS {
+	top := "[[region]]\nslug = \"" + targetSlug + "\"\nkind = \"" + targetKind +
+		"\"\nname = \"Target\"\nscope_tier = \"regional\"\nsort_priority = 60\n"
+	metro := "[[region]]\nslug = \"chicago-metro\"\nkind = \"us:metro\"\nname = \"Chicago Metro\"\n" +
+		"scope_tier = \"regional\"\nsort_priority = 40\nrollup_states = [\"" + rollupTarget + "\"]\n"
+	postal := postalHeaderCSV() + "10001,R," + targetSlug + "\n"
+	return fixtureFS(
+		map[string]string{"r_top": top, "r_metro": metro},
+		map[string]string{"r": postal},
+		orgFor("chicago-metro"),
+	)
+}
+
+func rollupCountrySpec() []countrySpec {
+	return []countrySpec{{Code: "R", RegionFiles: []string{"r_top", "r_metro"}, Postal: "r"}}
+}
+
+// TestBuildMemStore_RollupStatesValid confirms a metro naming a
+// state-equivalent region in rollup_states loads cleanly (the directional
+// edge resolves and never enters the parent/cycle graph).
+func TestBuildMemStore_RollupStatesValid(t *testing.T) {
+	fs := rollupFixture("il", "us:state", "il")
+	if _, err := buildMemStore(nil, fs, rollupCountrySpec()); err != nil {
+		t.Fatalf("valid rollup_states fixture rejected: %v", err)
+	}
+}
+
+// TestBuildMemStore_RollupStatesFederalDistrictAccepted pins the DC
+// relaxation: us:federal-district is a valid rollup target even though it
+// is not a state-equivalent kind for bucketing (IsRollupTargetKind).
+func TestBuildMemStore_RollupStatesFederalDistrictAccepted(t *testing.T) {
+	fs := rollupFixture("dc", "us:federal-district", "dc")
+	if _, err := buildMemStore(nil, fs, rollupCountrySpec()); err != nil {
+		t.Fatalf("federal-district rollup target should be accepted: %v", err)
+	}
+}
+
+// TestBuildMemStore_RollupStatesUnknownTarget fails closed when
+// rollup_states names a slug no region defines.
+func TestBuildMemStore_RollupStatesUnknownTarget(t *testing.T) {
+	fs := rollupFixture("il", "us:state", "nope")
+	_, err := buildMemStore(nil, fs, rollupCountrySpec())
+	if err == nil || !strings.Contains(err.Error(), "rollup_states references unknown slug") {
+		t.Fatalf("want unknown-slug rollup error, got %v", err)
+	}
+}
+
+// TestBuildMemStore_RollupStatesNonStateKind fails closed when
+// rollup_states points at a non-state, non-federal-district kind (here a
+// metro) — guarding against an editor pointing a rollup at the wrong tier.
+func TestBuildMemStore_RollupStatesNonStateKind(t *testing.T) {
+	// Target is a us:metro (registered, but not a valid rollup kind).
+	fs := rollupFixture("other-metro", "us:metro", "other-metro")
+	_, err := buildMemStore(nil, fs, rollupCountrySpec())
+	if err == nil || !strings.Contains(err.Error(), "must be a state-equivalent") {
+		t.Fatalf("want non-state-kind rollup error, got %v", err)
+	}
+}

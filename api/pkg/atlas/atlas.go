@@ -56,6 +56,17 @@ type Tag string
 // transitive). SortPriority is a server-side hint used by Lookup to
 // order orgs within the Regional bucket (lower = more specific = earlier).
 //
+// RollupStates is a directional, server-side-only association
+// (json:"-", like SortPriority): the state-equivalent region slugs on
+// whose detail/browse pages this region's OWN orgs should additionally
+// surface (in the Regional bucket), in the descendant/browse direction
+// ONLY. Unlike ParentSlugs it is NOT a graph edge — it is never added to
+// the parent map, cycle detection, or the ancestor walk — so it cannot
+// leak orgs across a /lookup. It lets a stateless multi-state metro
+// (e.g. chicago-metro) surface its orgs on its constituent states'
+// pages without the cross-state ancestor leak docs/region-graph.md §1
+// forbids. Resolved to a state->metros index at load (seedfiles).
+//
 // The TOML tags name the seed-file shape (regions_<cc>.toml). ID and
 // Country are stamped by the seedfiles loader after parsing and
 // carry `toml:"-"`. The TOML field for parents is `parents` (a
@@ -70,6 +81,7 @@ type Region struct {
 	ScopeTier    ScopeTier  `json:"scope_tier" toml:"scope_tier"`
 	ParentSlugs  []string   `json:"parent_slugs" toml:"parents"`
 	SortPriority int        `json:"-" toml:"sort_priority"` // server-side only, not on the wire
+	RollupStates []string   `json:"-" toml:"rollup_states"` // server-side only; directional metro→state page rollup (see above)
 }
 
 // Org is a single advocacy organization. Regions is denormalized onto
