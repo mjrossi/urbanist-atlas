@@ -1134,8 +1134,12 @@ components:
 
     SubmissionPayload:
       type: object
-      description: The proposed organization, as submitted by a member of the public.
-      required: [name, short_desc, website_url, tags]
+      description: |
+        The proposed organization, as submitted by a member of the
+        public. There is no `tags` field: the public form doesn't
+        collect tags — an editor assigns them while reviewing the
+        promotion PR, so they aren't part of the submission wire shape.
+      required: [name, short_desc, website_url]
       properties:
         name:
           type: string
@@ -1148,10 +1152,6 @@ components:
           type: string
           format: uri
           description: Optional.
-        tags:
-          type: array
-          items:
-            type: string
         region_slugs:
           type: array
           items:

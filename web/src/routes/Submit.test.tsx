@@ -59,7 +59,6 @@ const SUCCESS_BODY = {
     name: 'Strong Towns Sample',
     short_desc: 'Advocates for safer streets in Anytown.',
     website_url: 'https://example.org',
-    tags: [],
     region_slugs: ['brooklyn-ny'],
   },
   created_at: '2026-05-28T15:00:00Z',
@@ -271,9 +270,11 @@ describe('Submit', () => {
   });
 
   it('surfaces unmapped/hidden-field validation errors in the top-level banner', async () => {
-    // `tags` has no entry in FIELD_NAME_MAP; `submitter_email` maps to
-    // the `contact` form field, which renders no inline error slot.
-    // Both would be swallowed if only `setError`-mapped fields showed.
+    // `unrecognized_field` has no entry in FIELD_NAME_MAP (the client
+    // doesn't model every key the API might reject); `submitter_email`
+    // maps to the `contact` form field, which renders no inline error
+    // slot. Both would be swallowed if only `setError`-mapped fields
+    // showed.
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -282,7 +283,7 @@ describe('Submit', () => {
           detail: 'one or more fields failed validation',
           status: 400,
           errors: {
-            tags: 'too many tags (max 5)',
+            unrecognized_field: 'unexpected validation failure',
             submitter_email: 'must be a valid email address',
           },
         },
@@ -298,7 +299,7 @@ describe('Submit', () => {
     // Neither error has a home in the form, so both must appear in the
     // banner rather than vanishing.
     await waitFor(() => {
-      expect(screen.getByText(/too many tags/i)).toBeDefined();
+      expect(screen.getByText(/unexpected validation failure/i)).toBeDefined();
     });
     expect(screen.getByText(/must be a valid email address/i)).toBeDefined();
   });

@@ -170,7 +170,10 @@ type Meta struct {
 
 // NewSubmissionRequest Request body for `POST /api/v1/submissions`.
 type NewSubmissionRequest struct {
-	// Payload The proposed organization, as submitted by a member of the public.
+	// Payload The proposed organization, as submitted by a member of the
+	// public. There is no `tags` field: the public form doesn't
+	// collect tags — an editor assigns them while reviewing the
+	// promotion PR, so they aren't part of the submission wire shape.
 	Payload SubmissionPayload `json:"payload"`
 
 	// SubmitterEmail Optional. The submitter's contact email.
@@ -535,7 +538,10 @@ type Submission struct {
 	// accepted. This is the only ID exposed on the wire.
 	Id openapi_types.UUID `json:"id"`
 
-	// Payload The proposed organization, as submitted by a member of the public.
+	// Payload The proposed organization, as submitted by a member of the
+	// public. There is no `tags` field: the public form doesn't
+	// collect tags — an editor assigns them while reviewing the
+	// promotion PR, so they aren't part of the submission wire shape.
 	Payload SubmissionPayload `json:"payload"`
 
 	// ProcessedAt Set when status moves from `pending` to a terminal state.
@@ -562,7 +568,10 @@ type Submission struct {
 	SubmitterNote  *string              `json:"submitter_note,omitempty"`
 }
 
-// SubmissionPayload The proposed organization, as submitted by a member of the public.
+// SubmissionPayload The proposed organization, as submitted by a member of the
+// public. There is no `tags` field: the public form doesn't
+// collect tags — an editor assigns them while reviewing the
+// promotion PR, so they aren't part of the submission wire shape.
 type SubmissionPayload struct {
 	// ContactUrl Optional.
 	ContactUrl *string `json:"contact_url,omitempty"`
@@ -576,7 +585,6 @@ type SubmissionPayload struct {
 	// region in PR review using `submitter_note`.
 	RegionSlugs *[]string `json:"region_slugs,omitempty"`
 	ShortDesc   string    `json:"short_desc"`
-	Tags        []string  `json:"tags"`
 	WebsiteUrl  string    `json:"website_url"`
 }
 

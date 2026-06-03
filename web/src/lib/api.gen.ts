@@ -746,7 +746,12 @@ export interface components {
             meta: components["schemas"]["Meta"];
             data: components["schemas"]["Org"][];
         };
-        /** @description The proposed organization, as submitted by a member of the public. */
+        /**
+         * @description The proposed organization, as submitted by a member of the
+         *     public. There is no `tags` field: the public form doesn't
+         *     collect tags — an editor assigns them while reviewing the
+         *     promotion PR, so they aren't part of the submission wire shape.
+         */
         SubmissionPayload: {
             name: string;
             short_desc: string;
@@ -757,7 +762,6 @@ export interface components {
              * @description Optional.
              */
             contact_url?: string;
-            tags: string[];
             /**
              * @description Optional. Slugs of the regions this organization serves
              *     (e.g. `["brooklyn-ny","nyc-metro"]`). When provided, every

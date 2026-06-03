@@ -430,6 +430,38 @@ func TestRenderOrgBlock_AddedAt(t *testing.T) {
 	}
 }
 
+// TestRenderOrgBlock_EmptyTagsRendersPlaceholder pins the editor
+// affordance: public submissions no longer carry tags (the `tags` field
+// was dropped from SubmissionPayload), so sub.Payload.Tags is nil. The
+// rendered block must still emit a `tags = []` line — an explicit empty
+// array the editor fills in during PR review — rather than omitting the
+// key. region_slugs, when present, is rendered as-is.
+func TestRenderOrgBlock_EmptyTagsRendersPlaceholder(t *testing.T) {
+	sub := atlas.Submission{
+		PublicID: "01928200-3344-7000-9abc-000000000099",
+		Payload: atlas.SubmissionPayload{
+			Name:        "Queens Bus Riders",
+			ShortDesc:   "Riders organizing for faster, more frequent bus service.",
+			WebsiteURL:  "https://example.org/queens-bus-riders",
+			Tags:        nil, // public submissions don't carry tags
+			RegionSlugs: []string{"queens"},
+		},
+		Status:    atlas.SubmissionApproved,
+		CreatedAt: time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC),
+	}
+	addedAt := time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC)
+	out, err := RenderOrgBlock(sub, "queens-bus-riders", addedAt)
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(out, "tags = []") {
+		t.Fatalf("rendered block missing empty `tags = []` placeholder; got:\n%s", out)
+	}
+	if !strings.Contains(out, "queens") {
+		t.Fatalf("rendered block missing region_slugs entry `queens`; got:\n%s", out)
+	}
+}
+
 func TestDeriveSlug(t *testing.T) {
 	cases := map[string]string{
 		"Brooklyn Greenways":   "brooklyn-greenways",

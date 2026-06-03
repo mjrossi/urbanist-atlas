@@ -32,6 +32,14 @@ func RenderOrgBlock(sub atlas.Submission, slug string, addedAt time.Time) (strin
 	if slug == "" {
 		return "", fmt.Errorf("githubpr: empty slug for submission %s", sub.PublicID)
 	}
+	// Tags is no longer carried by public submissions (an editor assigns
+	// them in this PR). Default a nil slice to an empty one so the block
+	// always renders a `tags = []` placeholder rather than omitting the
+	// key — the editor fills it in during review.
+	tags := sub.Payload.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	entry := orgTOMLEntry{
 		Slug:        slug,
 		AddedAt:     toml.LocalDate{Year: addedAt.Year(), Month: int(addedAt.Month()), Day: addedAt.Day()},
@@ -39,7 +47,7 @@ func RenderOrgBlock(sub atlas.Submission, slug string, addedAt time.Time) (strin
 		ShortDesc:   sub.Payload.ShortDesc,
 		WebsiteURL:  sub.Payload.WebsiteURL,
 		ContactURL:  sub.Payload.ContactURL,
-		Tags:        sub.Payload.Tags,
+		Tags:        tags,
 		RegionSlugs: sub.Payload.RegionSlugs,
 	}
 	doc := orgTOMLDoc{Org: []orgTOMLEntry{entry}}

@@ -83,11 +83,15 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 		if body.Payload.RegionSlugs != nil {
 			rawRegionSlugs = *body.Payload.RegionSlugs
 		}
+		// Tags are intentionally not read from the wire: the public form
+		// doesn't collect them (an editor assigns tags in the promotion
+		// PR), and `tags` was dropped from SubmissionPayload. payload.Tags
+		// stays nil; the PR worker renders it as an empty `tags = []`
+		// placeholder for the editor to fill.
 		payload := atlas.SubmissionPayload{
 			Name:        strings.TrimSpace(body.Payload.Name),
 			ShortDesc:   strings.TrimSpace(body.Payload.ShortDesc),
 			WebsiteURL:  strings.TrimSpace(body.Payload.WebsiteUrl),
-			Tags:        normalizeStringSlice(body.Payload.Tags),
 			RegionSlugs: normalizeStringSlice(rawRegionSlugs),
 		}
 		if body.Payload.ContactUrl != nil {
@@ -395,7 +399,6 @@ func toOAPISubmissionPayload(p atlas.SubmissionPayload) oapi.SubmissionPayload {
 		Name:        p.Name,
 		ShortDesc:   p.ShortDesc,
 		WebsiteUrl:  p.WebsiteURL,
-		Tags:        nonNilSlice(append([]string(nil), p.Tags...)),
 		RegionSlugs: &regions,
 	}
 	if p.ContactURL != "" {

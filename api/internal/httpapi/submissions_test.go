@@ -133,7 +133,6 @@ func goodSubmissionBody() map[string]any {
 			"name":         "Brooklyn Greenways",
 			"short_desc":   "Volunteers expanding the protected-lane network.",
 			"website_url":  "https://example.org/brooklyn-greenways",
-			"tags":         []string{"cycling", "grassroots"},
 			"region_slugs": []string{"brooklyn-ny"},
 		},
 		"submitter_name":  "Jane",
@@ -162,6 +161,27 @@ func TestCreateSubmission_HappyPath(t *testing.T) {
 	}
 	if len(got.ID) != 36 {
 		t.Fatalf("id length: want 36, got %d (%q)", len(got.ID), got.ID)
+	}
+}
+
+// TestCreateSubmission_RejectsTagsField pins the wire-compat behavior
+// after `tags` was dropped from SubmissionPayload: the create handler
+// decodes with DisallowUnknownFields, so a client still sending a `tags`
+// key in the payload now gets a 400 rather than having it silently
+// accepted. Editors assign tags during PR review instead.
+func TestCreateSubmission_RejectsTagsField(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	body["payload"].(map[string]any)["tags"] = []string{"cycling"}
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400 for unknown `tags` field, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Content-Type"); !strings.HasPrefix(got, "application/problem+json") {
+		t.Fatalf("content-type: want problem+json, got %q", got)
 	}
 }
 
@@ -325,7 +345,6 @@ func TestAdminList_PaginatesWithCursor(t *testing.T) {
 			Name:        "Org " + strconv.Itoa(i),
 			ShortDesc:   "desc",
 			WebsiteURL:  "https://example.org/" + strconv.Itoa(i),
-			Tags:        []string{"cycling"},
 			RegionSlugs: []string{"brooklyn-ny"},
 		}
 		if _, err := rig.subs.Create(context.Background(), atlas.NewSubmissionInput{Payload: payload}); err != nil {

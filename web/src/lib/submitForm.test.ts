@@ -38,7 +38,6 @@ describe('buildNewSubmissionRequest', () => {
     expect(req.payload.website_url).toBe('https://example.org');
     expect(req.payload.short_desc).toBe('Advocates for safer streets in Anytown.');
     expect(req.payload.region_slugs).toEqual([]);
-    expect(req.payload.tags).toEqual([]);
   });
 
   it('correction: hides the org-description fields, synthesizes short_desc', () => {
