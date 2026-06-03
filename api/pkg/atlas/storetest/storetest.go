@@ -82,6 +82,9 @@ func RunContractSuite(t *testing.T, factory Factory) {
 	t.Run("AncestorRegions_RollupState_NoLeak", func(t *testing.T) {
 		testAncestorRegionsRollupStateNoLeak(t, factory)
 	})
+	t.Run("SearchRegions_RanksAndFiltersNational", func(t *testing.T) {
+		testSearchRegionsRanksAndFiltersNational(t, factory)
+	})
 }
 
 // testAncestorRegionsFiltersNational seeds a city under a metro under
@@ -592,6 +595,76 @@ func testAncestorRegionsRollupStateNoLeak(t *testing.T, factory Factory) {
 	// The leak guard: il must NOT appear (rollup_states is browse-only).
 	if containsSlug(got, "il") {
 		t.Errorf("rollup_states leaked into the ancestor walk: il reached from lake-county-in (got %v)", got)
+	}
+}
+
+// testSearchRegionsRanksAndFiltersNational seeds two same-named cities
+// in different states plus a national-tier row whose name matches the
+// query, then asserts SearchRegions: (a) excludes the national row,
+// (b) ranks an exact slug match ahead of name matches, and (c) carries
+// a state-ancestor ContextLabel that disambiguates the duplicates.
+func testSearchRegionsRanksAndFiltersNational(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	// Two states.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:state", Name: "Illinois", Slug: "il",
+		Country: atlas.CountryUS, ScopeTier: atlas.ScopeRegional,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 2, Kind: "us:state", Name: "Massachusetts", Slug: "ma",
+		Country: atlas.CountryUS, ScopeTier: atlas.ScopeRegional,
+	})
+	// Same-named cities, one per state.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 3, Kind: "us:city", Name: "Springfield", Slug: "springfield-il",
+		Country: atlas.CountryUS, ScopeTier: atlas.ScopeLocal,
+		ParentSlugs: []string{"il"},
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 4, Kind: "us:city", Name: "Springfield", Slug: "springfield-ma",
+		Country: atlas.CountryUS, ScopeTier: atlas.ScopeLocal,
+		ParentSlugs: []string{"ma"},
+	})
+	// An exact-slug target and a national row that both match "springfield".
+	seed.SeedRegion(t, atlas.Region{
+		ID: 5, Kind: "us:metro", Name: "Greater Springfield", Slug: "springfield",
+		Country: atlas.CountryUS, ScopeTier: atlas.ScopeRegional,
+		ParentSlugs: []string{"il"},
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 6, Kind: "xx:national", Name: "Springfield National Network", Slug: "springfield-national",
+		Country: atlas.CountryUS, ScopeTier: atlas.ScopeNational,
+	})
+
+	got, err := store.SearchRegions(context.Background(), "springfield", 0)
+	if err != nil {
+		t.Fatalf("SearchRegions: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatal("want results for 'springfield', got none")
+	}
+	// Exact slug match ranks first.
+	if got[0].Region.Slug != "springfield" {
+		t.Errorf("exact-slug match should rank first; got %q", got[0].Region.Slug)
+	}
+	// National row never surfaces.
+	for _, r := range got {
+		if r.Region.ScopeTier == atlas.ScopeNational || r.Region.Slug == "springfield-national" {
+			t.Errorf("national-tier row leaked into search results: %s", r.Region.Slug)
+		}
+	}
+	// The two duplicate-named cities carry distinct state context labels.
+	labels := map[string]string{}
+	for _, r := range got {
+		labels[r.Region.Slug] = r.ContextLabel
+	}
+	if labels["springfield-il"] != "Illinois" {
+		t.Errorf("springfield-il context label: want %q, got %q", "Illinois", labels["springfield-il"])
+	}
+	if labels["springfield-ma"] != "Massachusetts" {
+		t.Errorf("springfield-ma context label: want %q, got %q", "Massachusetts", labels["springfield-ma"])
 	}
 }
 

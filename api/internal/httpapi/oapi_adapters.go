@@ -148,6 +148,22 @@ func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 	return out
 }
 
+// toOAPIRegionSearchResults converts the domain-level search results to
+// the wire-level slice. Returns a non-nil zero-length slice when the
+// input is empty so the JSON body is `[]`, not `null`. ContextLabel
+// maps to a plain (possibly empty) string — the disambiguation hint is
+// required on the wire, never null.
+func toOAPIRegionSearchResults(in []atlas.RegionSearchResult) []oapi.RegionSearchResult {
+	out := make([]oapi.RegionSearchResult, 0, len(in))
+	for _, rsr := range in {
+		out = append(out, oapi.RegionSearchResult{
+			Region:       toOAPIRegion(rsr.Region),
+			ContextLabel: rsr.ContextLabel,
+		})
+	}
+	return out
+}
+
 // toOAPIRegionDetail converts a single domain region to the wire
 // shape. Orgs are bucketed by attachment scope_tier (the shared
 // pkg/atlas helper) and mapped via toOAPILookupOrgs so each row

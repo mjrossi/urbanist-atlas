@@ -124,6 +124,11 @@ func New(cfg Config) http.Handler {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
 			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics))
 			getHead(r, "/regions", listRegionsHandler(cfg.Store, logger))
+			// Static "/regions/search" before the "/regions/{slug}"
+			// param route. chi prefers static segments over params, so
+			// order here is for readers, not the matcher — but a router
+			// test pins that "search" never resolves as a slug.
+			getHead(r, "/regions/search", searchRegionsHandler(cfg.Store, logger))
 			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger))
 			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger))
 			getHead(r, "/recent", recentHandler(cfg.Store, logger))

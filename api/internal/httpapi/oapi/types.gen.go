@@ -448,6 +448,34 @@ type RegionDetail struct {
 // gracefully (e.g. fall back to displaying `name`).
 type RegionKind = string
 
+// RegionSearchResult A region matched by `GET /api/v1/regions/search`, plus a
+// disambiguation hint for type-ahead display.
+type RegionSearchResult struct {
+	// ContextLabel The nearest state/province-equivalent ancestor's name (e.g.
+	// "New York" for the `queens` borough), to disambiguate
+	// same-named regions in a type-ahead. Empty string when the
+	// region has no resolvable state ancestor (a state itself, or
+	// a top-level region).
+	ContextLabel string `json:"context_label"`
+
+	// Region A geographic unit an organization can serve. Regions form a
+	// directed acyclic graph; `parent_slugs` lists the direct parents
+	// (not transitive). Empty for top-of-hierarchy regions (states,
+	// multi-state regions, transit federations).
+	Region Region `json:"region"`
+}
+
+// RegionSearchResultsEnvelope Collection envelope for `GET /api/v1/regions/search`. Same shape
+// contract as `RegionSummariesEnvelope`.
+type RegionSearchResultsEnvelope struct {
+	Data []RegionSearchResult `json:"data"`
+
+	// Meta Attribution block included on every collection response.
+	// Carries the ODbL license obligation in-band so consumers
+	// that strip headers still see the share-alike requirement.
+	Meta Meta `json:"meta"`
+}
+
 // RegionSummariesEnvelope Collection envelope for `GET /api/v1/regions`. Wraps the
 // region list in a `meta` + `data` shape so every list
 // response carries the ODbL attribution alongside its
@@ -791,6 +819,17 @@ type LookupParams struct {
 
 	// Country ISO-style country code. Case-insensitive.
 	Country CountryQuery `form:"country" json:"country"`
+}
+
+// SearchRegionsParams defines parameters for SearchRegions.
+type SearchRegionsParams struct {
+	// Q The search term. Matched case-insensitively against region
+	// name and slug. Blank, whitespace-only, or omitted returns an
+	// empty result set.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Maximum number of results to return. Capped at 20.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // RejectSubmissionJSONRequestBody defines body for RejectSubmission for application/json ContentType.
