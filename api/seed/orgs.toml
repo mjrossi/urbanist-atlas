@@ -34,6 +34,18 @@
 # rules), and the Canvas Adjustments log of documented gaps. Slice
 # 7.8 extends those gates without changing the activity bar or scope
 # precedents.
+#
+# 2026-06-03 editorial pass: +33 net-new orgs filling documented
+# gaps — NYC borough-level groups (Brooklyn, Queens) plus citywide
+# Open Plans and Bike New York; rural / low-population US states
+# (Wyoming and North Dakota statewide gaps overturned; Reno, Lincoln,
+# and Omaha metro orgs; New Jersey city coverage); and a Canada
+# refresh (Saskatchewan and Northwest Territories gaps overturned;
+# Victoria, Nanaimo, London, Oshawa/Durham, Kingston, Windsor, and
+# Guelph CMAs; Cycle Toronto, Vélo Québec, Piétons Québec, RUTA
+# Montréal, Edmonton Transit Riders). Same activity bar + scope
+# precedents as slices 7.6–7.8; every new URL verified via
+# `just verify-org-urls` on 2026-06-03.
 
 # --- NYC region ---
 
@@ -82,6 +94,68 @@ short_desc = "Regional policy coalition advocating for sustainable transportatio
 website_url = "https://tstc.org"
 tags = ["transit", "policy", "regional", "advocacy"]
 region_slugs = ["nyc-tristate"]
+
+[[org]]
+slug = "open-plans"
+added_at = 2026-06-03
+name = "Open Plans"
+short_desc = "New York City livable-streets nonprofit, founded 1999. Runs campaigns on school streets, intersection daylighting, and curb management, and publishes the Streetsblog NYC and Streetfilms journalism projects."
+website_url = "https://www.openplans.org"
+contact_url = "mailto:hello@openplans.org"
+tags = ["advocacy", "safe-streets", "policy", "walking", "media"]
+region_slugs = ["nyc"]
+
+[[org]]
+slug = "bike-new-york"
+added_at = 2026-06-03
+name = "Bike New York"
+short_desc = "Citywide cycling nonprofit providing free bike-education classes across the five boroughs. Provided expertise on the NYC Streets Master Plan law and in 2026 proposed the Ride Clean New York plan to expand access to safe, legal e-bikes. Produces the Five Boro Bike Tour."
+website_url = "https://www.bike.nyc"
+contact_url = "https://www.bike.nyc/about/contact-us/"
+tags = ["cycling", "education", "advocacy", "safe-streets"]
+region_slugs = ["nyc"]
+
+# --- NYC boroughs ---
+# Transportation Alternatives' borough activist committees are
+# chapters of TA (listed citywide above) and are excluded per the
+# chapter rule; the groups below are independently organized.
+
+[[org]]
+slug = "bike-south-brooklyn"
+added_at = 2026-06-03
+name = "Bike South Brooklyn"
+short_desc = "Volunteer cycling-advocacy group for southern Brooklyn — Bay Ridge, Dyker Heights, Sheepshead Bay — founded 2018. Runs the Finish Fourth Avenue! campaign for a continuous Fourth Avenue bike lane and organizes monthly neighborhood rides."
+website_url = "https://www.bikesbk.org"
+contact_url = "https://www.bikesbk.org/about/"
+tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
+region_slugs = ["brooklyn"]
+
+[[org]]
+slug = "alliance-for-paseo-park"
+added_at = 2026-06-03
+name = "Alliance for Paseo Park"
+short_desc = "Resident-led nonprofit campaigning to make the 26-block 34th Avenue open street in Jackson Heights, Queens, a permanent linear park. Published a community Roadmap with WXY Studio in 2025; the street was co-named Paseo Park in November 2025."
+website_url = "https://www.paseopark.org"
+contact_url = "https://www.paseopark.org/about"
+tags = ["safe-streets", "walking", "advocacy", "grassroots", "equity"]
+region_slugs = ["queens"]
+
+[[org]]
+slug = "31st-ave-open-street-collective"
+added_at = 2026-06-03
+name = "31st Ave Open Street Collective"
+short_desc = "Independently incorporated group running the 31st Avenue open street in Astoria, Queens, and pressing for street-safety redesigns. Launched a 2025 petition backing the city's protected bike lane and bike-boulevard plan for nearby 31st Street."
+website_url = "https://www.31staveopenstreet.org"
+contact_url = "mailto:info@31staveopenstreet.org"
+tags = ["safe-streets", "walking", "advocacy", "grassroots"]
+region_slugs = ["queens"]
+
+# gap: no qualifying independent Bronx-, Manhattan-, or Staten
+# Island-anchored advocacy org cleared the activity bar as of
+# 2026-06-03. The Bronx and Staten Island landscape is dominated by
+# excluded TA borough committees and government bodies; Manhattan's
+# independent nonprofits (Open Plans, Bike New York) are citywide and
+# anchor at `nyc` above.
 
 # --- SF Bay Area ---
 
@@ -280,7 +354,7 @@ slug = "active-transportation-alliance"
 added_at = 2026-05-17
 name = "Active Transportation Alliance"
 short_desc = "Chicagoland's walking, biking, and transit advocacy nonprofit, working across the eight-county region with more than 20,000 members and supporters. Drove the 2019 campaign that established dedicated state funding for walking and biking and now pushes the Illinois Department of Transportation, RTA, and Chicago City Hall on infrastructure and policy."
-website_url = "https://activetrans.org"
+website_url = "https://activetransportation.org"
 tags = ["transit", "cycling", "walking", "safe-streets", "advocacy", "regional"]
 region_slugs = ["chicago-metro"]
 
@@ -1624,6 +1698,65 @@ website_url = "https://njbwc.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
 region_slugs = ["nj"]
 
+[[org]]
+slug = "hudson-county-complete-streets"
+added_at = 2026-06-03
+name = "Hudson County Complete Streets"
+short_desc = "Hudson County, New Jersey transportation-equity coalition. Runs the A Better PATH and Better Light Rail transit campaigns alongside the #FixJFKBlvd and JFK Boulevard East cycle-track street campaigns."
+website_url = "https://hudcostreets.org"
+contact_url = "https://hudcostreets.org/contact"
+tags = ["transit", "safe-streets", "advocacy", "coalition", "regional"]
+region_slugs = ["nj"]
+
+[[org]]
+slug = "bike-jc"
+added_at = 2026-06-03
+name = "Bike JC"
+short_desc = "Jersey City cycling and complete-streets advocacy nonprofit. Won City Council approval for the Franklin Street two-way protected bike lane after a three-year campaign, and is contesting New Jersey's 2026 e-bike licensing law."
+website_url = "https://www.bikejc.org"
+contact_url = "https://www.bikejc.org/contact"
+tags = ["cycling", "safe-streets", "advocacy", "complete-streets"]
+region_slugs = ["nj"]
+
+[[org]]
+slug = "bike-hoboken"
+added_at = 2026-06-03
+name = "Bike Hoboken"
+short_desc = "Hoboken, New Jersey advocacy nonprofit for cyclists, pedestrians, and transit riders, founded 2008. A founding member of Hoboken's Vision Zero Task Force, it runs the Green Circuit multi-use-path campaign and a near-miss reporting tool."
+website_url = "https://www.bikehoboken.org"
+contact_url = "https://www.bikehoboken.org/contact"
+tags = ["cycling", "walking", "safe-streets", "advocacy", "vision-zero"]
+region_slugs = ["hoboken"]
+
+[[org]]
+slug = "asbury-park-complete-streets"
+added_at = 2026-06-03
+name = "Asbury Park Complete Streets Coalition"
+short_desc = "Asbury Park, New Jersey transportation-equity group. Drove the city's February 2025 Vision Zero policy adoption and runs the Safe Streets Monmouth County initiative."
+website_url = "https://apcompletestreets.org"
+contact_url = "mailto:apcompletestreets@gmail.com"
+tags = ["complete-streets", "safe-streets", "advocacy", "vision-zero", "equity"]
+region_slugs = ["nj"]
+
+[[org]]
+slug = "streetspac-nj"
+added_at = 2026-06-03
+name = "StreetsPAC NJ"
+short_desc = "New Jersey political action committee endorsing candidates who back Vision Zero, protected bike lanes, dedicated bus lanes, and public transit. Ran candidate questionnaires for the 2025 municipal elections."
+website_url = "https://streetspacnj.org"
+tags = ["political", "policy", "advocacy", "safe-streets", "transit"]
+region_slugs = ["nj"]
+
+[[org]]
+slug = "trenton-cycling-revolution"
+added_at = 2026-06-03
+name = "Trenton Cycling Revolution"
+short_desc = "All-volunteer Greater Trenton group advocating for safe, equitable streets. Runs the Ciclovía open-streets event and the Tour de Trenton, and produced the Community Power NJ: Our Streets film on redlining and street safety."
+website_url = "https://www.trentoncycling.org"
+contact_url = "https://www.trentoncycling.org/contact"
+tags = ["cycling", "safe-streets", "advocacy", "equity", "education"]
+region_slugs = ["nj"]
+
 # --- New York ---
 
 [[org]]
@@ -1686,6 +1819,15 @@ website_url = "https://www.localmotion.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
 region_slugs = ["vt"]
 
+[[org]]
+slug = "transportation-for-vermonters"
+added_at = 2026-06-03
+name = "Transportation for Vermonters"
+short_desc = "Statewide Vermont transportation-advocacy coalition (T4VT), a project of the Vermont Natural Resources Council. Presses for expanded bus service, walkability, and biking infrastructure, with an annual State House Advocacy Day."
+website_url = "https://www.t4vt.org"
+tags = ["transit", "advocacy", "coalition", "policy"]
+region_slugs = ["vt"]
+
 # --- Delaware ---
 
 [[org]]
@@ -1695,6 +1837,16 @@ name = "Bike Delaware"
 short_desc = "Delaware's statewide nonprofit advocating for safe, convenient cycling and walking. Runs the #RideforPie Amish Country Bike Tour and works statewide policy at the General Assembly."
 website_url = "https://www.bikede.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["de-state"]
+
+[[org]]
+slug = "bikenewark"
+added_at = 2026-06-03
+name = "BikeNewark"
+short_desc = "Newark, Delaware bicycle-advocacy group. Built the Newark Bikeways low-stress network with wayfinding kiosks and advocated the Delaware Avenue two-way protected bikeway and the Pomeroy Trail connectors."
+website_url = "https://bikenewark.org"
+contact_url = "https://bikenewark.org/contact/"
+tags = ["cycling", "safe-streets", "advocacy", "education"]
 region_slugs = ["de-state"]
 
 # --- Maryland ---
@@ -1726,10 +1878,11 @@ tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["va"]
 
 # --- West Virginia ---
-# gap: no demonstrably-active statewide ped/bike advocacy nonprofit as
-# of 2026-05-20. Existing WV bike orgs (Country Roads Cyclists, WVMBA,
-# WVTrails) are recreational / mountain-bike / trail-focused rather
-# than safe-streets advocacy. Revisit if maintainer has local sources.
+# gap: still no demonstrably-active statewide ped/bike advocacy
+# nonprofit as of 2026-06-03. Existing WV bike orgs (Country Roads
+# Cyclists, WVMBA, WVTrails) are recreational / mountain-bike /
+# trail-focused; Bike Charleston (bikecrw.org) has an expired TLS
+# certificate and no datable recent activity. Revisit with local sources.
 
 # --- North Carolina ---
 
@@ -1829,11 +1982,13 @@ tags = ["cycling", "walking", "advocacy", "safe-streets"]
 region_slugs = ["ms"]
 
 # --- Arkansas ---
-# gap: no active statewide ped/bike advocacy nonprofit as of 2026-05-20.
-# Bike/Walk Arkansas was organized in 2015 but stalled and has not been
-# active since. ARDOT's Bicycle-Pedestrian Coordinator is reportedly
-# looking to help re-establish a statewide advocacy effort. Revisit when
-# that materializes.
+# gap: no active statewide ped/bike advocacy nonprofit as of 2026-06-03.
+# Bike/Walk Arkansas (organized 2015) remains stalled. Bicycle Advocacy
+# of Central Arkansas (BACA, Little Rock, founded 2004) is a real
+# metro-level 501(c)(3), but its own surface is stale (site ©2020, "no
+# events at the moment"), so it does not clear the 12-month activity
+# bar. Revisit if BACA refreshes its public surface or a statewide
+# effort re-forms.
 
 # --- Louisiana ---
 
@@ -1850,7 +2005,8 @@ region_slugs = ["new-orleans-la-metro", "la-state"]
 # gap: BikeOklahoma (Oklahoma Bicycling Coalition) is in the process of
 # dissolving and transferring assets to the Oklahoma Bicycle Summit, Inc.
 # (as of mid-2025). No replacement statewide advocacy 501(c)(3) is
-# active as of 2026-05-20. Revisit once the Oklahoma Bicycle Summit
+# active as of 2026-06-03, and OKC/Tulsa activity remains city programs
+# and government committees. Revisit once the Oklahoma Bicycle Summit
 # successor body stands up as a sustained advocacy entity.
 
 # --- Texas ---
@@ -1968,10 +2124,12 @@ region_slugs = ["ia"]
 
 # --- Kansas ---
 # gap: no clearly active statewide ped/bike advocacy nonprofit as of
-# 2026-05-20. BikeWalkKC (Kansas City) does some Kansas statewide work
-# (KDOT plan engagement, partner network) but is structurally a KC-metro
-# org. "Biking Across Kansas" is an annual tour, not an advocacy 501(c)(3).
-# Revisit if a clean KS-statewide advocacy entity surfaces.
+# 2026-06-03. BikeWalkKC (Kansas City) does some Kansas statewide work
+# but is structurally a KC-metro org. Bike Walk Wichita is a real
+# Wichita-metro group, but its own surface could not be verified to the
+# 12-month activity bar (newest content ©2022–2025, events page empty).
+# Revisit if Wichita refreshes its surface or a KS-statewide entity
+# surfaces.
 
 # --- Minnesota ---
 
@@ -2006,16 +2164,44 @@ website_url = "https://www.bikewalknebraska.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets", "policy"]
 region_slugs = ["ne"]
 
+# Metro-level Nebraska orgs (Lincoln, Omaha):
+
+[[org]]
+slug = "bicyclincoln"
+added_at = 2026-06-03
+name = "BicycLincoln"
+short_desc = "Lincoln, Nebraska cycling-advocacy nonprofit. Runs the Save the MoPac Gap campaign for the MoPac East Trail extension and publishes the regular Trail Ramblings advocacy blog."
+website_url = "https://www.bicyclincoln.org"
+tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
+region_slugs = ["lincoln-ne-metro"]
+
+[[org]]
+slug = "safe-omaha-streets"
+added_at = 2026-06-03
+name = "Safe Omaha Streets"
+short_desc = "Omaha safe-streets advocacy group, launched 2022. Engages on the city's Vision Zero plan, the Active Mobility Plan, and the Market-to-Midtown bikeway, and helped seed the statewide Safe Streets Nebraska coalition."
+website_url = "https://www.safeomahastreets.com"
+tags = ["safe-streets", "vision-zero", "advocacy", "grassroots", "complete-streets"]
+region_slugs = ["omaha-ne-metro"]
+
 # --- North Dakota ---
-# gap: no statewide ped/bike or transit advocacy nonprofit found as of
-# 2026-05-20. ND Parks and Recreation runs recreational biking
-# infrastructure but no independent advocacy entity surfaces in
-# research. Revisit if a maintainer has local sources.
+
+[[org]]
+slug = "bike-walk-north-dakota"
+added_at = 2026-06-03
+name = "Bike Walk North Dakota"
+short_desc = "North Dakota's statewide active-transportation advocacy nonprofit. Backed the Share the Road Safety Week resolution (HCR 3009) and the ND Moves Active Transportation and Transit Plan, and hosts an annual summit."
+website_url = "https://bikewalknd.org"
+contact_url = "https://bikewalknd.org/contact/"
+tags = ["cycling", "walking", "safe-streets", "advocacy", "policy"]
+region_slugs = ["nd"]
 
 # --- South Dakota ---
 # gap: no statewide ped/bike or transit advocacy nonprofit found as of
-# 2026-05-20. SD DOT has a Bicycle/Pedestrian division but no
-# independent statewide 501(c)(3) advocacy organization is active.
+# 2026-06-03. SD DOT has a Bicycle/Pedestrian division but no
+# independent statewide 501(c)(3) advocacy organization is active;
+# Sioux Falls groups (Falls Area Bicyclists, Black Hills Bike Hub) are
+# recreational riding clubs.
 
 # --- Alaska ---
 
@@ -2113,10 +2299,19 @@ tags = ["cycling", "walking", "advocacy", "safe-streets"]
 region_slugs = ["mt"]
 
 # --- Nevada ---
-# gap: no clean statewide ped/bike or transit advocacy nonprofit as of
-# 2026-05-20. Southern Nevada Bicycle Coalition exists but is
-# Las-Vegas-area only and lacks a statewide remit. RTC Snv runs the
-# Southern Nevada transit system but is not an advocacy entity.
+# Statewide NV still lacks a clean ped/bike/transit advocacy nonprofit
+# as of 2026-06-03; coverage is metro-level only — Southern Nevada
+# Bicycle Coalition (Las Vegas, see metro section above) and Truckee
+# Meadows Bicycle Alliance (Reno, below).
+
+[[org]]
+slug = "truckee-meadows-bicycle-alliance"
+added_at = 2026-06-03
+name = "Truckee Meadows Bicycle Alliance"
+short_desc = "Reno–Sparks and Washoe County cycling-advocacy nonprofit. Testified on Nevada Assembly Bill 168 in 2025 and runs the Biggest Little Bicycle Network campaign for connected, protected bike infrastructure."
+website_url = "https://bikewashoe.org"
+tags = ["cycling", "safe-streets", "advocacy", "policy"]
+region_slugs = ["reno-nv-metro"]
 
 # --- New Mexico ---
 
@@ -2158,18 +2353,34 @@ tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["wa"]
 
 # --- Wyoming ---
-# gap: no statewide ped/bike or transit advocacy nonprofit found as of
-# 2026-05-20. Local advocates exist (e.g., the visionary work behind
-# the Jackson Hole Community Pathway System) but no statewide 501(c)(3)
-# is active. Revisit if a maintainer has local sources.
+
+[[org]]
+slug = "wyoming-pathways"
+added_at = 2026-06-03
+name = "Wyoming Pathways"
+short_desc = "Statewide Wyoming nonprofit advocating for walkable, bikeable towns and connected pathways. Works with the Wyoming Department of Transportation on bicycle and pedestrian accommodation and runs the annual WyoGives giving-day campaign."
+website_url = "https://wyopath.org"
+contact_url = "https://wyopath.org/about/contact-us/"
+tags = ["cycling", "walking", "safe-streets", "advocacy", "complete-streets"]
+region_slugs = ["wy"]
+
+[[org]]
+slug = "friends-of-pathways"
+added_at = 2026-06-03
+name = "Friends of Pathways"
+short_desc = "Jackson Hole nonprofit advocating for a connected network of pathways, bike lanes, and sidewalks in Teton County, Wyoming. Campaigns for the Teton Pass and WY 390 Eastside pathway projects and runs Safe Routes to School programming."
+website_url = "https://friendsofpathways.org"
+contact_url = "https://friendsofpathways.org/contact/"
+tags = ["cycling", "walking", "safe-streets", "advocacy"]
+region_slugs = ["wy"]
 
 # --- Puerto Rico ---
-# gap: Puerto Rico Bicycle Coalition (Coalición Ciclistas PR) maintains
-# a Facebook presence but no clear website was located, and recent
-# activity could not be verified to the 12-month bar without
-# Facebook-side inspection. Worth re-verifying with social-media
-# checks; PR is a single-jurisdiction territory so an org anchored at
-# `pr` would cover all PR ZIPs.
+# gap: as of 2026-06-03, San Juan transit (Tren Urbano, AMA) is
+# government-run and the cycling presence is Facebook-only community
+# pages (e.g. Coalición Ciclistas PR) with no verifiable own-website
+# activity. Worth a Spanish-language deep-dive or a local contact; PR
+# is a single-jurisdiction territory, so an org anchored at `pr` would
+# cover all PR ZIPs.
 
 # --- Canada ---
 
@@ -2192,6 +2403,16 @@ name = "Walk Toronto"
 short_desc = "Volunteer pedestrian advocacy group working for safer, more walkable streets across Toronto. Pushes for default lower speed limits, longer walk signals, and pedestrian-priority intersections."
 website_url = "https://walktoronto.ca"
 tags = ["walking", "safe-streets", "advocacy", "grassroots"]
+region_slugs = ["toronto"]
+
+[[org]]
+slug = "cycle-toronto"
+added_at = 2026-06-03
+name = "Cycle Toronto"
+short_desc = "Toronto's member-supported cycling charity, founded 2008. Runs the Bloor, Danforth, and Yonge Loves Bikes corridor campaigns and the Build the Grid network campaign, and publishes a City Council cycling scorecard."
+website_url = "https://www.cycleto.ca"
+contact_url = "https://www.cycleto.ca/contact-us"
+tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
 region_slugs = ["toronto"]
 
 # --- Vancouver ---
@@ -2243,6 +2464,36 @@ short_desc = "Regional environmental council coordinating transit-funding, vehic
 website_url = "https://www.cremtl.org"
 tags = ["transit", "policy", "regional", "advocacy"]
 region_slugs = ["montreal-cma"]
+
+[[org]]
+slug = "velo-quebec"
+added_at = 2026-06-03
+name = "Vélo Québec"
+short_desc = "Montréal-based provincial cycling organization, founded 1967, which created the 5,000-km Route verte. Files public consultations and policy briefs and runs the Cycliste averti school cycling-education program."
+website_url = "https://www.velo.qc.ca"
+contact_url = "https://www.velo.qc.ca/en/contact-us/"
+tags = ["cycling", "advocacy", "policy", "education", "safe-streets"]
+region_slugs = ["montreal-cma", "qc"]
+
+[[org]]
+slug = "pietons-quebec"
+added_at = 2026-06-03
+name = "Piétons Québec"
+short_desc = "Québec's provincial pedestrian-rights advocacy nonprofit, founded 2015. Campaigns for a provincial pedestrian-safety strategy and stronger crosswalk standards; published a ten-year activity report in 2025."
+website_url = "https://pietons.quebec"
+contact_url = "https://pietons.quebec/nous-joindre/"
+tags = ["walking", "safe-streets", "advocacy", "policy"]
+region_slugs = ["montreal-cma", "qc"]
+
+[[org]]
+slug = "ruta-montreal"
+added_at = 2026-06-03
+name = "RUTA Montréal"
+short_desc = "Montréal nonprofit defending the rights of transit users with disabilities, focused on accessible and adapted (paratransit) service across the Island of Montréal."
+website_url = "https://rutamtl.com"
+contact_url = "https://rutamtl.com/nous-joindre/"
+tags = ["transit", "rider-union", "advocacy", "equity", "accessibility"]
+region_slugs = ["montreal"]
 
 # --- Calgary ---
 
@@ -2318,6 +2569,16 @@ contact_url = "mailto:info@bikeedmonton.ca"
 tags = ["cycling", "advocacy", "safe-streets", "grassroots", "education"]
 region_slugs = ["edmonton-cma"]
 
+[[org]]
+slug = "edmonton-transit-riders"
+added_at = 2026-06-03
+name = "Edmonton Transit Riders"
+short_desc = "Volunteer-led Edmonton transit-rider advocacy group. Campaigns for frequent, reliable, affordable bus and LRT service, hosts transit town halls, and publishes municipal-election transit guides."
+website_url = "https://edmontontransitriders.org"
+contact_url = "https://edmontontransitriders.org/contact-us/"
+tags = ["transit", "rider-union", "grassroots", "advocacy"]
+region_slugs = ["edmonton-cma"]
+
 # --- Québec City ---
 
 [[org]]
@@ -2391,6 +2652,89 @@ website_url = "https://misscyclingnow.ca"
 tags = ["cycling", "advocacy", "grassroots"]
 region_slugs = ["toronto-cma"]
 
+# === 2026-06-03 editorial pass — additional CA CMAs ===
+
+# --- Victoria ---
+
+[[org]]
+slug = "capital-bike"
+added_at = 2026-06-03
+name = "Capital Bike"
+short_desc = "Greater Victoria cycling-advocacy charity, formed in 2019 from the Greater Victoria Cycling Coalition and the Bike to Work Society. Advocates for all-ages-and-abilities bike routes across the Capital Regional District and runs GoByBike Week."
+website_url = "https://capitalbike.ca"
+tags = ["cycling", "safe-streets", "advocacy", "education"]
+region_slugs = ["victoria-cma"]
+
+# --- Nanaimo ---
+
+[[org]]
+slug = "nanaimo-area-cycling-coalition"
+added_at = 2026-06-03
+name = "Nanaimo Area Cycling Coalition"
+short_desc = "Volunteer cycling-advocacy coalition for the Nanaimo area on Vancouver Island, with a new board as of 2025. Advocates for connected bike lanes and responded to the Regional District's Cedar Village active-transportation plan."
+website_url = "https://www.cycleinnanaimo.ca"
+contact_url = "mailto:admin@cycleinnanaimo.ca"
+tags = ["cycling", "safe-streets", "advocacy", "grassroots"]
+region_slugs = ["nanaimo-cma"]
+
+# --- London ---
+
+[[org]]
+slug = "london-cycle-link"
+added_at = 2026-06-03
+name = "London Cycle Link"
+short_desc = "London, Ontario cycling-advocacy charity. Advocates for a connected network of protected bike lanes, all-season maintenance, and bike share, and runs Bike Month and the Squeaky Wheel Bike Co-op."
+website_url = "https://www.londoncyclelink.ca"
+contact_url = "https://www.londoncyclelink.ca/contact"
+tags = ["cycling", "safe-streets", "advocacy", "education"]
+region_slugs = ["london-cma"]
+
+# --- Oshawa / Durham Region ---
+
+[[org]]
+slug = "durham-region-cycling-coalition"
+added_at = 2026-06-03
+name = "Durham Region Cycling Coalition"
+short_desc = "Coalition advocating for safe cycling across Durham Region's municipalities east of Toronto — Oshawa, Whitby, Ajax, Pickering, Clarington. Submits infrastructure feedback on road reconstructions and opposed Ontario's bike-lane removal law."
+website_url = "https://durhamsafecycling.ca"
+contact_url = "https://durhamsafecycling.ca/contact-us/"
+tags = ["cycling", "safe-streets", "advocacy", "regional"]
+region_slugs = ["oshawa-cma"]
+
+# --- Kingston ---
+
+[[org]]
+slug = "kingston-coalition-active-transportation"
+added_at = 2026-06-03
+name = "Kingston Coalition for Active Transportation"
+short_desc = "Kingston, Ontario nonprofit (KCAT) advocating for walking, wheeling, and transit, founded 2008. Runs School Streets and Quiet Streets programs, tracks collision data, and publishes a quarterly newsletter."
+website_url = "https://kcat.ca"
+contact_url = "mailto:info@kcat.ca"
+tags = ["cycling", "walking", "safe-streets", "advocacy", "coalition"]
+region_slugs = ["kingston-cma"]
+
+# --- Windsor ---
+
+[[org]]
+slug = "bike-windsor-essex"
+added_at = 2026-06-03
+name = "Bike Windsor Essex"
+short_desc = "Windsor–Essex cycling-advocacy nonprofit and resource centre, founded 2010. Runs Cycle Smart school programs and a community Bike Kitchen, and partnered with the Detroit Greenways Coalition on the Gordie Howe Bridge active-transportation route."
+website_url = "https://www.bikewindsoressex.ca"
+tags = ["cycling", "safe-streets", "advocacy", "education"]
+region_slugs = ["windsor-cma"]
+
+# --- Guelph ---
+
+[[org]]
+slug = "guelph-community-active-transportation"
+added_at = 2026-06-03
+name = "Guelph Community for Active Transportation"
+short_desc = "Guelph, Ontario advocacy group promoting walking, cycling, and transit, founded 2012. Runs the Better Streets campaign, won restored winter bike-lane maintenance, and hosts the annual Pride Ride."
+website_url = "https://gcat.ca"
+tags = ["cycling", "walking", "safe-streets", "advocacy"]
+region_slugs = ["guelph-cma"]
+
 # --- Québec (provincial) ---
 
 [[org]]
@@ -2447,10 +2791,16 @@ tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
 region_slugs = ["winnipeg-cma", "mb"]
 
 # --- Saskatchewan (provincial) ---
-# gap: Saskatchewan Cycling Association is the provincial branch of
-# Cycling Canada but is sport-focused (racing, club programs) rather
-# than safe-streets advocacy. No clean advocacy entity at the
-# provincial level as of 2026-05-20.
+
+[[org]]
+slug = "saskatoon-cycles"
+added_at = 2026-06-03
+name = "Saskatoon Cycles"
+short_desc = "Saskatoon cycling and active-transportation advocacy nonprofit, incorporated 2010, and Saskatchewan's de facto provincial cycling voice. Runs the SafeConnect campaign pressing the city for a continuous, protected bikeway network."
+website_url = "https://saskatooncycles.org"
+contact_url = "https://saskatooncycles.org/contact-us/"
+tags = ["cycling", "safe-streets", "advocacy", "complete-streets", "grassroots"]
+region_slugs = ["saskatoon-cma", "sk"]
 
 # --- Nova Scotia (provincial) ---
 
@@ -2464,8 +2814,12 @@ tags = ["cycling", "advocacy", "safe-streets"]
 region_slugs = ["ns"]
 
 # --- New Brunswick (provincial) ---
-# gap: no clear provincial ped/bike or transit advocacy nonprofit
-# found as of 2026-05-20. Revisit if a maintainer has local sources.
+# gap: no qualifying provincial or city ped/bike/transit advocacy
+# nonprofit cleared the activity bar as of 2026-06-03. The Active
+# Transportation Coalition Moncton is Facebook-only (no website), and
+# Saint John Cycling is recreational/MTB-leaning with no datable
+# advocacy on its own site; Vélo NB is the sport governing body.
+# Revisit if one of these surfaces dated advocacy on its own channel.
 
 # --- Newfoundland and Labrador (provincial) ---
 
@@ -2479,18 +2833,32 @@ tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["nl-province"]
 
 # --- Prince Edward Island (provincial) ---
-# gap: Cycling PEI exists but is primarily sport/recreational (Cycling
-# Canada provincial branch) rather than safe-streets advocacy.
-# Charlottetown adopted an active-transportation plan in 2025 but no
-# independent provincial advocacy nonprofit is active as of 2026-05-20.
+# gap: Cycling PEI is sport/recreational. Bike Friendly Communities PEI
+# (Charlottetown) authored the Capital Region Active Transportation
+# Plan, but its own surface shows no dated activity within 12 months
+# (site ©2024, events page empty), so it does not clear the activity
+# bar as of 2026-06-03. Revisit if BFC-PEI refreshes its public surface.
 
-# --- Yukon, Northwest Territories, Nunavut (territories) ---
-# gap: no provincial/territorial ped/bike or transit advocacy
-# nonprofits found for YT, NT, or NU as of 2026-05-20. Population
-# density and advocacy ecosystem in the Canadian North make this
-# expected; ZIPs in these territories return empty `local`/`regional`
-# arrays at the territory-tier ancestor walk per the empty-state
-# policy in the design spec.
+# --- Northwest Territories ---
+
+[[org]]
+slug = "shift-nwt"
+added_at = 2026-06-03
+name = "SHIFT NWT"
+short_desc = "Yellowknife active-mobility advocacy project pressing for complete streets and protected bike lanes in the Northwest Territories. Runs a free bike-lending fleet and a multimodal traffic-counter program feeding data to city planners."
+website_url = "https://shiftnwt.org"
+contact_url = "https://shiftnwt.org/contact"
+tags = ["cycling", "safe-streets", "advocacy", "complete-streets"]
+region_slugs = ["nt"]
+
+# --- Yukon, Nunavut (territories) ---
+# gap: no qualifying territorial ped/bike or transit advocacy nonprofit
+# found for YT or NU as of 2026-06-03. The Whitehorse Urban Cycling
+# Coalition (YT) exists but its own surface is dormant (newest content
+# ~2020), and the Cycling Association of Yukon is a sport governing
+# body; Nunavut has no advocacy nonprofit. Postal codes in these
+# territories return empty `local`/`regional` arrays at the
+# territory-tier ancestor walk per the empty-state policy.
 
 # --- Portugal ---
 #
