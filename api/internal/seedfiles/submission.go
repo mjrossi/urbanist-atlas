@@ -32,7 +32,6 @@ type SubmissionPayloadInput struct {
 	ShortDesc   string
 	WebsiteURL  string
 	ContactURL  string
-	Tags        []string
 	RegionSlugs []string
 }
 
@@ -51,7 +50,7 @@ type SubmitterInput struct {
 // passes.
 //
 // Field keys match the wire shape (`name`, `short_desc`,
-// `website_url`, `contact_url`, `tags`, `region_slugs`,
+// `website_url`, `contact_url`, `region_slugs`,
 // `submitter_name`, `submitter_email`, `submitter_note`) so the
 // frontend can plug them straight into react-hook-form's setError.
 // The values are sentences (end with a period) safe to render to end
@@ -85,21 +84,6 @@ func ValidateSubmissionPayload(p SubmissionPayloadInput, s SubmitterInput) map[s
 	if p.ContactURL != "" {
 		if msg := checkContactURL(p.ContactURL); msg != "" {
 			errs["contact_url"] = msg
-		}
-	}
-
-	if len(p.Tags) > MaxTags {
-		errs["tags"] = fmt.Sprintf("Tags must have at most %d entries.", MaxTags)
-	} else {
-		for i, tag := range p.Tags {
-			if tag == "" {
-				errs["tags"] = fmt.Sprintf("Tag at index %d is empty.", i)
-				break
-			}
-			if utf8.RuneCountInString(tag) > MaxTagLen {
-				errs["tags"] = fmt.Sprintf("Tag at index %d must be at most %d characters.", i, MaxTagLen)
-				break
-			}
 		}
 	}
 

@@ -115,7 +115,6 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 				ShortDesc:   payload.ShortDesc,
 				WebsiteURL:  payload.WebsiteURL,
 				ContactURL:  payload.ContactURL,
-				Tags:        payload.Tags,
 				RegionSlugs: payload.RegionSlugs,
 			},
 			seedfiles.SubmitterInput{
