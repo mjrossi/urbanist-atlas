@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -33,6 +35,41 @@ func listRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc
 			return
 		}
 		respondCollection(w, toOAPIRegionSummaries(regions))
+	}
+}
+
+// searchRegionsHandler answers GET /api/v1/regions/search — the region
+// type-ahead behind the public submission form. Case-insensitive search
+// over the FULL non-national region graph (every kind, not just the
+// browse set ListRegions returns), ranked for relevance, each result
+// carrying a state-ancestor context label for disambiguation. A blank
+// `q` returns an empty `data` array (not a 400) so the SPA's
+// empty-input state needs no special handling.
+//
+// Ranking, the national-tier exclusion, and the context label live in
+// pkg/atlas (MemStore.SearchRegions); this handler is the thin
+// parse-validate-encode adapter.
+func searchRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rid := requestIDFromContext(r.Context())
+		q := strings.TrimSpace(r.URL.Query().Get("q"))
+		limit := 0 // 0 lets the store apply its default; the cap is shared
+		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 1 || n > maxRegionSearchLimit {
+				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Limit",
+					fmt.Sprintf("The limit query parameter must be an integer between 1 and %d.", maxRegionSearchLimit), rid)
+				return
+			}
+			limit = n
+		}
+		results, err := store.SearchRegions(r.Context(), q, limit)
+		if err != nil {
+			logger.ErrorContext(r.Context(), "search regions failed", "err", err, "rid", rid)
+			writeInternalProblem(w, r, rid)
+			return
+		}
+		respondCollection(w, toOAPIRegionSearchResults(results))
 	}
 }
 

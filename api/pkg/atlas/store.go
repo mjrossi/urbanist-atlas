@@ -108,6 +108,21 @@ type Store interface {
 	// resolved by slug ASC so the choice is deterministic.
 	ListRegions(ctx context.Context) ([]RegionSummary, error)
 
+	// SearchRegions returns regions whose name or slug matches query
+	// (case-insensitive), for type-ahead use. Unlike ListRegions it
+	// searches the FULL graph (every kind — boroughs, counties, metros,
+	// states), not just the browseable, org-bearing subset, so a
+	// submitter can attach an org to any node. Excludes
+	// scope_tier='national' rows. Ranked exact-slug > exact-name >
+	// name-prefix > slug-prefix > substring, with Name ASC then Slug ASC
+	// as the stable tiebreak. Capped at limit (<=0 selects a default;
+	// the implementation applies a hard maximum). A blank query returns
+	// an empty slice, not an error.
+	//
+	// Each result's ContextLabel carries the nearest state/province
+	// ancestor's name for disambiguation; empty when none resolves.
+	SearchRegions(ctx context.Context, query string, limit int) ([]RegionSearchResult, error)
+
 	// GetOrgBySlug returns the approved organization identified by slug,
 	// with every region it serves denormalized at Org.Regions (sorted
 	// ascending by region ID). Returns ErrOrgNotFound when no row

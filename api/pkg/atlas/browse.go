@@ -27,6 +27,25 @@ type RegionSummary struct {
 	BrowseParentSlug string
 }
 
+// RegionSearchResult is the domain shape returned by
+// Store.SearchRegions: one matched region (any non-national kind) plus
+// a human-readable disambiguation hint.
+//
+// ContextLabel is the name of the region's nearest state/province-
+// equivalent ancestor (e.g. "New York" for the `queens` borough), so a
+// type-ahead can tell same-named leaves apart ("Springfield" in IL vs
+// MA). Empty string when the region has no resolvable state ancestor
+// (a state itself, or a top-level region) — maps to an empty string on
+// the wire, never null.
+//
+// The wire-level twin lives in the generated oapi package; the HTTP
+// handler adapts one to the other so pkg/atlas stays free of OpenAPI
+// types.
+type RegionSearchResult struct {
+	Region       Region
+	ContextLabel string
+}
+
 // RegionDetail is the domain shape returned by atlas.GetRegion: a
 // region plus the orgs in scope for it, bucketed by attachment
 // scope_tier, plus the upward ancestry walk and a descendant

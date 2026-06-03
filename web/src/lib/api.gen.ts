@@ -218,6 +218,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/regions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search regions by name or slug for type-ahead.
+         * @description Case-insensitive search over the FULL region graph — every kind
+         *     (boroughs, counties, cities, metros/CMAs, states/provinces,
+         *     multi-state coalitions), not just the curated browse set that
+         *     `GET /api/v1/regions` returns. Powers the region type-ahead on
+         *     the public submission form so a submitter can attach an org to a
+         *     canonical slug instead of free text.
+         *
+         *     Results are ranked for relevance — exact slug, then exact name,
+         *     then name prefix, then slug prefix, then substring — with name
+         *     ascending (then slug ascending) as the stable tiebreak. Each
+         *     result carries a `context_label`: the nearest state/province
+         *     ancestor's name (e.g. "New York" for `queens`), so the client
+         *     can tell same-named leaves apart ("Springfield" in IL vs MA).
+         *     The label is an empty string when no state ancestor resolves.
+         *
+         *     `scope_tier='national'` regions are always excluded (the same v1
+         *     editorial gate as `/lookup` and the other browse endpoints). A
+         *     blank or omitted `q` returns an empty `data` array rather than
+         *     an error, so the client's empty-input state needs no special
+         *     handling.
+         *
+         *     Wrapped in the standard `{ meta, data }` collection envelope.
+         */
+        get: operations["searchRegions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{slug}": {
         parameters: {
             query?: never;
@@ -739,6 +780,30 @@ export interface components {
             data: components["schemas"]["RegionSummary"][];
         };
         /**
+         * @description A region matched by `GET /api/v1/regions/search`, plus a
+         *     disambiguation hint for type-ahead display.
+         */
+        RegionSearchResult: {
+            region: components["schemas"]["Region"];
+            /**
+             * @description The nearest state/province-equivalent ancestor's name (e.g.
+             *     "New York" for the `queens` borough), to disambiguate
+             *     same-named regions in a type-ahead. Empty string when the
+             *     region has no resolvable state ancestor (a state itself, or
+             *     a top-level region).
+             * @example New York
+             */
+            context_label: string;
+        };
+        /**
+         * @description Collection envelope for `GET /api/v1/regions/search`. Same shape
+         *     contract as `RegionSummariesEnvelope`.
+         */
+        RegionSearchResultsEnvelope: {
+            meta: components["schemas"]["Meta"];
+            data: components["schemas"]["RegionSearchResult"][];
+        };
+        /**
          * @description Collection envelope for `GET /api/v1/recent`. Same shape
          *     contract as `RegionSummariesEnvelope`.
          */
@@ -1222,6 +1287,44 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    searchRegions: {
+        parameters: {
+            query?: {
+                /**
+                 * @description The search term. Matched case-insensitively against region
+                 *     name and slug. Blank, whitespace-only, or omitted returns an
+                 *     empty result set.
+                 */
+                q?: string;
+                /** @description Maximum number of results to return. Capped at 20. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /**
+             * @description Matching regions, ranked by relevance. Wrapped in a
+             *     `{ meta, data }` envelope; the `RegionSearchResult[]` lives
+             *     at `data`.
+             */
+            200: {
+                headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionSearchResultsEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };

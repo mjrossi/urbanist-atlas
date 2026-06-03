@@ -37,6 +37,11 @@ const submissionBodyLimit = 64 * 1024
 // response.
 const maxAdminListLimit = 200
 
+// maxRegionSearchLimit caps ?limit= on GET /api/v1/regions/search.
+// Matches the `maximum: 20` in the OpenAPI spec and the store's own
+// hard cap — the type-ahead never needs more than a screenful.
+const maxRegionSearchLimit = 20
+
 // Upper bounds on the raw `postal_code` and `country` query parameters
 // for GET /api/v1/lookup. Generous relative to the longest validators
 // in pkg/atlas/postal.go (PT is 7 chars after hyphen-strip; every
