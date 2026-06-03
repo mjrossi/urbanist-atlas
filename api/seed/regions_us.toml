@@ -266,10 +266,11 @@ name = "Washington"
 scope_tier = "local"
 sort_priority = 10
 parents = ["washington-dc-metro", "dc"]
-# DC is a federal district that is its own state-equivalent. Without
-# this leaf, every DC ZIP would anchor at washington-dc-metro and the
-# breadcrumb walk would surface the metro's other state parents (MD,
-# VA, WV) ahead of DC itself (tied at sort_priority=60, ordered by id
-# which reflects load order — ids are assigned in dependency order by
-# api/internal/seedfiles/build.go). With the city leaf in place, DC ZIPs land here first
-# and the metro/state parents bridge in at depth 1.
+# DC is a federal district that is its own state-equivalent. This leaf
+# gives DC's Census-backed ZIPs a city-scale (local) anchor; the
+# HUD-backfill DC ZIPs that Census omits anchor one tier up at the
+# washington-dc-metro-dc portion instead. Neither route leaks MD/VA/WV:
+# washington-dc-metro is a stateless umbrella (parents=[]) with one
+# us:metro-portion per spanned jurisdiction (DC/MD/VA/WV), so the metro's
+# orgs reach the MD/VA/WV state pages only via rollup_states (browse-only),
+# never through this leaf's ancestor walk. See docs/region-graph.md §1.

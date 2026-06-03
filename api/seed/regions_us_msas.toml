@@ -16,11 +16,18 @@
 #
 # Parents:
 #   - Single-state MSAs parent under their state slug.
-#   - Multi-state MSAs without an override parent under all their
-#     constituent states (so MSA-anchored ZCTAs surface state-tier
-#     orgs through the ancestor walk). Curated multi-state regions
-#     in regions_us.toml (nyc-tristate, chicagoland) are
-#     plumbed in via the override file.
+#   - Multi-state MSAs (no override) are STATELESS umbrellas: parents = []
+#     plus rollup_states = [each spanned state], so the metro's own orgs
+#     surface on each state's detail page (browse direction) WITHOUT
+#     leaking state-tier orgs across the line in postal lookups. Each
+#     spanned state also gets a us:metro-portion leaf
+#     (parents = [state, umbrella]) that its constituent ZCTAs anchor at,
+#     so a lookup reaches only its own state. The portion slug is
+#     "<umbrella>-<state>", which sorts right after the umbrella.
+#   - Curated multi-state metros (nyc-metro, chicago-metro) instead route
+#     via the override file to a multi-state region (nyc-tristate,
+#     chicagoland) with hand-curated county leaves, and carry their
+#     rollup_states in the override.
 #
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves
@@ -105,8 +112,25 @@ kind = "us:metro"
 name = "Allentown Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["pa", "nj"]
+parents = []
+rollup_states = ["nj", "pa"]
 # Census CBSA 10900 — Allentown-Bethlehem-Easton, PA-NJ
+
+[[region]]
+slug = "allentown-pa-metro-nj"
+kind = "us:metro-portion"
+name = "Allentown Metro (NJ)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nj", "allentown-pa-metro"]
+
+[[region]]
+slug = "allentown-pa-metro-pa"
+kind = "us:metro-portion"
+name = "Allentown Metro (PA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa", "allentown-pa-metro"]
 
 [[region]]
 slug = "altoona-pa-metro"
@@ -240,8 +264,25 @@ kind = "us:metro"
 name = "Augusta Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ga", "sc"]
+parents = []
+rollup_states = ["ga", "sc"]
 # Census CBSA 12260 — Augusta-Richmond County, GA-SC
+
+[[region]]
+slug = "augusta-ga-metro-ga"
+kind = "us:metro-portion"
+name = "Augusta Metro (GA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga", "augusta-ga-metro"]
+
+[[region]]
+slug = "augusta-ga-metro-sc"
+kind = "us:metro-portion"
+name = "Augusta Metro (SC)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc", "augusta-ga-metro"]
 
 [[region]]
 slug = "austin-tx-metro"
@@ -537,8 +578,25 @@ kind = "us:metro"
 name = "Cape Girardeau Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["mo", "il"]
+parents = []
+rollup_states = ["il", "mo"]
 # Census CBSA 16020 — Cape Girardeau, MO-IL
+
+[[region]]
+slug = "cape-girardeau-mo-metro-il"
+kind = "us:metro-portion"
+name = "Cape Girardeau Metro (IL)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il", "cape-girardeau-mo-metro"]
+
+[[region]]
+slug = "cape-girardeau-mo-metro-mo"
+kind = "us:metro-portion"
+name = "Cape Girardeau Metro (MO)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "cape-girardeau-mo-metro"]
 
 [[region]]
 slug = "carson-city-nv-metro"
@@ -609,8 +667,25 @@ kind = "us:metro"
 name = "Charlotte Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["nc", "sc"]
+parents = []
+rollup_states = ["nc", "sc"]
 # Census CBSA 16740 — Charlotte-Concord-Gastonia, NC-SC
+
+[[region]]
+slug = "charlotte-nc-metro-nc"
+kind = "us:metro-portion"
+name = "Charlotte Metro (NC)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc", "charlotte-nc-metro"]
+
+[[region]]
+slug = "charlotte-nc-metro-sc"
+kind = "us:metro-portion"
+name = "Charlotte Metro (SC)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sc", "charlotte-nc-metro"]
 
 [[region]]
 slug = "charlottesville-va-metro"
@@ -627,8 +702,25 @@ kind = "us:metro"
 name = "Chattanooga Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["tn", "ga"]
+parents = []
+rollup_states = ["ga", "tn"]
 # Census CBSA 16860 — Chattanooga, TN-GA
+
+[[region]]
+slug = "chattanooga-tn-metro-ga"
+kind = "us:metro-portion"
+name = "Chattanooga Metro (GA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga", "chattanooga-tn-metro"]
+
+[[region]]
+slug = "chattanooga-tn-metro-tn"
+kind = "us:metro-portion"
+name = "Chattanooga Metro (TN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "chattanooga-tn-metro"]
 
 [[region]]
 slug = "cheyenne-wy-metro"
@@ -646,6 +738,7 @@ name = "Chicago Metro"
 scope_tier = "regional"
 sort_priority = 40
 parents = ["chicagoland"]
+rollup_states = ["il"]
 # Census CBSA 16980 — Chicago-Naperville-Elgin, IL-IN
 
 [[region]]
@@ -663,8 +756,33 @@ kind = "us:metro"
 name = "Cincinnati Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["oh", "ky", "in"]
+parents = []
+rollup_states = ["in", "ky", "oh"]
 # Census CBSA 17140 — Cincinnati, OH-KY-IN
+
+[[region]]
+slug = "cincinnati-oh-metro-in"
+kind = "us:metro-portion"
+name = "Cincinnati Metro (IN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in", "cincinnati-oh-metro"]
+
+[[region]]
+slug = "cincinnati-oh-metro-ky"
+kind = "us:metro-portion"
+name = "Cincinnati Metro (KY)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "cincinnati-oh-metro"]
+
+[[region]]
+slug = "cincinnati-oh-metro-oh"
+kind = "us:metro-portion"
+name = "Cincinnati Metro (OH)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh", "cincinnati-oh-metro"]
 
 [[region]]
 slug = "clarksville-tn-metro"
@@ -672,8 +790,25 @@ kind = "us:metro"
 name = "Clarksville Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["tn", "ky"]
+parents = []
+rollup_states = ["ky", "tn"]
 # Census CBSA 17300 — Clarksville, TN-KY
+
+[[region]]
+slug = "clarksville-tn-metro-ky"
+kind = "us:metro-portion"
+name = "Clarksville Metro (KY)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "clarksville-tn-metro"]
+
+[[region]]
+slug = "clarksville-tn-metro-tn"
+kind = "us:metro-portion"
+name = "Clarksville Metro (TN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "clarksville-tn-metro"]
 
 [[region]]
 slug = "cleveland-oh-metro"
@@ -744,8 +879,25 @@ kind = "us:metro"
 name = "Columbus Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ga", "al"]
+parents = []
+rollup_states = ["al", "ga"]
 # Census CBSA 17980 — Columbus, GA-AL
+
+[[region]]
+slug = "columbus-ga-metro-al"
+kind = "us:metro-portion"
+name = "Columbus Metro (AL)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["al", "columbus-ga-metro"]
+
+[[region]]
+slug = "columbus-ga-metro-ga"
+kind = "us:metro-portion"
+name = "Columbus Metro (GA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ga", "columbus-ga-metro"]
 
 [[region]]
 slug = "columbus-in-metro"
@@ -825,8 +977,25 @@ kind = "us:metro"
 name = "Davenport Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ia", "il"]
+parents = []
+rollup_states = ["ia", "il"]
 # Census CBSA 19340 — Davenport-Moline-Rock Island, IA-IL
+
+[[region]]
+slug = "davenport-ia-metro-ia"
+kind = "us:metro-portion"
+name = "Davenport Metro (IA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia", "davenport-ia-metro"]
+
+[[region]]
+slug = "davenport-ia-metro-il"
+kind = "us:metro-portion"
+name = "Davenport Metro (IL)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il", "davenport-ia-metro"]
 
 [[region]]
 slug = "dayton-oh-metro"
@@ -924,8 +1093,25 @@ kind = "us:metro"
 name = "Duluth Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["mn", "wi"]
+parents = []
+rollup_states = ["mn", "wi"]
 # Census CBSA 20260 — Duluth, MN-WI
+
+[[region]]
+slug = "duluth-mn-metro-mn"
+kind = "us:metro-portion"
+name = "Duluth Metro (MN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "duluth-mn-metro"]
+
+[[region]]
+slug = "duluth-mn-metro-wi"
+kind = "us:metro-portion"
+name = "Duluth Metro (WI)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi", "duluth-mn-metro"]
 
 [[region]]
 slug = "durham-nc-metro"
@@ -1050,8 +1236,25 @@ kind = "us:metro"
 name = "Fargo Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["nd", "mn"]
+parents = []
+rollup_states = ["mn", "nd"]
 # Census CBSA 22020 — Fargo, ND-MN
+
+[[region]]
+slug = "fargo-nd-metro-mn"
+kind = "us:metro-portion"
+name = "Fargo Metro (MN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "fargo-nd-metro"]
+
+[[region]]
+slug = "fargo-nd-metro-nd"
+kind = "us:metro-portion"
+name = "Fargo Metro (ND)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nd", "fargo-nd-metro"]
 
 [[region]]
 slug = "farmington-nm-metro"
@@ -1140,8 +1343,25 @@ kind = "us:metro"
 name = "Fort Smith Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ar", "ok"]
+parents = []
+rollup_states = ["ar", "ok"]
 # Census CBSA 22900 — Fort Smith, AR-OK
+
+[[region]]
+slug = "fort-smith-ar-metro-ar"
+kind = "us:metro-portion"
+name = "Fort Smith Metro (AR)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar", "fort-smith-ar-metro"]
+
+[[region]]
+slug = "fort-smith-ar-metro-ok"
+kind = "us:metro-portion"
+name = "Fort Smith Metro (OK)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ok", "fort-smith-ar-metro"]
 
 [[region]]
 slug = "fort-wayne-in-metro"
@@ -1221,8 +1441,25 @@ kind = "us:metro"
 name = "Grand Forks Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["nd", "mn"]
+parents = []
+rollup_states = ["mn", "nd"]
 # Census CBSA 24220 — Grand Forks, ND-MN
+
+[[region]]
+slug = "grand-forks-nd-metro-mn"
+kind = "us:metro-portion"
+name = "Grand Forks Metro (MN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "grand-forks-nd-metro"]
+
+[[region]]
+slug = "grand-forks-nd-metro-nd"
+kind = "us:metro-portion"
+name = "Grand Forks Metro (ND)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nd", "grand-forks-nd-metro"]
 
 [[region]]
 slug = "grand-island-ne-metro"
@@ -1365,8 +1602,25 @@ kind = "us:metro"
 name = "Hagerstown Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["md", "wv"]
+parents = []
+rollup_states = ["md", "wv"]
 # Census CBSA 25180 — Hagerstown-Martinsburg, MD-WV
+
+[[region]]
+slug = "hagerstown-md-metro-md"
+kind = "us:metro-portion"
+name = "Hagerstown Metro (MD)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["md", "hagerstown-md-metro"]
+
+[[region]]
+slug = "hagerstown-md-metro-wv"
+kind = "us:metro-portion"
+name = "Hagerstown Metro (WV)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "hagerstown-md-metro"]
 
 [[region]]
 slug = "hammond-la-metro"
@@ -1500,8 +1754,33 @@ kind = "us:metro"
 name = "Huntington Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["wv", "ky", "oh"]
+parents = []
+rollup_states = ["ky", "oh", "wv"]
 # Census CBSA 26580 — Huntington-Ashland, WV-KY-OH
+
+[[region]]
+slug = "huntington-wv-metro-ky"
+kind = "us:metro-portion"
+name = "Huntington Metro (KY)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "huntington-wv-metro"]
+
+[[region]]
+slug = "huntington-wv-metro-oh"
+kind = "us:metro-portion"
+name = "Huntington Metro (OH)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh", "huntington-wv-metro"]
+
+[[region]]
+slug = "huntington-wv-metro-wv"
+kind = "us:metro-portion"
+name = "Huntington Metro (WV)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "huntington-wv-metro"]
 
 [[region]]
 slug = "huntsville-al-metro"
@@ -1644,8 +1923,25 @@ kind = "us:metro"
 name = "Joplin Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["mo", "ks"]
+parents = []
+rollup_states = ["ks", "mo"]
 # Census CBSA 27900 — Joplin, MO-KS
+
+[[region]]
+slug = "joplin-mo-metro-ks"
+kind = "us:metro-portion"
+name = "Joplin Metro (KS)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ks", "joplin-mo-metro"]
+
+[[region]]
+slug = "joplin-mo-metro-mo"
+kind = "us:metro-portion"
+name = "Joplin Metro (MO)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "joplin-mo-metro"]
 
 [[region]]
 slug = "kahului-hi-metro"
@@ -1680,8 +1976,25 @@ kind = "us:metro"
 name = "Kansas City Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["mo", "ks"]
+parents = []
+rollup_states = ["ks", "mo"]
 # Census CBSA 28140 — Kansas City, MO-KS
+
+[[region]]
+slug = "kansas-city-mo-metro-ks"
+kind = "us:metro-portion"
+name = "Kansas City Metro (KS)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ks", "kansas-city-mo-metro"]
+
+[[region]]
+slug = "kansas-city-mo-metro-mo"
+kind = "us:metro-portion"
+name = "Kansas City Metro (MO)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "kansas-city-mo-metro"]
 
 [[region]]
 slug = "kennewick-wa-metro"
@@ -1716,8 +2029,25 @@ kind = "us:metro"
 name = "Kingsport Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["tn", "va"]
+parents = []
+rollup_states = ["tn", "va"]
 # Census CBSA 28700 — Kingsport-Bristol, TN-VA
+
+[[region]]
+slug = "kingsport-tn-metro-tn"
+kind = "us:metro-portion"
+name = "Kingsport Metro (TN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "kingsport-tn-metro"]
+
+[[region]]
+slug = "kingsport-tn-metro-va"
+kind = "us:metro-portion"
+name = "Kingsport Metro (VA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va", "kingsport-tn-metro"]
 
 [[region]]
 slug = "kingston-ny-metro"
@@ -1761,8 +2091,25 @@ kind = "us:metro"
 name = "La Crosse Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["wi", "mn"]
+parents = []
+rollup_states = ["mn", "wi"]
 # Census CBSA 29100 — La Crosse-Onalaska, WI-MN
+
+[[region]]
+slug = "la-crosse-wi-metro-mn"
+kind = "us:metro-portion"
+name = "La Crosse Metro (MN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "la-crosse-wi-metro"]
+
+[[region]]
+slug = "la-crosse-wi-metro-wi"
+kind = "us:metro-portion"
+name = "La Crosse Metro (WI)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi", "la-crosse-wi-metro"]
 
 [[region]]
 slug = "lafayette-in-metro"
@@ -1887,8 +2234,25 @@ kind = "us:metro"
 name = "Lewiston Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["id", "wa"]
+parents = []
+rollup_states = ["id", "wa"]
 # Census CBSA 30300 — Lewiston, ID-WA
+
+[[region]]
+slug = "lewiston-id-metro-id"
+kind = "us:metro-portion"
+name = "Lewiston Metro (ID)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id", "lewiston-id-metro"]
+
+[[region]]
+slug = "lewiston-id-metro-wa"
+kind = "us:metro-portion"
+name = "Lewiston Metro (WA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa", "lewiston-id-metro"]
 
 [[region]]
 slug = "lewiston-me-metro"
@@ -1950,8 +2314,25 @@ kind = "us:metro"
 name = "Logan Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ut", "id"]
+parents = []
+rollup_states = ["id", "ut"]
 # Census CBSA 30860 — Logan, UT-ID
+
+[[region]]
+slug = "logan-ut-metro-id"
+kind = "us:metro-portion"
+name = "Logan Metro (ID)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["id", "logan-ut-metro"]
+
+[[region]]
+slug = "logan-ut-metro-ut"
+kind = "us:metro-portion"
+name = "Logan Metro (UT)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ut", "logan-ut-metro"]
 
 [[region]]
 slug = "longview-tx-metro"
@@ -1977,8 +2358,25 @@ kind = "us:metro"
 name = "Louisville/Jefferson County Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ky", "in"]
+parents = []
+rollup_states = ["in", "ky"]
 # Census CBSA 31140 — Louisville/Jefferson County, KY-IN
+
+[[region]]
+slug = "louisville-jefferson-county-ky-metro-in"
+kind = "us:metro-portion"
+name = "Louisville/Jefferson County Metro (IN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in", "louisville-jefferson-county-ky-metro"]
+
+[[region]]
+slug = "louisville-jefferson-county-ky-metro-ky"
+kind = "us:metro-portion"
+name = "Louisville/Jefferson County Metro (KY)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "louisville-jefferson-county-ky-metro"]
 
 [[region]]
 slug = "lubbock-tx-metro"
@@ -2085,8 +2483,33 @@ kind = "us:metro"
 name = "Memphis Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["tn", "ms", "ar"]
+parents = []
+rollup_states = ["ar", "ms", "tn"]
 # Census CBSA 32820 — Memphis, TN-MS-AR
+
+[[region]]
+slug = "memphis-tn-metro-ar"
+kind = "us:metro-portion"
+name = "Memphis Metro (AR)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar", "memphis-tn-metro"]
+
+[[region]]
+slug = "memphis-tn-metro-ms"
+kind = "us:metro-portion"
+name = "Memphis Metro (MS)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ms", "memphis-tn-metro"]
+
+[[region]]
+slug = "memphis-tn-metro-tn"
+kind = "us:metro-portion"
+name = "Memphis Metro (TN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tn", "memphis-tn-metro"]
 
 [[region]]
 slug = "merced-ca-metro"
@@ -2139,8 +2562,25 @@ kind = "us:metro"
 name = "Minneapolis Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["mn", "wi"]
+parents = []
+rollup_states = ["mn", "wi"]
 # Census CBSA 33460 — Minneapolis-St. Paul-Bloomington, MN-WI
+
+[[region]]
+slug = "minneapolis-mn-metro-mn"
+kind = "us:metro-portion"
+name = "Minneapolis Metro (MN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "minneapolis-mn-metro"]
+
+[[region]]
+slug = "minneapolis-mn-metro-wi"
+kind = "us:metro-portion"
+name = "Minneapolis Metro (WI)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wi", "minneapolis-mn-metro"]
 
 [[region]]
 slug = "minot-nd-metro"
@@ -2338,6 +2778,7 @@ name = "New York Metro"
 scope_tier = "regional"
 sort_priority = 40
 parents = ["nyc-tristate"]
+rollup_states = ["ny"]
 # Census CBSA 35620 — New York-Newark-Jersey City, NY-NJ
 
 [[region]]
@@ -2391,8 +2832,25 @@ kind = "us:metro"
 name = "Omaha Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ne", "ia"]
+parents = []
+rollup_states = ["ia", "ne"]
 # Census CBSA 36540 — Omaha, NE-IA
+
+[[region]]
+slug = "omaha-ne-metro-ia"
+kind = "us:metro-portion"
+name = "Omaha Metro (IA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia", "omaha-ne-metro"]
+
+[[region]]
+slug = "omaha-ne-metro-ne"
+kind = "us:metro-portion"
+name = "Omaha Metro (NE)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ne", "omaha-ne-metro"]
 
 [[region]]
 slug = "orlando-fl-metro"
@@ -2436,8 +2894,25 @@ kind = "us:metro"
 name = "Paducah Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ky", "il"]
+parents = []
+rollup_states = ["il", "ky"]
 # Census CBSA 37140 — Paducah, KY-IL
+
+[[region]]
+slug = "paducah-ky-metro-il"
+kind = "us:metro-portion"
+name = "Paducah Metro (IL)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il", "paducah-ky-metro"]
+
+[[region]]
+slug = "paducah-ky-metro-ky"
+kind = "us:metro-portion"
+name = "Paducah Metro (KY)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "paducah-ky-metro"]
 
 [[region]]
 slug = "palm-bay-fl-metro"
@@ -2490,8 +2965,41 @@ kind = "us:metro"
 name = "Philadelphia Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["pa", "nj", "de-state", "md"]
+parents = []
+rollup_states = ["de-state", "md", "nj", "pa"]
 # Census CBSA 37980 — Philadelphia-Camden-Wilmington, PA-NJ-DE-MD
+
+[[region]]
+slug = "philadelphia-pa-metro-de"
+kind = "us:metro-portion"
+name = "Philadelphia Metro (DE)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["de-state", "philadelphia-pa-metro"]
+
+[[region]]
+slug = "philadelphia-pa-metro-md"
+kind = "us:metro-portion"
+name = "Philadelphia Metro (MD)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["md", "philadelphia-pa-metro"]
+
+[[region]]
+slug = "philadelphia-pa-metro-nj"
+kind = "us:metro-portion"
+name = "Philadelphia Metro (NJ)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nj", "philadelphia-pa-metro"]
+
+[[region]]
+slug = "philadelphia-pa-metro-pa"
+kind = "us:metro-portion"
+name = "Philadelphia Metro (PA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["pa", "philadelphia-pa-metro"]
 
 [[region]]
 slug = "phoenix-az-metro"
@@ -2571,8 +3079,25 @@ kind = "us:metro"
 name = "Portland Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["or", "wa"]
+parents = []
+rollup_states = ["or", "wa"]
 # Census CBSA 38900 — Portland-Vancouver-Hillsboro, OR-WA
+
+[[region]]
+slug = "portland-or-metro-or"
+kind = "us:metro-portion"
+name = "Portland Metro (OR)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["or", "portland-or-metro"]
+
+[[region]]
+slug = "portland-or-metro-wa"
+kind = "us:metro-portion"
+name = "Portland Metro (WA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wa", "portland-or-metro"]
 
 [[region]]
 slug = "prescott-valley-az-metro"
@@ -2589,8 +3114,25 @@ kind = "us:metro"
 name = "Providence Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ri", "ma"]
+parents = []
+rollup_states = ["ma", "ri"]
 # Census CBSA 39300 — Providence-Warwick, RI-MA
+
+[[region]]
+slug = "providence-ri-metro-ma"
+kind = "us:metro-portion"
+name = "Providence Metro (MA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ma", "providence-ri-metro"]
+
+[[region]]
+slug = "providence-ri-metro-ri"
+kind = "us:metro-portion"
+name = "Providence Metro (RI)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ri", "providence-ri-metro"]
 
 [[region]]
 slug = "provo-ut-metro"
@@ -2994,8 +3536,33 @@ kind = "us:metro"
 name = "Sioux City Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["ia", "ne", "sd"]
+parents = []
+rollup_states = ["ia", "ne", "sd"]
 # Census CBSA 43580 — Sioux City, IA-NE-SD
+
+[[region]]
+slug = "sioux-city-ia-metro-ia"
+kind = "us:metro-portion"
+name = "Sioux City Metro (IA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ia", "sioux-city-ia-metro"]
+
+[[region]]
+slug = "sioux-city-ia-metro-ne"
+kind = "us:metro-portion"
+name = "Sioux City Metro (NE)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ne", "sioux-city-ia-metro"]
+
+[[region]]
+slug = "sioux-city-ia-metro-sd"
+kind = "us:metro-portion"
+name = "Sioux City Metro (SD)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sd", "sioux-city-ia-metro"]
 
 [[region]]
 slug = "sioux-falls-sd-metro"
@@ -3003,8 +3570,25 @@ kind = "us:metro"
 name = "Sioux Falls Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["sd", "mn"]
+parents = []
+rollup_states = ["mn", "sd"]
 # Census CBSA 43620 — Sioux Falls, SD-MN
+
+[[region]]
+slug = "sioux-falls-sd-metro-mn"
+kind = "us:metro-portion"
+name = "Sioux Falls Metro (MN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mn", "sioux-falls-sd-metro"]
+
+[[region]]
+slug = "sioux-falls-sd-metro-sd"
+kind = "us:metro-portion"
+name = "Sioux Falls Metro (SD)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["sd", "sioux-falls-sd-metro"]
 
 [[region]]
 slug = "slidell-la-metro"
@@ -3021,8 +3605,25 @@ kind = "us:metro"
 name = "South Bend Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["in", "mi"]
+parents = []
+rollup_states = ["in", "mi"]
 # Census CBSA 43780 — South Bend-Mishawaka, IN-MI
+
+[[region]]
+slug = "south-bend-in-metro-in"
+kind = "us:metro-portion"
+name = "South Bend Metro (IN)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["in", "south-bend-in-metro"]
+
+[[region]]
+slug = "south-bend-in-metro-mi"
+kind = "us:metro-portion"
+name = "South Bend Metro (MI)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mi", "south-bend-in-metro"]
 
 [[region]]
 slug = "spartanburg-sc-metro"
@@ -3102,8 +3703,25 @@ kind = "us:metro"
 name = "St. Joseph Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["mo", "ks"]
+parents = []
+rollup_states = ["ks", "mo"]
 # Census CBSA 41140 — St. Joseph, MO-KS
+
+[[region]]
+slug = "st-joseph-mo-metro-ks"
+kind = "us:metro-portion"
+name = "St. Joseph Metro (KS)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ks", "st-joseph-mo-metro"]
+
+[[region]]
+slug = "st-joseph-mo-metro-mo"
+kind = "us:metro-portion"
+name = "St. Joseph Metro (MO)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "st-joseph-mo-metro"]
 
 [[region]]
 slug = "st-louis-mo-metro"
@@ -3111,8 +3729,25 @@ kind = "us:metro"
 name = "St. Louis Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["mo", "il"]
+parents = []
+rollup_states = ["il", "mo"]
 # Census CBSA 41180 — St. Louis, MO-IL
+
+[[region]]
+slug = "st-louis-mo-metro-il"
+kind = "us:metro-portion"
+name = "St. Louis Metro (IL)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["il", "st-louis-mo-metro"]
+
+[[region]]
+slug = "st-louis-mo-metro-mo"
+kind = "us:metro-portion"
+name = "St. Louis Metro (MO)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["mo", "st-louis-mo-metro"]
 
 [[region]]
 slug = "state-college-pa-metro"
@@ -3192,8 +3827,25 @@ kind = "us:metro"
 name = "Texarkana Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["tx", "ar"]
+parents = []
+rollup_states = ["ar", "tx"]
 # Census CBSA 45500 — Texarkana, TX-AR
+
+[[region]]
+slug = "texarkana-tx-metro-ar"
+kind = "us:metro-portion"
+name = "Texarkana Metro (AR)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ar", "texarkana-tx-metro"]
+
+[[region]]
+slug = "texarkana-tx-metro-tx"
+kind = "us:metro-portion"
+name = "Texarkana Metro (TX)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["tx", "texarkana-tx-metro"]
 
 [[region]]
 slug = "toledo-oh-metro"
@@ -3336,8 +3988,25 @@ kind = "us:metro"
 name = "Virginia Beach Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["va", "nc"]
+parents = []
+rollup_states = ["nc", "va"]
 # Census CBSA 47260 — Virginia Beach-Chesapeake-Norfolk, VA-NC
+
+[[region]]
+slug = "virginia-beach-va-metro-nc"
+kind = "us:metro-portion"
+name = "Virginia Beach Metro (NC)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["nc", "virginia-beach-va-metro"]
+
+[[region]]
+slug = "virginia-beach-va-metro-va"
+kind = "us:metro-portion"
+name = "Virginia Beach Metro (VA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va", "virginia-beach-va-metro"]
 
 [[region]]
 slug = "visalia-ca-metro"
@@ -3381,8 +4050,41 @@ kind = "us:metro"
 name = "Washington Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["dc", "va", "md", "wv"]
+parents = []
+rollup_states = ["dc", "md", "va", "wv"]
 # Census CBSA 47900 — Washington-Arlington-Alexandria, DC-VA-MD-WV
+
+[[region]]
+slug = "washington-dc-metro-dc"
+kind = "us:metro-portion"
+name = "Washington Metro (DC)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["dc", "washington-dc-metro"]
+
+[[region]]
+slug = "washington-dc-metro-md"
+kind = "us:metro-portion"
+name = "Washington Metro (MD)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["md", "washington-dc-metro"]
+
+[[region]]
+slug = "washington-dc-metro-va"
+kind = "us:metro-portion"
+name = "Washington Metro (VA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va", "washington-dc-metro"]
+
+[[region]]
+slug = "washington-dc-metro-wv"
+kind = "us:metro-portion"
+name = "Washington Metro (WV)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "washington-dc-metro"]
 
 [[region]]
 slug = "waterbury-ct-metro"
@@ -3426,8 +4128,25 @@ kind = "us:metro"
 name = "Weirton Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["wv", "oh"]
+parents = []
+rollup_states = ["oh", "wv"]
 # Census CBSA 48260 — Weirton-Steubenville, WV-OH
+
+[[region]]
+slug = "weirton-wv-metro-oh"
+kind = "us:metro-portion"
+name = "Weirton Metro (OH)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh", "weirton-wv-metro"]
+
+[[region]]
+slug = "weirton-wv-metro-wv"
+kind = "us:metro-portion"
+name = "Weirton Metro (WV)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "weirton-wv-metro"]
 
 [[region]]
 slug = "wenatchee-wa-metro"
@@ -3444,8 +4163,25 @@ kind = "us:metro"
 name = "Wheeling Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["wv", "oh"]
+parents = []
+rollup_states = ["oh", "wv"]
 # Census CBSA 48540 — Wheeling, WV-OH
+
+[[region]]
+slug = "wheeling-wv-metro-oh"
+kind = "us:metro-portion"
+name = "Wheeling Metro (OH)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh", "wheeling-wv-metro"]
+
+[[region]]
+slug = "wheeling-wv-metro-wv"
+kind = "us:metro-portion"
+name = "Wheeling Metro (WV)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "wheeling-wv-metro"]
 
 [[region]]
 slug = "wichita-falls-tx-metro"
@@ -3498,8 +4234,25 @@ kind = "us:metro"
 name = "Winchester Metro"
 scope_tier = "regional"
 sort_priority = 40
-parents = ["va", "wv"]
+parents = []
+rollup_states = ["va", "wv"]
 # Census CBSA 49020 — Winchester, VA-WV
+
+[[region]]
+slug = "winchester-va-metro-va"
+kind = "us:metro-portion"
+name = "Winchester Metro (VA)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["va", "winchester-va-metro"]
+
+[[region]]
+slug = "winchester-va-metro-wv"
+kind = "us:metro-portion"
+name = "Winchester Metro (WV)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["wv", "winchester-va-metro"]
 
 [[region]]
 slug = "winston-nc-metro"

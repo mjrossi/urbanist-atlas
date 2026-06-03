@@ -25,6 +25,10 @@ var update = flag.Bool("update", false, "regenerate golden files")
 //   - CMA 535 → toronto-cma         (override slug + name)
 //   - CMA 933 → metro-vancouver     (override slug + kind)
 //   - CMA 421 → auto-slug           (no override; region writer path)
+//   - CMA 505 → ottawa-gatineau-cma (stateless multi-province umbrella +
+//     rollup_states + on/qc portions)
+//   - FSA K1A → ottawa-gatineau-cma-on (cma-portion, Ontario side)
+//   - FSA J8X → ottawa-gatineau-cma-qc (cma-portion, Quebec side)
 //   - FSA M5V → toronto             (city-leaf)
 //   - FSA M1B → toronto-cma         (cma, via "M" prefix)
 //   - FSA V5Z → metro-vancouver     (cma, via "V5" prefix)
@@ -41,6 +45,9 @@ func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 			{"535", "B", "Toronto", "35"},
 			{"933", "B", "Vancouver", "59"},
 			{"421", "B", "Sherbrooke", "24"},
+			// Ottawa-Gatineau is multi-province (one row per province).
+			{"505", "B", "Ottawa - Gatineau", "35"},
+			{"505", "B", "Ottawa - Gatineau", "24"},
 		},
 	)
 	fsaDBF := buildDBF(t,
@@ -51,6 +58,9 @@ func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 			{"V5Z", "59"},
 			{"V6X", "59"},
 			{"X0A", "62"},
+			// Ottawa-Gatineau portions: K1A is Ontario, J8X is Quebec.
+			{"K1A", "35"},
+			{"J8X", "24"},
 		},
 	)
 	writeZipWithDBF(t, filepath.Join(srcDir, "lcma000b21a_e.zip"), "lcma000b21a_e.dbf", cmaDBF)
@@ -72,6 +82,11 @@ cma_uid = "933"
 slug = "metro-vancouver"
 name = "Metro Vancouver"
 kind = "ca:regional-district"
+
+[[override]]
+cma_uid = "505"
+slug = "ottawa-gatineau-cma"
+name = "Ottawa-Gatineau"
 `
 	if err := os.WriteFile(filepath.Join(outDir, "regions_ca_cma_overrides.toml"), []byte(overridesTOML), 0o644); err != nil {
 		t.Fatalf("stage overrides: %v", err)

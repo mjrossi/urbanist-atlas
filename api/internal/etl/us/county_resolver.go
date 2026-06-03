@@ -16,7 +16,9 @@ package us
 //
 //  1. NYC borough leaf (county ∈ {36005, 36047, 36061, 36081, 36085})
 //  2. Curated non-NYC county leaf (Cook County IL, Lake County IN)
-//  3. MSA region via countyToMSA → msaSlugs
+//  3. MSA region via countyToMSA: for a multi-state MSA, the ZCTA's
+//     own-state portion (portionSlugs); otherwise the bare umbrella slug
+//     (msaSlugs)
 //  4. State / territory region via 2-digit FIPS prefix
 //
 // When no tier matches (rare: APO/FPO 999xx ZIPs whose county FIPS
@@ -27,15 +29,18 @@ package us
 // county-leaf and MSA — is a single insertion in Resolve. Both the
 // ZCTA and HUD callers pick it up automatically.
 type countyResolver struct {
-	countyToMSA map[string]string // 5-digit county FIPS → CBSA code
-	msaSlugs    map[string]string // CBSA code → MSA region slug
+	countyToMSA  map[string]string // 5-digit county FIPS → CBSA code
+	msaSlugs     map[string]string // CBSA code → MSA umbrella slug
+	portionSlugs map[string]string // "CBSAcode:stateFIPS" → per-state portion slug
 }
 
 // newCountyResolver builds a resolver from the per-run lookup tables.
 // The borough / county-leaf / state-FIPS maps are package-level
 // constants (see mappings.go) and don't need to be passed in.
-func newCountyResolver(countyToMSA, msaSlugs map[string]string) countyResolver {
-	return countyResolver{countyToMSA: countyToMSA, msaSlugs: msaSlugs}
+// portionSlugs routes a multi-state-MSA county to its own-state portion;
+// pass nil/empty to disable (single-state-only runs and unit tests).
+func newCountyResolver(countyToMSA, msaSlugs, portionSlugs map[string]string) countyResolver {
+	return countyResolver{countyToMSA: countyToMSA, msaSlugs: msaSlugs, portionSlugs: portionSlugs}
 }
 
 // Resolve walks the 4-tier fallback for a 5-digit county GEOID.
@@ -49,8 +54,18 @@ func (r countyResolver) Resolve(countyGEOID string) (slug, reason string, ok boo
 	if s := countyToLeaf[countyGEOID]; s != "" {
 		return s, "county-leaf", true
 	}
-	if s := r.msaSlugs[r.countyToMSA[countyGEOID]]; s != "" {
-		return s, "msa", true
+	if code := r.countyToMSA[countyGEOID]; code != "" {
+		// Multi-state MSA: route to the ZCTA's own-state portion so the
+		// ancestor walk reaches only its own state (leak-free). Single-state
+		// MSAs have no portion entry and fall through to the bare umbrella.
+		if len(countyGEOID) >= 2 {
+			if p := r.portionSlugs[code+":"+countyGEOID[:2]]; p != "" {
+				return p, "msa-portion", true
+			}
+		}
+		if s := r.msaSlugs[code]; s != "" {
+			return s, "msa", true
+		}
 	}
 	if len(countyGEOID) >= 2 {
 		if s := stateFIPSToSlug[countyGEOID[:2]]; s != "" {

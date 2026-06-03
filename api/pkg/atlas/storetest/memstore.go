@@ -29,3 +29,7 @@ func (m memSeeder) SeedPostalCode(_ *testing.T, country atlas.Country, code stri
 func (m memSeeder) SeedOrg(_ *testing.T, org atlas.Org, regionIDs []int64) {
 	m.s.AddOrg(org, regionIDs)
 }
+
+func (m memSeeder) SeedRollupState(_ *testing.T, metroSlug, stateSlug string) {
+	m.s.AddRollupState(metroSlug, stateSlug)
+}

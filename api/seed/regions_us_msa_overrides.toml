@@ -21,12 +21,14 @@ cbsa_code = "35620"
 slug = "nyc-metro"
 name = "New York Metro"
 parents = ["nyc-tristate"]
+rollup_states = ["ny"]
 
 [[override]]
 cbsa_code = "16980"
 slug = "chicago-metro"
 name = "Chicago Metro"
 parents = ["chicagoland"]
+rollup_states = ["il"]
 
 # Single-state metros parent to their state, matching the
 # auto-generated MSA convention for every other US metro. The

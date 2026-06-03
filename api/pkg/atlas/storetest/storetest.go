@@ -39,6 +39,10 @@ type Seeder interface {
 	// attachments. AddedAt should round-trip through OrgsForRegions
 	// and ListRecent.
 	SeedOrg(t *testing.T, org atlas.Org, regionIDs []int64)
+	// SeedRollupState records a directional rollup_states edge: metroSlug's
+	// own orgs also surface on stateSlug's detail page (browse direction
+	// only). Both slugs must reference regions seeded earlier.
+	SeedRollupState(t *testing.T, metroSlug, stateSlug string)
 }
 
 // Factory builds a fresh, empty Store for one contract test and
@@ -71,6 +75,12 @@ func RunContractSuite(t *testing.T, factory Factory) {
 	})
 	t.Run("GetRegion_DescendantRegionNames_ExcludesFocusAndAncestors", func(t *testing.T) {
 		testGetRegionDescendantRegionNamesExcludesFocusAndAncestors(t, factory)
+	})
+	t.Run("GetRegion_RollupMetro_SurfacesOnStatePage", func(t *testing.T) {
+		testGetRegionRollupMetroSurfacesOnStatePage(t, factory)
+	})
+	t.Run("AncestorRegions_RollupState_NoLeak", func(t *testing.T) {
+		testAncestorRegionsRollupStateNoLeak(t, factory)
 	})
 }
 
@@ -464,4 +474,149 @@ func regionIDs(regions []atlas.Region) []int64 {
 		out[i] = r.ID
 	}
 	return out
+}
+
+// testGetRegionRollupMetroSurfacesOnStatePage pins the rollup_states
+// contract: a stateless multi-state metro's OWN orgs surface in the
+// Regional bucket of a state that names it via rollup_states — and the
+// rollup is NODE-only, so an out-of-state leaf's org beneath the metro
+// does NOT leak onto the state page.
+func testGetRegionRollupMetroSurfacesOnStatePage(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	// il (state) and chicagoland (multi-state, no parent) are both roots.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:state", Name: "Illinois", Slug: "il",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 60,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 2, Kind: "us:multi-state", Name: "Chicagoland", Slug: "chicagoland",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 80,
+	})
+	// chicago-metro is stateless (parent = chicagoland only) and rolls up
+	// to il via rollup_states.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 3, Kind: "us:metro", Name: "Chicago Metro", Slug: "chicago-metro",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 40,
+		ParentSlugs: []string{"chicagoland"},
+	})
+	// An out-of-state leaf beneath the metro (Gary's county). Used to
+	// prove the rollup is node-only — its org must NOT reach /il.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 4, Kind: "us:county", Name: "Lake County, IN", Slug: "lake-county-in",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 30,
+		ParentSlugs: []string{"chicago-metro"},
+	})
+	seed.SeedRollupState(t, "chicago-metro", "il")
+
+	// Metro-tier org on the metro NODE; county org on the out-of-state leaf.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 100, Slug: "ata", Name: "Active Transportation Alliance",
+		ShortDesc: "metro", WebsiteURL: "https://example.test",
+	}, []int64{3})
+	seed.SeedOrg(t, atlas.Org{
+		ID: 101, Slug: "gary-org", Name: "Gary Org",
+		ShortDesc: "indiana", WebsiteURL: "https://example.test",
+	}, []int64{4})
+
+	detail, err := atlas.GetRegion(context.Background(), store, "il")
+	if err != nil {
+		t.Fatalf("GetRegion: %v", err)
+	}
+	if detail == nil {
+		t.Fatalf("GetRegion returned nil for il")
+	}
+
+	// ATA must surface in Regional (chicago-metro is regional, not state-kind).
+	if !hasOrg(detail.Regional, "ata") {
+		t.Errorf("Regional missing rolled-up metro org 'ata'; got %v", orgSlugs(detail.Regional))
+	}
+	if hasOrg(detail.Local, "ata") || hasOrg(detail.Statewide, "ata") {
+		t.Errorf("'ata' should be Regional only; local=%v statewide=%v", orgSlugs(detail.Local), orgSlugs(detail.Statewide))
+	}
+	// MatchedRegionSlugs should point at the metro that caused the surface.
+	for _, o := range detail.Regional {
+		if o.Slug == "ata" {
+			if got := o.MatchedRegionSlugs; len(got) != 1 || got[0] != "chicago-metro" {
+				t.Errorf("ata MatchedRegionSlugs = %v, want [chicago-metro]", got)
+			}
+		}
+	}
+	// Node-only: the out-of-state leaf's org must NOT appear anywhere.
+	if hasOrg(detail.Local, "gary-org") || hasOrg(detail.Regional, "gary-org") || hasOrg(detail.Statewide, "gary-org") {
+		t.Errorf("node-only violated: gary-org (under chicago-metro) leaked onto /il")
+	}
+	// The rolled-up metro's slug→name must resolve for the SPA's "matched via".
+	if got, want := detail.DescendantRegionNames["chicago-metro"], "Chicago Metro"; got != want {
+		t.Errorf("DescendantRegionNames[chicago-metro] = %q, want %q", got, want)
+	}
+}
+
+// testAncestorRegionsRollupStateNoLeak pins the leak-free guarantee:
+// rollup_states is NOT an ancestor edge, so a leaf beneath a metro that
+// rolls up to a state never reaches that state via the ancestor walk.
+func testAncestorRegionsRollupStateNoLeak(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:state", Name: "Illinois", Slug: "il",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 60,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 2, Kind: "us:multi-state", Name: "Chicagoland", Slug: "chicagoland",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 80,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 3, Kind: "us:metro", Name: "Chicago Metro", Slug: "chicago-metro",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 40,
+		ParentSlugs: []string{"chicagoland"},
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 4, Kind: "us:county", Name: "Lake County, IN", Slug: "lake-county-in",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 30,
+		ParentSlugs: []string{"chicago-metro"},
+	})
+	seed.SeedRollupState(t, "chicago-metro", "il")
+
+	ancestors, err := store.AncestorRegions(context.Background(), 4)
+	if err != nil {
+		t.Fatalf("AncestorRegions: %v", err)
+	}
+	got := slugs(ancestors)
+	// Sanity: the real ancestor edges resolve.
+	if !containsSlug(got, "chicago-metro") || !containsSlug(got, "chicagoland") {
+		t.Errorf("ancestor walk missing real edges: got %v", got)
+	}
+	// The leak guard: il must NOT appear (rollup_states is browse-only).
+	if containsSlug(got, "il") {
+		t.Errorf("rollup_states leaked into the ancestor walk: il reached from lake-county-in (got %v)", got)
+	}
+}
+
+func hasOrg(orgs []atlas.Org, slug string) bool {
+	for _, o := range orgs {
+		if o.Slug == slug {
+			return true
+		}
+	}
+	return false
+}
+
+func orgSlugs(orgs []atlas.Org) []string {
+	out := make([]string, len(orgs))
+	for i, o := range orgs {
+		out[i] = o.Slug
+	}
+	return out
+}
+
+func containsSlug(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
 }

@@ -60,6 +60,16 @@ var stateKinds = map[RegionKind]bool{
 // administrative tier) kinds. The unknown empty string returns false.
 func IsStateKind(k RegionKind) bool { return stateKinds[k] }
 
+// IsRollupTargetKind reports whether k may be named in a region's
+// rollup_states — the state-equivalent kinds plus us:federal-district.
+// DC (us:federal-district) is deliberately NOT state-equivalent for
+// bucketing (a DMV org stays Regional, see stateKinds), but it IS a
+// valid rollup target so the bi-state Washington metro can surface its
+// own orgs on the /dc detail page. The unknown empty string returns false.
+func IsRollupTargetKind(k RegionKind) bool {
+	return stateKinds[k] || k == "us:federal-district"
+}
+
 // StateKinds returns the state-equivalent kinds in deterministic
 // alphabetical order. Callers must not mutate the returned slice — it's
 // a fresh copy each call, but treat it as immutable.

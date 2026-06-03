@@ -19,6 +19,12 @@ type MemStore struct {
 	orgs          []Org
 	orgRegions    map[int64][]int64 // org id -> region ids it serves
 	postalToLeaf  map[string]int64  // postalKey -> leaf region id
+	// rollupByState maps a state-equivalent (or us:federal-district)
+	// region id to the metro region ids whose OWN orgs surface on that
+	// region's detail page (the rollup_states relation). Browse/descendant
+	// direction ONLY — never read by AncestorRegions/Lookup, so it cannot
+	// leak orgs across a postal-code lookup.
+	rollupByState map[int64][]int64
 }
 
 // NewMemStore returns an empty MemStore. Populate via AddRegion,
@@ -31,6 +37,7 @@ func NewMemStore() *MemStore {
 		parents:       map[int64][]int64{},
 		orgRegions:    map[int64][]int64{},
 		postalToLeaf:  map[string]int64{},
+		rollupByState: map[int64][]int64{},
 	}
 }
 
@@ -52,6 +59,33 @@ func (s *MemStore) AddRegion(r Region) {
 		}
 		s.parents[r.ID] = parentIDs
 	}
+}
+
+// AddRollupState records that metroSlug's OWN orgs should additionally
+// surface on stateSlug's detail page (the rollup_states relation). This
+// is the descendant/browse direction ONLY: it is never an ancestor edge,
+// so a leaf under metroSlug can never reach stateSlug via the ancestor
+// walk. Both slugs must already be registered (the seedfiles loader calls
+// this in a post-pass, after every region is added). Idempotent per
+// (state, metro) pair; an unregistered slug is silently ignored (the
+// loader validates existence and kind before calling).
+func (s *MemStore) AddRollupState(metroSlug, stateSlug string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	metroID, ok := s.regionsBySlug[metroSlug]
+	if !ok {
+		return
+	}
+	stateID, ok := s.regionsBySlug[stateSlug]
+	if !ok {
+		return
+	}
+	for _, id := range s.rollupByState[stateID] {
+		if id == metroID {
+			return
+		}
+	}
+	s.rollupByState[stateID] = append(s.rollupByState[stateID], metroID)
 }
 
 // AddOrg registers an organization with the IDs of the regions it
@@ -267,6 +301,30 @@ func (s *MemStore) DescendantRegions(_ context.Context, focusRegionID int64) ([]
 		}
 		out = append(out, r)
 	}
+	return out, nil
+}
+
+// RollupMetrosFor implements Store. Returns the metro NODES (not their
+// descendants) whose OWN orgs should additionally surface on the given
+// state-equivalent region's detail page — the rollup_states relation,
+// resolved at load. Empty slice for any region that is not a rollup
+// target. National-tier metros are excluded. This relation is
+// browse/descendant direction ONLY; AncestorRegions never consults it,
+// so a leaf under the metro cannot leak the state via the ancestor walk.
+// Sorted by ID for a deterministic order.
+func (s *MemStore) RollupMetrosFor(_ context.Context, stateRegionID int64) ([]Region, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ids := s.rollupByState[stateRegionID]
+	out := make([]Region, 0, len(ids))
+	for _, id := range ids {
+		r, ok := s.regionsByID[id]
+		if !ok || r.ScopeTier == ScopeNational {
+			continue
+		}
+		out = append(out, r)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
 }
 

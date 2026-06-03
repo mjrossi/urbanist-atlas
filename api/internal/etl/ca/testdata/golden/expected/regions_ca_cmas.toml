@@ -17,9 +17,14 @@
 #
 # Parents:
 #   - Single-province CMAs parent under their province slug.
-#   - Multi-province CMAs (Ottawa-Gatineau) parent under all their
-#     constituent provinces so MSA-anchored FSAs surface
-#     province-tier orgs through the ancestor walk.
+#   - Multi-province CMAs (Ottawa-Gatineau) are STATELESS umbrellas:
+#     parents = [] plus rollup_states = [each spanned province], so the
+#     CMA's own orgs surface on each province's detail page (browse
+#     direction) WITHOUT leaking province-tier orgs across the line in
+#     postal lookups. Each spanned province also gets a ca:cma-portion
+#     leaf (parents = [province, umbrella]) that its FSAs anchor at, so a
+#     lookup reaches only its own province. Portion slug is
+#     "<umbrella>-<province>", which sorts right after the umbrella.
 #
 # Loaded by just loaddata BETWEEN regions_ca_provinces.toml (parents:
 # provinces) and regions_ca.toml (children: curated cities). Cross-file
@@ -33,6 +38,32 @@ scope_tier = "regional"
 sort_priority = 40
 parents = ["bc"]
 # StatsCan CMA 933 — Metro Vancouver
+
+[[region]]
+slug = "ottawa-gatineau-cma"
+kind = "ca:cma"
+name = "Ottawa-Gatineau"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+rollup_states = ["on", "qc"]
+# StatsCan CMA 505 — Ottawa-Gatineau
+
+[[region]]
+slug = "ottawa-gatineau-cma-on"
+kind = "ca:cma-portion"
+name = "Ottawa-Gatineau (ON)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["on", "ottawa-gatineau-cma"]
+
+[[region]]
+slug = "ottawa-gatineau-cma-qc"
+kind = "ca:cma-portion"
+name = "Ottawa-Gatineau (QC)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["qc", "ottawa-gatineau-cma"]
 
 [[region]]
 slug = "sherbrooke-cma"

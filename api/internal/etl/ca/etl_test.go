@@ -125,9 +125,13 @@ func TestAssignCMAs_OverrideAndParents(t *testing.T) {
 		t.Errorf("Vancouver kind/slug = %+v", a)
 	}
 
-	// Ottawa-Gatineau: multi-province parents in source order.
-	if diff := cmp.Diff([]string{"on", "qc"}, byUID["505"].Parents); diff != "" {
-		t.Errorf("Ottawa-Gatineau parents (-want +got):\n%s", diff)
+	// Ottawa-Gatineau: multi-province → STATELESS umbrella + sorted
+	// rollup_states (no parent edges; per-province routing via portions).
+	if diff := cmp.Diff([]string{}, byUID["505"].Parents); diff != "" {
+		t.Errorf("Ottawa-Gatineau should be stateless (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"on", "qc"}, byUID["505"].RollupStates); diff != "" {
+		t.Errorf("Ottawa-Gatineau rollup_states (-want +got):\n%s", diff)
 	}
 
 	// Halifax: no override, auto-generated slug + name from source.
@@ -186,15 +190,22 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		{CFSAUID: "L1B", PRUID: "35"}, // L1 prefix → toronto-cma
 		{CFSAUID: "L8N", PRUID: "35"}, // L8 prefix → hamilton-cma (not in known) → province
 		{CFSAUID: "A0A", PRUID: "10"}, // no prefix → province (nl-province)
+		{CFSAUID: "K1A", PRUID: "35"}, // K1 prefix, Ontario side → ottawa on-portion
 		{CFSAUID: "X9X", PRUID: "99"}, // no leaf, no prefix, unknown province → unknown
 	}
 	known := map[string]bool{
-		"toronto-cma":  true,
-		"montreal-cma": true,
+		"toronto-cma":         true,
+		"montreal-cma":        true,
+		"ottawa-gatineau-cma": true,
 		// hamilton-cma intentionally absent
 	}
+	// Ottawa-Gatineau is multi-province: its Ontario FSAs route to the
+	// on-portion rather than the bare umbrella.
+	portionByCMA := map[string]string{
+		"ottawa-gatineau-cma:35": "ottawa-gatineau-cma-on",
+	}
 
-	anchors, reasons := Crosswalk(fsas, known)
+	anchors, reasons := Crosswalk(fsas, known, portionByCMA)
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {
 		got[a.FSA] = a
@@ -210,6 +221,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"L1B": {"toronto-cma", "cma"},
 		"L8N": {"on", "province"},
 		"A0A": {"nl-province", "province"},
+		"K1A": {"ottawa-gatineau-cma-on", "cma-portion"},
 	}
 	for fsa, w := range expectations {
 		a, ok := got[fsa]

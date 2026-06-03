@@ -35,8 +35,9 @@ import "sort"
 // Callers:
 //   - Lookup: inScope = leaf + ancestors (upward walk from a postal
 //     code's leaf region).
-//   - GetRegion: inScope = focus + ancestors + descendants (both
-//     directions from a slug-addressed region).
+//   - GetRegion: inScope = focus + descendants + rolled-up metros
+//     (rollup_states). Ancestors are used only for the breadcrumb, never
+//     for org scope.
 //
 // inScope must already have national-tier regions filtered out — the
 // function trusts the caller's editorial gate.
