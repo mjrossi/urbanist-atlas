@@ -1,9 +1,12 @@
 package seedfiles
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 // These tests live in the white-box seedfiles package so they can call
@@ -306,5 +309,114 @@ func TestBuildMemStore_RollupStatesNonStateKind(t *testing.T) {
 	_, err := buildMemStore(nil, fs, rollupCountrySpec())
 	if err == nil || !strings.Contains(err.Error(), "must be a state-equivalent") {
 		t.Fatalf("want non-state-kind rollup error, got %v", err)
+	}
+}
+
+// TestBuildMemStore_MetroPortionShape proves the Phase-2 ETL OUTPUT shape
+// loads through the real loader and behaves: a STATELESS multi-state
+// umbrella (parents=[], rollup_states) plus per-state us:metro-portion
+// leaves (parents=[state, umbrella]) in the same file, with each portion
+// sorted AFTER its umbrella (as the ETL slug-sort guarantees) so the
+// load-order guard is satisfied. Asserts the umbrella's org rolls up to
+// EACH spanned state's page, and a portion-anchored ZIP reaches only its
+// OWN state via the ancestor walk (no cross-state leak).
+func TestBuildMemStore_MetroPortionShape(t *testing.T) {
+	states := `[[region]]
+slug = "ky"
+kind = "us:state"
+name = "Kentucky"
+scope_tier = "regional"
+sort_priority = 60
+
+[[region]]
+slug = "oh"
+kind = "us:state"
+name = "Ohio"
+scope_tier = "regional"
+sort_priority = 60
+`
+	// Stateless umbrella + two portions, in slug order (umbrella first, as
+	// the ETL emits — "<umbrella>-<state>" sorts right after "<umbrella>").
+	msas := `[[region]]
+slug = "cincinnati-oh-metro"
+kind = "us:metro"
+name = "Cincinnati Metro"
+scope_tier = "regional"
+sort_priority = 40
+parents = []
+rollup_states = ["ky", "oh"]
+
+[[region]]
+slug = "cincinnati-oh-metro-ky"
+kind = "us:metro-portion"
+name = "Cincinnati Metro (KY)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["ky", "cincinnati-oh-metro"]
+
+[[region]]
+slug = "cincinnati-oh-metro-oh"
+kind = "us:metro-portion"
+name = "Cincinnati Metro (OH)"
+scope_tier = "regional"
+sort_priority = 40
+parents = ["oh", "cincinnati-oh-metro"]
+`
+	postal := postalHeaderCSV() + "41011,R,cincinnati-oh-metro-ky\n45202,R,cincinnati-oh-metro-oh\n"
+	fs := fixtureFS(
+		map[string]string{"r_states": states, "r_msas": msas},
+		map[string]string{"r": postal},
+		orgFor("cincinnati-oh-metro"),
+	)
+	cs := []countrySpec{{Code: "R", RegionFiles: []string{"r_states", "r_msas"}, Postal: "r"}}
+	store, err := buildMemStore(nil, fs, cs)
+	if err != nil {
+		t.Fatalf("metro-portion shape rejected by loader: %v", err)
+	}
+
+	// The umbrella's own org rolls up to BOTH spanned states' pages.
+	for _, state := range []string{"ky", "oh"} {
+		detail, err := atlas.GetRegion(context.Background(), store, state)
+		if err != nil || detail == nil {
+			t.Fatalf("GetRegion(%s): %v", state, err)
+		}
+		found := false
+		for _, o := range detail.Regional {
+			if o.Slug == "advocates" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("umbrella org should roll up to /%s Regional bucket", state)
+		}
+	}
+
+	// Leak check: a KY-portion ZIP reaches ky + the umbrella, never oh.
+	leaf, err := store.ResolveLeafRegion(context.Background(), "R", "41011")
+	if err != nil {
+		t.Fatalf("ResolveLeafRegion 41011: %v", err)
+	}
+	anc, err := store.AncestorRegions(context.Background(), leaf.ID)
+	if err != nil {
+		t.Fatalf("AncestorRegions: %v", err)
+	}
+	var got []string
+	hasOH, hasKY, hasUmbrella := false, false, false
+	for _, r := range anc {
+		got = append(got, r.Slug)
+		switch r.Slug {
+		case "oh":
+			hasOH = true
+		case "ky":
+			hasKY = true
+		case "cincinnati-oh-metro":
+			hasUmbrella = true
+		}
+	}
+	if !hasKY || !hasUmbrella {
+		t.Errorf("KY-portion ancestor walk should include ky + umbrella; got %v", got)
+	}
+	if hasOH {
+		t.Errorf("LEAK: KY-portion ZIP reached oh via the ancestor walk; got %v", got)
 	}
 }

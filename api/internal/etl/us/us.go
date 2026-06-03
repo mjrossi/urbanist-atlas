@@ -96,7 +96,7 @@ func init() {
 			},
 		},
 		Targets: []etl.OutputTarget{
-			{Path: "regions_us_msas.toml", Format: "toml", MinRows: 380, MaxRows: 400},
+			{Path: "regions_us_msas.toml", Format: "toml", MinRows: 380, MaxRows: 500},
 			// Row band widened from 30000-35000 in slice #7.5.5 to
 			// accommodate the additive HUD backfill (~5-10k net-new
 			// rows; ZCTA-source rows unchanged).
@@ -149,13 +149,16 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	for code, a := range assignments {
 		cbsaToSlug[code] = a.Slug
 	}
+	// Expand to the full emitted region set (umbrellas + per-state
+	// portions) and the portion anchor lookup the crosswalk routes through.
+	rows, portionSlugs := BuildRegionRows(msas, assignments, overrides)
 
 	if target.Regions() {
 		msaTOMLPath := filepath.Join(outDir, "regions_us_msas.toml")
-		if err := writeMSAs(msaTOMLPath, msas, assignments); err != nil {
+		if err := writeMSAs(msaTOMLPath, rows); err != nil {
 			return err
 		}
-		logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "count", len(msas))
+		logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "regions", len(rows), "portions", len(portionSlugs))
 	}
 
 	if !target.Postal() {
@@ -177,7 +180,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounty))
 
-	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, cbsaToSlug)
+	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, cbsaToSlug, portionSlugs)
 
 	hudPath := findHUDFile(srcDir)
 	var hudAnchors []PostalAnchor
@@ -198,7 +201,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 		// ZCTA ZIPs stranded at the bare state (their 2020 legacy county
 		// isn't in the 2023 planning-region countyToMSA) using HUD's
 		// current-vintage county. Mutates `anchors` in place.
-		ctReasons := ReconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, cbsaToSlug)
+		ctReasons := ReconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, cbsaToSlug, portionSlugs)
 		ctReconciled := 0
 		for k, n := range ctReasons {
 			if strings.HasPrefix(k, "ct-reconciled:") {
@@ -212,7 +215,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 			"skip_hud_unresolved", ctReasons["ct-skip:hud-unresolved"],
 		)
 
-		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug)
+		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug, portionSlugs)
 		logger.Info(fmt.Sprintf("etl us: hud backfill: added %d anchors across %+v", len(hudAnchors), hudReasons),
 			"added", len(hudAnchors),
 			"borough_count", hudReasons["hud:nyc-borough"],
@@ -290,13 +293,13 @@ func loadZCTACounty(path string) (map[string]ZCTACounty, error) {
 	return ParseZCTACounty(f)
 }
 
-func writeMSAs(path string, msas []MSA, assignments map[string]MSAOverride) error {
+func writeMSAs(path string, rows []RegionRow) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("etl us: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WriteMSAsTOML(f, msas, assignments)
+	return WriteMSAsTOML(f, rows)
 }
 
 func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {

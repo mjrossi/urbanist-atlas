@@ -92,6 +92,29 @@ Why: if `nyc-metro → {ny, nj, ct}`, then a Brooklyn lookup walks
 `brooklyn → nyc → nyc-metro → {nj, ct}`, incorrectly inheriting NJ
 and CT as ancestors. The walk picks up *all* ancestors transitively.
 
+**How the ETL resolves this at scale (`rollup_states` + portions).** A
+multi-state metro still needs two things: (a) its own metro-tier orgs
+should appear on each spanned state's `/region/<state>` page, and (b) a
+ZIP in the metro should reach *its own* state — never the neighbours. The
+ETL gives every auto-generated multi-state metro a **stateless umbrella**
+(`parents = []`) plus a directional **`rollup_states`** list (the spanned
+states) and one **`us:metro-portion`** leaf per state
+(`parents = [state, umbrella]`); each ZIP anchors at its own state's
+portion (chosen by the ZIP's county FIPS). `rollup_states` is consulted
+only in the browse/descendant direction (region-detail + browse counts),
+**never in the ancestor walk** — so (a) holds without breaking (b). It is
+a server-side field (`atlas.Region.RollupStates`, `json:"-"`), resolved
+to a `state → metros` index at load and validated to point only at
+state-equivalent kinds (plus `us:federal-district`, for DC). The two
+flagship metros (`chicago-metro`, `nyc-metro`) keep the hand-curated
+variant — routed to a `us:multi-state` advocacy node
+(`chicagoland` / `nyc-tristate`) with curated county/borough leaves — and
+carry their `rollup_states` via the override file. Canada's lone
+cross-province CMA (`ottawa-gatineau-cma`) uses the same
+stateless-umbrella + `ca:cma-portion` shape. Portions are plumbing: they
+are excluded from the default browse list and are not state-equivalent
+for bucketing.
+
 ### 2. Multi-state / federation regions parent the metro or the leaf, not the state
 
 `nyc-tristate` is a parent of `nyc-metro`, not of NY/NJ/CT. The rule:

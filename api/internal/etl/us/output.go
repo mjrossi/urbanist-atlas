@@ -77,16 +77,64 @@ func AssignMSASlugs(msas []MSA, overrides []MSAOverride) map[string]MSAOverride 
 			out[m.CBSACode] = o
 			continue
 		}
-		slug := autoSlug(m)
-		name := autoName(m)
-		parents := autoParents(m)
-		out[m.CBSACode] = MSAOverride{
+		a := MSAOverride{
 			CBSACode: m.CBSACode,
-			Slug:     slug,
-			Name:     name,
-			Parents:  parents,
+			Slug:     autoSlug(m),
+			Name:     autoName(m),
 		}
+		// Multi-state by constituent counties (authoritative — the title's
+		// abbrev list can disagree): emit a STATELESS umbrella plus
+		// rollup_states, so the metro's own orgs surface on each spanned
+		// state's page (browse direction) WITHOUT leaking state-tier orgs
+		// across the line in postal lookups (docs/region-graph.md §1).
+		// Per-state ZCTA routing goes through the portions BuildRegionRows
+		// generates. Single-state MSAs keep their title-based state parent
+		// edge, unchanged.
+		if states := spannedStates(m); len(states) >= 2 {
+			a.Parents = []string{}
+			a.RollupStates = make([]string, len(states))
+			for i, s := range states {
+				a.RollupStates[i] = s.Slug
+			}
+		} else {
+			a.Parents = autoParents(m)
+		}
+		out[m.CBSACode] = a
 	}
+	return out
+}
+
+// stateEntry is one state an MSA's counties fall in: the 2-digit FIPS
+// prefix, the region slug (e.g. "il", "ca-state", "dc"), and the bare
+// 2-letter abbrev used in portion slugs/names (the slug minus "-state").
+type stateEntry struct {
+	FIPS   string
+	Slug   string
+	Abbrev string
+}
+
+// spannedStates returns the distinct states an MSA spans, derived from
+// its constituent county FIPS (the authoritative source — a ZCTA always
+// routes to a county that is genuinely in the MSA, so every routed state
+// has a portion). Sorted by slug for deterministic output. Counties
+// whose 2-digit prefix isn't a known state/territory/district FIPS are
+// skipped.
+func spannedStates(m MSA) []stateEntry {
+	seen := map[string]bool{}
+	var out []stateEntry
+	for _, geoid := range m.Counties {
+		if len(geoid) < 2 {
+			continue
+		}
+		fips := geoid[:2]
+		slug, ok := stateFIPSToSlug[fips]
+		if !ok || seen[slug] {
+			continue
+		}
+		seen[slug] = true
+		out = append(out, stateEntry{FIPS: fips, Slug: slug, Abbrev: strings.TrimSuffix(slug, "-state")})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
 	return out
 }
 
@@ -209,30 +257,94 @@ func autoParents(m MSA) []string {
 	return parents
 }
 
+// RegionRow is one emitted [[region]] in regions_us_msas.toml: a metro
+// umbrella (Kind us:metro) or an auto-generated per-state portion (Kind
+// us:metro-portion). Comment is the trailing "# Census CBSA …" line for
+// umbrellas, empty for portions.
+type RegionRow struct {
+	Slug         string
+	Name         string
+	Kind         string
+	Parents      []string
+	RollupStates []string
+	Comment      string
+}
+
+// BuildRegionRows expands per-CBSA assignments into the full set of
+// emitted region rows — one umbrella per MSA, plus one us:metro-portion
+// per spanned state for non-overridden multi-state MSAs — and the portion
+// anchor lookup (cbsaCode+":"+stateFIPS → portion slug) the crosswalk
+// uses to anchor each ZCTA to its OWN state's portion.
+//
+// Overridden CBSAs (nyc-metro, chicago-metro, bridgeport-ct-metro) take
+// their override verbatim and never get portions: their per-state routing
+// is hand-curated via county leaves (docs/region-graph.md §3), and the
+// rollup_states they need is supplied by the override file.
+func BuildRegionRows(msas []MSA, assignments map[string]MSAOverride, overrides []MSAOverride) ([]RegionRow, map[string]string) {
+	overridden := make(map[string]bool, len(overrides))
+	for _, o := range overrides {
+		overridden[o.CBSACode] = true
+	}
+	var rows []RegionRow
+	portionSlugs := map[string]string{}
+	for _, m := range msas {
+		a := assignments[m.CBSACode]
+		rows = append(rows, RegionRow{
+			Slug:         a.Slug,
+			Name:         a.Name,
+			Kind:         "us:metro",
+			Parents:      a.Parents,
+			RollupStates: a.RollupStates,
+			Comment:      fmt.Sprintf("# Census CBSA %s — %s", m.CBSACode, m.Title),
+		})
+		if overridden[m.CBSACode] {
+			continue
+		}
+		states := spannedStates(m)
+		if len(states) < 2 {
+			continue
+		}
+		for _, s := range states {
+			portionSlug := a.Slug + "-" + s.Abbrev
+			rows = append(rows, RegionRow{
+				Slug:    portionSlug,
+				Name:    a.Name + " (" + strings.ToUpper(s.Abbrev) + ")",
+				Kind:    "us:metro-portion",
+				Parents: []string{s.Slug, a.Slug},
+			})
+			portionSlugs[m.CBSACode+":"+s.FIPS] = portionSlug
+		}
+	}
+	return rows, portionSlugs
+}
+
 // WriteMSAsTOML emits the regions_us_msas.toml file deterministically:
-// regions sorted by slug ASC, no embedded timestamps, LF line endings,
-// trailing newline.
-func WriteMSAsTOML(w io.Writer, msas []MSA, assignments map[string]MSAOverride) error {
-	sorted := make([]MSA, len(msas))
-	copy(sorted, msas)
-	// Sort by assigned slug so the file order is human-friendly.
-	sort.Slice(sorted, func(i, j int) bool {
-		return assignments[sorted[i].CBSACode].Slug < assignments[sorted[j].CBSACode].Slug
-	})
+// rows sorted by slug ASC, no embedded timestamps, LF line endings,
+// trailing newline. Because a portion slug is its umbrella's slug plus a
+// "-<state>" suffix, the slug sort places every portion immediately after
+// its umbrella — which is also the load-order the seedfiles loader
+// requires (a portion's umbrella parent must register first).
+func WriteMSAsTOML(w io.Writer, rows []RegionRow) error {
+	sorted := make([]RegionRow, len(rows))
+	copy(sorted, rows)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Slug < sorted[j].Slug })
 
 	bw := bufio.NewWriter(w)
 	if _, err := bw.WriteString(msaTOMLHeader); err != nil {
 		return err
 	}
-	for _, m := range sorted {
-		a := assignments[m.CBSACode]
-		if a.Slug == "" {
-			return fmt.Errorf("write msas: empty slug for cbsa %s (%s)", m.CBSACode, m.Title)
+	for _, r := range sorted {
+		if r.Slug == "" {
+			return fmt.Errorf("write msas: empty slug (name %q)", r.Name)
 		}
-		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %q\nkind = \"us:metro\"\nname = %q\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [", a.Slug, a.Name); err != nil {
+		kind := r.Kind
+		if kind == "" {
+			kind = "us:metro"
+		}
+		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %q\nkind = %q\nname = %q\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [", r.Slug, kind, r.Name); err != nil {
 			return err
 		}
-		for i, p := range a.Parents {
+		for i, p := range r.Parents {
 			if i > 0 {
 				if _, err := bw.WriteString(", "); err != nil {
 					return err
@@ -245,11 +357,13 @@ func WriteMSAsTOML(w io.Writer, msas []MSA, assignments map[string]MSAOverride) 
 		if _, err := bw.WriteString("]\n"); err != nil {
 			return err
 		}
-		if err := writeStringList(bw, "rollup_states", a.RollupStates); err != nil {
+		if err := writeStringList(bw, "rollup_states", r.RollupStates); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(bw, "# Census CBSA %s — %s\n", m.CBSACode, m.Title); err != nil {
-			return err
+		if r.Comment != "" {
+			if _, err := fmt.Fprintf(bw, "%s\n", r.Comment); err != nil {
+				return err
+			}
 		}
 	}
 	return bw.Flush()
@@ -298,11 +412,18 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 #
 # Parents:
 #   - Single-state MSAs parent under their state slug.
-#   - Multi-state MSAs without an override parent under all their
-#     constituent states (so MSA-anchored ZCTAs surface state-tier
-#     orgs through the ancestor walk). Curated multi-state regions
-#     in regions_us.toml (nyc-tristate, chicagoland) are
-#     plumbed in via the override file.
+#   - Multi-state MSAs (no override) are STATELESS umbrellas: parents = []
+#     plus rollup_states = [each spanned state], so the metro's own orgs
+#     surface on each state's detail page (browse direction) WITHOUT
+#     leaking state-tier orgs across the line in postal lookups. Each
+#     spanned state also gets a us:metro-portion leaf
+#     (parents = [state, umbrella]) that its constituent ZCTAs anchor at,
+#     so a lookup reaches only its own state. The portion slug is
+#     "<umbrella>-<state>", which sorts right after the umbrella.
+#   - Curated multi-state metros (nyc-metro, chicago-metro) instead route
+#     via the override file to a multi-state region (nyc-tristate,
+#     chicagoland) with hand-curated county leaves, and carry their
+#     rollup_states in the override.
 #
 # Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
 # states) and regions_us.toml (children: curated city/borough leaves

@@ -62,7 +62,7 @@ func init() {
 			},
 		},
 		Targets: []etl.OutputTarget{
-			{Path: "regions_ca_cmas.toml", Format: "toml", MinRows: 35, MaxRows: 45},
+			{Path: "regions_ca_cmas.toml", Format: "toml", MinRows: 35, MaxRows: 50},
 			{Path: "postal_codes_ca.csv", Format: "csv", MinRows: 1500, MaxRows: 1700},
 		},
 		Regenerate: Regenerate,
@@ -91,13 +91,19 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	for _, a := range assignments {
 		knownCMASlugs[a.Slug] = true
 	}
+	// Expand multi-province CMAs (Ottawa-Gatineau) into per-province
+	// portions + the portion anchor lookup the FSA crosswalk routes through.
+	portions, portionByCMA := buildCMAPortions(cmas, assignments)
+	allRegions := make([]CMAAssignment, 0, len(assignments)+len(portions))
+	allRegions = append(allRegions, assignments...)
+	allRegions = append(allRegions, portions...)
 
 	if target.Regions() {
 		tomlPath := filepath.Join(outDir, "regions_ca_cmas.toml")
-		if err := writeCMAsToFile(tomlPath, assignments); err != nil {
+		if err := writeCMAsToFile(tomlPath, allRegions); err != nil {
 			return err
 		}
-		logger.Info("etl ca: wrote CMAs", "path", tomlPath, "count", len(assignments))
+		logger.Info("etl ca: wrote CMAs", "path", tomlPath, "regions", len(allRegions), "portions", len(portions))
 	}
 
 	if !target.Postal() {
@@ -113,7 +119,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl ca: parsed FSA boundary", "fsas", len(fsas), "path", fsaZipPath)
 
-	anchors, reasons := Crosswalk(fsas, knownCMASlugs)
+	anchors, reasons := Crosswalk(fsas, knownCMASlugs, portionByCMA)
 	csvPath := filepath.Join(outDir, "postal_codes_ca.csv")
 	if err := writeCSVToFile(csvPath, anchors); err != nil {
 		return err

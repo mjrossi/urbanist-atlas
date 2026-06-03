@@ -26,7 +26,7 @@ type PostalAnchor struct {
 // knownCMASlugs is built by the caller from the generated CMA list so
 // prefix overrides that point at a CMA we filtered out don't silently
 // fail.
-func Crosswalk(fsas []FSARow, knownCMASlugs map[string]bool) ([]PostalAnchor, map[string]int) {
+func Crosswalk(fsas []FSARow, knownCMASlugs map[string]bool, portionByCMA map[string]string) ([]PostalAnchor, map[string]int) {
 	sort.Slice(fsas, func(i, j int) bool { return fsas[i].CFSAUID < fsas[j].CFSAUID })
 
 	out := make([]PostalAnchor, 0, len(fsas))
@@ -40,8 +40,17 @@ func Crosswalk(fsas []FSARow, knownCMASlugs map[string]bool) ([]PostalAnchor, ma
 			anchor.Reason = "city-leaf"
 		default:
 			if slug := lookupCMAPrefix(f.CFSAUID, knownCMASlugs); slug != "" {
-				anchor.AnchorSlug = slug
-				anchor.Reason = "cma"
+				// Multi-province CMA: route to the FSA's own-province
+				// portion so the ancestor walk reaches only its own
+				// province (leak-free). Single-province CMAs have no portion
+				// entry and keep the bare umbrella slug.
+				if p := portionByCMA[slug+":"+f.PRUID]; p != "" {
+					anchor.AnchorSlug = p
+					anchor.Reason = "cma-portion"
+				} else {
+					anchor.AnchorSlug = slug
+					anchor.Reason = "cma"
+				}
 			} else if slug := provinceUIDToSlug[f.PRUID]; slug != "" {
 				anchor.AnchorSlug = slug
 				anchor.Reason = "province"

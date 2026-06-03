@@ -166,26 +166,34 @@ func TestAutoParents(t *testing.T) {
 
 func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 	msas := []MSA{
-		{CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ-PA", StateAbbrevs: []string{"NY", "NJ", "PA"}},
-		{CBSACode: "47900", Title: "Washington-Arlington-Alexandria, DC-VA-MD-WV", StateAbbrevs: []string{"DC", "VA", "MD", "WV"}},
+		{CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ-PA", StateAbbrevs: []string{"NY", "NJ", "PA"},
+			Counties: []string{"34017", "36061", "42103"}},
+		{CBSACode: "47900", Title: "Washington-Arlington-Alexandria, DC-VA-MD-WV", StateAbbrevs: []string{"DC", "VA", "MD", "WV"},
+			Counties: []string{"11001", "24031", "51059", "54037"}},
 	}
 	overrides := []MSAOverride{
 		{CBSACode: "35620", Slug: "nyc-metro", Name: "New York Metro", Parents: []string{"nyc-tristate"}},
 	}
 	got := AssignMSASlugs(msas, overrides)
 
+	// Override wins verbatim — statelessness is NOT applied to overridden
+	// CBSAs (their multi-state routing is hand-curated via county leaves).
 	if got["35620"].Slug != "nyc-metro" {
 		t.Errorf("override slug = %q, want nyc-metro", got["35620"].Slug)
 	}
 	if diff := cmp.Diff([]string{"nyc-tristate"}, got["35620"].Parents); diff != "" {
 		t.Errorf("override parents (-want +got):\n%s", diff)
 	}
-	// Non-overridden MSA falls through to auto-gen.
+	// Non-overridden multi-state MSA: STATELESS umbrella + sorted
+	// rollup_states derived from the constituent county FIPS.
 	if got["47900"].Slug != "washington-dc-metro" {
 		t.Errorf("auto slug = %q, want washington-dc-metro", got["47900"].Slug)
 	}
-	if diff := cmp.Diff([]string{"dc", "va", "md", "wv"}, got["47900"].Parents); diff != "" {
-		t.Errorf("auto parents (-want +got):\n%s", diff)
+	if diff := cmp.Diff([]string{}, got["47900"].Parents); diff != "" {
+		t.Errorf("multi-state umbrella must be stateless (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"dc", "md", "va", "wv"}, got["47900"].RollupStates); diff != "" {
+		t.Errorf("multi-state rollup_states (-want +got):\n%s", diff)
 	}
 }
 
@@ -208,6 +216,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"60601": {CountyGEOID: "17031"}, // Cook County — but place-leaf wins
 		"60002": {CountyGEOID: "17031"}, // Cook County → county-leaf
 		"39580": {CountyGEOID: "37183"}, // Wake County, NC → MSA
+		"41011": {CountyGEOID: "21037"}, // Kenton County, KY (Cincinnati metro, KY side) → msa-portion
 		// 99999 has no county row.
 		"82001": {CountyGEOID: "56021"}, // Cheyenne, WY → state fallback
 	}
@@ -216,15 +225,22 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"36061": "35620", // NYC MSA
 		"17031": "16980", // Chicago MSA
 		"37183": "39580", // Raleigh MSA
+		"21037": "17140", // Cincinnati MSA (multi-state)
 	}
 	msaSlugs := map[string]string{
 		"14460": "greater-boston",
 		"35620": "nyc-metro",
 		"16980": "chicago-metro",
 		"39580": "raleigh-nc-metro",
+		"17140": "cincinnati-oh-metro",
+	}
+	// Multi-state MSA portion routing: a KY-side Cincinnati ZCTA anchors
+	// at its own-state portion, not the bare umbrella.
+	portionSlugs := map[string]string{
+		"17140:21": "cincinnati-oh-metro-ky",
 	}
 
-	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, msaSlugs)
+	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, msaSlugs, portionSlugs)
 
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {
@@ -240,6 +256,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"10001": {"manhattan", "nyc-borough"},
 		"60002": {"cook-county", "county-leaf"},
 		"39580": {"raleigh-nc-metro", "msa"},
+		"41011": {"cincinnati-oh-metro-ky", "msa-portion"},
 		"82001": {"wy", "state"},
 	}
 	for zcta, w := range expectations {

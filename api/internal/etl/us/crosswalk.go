@@ -35,9 +35,10 @@ func Crosswalk(
 	zctaPlace map[string]ZCTAPlace,
 	zctaCounty map[string]ZCTACounty,
 	countyToMSA map[string]string,
-	msaSlugs map[string]string, // CBSA code → slug
+	msaSlugs map[string]string, // CBSA code → umbrella slug
+	portionSlugs map[string]string, // "CBSAcode:stateFIPS" → portion slug
 ) ([]PostalAnchor, map[string]int) {
-	resolver := newCountyResolver(countyToMSA, msaSlugs)
+	resolver := newCountyResolver(countyToMSA, msaSlugs, portionSlugs)
 
 	zctas := map[string]struct{}{}
 	for z := range zctaPlace {
@@ -120,9 +121,10 @@ func CrosswalkHUDBackfill(
 	huds []HUDZipCounty,
 	zctaAnchors []PostalAnchor,
 	countyToMSA map[string]string,
-	msaSlugs map[string]string, // CBSA code → slug
+	msaSlugs map[string]string, // CBSA code → umbrella slug
+	portionSlugs map[string]string, // "CBSAcode:stateFIPS" → portion slug
 ) ([]PostalAnchor, map[string]int) {
-	resolver := newCountyResolver(countyToMSA, msaSlugs)
+	resolver := newCountyResolver(countyToMSA, msaSlugs, portionSlugs)
 
 	// Build set of ZIPs already resolved by ZCTA.
 	resolved := make(map[string]struct{}, len(zctaAnchors))
@@ -222,13 +224,14 @@ func ReconcileCTLegacyCounties(
 	zctaCounty map[string]ZCTACounty,
 	huds []HUDZipCounty,
 	countyToMSA map[string]string,
-	msaSlugs map[string]string, // CBSA code → slug
+	msaSlugs map[string]string, // CBSA code → umbrella slug
+	portionSlugs map[string]string, // "CBSAcode:stateFIPS" → portion slug
 ) map[string]int {
 	counts := map[string]int{}
 	if len(huds) == 0 {
 		return counts
 	}
-	resolver := newCountyResolver(countyToMSA, msaSlugs)
+	resolver := newCountyResolver(countyToMSA, msaSlugs, portionSlugs)
 	primary := hudPrimaryCounty(huds)
 
 	for i := range zctaAnchors {

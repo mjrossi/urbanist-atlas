@@ -70,6 +70,12 @@ type CMAAssignment struct {
 	Kind    string
 	Name    string
 	Parents []string
+	// RollupStates is the directional rollup_states list emitted onto the
+	// region row (atlas.Region.RollupStates): the province slugs on whose
+	// detail pages this CMA's OWN orgs should surface (browse direction
+	// only). Set on multi-province umbrellas (Ottawa-Gatineau → on, qc);
+	// empty for single-province CMAs and for portion rows.
+	RollupStates []string
 }
 
 // assignCMAs produces one assignment per CMA in canonical order
@@ -100,26 +106,92 @@ func assignCMAs(cmas []CMA, overrides []CMAOverride) []CMAAssignment {
 		if kind == "" {
 			kind = "ca:cma"
 		}
-		parents := make([]string, 0, len(c.ProvinceUIDs))
-		seen := map[string]bool{}
-		for _, pruid := range c.ProvinceUIDs {
-			ps := provinceUIDToSlug[pruid]
-			if ps == "" || seen[ps] {
-				continue
+		// Multi-province CMA (Ottawa-Gatineau): STATELESS umbrella +
+		// rollup_states, with per-province FSA routing via portions
+		// (buildCMAPortions). Single-province CMAs keep their province
+		// parent edge. Mirrors the US multi-state metro handling.
+		provs := spannedProvinces(c)
+		parents := []string{}
+		var rollup []string
+		if len(provs) >= 2 {
+			rollup = make([]string, len(provs))
+			for i, p := range provs {
+				rollup[i] = p.Slug
 			}
-			parents = append(parents, ps)
-			seen[ps] = true
+		} else {
+			for _, p := range provs {
+				parents = append(parents, p.Slug)
+			}
 		}
 		out = append(out, CMAAssignment{
-			UID:     c.UID,
-			Slug:    slug,
-			Kind:    kind,
-			Name:    name,
-			Parents: parents,
+			UID:          c.UID,
+			Slug:         slug,
+			Kind:         kind,
+			Name:         name,
+			Parents:      parents,
+			RollupStates: rollup,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
 	return out
+}
+
+// provinceEntry is one province a CMA spans: the StatsCan PRUID, the
+// province region slug (e.g. "on", "qc", "nl-province"), and the bare
+// abbrev used in portion slugs/names (the slug minus "-province").
+type provinceEntry struct {
+	PRUID  string
+	Slug   string
+	Abbrev string
+}
+
+// spannedProvinces returns the distinct provinces a CMA spans, derived
+// from its StatsCan ProvinceUIDs, sorted by slug for deterministic
+// output. Unknown PRUIDs are skipped.
+func spannedProvinces(c CMA) []provinceEntry {
+	seen := map[string]bool{}
+	var out []provinceEntry
+	for _, pruid := range c.ProvinceUIDs {
+		slug := provinceUIDToSlug[pruid]
+		if slug == "" || seen[slug] {
+			continue
+		}
+		seen[slug] = true
+		out = append(out, provinceEntry{PRUID: pruid, Slug: slug, Abbrev: strings.TrimSuffix(slug, "-province")})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
+	return out
+}
+
+// buildCMAPortions returns the per-province portion rows for multi-
+// province CMAs (only Ottawa-Gatineau in v1) plus the portion anchor
+// lookup ("umbrellaSlug:PRUID" → portion slug) the FSA crosswalk routes
+// through. Mirrors us.BuildRegionRows' portion logic.
+func buildCMAPortions(cmas []CMA, assignments []CMAAssignment) ([]CMAAssignment, map[string]string) {
+	byUID := make(map[string]CMAAssignment, len(assignments))
+	for _, a := range assignments {
+		byUID[a.UID] = a
+	}
+	var portions []CMAAssignment
+	portionByCMA := map[string]string{}
+	for _, c := range cmas {
+		provs := spannedProvinces(c)
+		if len(provs) < 2 {
+			continue
+		}
+		a := byUID[c.UID]
+		for _, p := range provs {
+			portionSlug := a.Slug + "-" + p.Abbrev
+			portions = append(portions, CMAAssignment{
+				Slug:    portionSlug,
+				Kind:    "ca:cma-portion",
+				Name:    a.Name + " (" + strings.ToUpper(p.Abbrev) + ")",
+				Parents: []string{p.Slug, a.Slug},
+			})
+			portionByCMA[a.Slug+":"+p.PRUID] = portionSlug
+		}
+	}
+	return portions, portionByCMA
 }
 
 // slugify is a small Latin-1-diacritic-folding slugger. CA CMAs have
@@ -186,13 +258,20 @@ func foldDiacritic(r rune) rune {
 	return r
 }
 
-// WriteCMAsTOML emits regions_ca_cmas.toml deterministically.
+// WriteCMAsTOML emits regions_ca_cmas.toml deterministically: rows
+// sorted by slug ASC (so each "<umbrella>-<province>" portion lands
+// right after its umbrella, satisfying the loader's parents-first order),
+// no embedded timestamps, LF line endings, trailing newline.
 func WriteCMAsTOML(w io.Writer, assignments []CMAAssignment) error {
+	sorted := make([]CMAAssignment, len(assignments))
+	copy(sorted, assignments)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Slug < sorted[j].Slug })
+
 	bw := bufio.NewWriter(w)
 	if _, err := bw.WriteString(cmaTOMLHeader); err != nil {
 		return err
 	}
-	for _, a := range assignments {
+	for _, a := range sorted {
 		// TOML basic strings allow arbitrary UTF-8 — we just need to
 		// escape \ and " — so non-ASCII characters in CMA names (é, è
 		// in Montréal/Trois-Rivières/Québec) round-trip cleanly. Using
@@ -214,8 +293,30 @@ func WriteCMAsTOML(w io.Writer, assignments []CMAAssignment) error {
 		if _, err := bw.WriteString("]\n"); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(bw, "# StatsCan CMA %s — %s\n", a.UID, a.Name); err != nil {
-			return err
+		if len(a.RollupStates) > 0 {
+			if _, err := bw.WriteString("rollup_states = ["); err != nil {
+				return err
+			}
+			for i, s := range a.RollupStates {
+				if i > 0 {
+					if _, err := bw.WriteString(", "); err != nil {
+						return err
+					}
+				}
+				if _, err := bw.WriteString(tomlString(s)); err != nil {
+					return err
+				}
+			}
+			if _, err := bw.WriteString("]\n"); err != nil {
+				return err
+			}
+		}
+		// Portion rows carry no StatsCan UID, so they get no provenance
+		// comment; umbrellas keep theirs.
+		if a.UID != "" {
+			if _, err := fmt.Fprintf(bw, "# StatsCan CMA %s — %s\n", a.UID, a.Name); err != nil {
+				return err
+			}
 		}
 	}
 	return bw.Flush()
@@ -270,9 +371,14 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 #
 # Parents:
 #   - Single-province CMAs parent under their province slug.
-#   - Multi-province CMAs (Ottawa-Gatineau) parent under all their
-#     constituent provinces so MSA-anchored FSAs surface
-#     province-tier orgs through the ancestor walk.
+#   - Multi-province CMAs (Ottawa-Gatineau) are STATELESS umbrellas:
+#     parents = [] plus rollup_states = [each spanned province], so the
+#     CMA's own orgs surface on each province's detail page (browse
+#     direction) WITHOUT leaking province-tier orgs across the line in
+#     postal lookups. Each spanned province also gets a ca:cma-portion
+#     leaf (parents = [province, umbrella]) that its FSAs anchor at, so a
+#     lookup reaches only its own province. Portion slug is
+#     "<umbrella>-<province>", which sorts right after the umbrella.
 #
 # Loaded by just loaddata BETWEEN regions_ca_provinces.toml (parents:
 # provinces) and regions_ca.toml (children: curated cities). Cross-file
