@@ -2,6 +2,7 @@ package ca
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -36,9 +37,29 @@ type cmaGeometry struct {
 	bbox  polyclip.Rectangle
 }
 
+// minOverlapFraction is the smallest share of an FSA's own area that must
+// fall inside a CMA for the FSA to anchor to that CMA rather than its
+// province. StatsCan digitizes the FSA and CMA boundaries separately, so
+// they don't perfectly coincide: a rural FSA running alongside a CMA
+// boundary picks up a sub-square-metre line-work sliver. Without this floor
+// that noise wins the max-overlap and wrongly anchors the FSA to a metro it
+// isn't in. The floor is relative to FSA area so it is size-invariant — a
+// small urban FSA wholly inside a CMA (~100%) still clears it, while a
+// grazing sliver never does.
+//
+// Calibrated from the measured overlap distribution over the 2021 vintage:
+// the noise slivers all fall at or below 1e-6 (1e-4 %) of FSA area, then
+// there is a completely empty gap up to 1e-3 (0.1 %) before genuine partial
+// overlaps begin — so 0.1 % sits squarely in that gap, stripping every
+// noise sliver while preserving every FSA with real geometric overlap. This
+// only removes noise; it deliberately does not impose a "majority in the
+// metro" rule, keeping the join's max-overlap semantics intact.
+const minOverlapFraction = 0.001
+
 // SpatialJoinFSAToCMA assigns each FSA to the CMA it overlaps most by
-// area. It returns CFSAUID → CMAUID for every FSA that overlaps at least
-// one type-'B' CMA; FSAs that overlap none are omitted, so the crosswalk
+// area. It returns CFSAUID → CMAUID for every FSA whose largest CMA overlap
+// clears minOverlapFraction of the FSA's area; FSAs that overlap no CMA, or
+// only by a sub-threshold line-work sliver, are omitted so the crosswalk
 // falls them through to their province. The returned CMAUIDs are the raw
 // StatsCan codes (e.g. "535"); the caller resolves them to region slugs
 // via the CMA assignments.
@@ -132,6 +153,21 @@ func assignFSAsToCMAs(zipPath string, cmas []cmaGeometry) (map[string]string, er
 			continue
 		}
 		fbb := poly.BoundingBox()
+		// polyclip's sweep-line loses precision at native EPSG:3347
+		// coordinates (~9e6 m): the cross-products reach ~1e14, events
+		// mis-order, and Construct returns near-empty intersections for
+		// polygons that genuinely overlap (e.g. an FSA wholly inside its
+		// CMA computing as 0). The failure is data-dependent, so it
+		// silently corrupts only some anchors. Translating everything to
+		// the FSA's local origin first keeps the arithmetic well
+		// conditioned; area and overlap are translation-invariant, so only
+		// the numerics change. fsaArea uses the cheap gross area (holes
+		// counted positive) — it is only the floor's denominator, and the
+		// exact even-odd polygonArea is prohibitively slow on archipelago
+		// FSAs with hundreds of island contours.
+		ox, oy := fbb.Min.X, fbb.Min.Y
+		local := translate(poly, ox, oy)
+		fsaArea := polygonGrossArea(local)
 
 		bestUID, bestArea := "", 0.0
 		for i := range cmas {
@@ -144,7 +180,7 @@ func assignFSAsToCMAs(zipPath string, cmas []cmaGeometry) (map[string]string, er
 				if !bboxesOverlap(fbb, part.BoundingBox()) {
 					continue
 				}
-				area += polygonArea(poly.Construct(polyclip.INTERSECTION, part))
+				area += polygonArea(local.Construct(polyclip.INTERSECTION, translate(part, ox, oy)))
 			}
 			// cmas is sorted by UID ascending and we only replace on a
 			// strictly larger area, so the smallest UID wins any tie
@@ -153,7 +189,10 @@ func assignFSAsToCMAs(zipPath string, cmas []cmaGeometry) (map[string]string, er
 				bestArea, bestUID = area, c.uid
 			}
 		}
-		if bestUID != "" {
+		// Anchor only on a meaningful share of the FSA; a sub-threshold best
+		// overlap is boundary line-work noise, so the FSA falls through to
+		// its province (omitted from the map).
+		if bestUID != "" && fsaArea > 0 && bestArea >= minOverlapFraction*fsaArea {
 			out[fsa] = bestUID
 		}
 	}
@@ -195,9 +234,10 @@ func fieldIndexByName(fields []shp.Field, name string) int {
 
 // shapePolygon converts a go-shp Polygon (rings flattened into Points and
 // delimited by Parts) into a polyclip Polygon (one Contour per ring).
-// Outer rings and holes are both passed as contours; polyclip's even-odd
-// handling yields the correct net intersection area downstream. Returns
-// false for non-polygon or empty geometry.
+// Outer rings and holes are both passed as contours: polyclip interprets a
+// polygon under the even-odd rule, so a ring nested inside another is
+// treated as a hole regardless of its winding, and polygonArea measures the
+// result the same way. Returns false for non-polygon or empty geometry.
 func shapePolygon(s shp.Shape) (polyclip.Polygon, bool) {
 	p, ok := s.(*shp.Polygon)
 	if !ok {
@@ -225,29 +265,148 @@ func shapePolygon(s shp.Shape) (polyclip.Polygon, bool) {
 	return poly, true
 }
 
-// polygonArea returns the absolute net area of a polyclip Polygon via the
-// shoelace formula summed over its rings: outer rings contribute positive
-// signed area and holes negative, so the magnitude of the sum is the area
-// with holes removed.
+// polygonArea returns the net area of a polyclip Polygon under the even-odd
+// fill rule. polyclip's boolean output (connector.toPolygon) emits result
+// contours in the order the sweep traced them and gives holes no guaranteed
+// winding, so hole-ness cannot be inferred from each contour's signed-area
+// sign — summing signed areas would add a hole's area instead of subtracting
+// it. Instead a contour nested inside an odd number of other contours is a
+// hole (subtracted); one nested in an even number, including zero, is filled
+// (added). For valid (non-self-intersecting) even-odd polygons the result is
+// non-negative.
 func polygonArea(p polyclip.Polygon) float64 {
-	var signed float64
-	for _, c := range p {
-		n := len(c)
-		if n < 3 {
+	ox, oy, ok := polygonOrigin(p)
+	if !ok {
+		return 0
+	}
+	// Precompute each contour's bounding box once so nestingDepth can reject
+	// non-containing pairs in O(1); without this an archipelago FSA (hundreds
+	// of disjoint island contours) costs O(contours² × vertices) in futile
+	// point-in-polygon tests.
+	bboxes := make([]polyclip.Rectangle, len(p))
+	for i := range p {
+		bboxes[i] = p[i].BoundingBox()
+	}
+	var total float64
+	for i := range p {
+		a := contourAbsArea(p[i], ox, oy)
+		if a == 0 {
 			continue
 		}
-		for i := range n {
-			j := i + 1
-			if j == n {
-				j = 0
-			}
-			signed += c[i].X*c[j].Y - c[j].X*c[i].Y
+		if nestingDepth(p, bboxes, i)%2 == 0 {
+			total += a
+		} else {
+			total -= a
 		}
+	}
+	return total
+}
+
+// translate returns a copy of p with every vertex shifted by (-dx,-dy),
+// bringing it to a local origin so polyclip's sweep-line runs on
+// well-conditioned (small) coordinates. Intersection area is
+// translation-invariant, so results are unchanged — only the numerics
+// improve. See assignFSAsToCMAs for why this matters at EPSG:3347 scale.
+func translate(p polyclip.Polygon, dx, dy float64) polyclip.Polygon {
+	out := make(polyclip.Polygon, len(p))
+	for i, c := range p {
+		nc := make(polyclip.Contour, len(c))
+		for j, pt := range c {
+			nc[j] = polyclip.Point{X: pt.X - dx, Y: pt.Y - dy}
+		}
+		out[i] = nc
+	}
+	return out
+}
+
+// polygonGrossArea sums the unsigned areas of every contour (holes counted
+// positive), a cheap O(vertices) upper bound on the true area. It is the
+// FSA-size denominator for the overlap floor, where a slight overestimate is
+// harmless — unlike polygonArea it skips the O(contours²) even-odd nesting,
+// which is prohibitively slow on archipelago FSAs with hundreds of island
+// contours.
+func polygonGrossArea(p polyclip.Polygon) float64 {
+	ox, oy, ok := polygonOrigin(p)
+	if !ok {
+		return 0
+	}
+	var total float64
+	for _, c := range p {
+		total += contourAbsArea(c, ox, oy)
+	}
+	return total
+}
+
+// polygonOrigin returns the minimum-X/Y corner of p, used as a local origin
+// for the area shoelace. StatsCan coordinates sit ~9e6 m from the EPSG:3347
+// false origin, where the shoelace products reach ~1e13 and catastrophic
+// float64 cancellation corrupts small areas (a sliver computes as noise
+// instead of ~0). Subtracting this corner first keeps the arithmetic near
+// zero; area is translation-invariant so well-scaled inputs are unchanged.
+// ok is false for an empty polygon.
+func polygonOrigin(p polyclip.Polygon) (ox, oy float64, ok bool) {
+	ox, oy = math.Inf(1), math.Inf(1)
+	for _, c := range p {
+		for _, pt := range c {
+			if pt.X < ox {
+				ox = pt.X
+			}
+			if pt.Y < oy {
+				oy = pt.Y
+			}
+		}
+	}
+	return ox, oy, !math.IsInf(ox, 1)
+}
+
+// contourAbsArea returns the unsigned area of a single contour via the
+// shoelace formula, with every vertex shifted by the local origin (ox,oy) to
+// avoid large-coordinate cancellation. Winding only flips the sign, which we
+// discard: hole-ness is decided by nesting in polygonArea, not by winding.
+func contourAbsArea(c polyclip.Contour, ox, oy float64) float64 {
+	n := len(c)
+	if n < 3 {
+		return 0
+	}
+	var signed float64
+	for i := range n {
+		j := i + 1
+		if j == n {
+			j = 0
+		}
+		signed += (c[i].X-ox)*(c[j].Y-oy) - (c[j].X-ox)*(c[i].Y-oy)
 	}
 	if signed < 0 {
 		signed = -signed
 	}
 	return signed / 2
+}
+
+// nestingDepth counts how many other contours of p contain contour i. The
+// contours of a boolean-op result are pairwise non-crossing, so every vertex
+// of contour i lies strictly inside or strictly outside each other contour —
+// one vertex classifies the whole contour. Even depth ⇒ filled, odd ⇒ hole.
+// bboxes[j] is the precomputed bounding box of p[j]; a representative point
+// outside it can't be contained, so the O(vertices) Contains is skipped.
+func nestingDepth(p polyclip.Polygon, bboxes []polyclip.Rectangle, i int) int {
+	if len(p[i]) < 3 {
+		return 0
+	}
+	rep := p[i][0]
+	depth := 0
+	for j := range p {
+		if j == i || len(p[j]) < 3 {
+			continue
+		}
+		bb := bboxes[j]
+		if rep.X < bb.Min.X || rep.X > bb.Max.X || rep.Y < bb.Min.Y || rep.Y > bb.Max.Y {
+			continue
+		}
+		if p[j].Contains(rep) {
+			depth++
+		}
+	}
+	return depth
 }
 
 // polygonsBBox returns the bounding box enclosing all of a CMA's polygon

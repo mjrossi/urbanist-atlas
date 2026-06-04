@@ -767,6 +767,27 @@ join of the boundary polygons — see Open Question #4 below.)**
    ~768 FSAs re-anchored province → CMA. `regions_ca_cmas.toml` is
    unchanged (all CMAs were already emitted; only the postal routing
    improved).
+
+   **Correctness follow-up (code-review of #81).** The initial spatial
+   join had three latent defects in the overlap computation, all fixed:
+   (a) **hole handling** — `polygonArea` must measure polyclip's boolean
+   output by the even-odd rule (nesting), not by signed-area cancellation;
+   polyclip gives result holes no guaranteed winding, so the naive signed
+   sum *added* hole area instead of subtracting it. (b) **large-coordinate
+   precision** — polyclip's sweep-line mis-orders events at native
+   EPSG:3347 coordinates (~9e6 m, cross-products ~1e14), returning
+   near-empty intersections for polygons that genuinely overlap (e.g. A1A,
+   downtown St. John's, measured 0% of its own CMA). This corrupted anchors
+   *data-dependently*, so it was invisible without regenerating and
+   spot-checking. **Both FSA and CMA polygons are now translated to a local
+   origin before `Construct`** — mandatory; any future vintage bump or
+   reuse of `spatial.go` must preserve this. (c) **noise floor** — an FSA
+   anchors to a CMA only when the max overlap clears `minOverlapFraction`
+   (0.1 %) of the FSA's area, so separately-digitized boundary slivers fall
+   through to province; 0.1 % is calibrated to the empty gap between the
+   ≤1e-4 % noise cluster and the ≥0.1 % genuine-overlap cluster. Net effect
+   over the 2021 vintage: 95 FSAs corrected, `regions_ca_cmas.toml` still
+   unchanged.
 5. **Phase 2 / API-keys impact**: none. The smallest-anchor model
    doesn't change the wire contract; lookup responses look the
    same to clients. Anchors that resolve to MSA or state regions

@@ -1,0 +1,226 @@
+package ca
+
+import (
+	"math"
+	"path/filepath"
+	"testing"
+
+	polyclip "github.com/ctessum/polyclip-go"
+	shp "github.com/jonas-p/go-shp"
+)
+
+// boxContour builds a polyclip.Contour for an axis-aligned box. cw selects
+// clockwise vs counter-clockwise vertex order so tests can prove polygonArea
+// ignores winding (polyclip's boolean output gives holes no guaranteed
+// winding).
+func boxContour(minX, minY, maxX, maxY float64, cw bool) polyclip.Contour {
+	c := polyclip.Contour{
+		{X: minX, Y: minY},
+		{X: minX, Y: maxY},
+		{X: maxX, Y: maxY},
+		{X: maxX, Y: minY},
+	}
+	if cw {
+		return c
+	}
+	rev := make(polyclip.Contour, len(c))
+	for i, p := range c {
+		rev[len(c)-1-i] = p
+	}
+	return rev
+}
+
+// holedShape builds a *shp.Polygon from one or more rings (ring 0 is the
+// outer boundary; any further rings are holes), the production input shape
+// that shapePolygon consumes.
+func holedShape(rings ...[]shp.Point) shp.Shape {
+	poly := shp.Polygon(*shp.NewPolyLine(rings))
+	return &poly
+}
+
+// TestPolygonArea_SubtractsHoles pins the core area math: a polygon with a
+// hole must measure outer-minus-hole, and the result must not depend on the
+// winding of either contour (polyclip's connector emits result contours in
+// arbitrary winding). Outer 100×100 = 10000, hole 40×40 = 1600 → net 8400.
+func TestPolygonArea_SubtractsHoles(t *testing.T) {
+	const want = 8400.0
+	for _, outerCW := range []bool{true, false} {
+		for _, holeCW := range []bool{true, false} {
+			poly := polyclip.Polygon{
+				boxContour(0, 0, 100, 100, outerCW),
+				boxContour(30, 30, 70, 70, holeCW),
+			}
+			if got := polygonArea(poly); got != want {
+				t.Errorf("polygonArea(outerCW=%v, holeCW=%v) = %v, want %v",
+					outerCW, holeCW, got, want)
+			}
+		}
+	}
+}
+
+// TestPolygonArea_HoleThroughConstruct exercises the real production path:
+// an FSA polygon with a hole, intersected with a CMA that fully contains it.
+// shapePolygon → Construct(INTERSECTION) → polygonArea must yield the holed
+// FSA's true area (outer 10000 − hole 1600 = 8400), not 11600.
+func TestPolygonArea_HoleThroughConstruct(t *testing.T) {
+	fsa := holedShape(square(0, 0, 100, 100), square(30, 30, 70, 70)) // net 8400
+	cma := holedShape(square(-50, -50, 150, 150))                     // solid container
+
+	fp, ok := shapePolygon(fsa)
+	if !ok {
+		t.Fatal("shapePolygon(fsa) returned !ok")
+	}
+	cp, ok := shapePolygon(cma)
+	if !ok {
+		t.Fatal("shapePolygon(cma) returned !ok")
+	}
+
+	got := polygonArea(fp.Construct(polyclip.INTERSECTION, cp))
+	if got != 8400.0 {
+		t.Errorf("intersection area = %v, want 8400 (hole subtracted)", got)
+	}
+}
+
+// TestSpatialJoin_StraddleAssignsLargerOverlap covers the headline behavior
+// the slice exists for: an FSA spanning two CMAs is assigned to the one it
+// overlaps most by area — even when that CMA has the higher UID, proving
+// area (not UID order) decides.
+func TestSpatialJoin_StraddleAssignsLargerOverlap(t *testing.T) {
+	dir := t.TempDir()
+	cmaFields := []dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}}
+	cmaRows := [][]string{{"100", "B"}, {"200", "B"}}
+	cmaRings := [][]shp.Point{
+		square(0, 0, 100, 100),   // CMA 100 (west)
+		square(100, 0, 200, 100), // CMA 200 (east)
+	}
+	writeShapefileZip(t, filepath.Join(dir, "cma.zip"), "cma", cmaFields, cmaRows, cmaRings)
+
+	fsaFields := []dbfFieldDef{{"CFSAUID", 3}}
+	fsaRows := [][]string{{"X1X"}}
+	// x∈[60,160]: 40 wide inside CMA 100, 60 wide inside CMA 200 → CMA 200
+	// wins on area despite the higher UID.
+	fsaRings := [][]shp.Point{square(60, 0, 160, 100)}
+	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
+
+	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	if err != nil {
+		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+	}
+	if got["X1X"] != "200" {
+		t.Errorf("X1X assigned to %q, want 200 (larger overlap)", got["X1X"])
+	}
+}
+
+// TestSpatialJoin_EqualOverlapTieBreaksToSmallerUID covers the deterministic
+// tie-break: an FSA overlapping two CMAs by exactly equal area resolves to
+// the smaller UID (cmas are UID-sorted and only a strictly larger area
+// displaces the incumbent).
+func TestSpatialJoin_EqualOverlapTieBreaksToSmallerUID(t *testing.T) {
+	dir := t.TempDir()
+	cmaFields := []dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}}
+	cmaRows := [][]string{{"100", "B"}, {"200", "B"}}
+	cmaRings := [][]shp.Point{
+		square(0, 0, 100, 100),
+		square(100, 0, 200, 100),
+	}
+	writeShapefileZip(t, filepath.Join(dir, "cma.zip"), "cma", cmaFields, cmaRows, cmaRings)
+
+	fsaFields := []dbfFieldDef{{"CFSAUID", 3}}
+	fsaRows := [][]string{{"Y1Y"}}
+	// x∈[50,150]: 50 wide in each CMA → exact area tie (axis-aligned box
+	// clips give integer-exact areas).
+	fsaRings := [][]shp.Point{square(50, 0, 150, 100)}
+	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
+
+	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	if err != nil {
+		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+	}
+	if got["Y1Y"] != "100" {
+		t.Errorf("Y1Y assigned to %q, want 100 (smaller UID on tie)", got["Y1Y"])
+	}
+}
+
+// TestPolygonArea_AccurateAtLargeOffset guards the numerical hygiene the real
+// data needs: EPSG:3347 coordinates sit ~9e6 m from the false origin, where
+// the raw shoelace products reach ~1e13 and catastrophic float cancellation
+// corrupts small areas. polygonArea must translate to a local origin first.
+// A 1000 × 0.01 sliver has area exactly 10 regardless of where it sits.
+func TestPolygonArea_AccurateAtLargeOffset(t *testing.T) {
+	const ox, oy = 9_000_000.0, 2_000_000.0
+	poly := polyclip.Polygon{polyclip.Contour{
+		{X: ox, Y: oy},
+		{X: ox + 1000, Y: oy},
+		{X: ox + 1000, Y: oy + 0.01},
+		{X: ox, Y: oy + 0.01},
+	}}
+	if got := polygonArea(poly); math.Abs(got-10.0) > 1e-6 {
+		t.Errorf("polygonArea at 9e6 offset = %v, want 10 (±1e-6)", got)
+	}
+}
+
+// TestPolygonGrossArea_CountsHolesPositiveAndIsOffsetStable pins the cheap
+// denominator used by the overlap floor: it counts holes as positive (an
+// intentional over-estimate, outer 10000 + hole 1600 = 11600) and stays
+// accurate at the ~9e6 m offset of real EPSG:3347 coordinates.
+func TestPolygonGrossArea_CountsHolesPositiveAndIsOffsetStable(t *testing.T) {
+	const off = 9_000_000.0
+	poly := polyclip.Polygon{
+		boxContour(off, off, off+100, off+100, true),
+		boxContour(off+30, off+30, off+70, off+70, true),
+	}
+	if got := polygonGrossArea(poly); math.Abs(got-11600.0) > 1e-6 {
+		t.Errorf("polygonGrossArea = %v, want 11600 (holes positive, offset-stable)", got)
+	}
+}
+
+// TestSpatialJoin_NoiseSliverFallsThrough is the decisive correctness case:
+// separately digitized FSA and CMA boundaries leave sub-square-metre slivers
+// along shared edges, so an FSA merely running alongside a CMA boundary must
+// fall through to its province, not anchor to that metro on noise.
+func TestSpatialJoin_NoiseSliverFallsThrough(t *testing.T) {
+	dir := t.TempDir()
+	cmaFields := []dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}}
+	cmaRows := [][]string{{"100", "B"}}
+	cmaRings := [][]shp.Point{square(99.99, 0, 200, 100)}
+	writeShapefileZip(t, filepath.Join(dir, "cma.zip"), "cma", cmaFields, cmaRows, cmaRings)
+
+	fsaFields := []dbfFieldDef{{"CFSAUID", 3}}
+	fsaRows := [][]string{{"Z9Z"}}
+	// FSA area 10000; overlap = 0.01 wide × 100 = 1 → 0.01% of the FSA, an
+	// order of magnitude below the 0.1% floor.
+	fsaRings := [][]shp.Point{square(0, 0, 100, 100)}
+	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
+
+	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	if err != nil {
+		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+	}
+	if uid, ok := got["Z9Z"]; ok {
+		t.Errorf("Z9Z anchored to CMA %q on a 0.1%% sliver; want province fallback (absent)", uid)
+	}
+}
+
+// TestSpatialJoin_SubstantialOverlapAnchors guards that the overlap floor is
+// not so aggressive it drops genuine membership: an FSA wholly inside a CMA
+// (100% overlap) must still anchor.
+func TestSpatialJoin_SubstantialOverlapAnchors(t *testing.T) {
+	dir := t.TempDir()
+	cmaFields := []dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}}
+	cmaRows := [][]string{{"100", "B"}}
+	cmaRings := [][]shp.Point{square(-50, -50, 150, 150)} // fully contains the FSA
+	writeShapefileZip(t, filepath.Join(dir, "cma.zip"), "cma", cmaFields, cmaRows, cmaRings)
+
+	fsaFields := []dbfFieldDef{{"CFSAUID", 3}}
+	fsaRows := [][]string{{"A1A"}}
+	fsaRings := [][]shp.Point{square(0, 0, 100, 100)}
+	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
+
+	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	if err != nil {
+		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+	}
+	if got["A1A"] != "100" {
+		t.Errorf("A1A = %q, want 100 (fully contained)", got["A1A"])
+	}
+}
