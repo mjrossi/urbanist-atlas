@@ -197,10 +197,15 @@ See the plan for the full schema, but at a glance:
   ~33,700 ZIPs with city-leaf precision where curated) and HUD's
   quarterly USPS ZIP-County crosswalk (additive backfill for the ~9k
   operational ZIPs Census omits — P.O. Box-only, single-building,
-  APO/FPO). See
+  APO/FPO). The **CA pipeline** resolves each FSA to its smallest
+  CMA by a max-overlap spatial join of the StatsCan FSA + CMA
+  boundary polygons (`api/internal/etl/ca/spatial.go`, #81) —
+  retiring the earlier coarse FSA-prefix table — with a curated
+  city leaf still outranking the CMA and FSAs lacking real CMA
+  overlap falling through to province. See
   [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](./docs/superpowers/specs/2026-05-19-postal-coverage-design.md)
-  for the smallest-anchor design rationale, two-source merge, and
-  editorial conventions.
+  for the smallest-anchor design rationale, the US two-source merge,
+  the CA spatial join (Open Question §4), and editorial conventions.
 - Organizations attach to any node in the region graph (many-to-many
   via the `region_slugs` array in each `[[org]]` entry of
   `orgs.toml`). At boot the FileStore resolves those slugs to the
