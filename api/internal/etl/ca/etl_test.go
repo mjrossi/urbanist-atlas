@@ -9,55 +9,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestSlugify(t *testing.T) {
-	cases := []struct {
-		in, want string
-	}{
-		{"Toronto", "toronto"},
-		{"Montréal", "montreal"},
-		{"Trois-Rivières", "trois-rivieres"},
-		{"Québec", "quebec"},
-		{"Ottawa - Gatineau", "ottawa-gatineau"},
-		{"   leading/trailing///   ", "leading-trailing"},
-		// Underscores treated as separators too.
-		{"foo_bar", "foo-bar"},
-		// Empty input.
-		{"", ""},
-		// Punctuation dropped silently (no separator emitted).
-		{"O'Brien", "obrien"},
-	}
-	for _, c := range cases {
-		got := slugify(c.in)
-		if got != c.want {
-			t.Errorf("slugify(%q) = %q, want %q", c.in, got, c.want)
-		}
-	}
-}
-
-func TestFoldDiacritic(t *testing.T) {
-	// Spot-check the French CMA-name set: é/è/ê for Québec/Montréal,
-	// à for à-prefixed cities (rare in CMAs but parsed elsewhere), and
-	// the cedilla.
-	cases := []struct {
-		in, want rune
-	}{
-		{'é', 'e'}, {'è', 'e'}, {'ê', 'e'},
-		{'à', 'a'}, {'â', 'a'},
-		{'î', 'i'},
-		{'ô', 'o'}, {'ö', 'o'},
-		{'û', 'u'}, {'ù', 'u'},
-		{'ç', 'c'},
-		{'ñ', 'n'},
-		// Unmapped passes through.
-		{'z', 'z'},
-	}
-	for _, c := range cases {
-		if got := foldDiacritic(c.in); got != c.want {
-			t.Errorf("foldDiacritic(%q) = %q, want %q", c.in, got, c.want)
-		}
-	}
-}
-
 func TestCleanCMAName(t *testing.T) {
 	cases := []struct {
 		in, want string

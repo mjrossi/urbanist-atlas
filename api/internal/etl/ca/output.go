@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -96,7 +97,7 @@ func assignCMAs(cmas []CMA, overrides []CMAOverride) []CMAAssignment {
 		override := overrideByUID[c.UID]
 		slug := override.Slug
 		if slug == "" {
-			slug = slugify(c.Name) + "-cma"
+			slug = etl.Slugify(c.Name) + "-cma"
 		}
 		name := override.Name
 		if name == "" {
@@ -192,70 +193,6 @@ func buildCMAPortions(cmas []CMA, assignments []CMAAssignment) ([]CMAAssignment,
 		}
 	}
 	return portions, portionByCMA
-}
-
-// slugify is a small Latin-1-diacritic-folding slugger. CA CMAs have
-// French names with é/è/à etc.; this strips them to ASCII so slugs
-// match the project's "lowercase ASCII with hyphens" convention.
-func slugify(s string) string {
-	var b strings.Builder
-	prevDash := false
-	for _, r := range s {
-		switch {
-		case r >= 'A' && r <= 'Z':
-			b.WriteRune(r + 32)
-			prevDash = false
-		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
-			b.WriteRune(r)
-			prevDash = false
-		case r == ' ' || r == '-' || r == '_' || r == '/':
-			if !prevDash && b.Len() > 0 {
-				b.WriteByte('-')
-				prevDash = true
-			}
-		default:
-			if folded := foldDiacritic(r); folded != r {
-				b.WriteRune(folded)
-				prevDash = false
-			}
-			// other punctuation dropped silently
-		}
-	}
-	return strings.TrimRight(b.String(), "-")
-}
-
-func foldDiacritic(r rune) rune {
-	switch r {
-	case 'à', 'á', 'â', 'ã', 'ä', 'å':
-		return 'a'
-	case 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å':
-		return 'a'
-	case 'è', 'é', 'ê', 'ë':
-		return 'e'
-	case 'È', 'É', 'Ê', 'Ë':
-		return 'e'
-	case 'ì', 'í', 'î', 'ï':
-		return 'i'
-	case 'Ì', 'Í', 'Î', 'Ï':
-		return 'i'
-	case 'ñ':
-		return 'n'
-	case 'Ñ':
-		return 'n'
-	case 'ò', 'ó', 'ô', 'õ', 'ö', 'ø':
-		return 'o'
-	case 'Ò', 'Ó', 'Ô', 'Õ', 'Ö', 'Ø':
-		return 'o'
-	case 'ù', 'ú', 'û', 'ü':
-		return 'u'
-	case 'Ù', 'Ú', 'Û', 'Ü':
-		return 'u'
-	case 'ç':
-		return 'c'
-	case 'Ç':
-		return 'c'
-	}
-	return r
 }
 
 // WriteCMAsTOML emits regions_ca_cmas.toml deterministically: rows

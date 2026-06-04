@@ -8,59 +8,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestSlugify(t *testing.T) {
-	cases := []struct {
-		in, want string
-	}{
-		{"New York", "new-york"},
-		{"  Padding  Spaces  ", "padding-spaces"},
-		{"Mayagüez", "mayaguez"},
-		{"San José", "san-jose"},
-		{"Wilkes-Barre--Hazleton", "wilkes-barre-hazleton"},
-		{"Anchorage Municipality, AK", "anchorage-municipality-ak"},
-		// All-punctuation collapses to empty — leftover defensive
-		// behavior the caller depends on (autoSlug falls back to
-		// "msa-<code>" when this returns "").
-		{"!@#$%", ""},
-		// Trailing separators trimmed.
-		{"foo-", "foo"},
-	}
-	for _, c := range cases {
-		got := slugify(c.in)
-		if got != c.want {
-			t.Errorf("slugify(%q) = %q, want %q", c.in, got, c.want)
-		}
-	}
-}
-
-func TestFoldDiacritic(t *testing.T) {
-	// Spot-check one rune per Latin diacritic group. The full table
-	// covers Latin-1 Supplement + Latin Extended-A, but exhaustive
-	// testing would just retype the table — sample for coverage.
-	cases := []struct {
-		in   rune
-		want rune
-	}{
-		{'á', 'a'},
-		{'é', 'e'},
-		{'í', 'i'},
-		{'ñ', 'n'},
-		{'ó', 'o'},
-		{'ú', 'u'},
-		{'ç', 'c'},
-		{'ł', 'l'},
-		{'ş', 's'},
-		{'ž', 'z'},
-		// Unmapped rune passes through.
-		{'A', 'A'},
-	}
-	for _, c := range cases {
-		if got := foldDiacritic(c.in); got != c.want {
-			t.Errorf("foldDiacritic(%q) = %q, want %q", c.in, got, c.want)
-		}
-	}
-}
-
 func TestFirstCity(t *testing.T) {
 	cases := []struct {
 		in, want string
@@ -365,20 +312,6 @@ func TestParseStateAbbrevs_NoStateSuffix(t *testing.T) {
 	got := parseStateAbbrevs("Aguadilla-Isabela, PR")
 	if diff := cmp.Diff([]string{"PR"}, got); diff != "" {
 		t.Errorf("parseStateAbbrevs PR (-want +got):\n%s", diff)
-	}
-}
-
-func TestSlugify_DoesNotPropagateInteriorWhitespace(t *testing.T) {
-	// Multiple consecutive separators collapse to one hyphen.
-	in := "  Foo   Bar  -  Baz  "
-	want := "foo-bar-baz"
-	if got := slugify(in); got != want {
-		t.Errorf("slugify(%q) = %q, want %q", in, got, want)
-	}
-	// Documentation: a stand-alone slugify never starts with a
-	// hyphen (prevDash blocks the leading separator from emitting).
-	if strings.HasPrefix(slugify(in), "-") {
-		t.Errorf("slugify must not emit leading hyphen")
 	}
 }
 

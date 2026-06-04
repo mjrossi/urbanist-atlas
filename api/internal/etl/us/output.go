@@ -8,8 +8,8 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"unicode"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -153,70 +153,8 @@ func firstCity(title string) string {
 	return strings.TrimSpace(title[:i])
 }
 
-// slugify lowercases, drops diacritics, removes punctuation, and
-// collapses whitespace + interior hyphens into single hyphens. Used
-// for MSA slug generation; doesn't try to match every potential
-// Unicode source — just the common Latin diacritics that appear in
-// PR/Mayagüez-style CBSA titles.
-func slugify(s string) string {
-	var b strings.Builder
-	prevDash := false
-	for _, r := range s {
-		r = unicode.ToLower(r)
-		// Fold common Latin diacritics: ü→u, é→e, etc. The diacritic
-		// is dropped; the base letter is kept.
-		if r >= 0x00C0 && r <= 0x017F {
-			r = foldDiacritic(r)
-		}
-		switch {
-		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
-			b.WriteRune(r)
-			prevDash = false
-		case r == ' ' || r == '-' || r == '_' || r == '/':
-			if !prevDash && b.Len() > 0 {
-				b.WriteByte('-')
-				prevDash = true
-			}
-		}
-		// All other runes (punctuation, etc.) are dropped silently.
-	}
-	out := b.String()
-	return strings.TrimRight(out, "-")
-}
-
-// foldDiacritic maps the Latin-1 Supplement + Latin Extended-A range
-// to ASCII letters. Coverage is good enough for the few diacritics
-// that appear in CBSA titles (mostly Spanish in PR rows).
-func foldDiacritic(r rune) rune {
-	switch r {
-	case 'à', 'á', 'â', 'ã', 'ä', 'å', 'ā', 'ă', 'ą':
-		return 'a'
-	case 'è', 'é', 'ê', 'ë', 'ē', 'ĕ', 'ė', 'ę', 'ě':
-		return 'e'
-	case 'ì', 'í', 'î', 'ï', 'ĩ', 'ī', 'ĭ', 'į':
-		return 'i'
-	case 'ñ', 'ń', 'ņ', 'ň':
-		return 'n'
-	case 'ò', 'ó', 'ô', 'õ', 'ö', 'ø', 'ō', 'ŏ', 'ő':
-		return 'o'
-	case 'ù', 'ú', 'û', 'ü', 'ũ', 'ū', 'ŭ', 'ů', 'ű', 'ų':
-		return 'u'
-	case 'ÿ', 'ý':
-		return 'y'
-	case 'ç', 'ć', 'ĉ', 'ċ', 'č':
-		return 'c'
-	case 'ł', 'ļ', 'ľ':
-		return 'l'
-	case 'ś', 'ŝ', 'ş', 'š':
-		return 's'
-	case 'ź', 'ż', 'ž':
-		return 'z'
-	}
-	return r
-}
-
 func autoSlug(m MSA) string {
-	city := slugify(firstCity(m.Title))
+	city := etl.Slugify(firstCity(m.Title))
 	if city == "" {
 		// Defensive: fall back to CBSA code so we always have *some*
 		// unique slug rather than blowing up the load.
