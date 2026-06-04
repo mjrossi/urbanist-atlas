@@ -217,31 +217,75 @@ Two source files, neither of which require an account:
   Lists every Census Metropolitan Area (population ≥100k, type B)
   with its UID, name, and constituent provinces.
 
-The pipeline reads the DBF attribute tables (a minimal stdlib-only
-DBF reader lives at `api/internal/etl/ca/dbf.go`) and emits
-`regions_ca_cmas.toml` (41 CMAs) + `postal_codes_ca.csv`
-(1,643 FSAs).
+The pipeline reads two things from each StatsCan zip: the **DBF
+attribute table** (a minimal stdlib-only reader at
+`api/internal/etl/ca/dbf.go` — CMA/FSA codes, names, province IDs)
+and, for the FSA → CMA assignment, the **`.shp` polygon geometry**
+(via `spatial.go`). It emits `regions_ca_cmas.toml` (41 CMAs + 2
+Ottawa-Gatineau portions) + `postal_codes_ca.csv` (1,643 FSAs).
 
-**FSA → CMA mapping caveat.** StatsCan's per-postal-code mapping
-file (PCCF) is licence-restricted. Slice #7.5.4 sidesteps it with
-a coarse FSA-prefix → CMA hand-mapping table in
-`api/internal/etl/ca/mappings.go`:
+The CMA region rows come straight from the CMA DBF (`assignCMAs`):
+one row per type-`B` CMAUID, slug/name/kind from
+`regions_ca_cma_overrides.toml`, parents from the constituent
+provinces. The smallest-anchor priority for each FSA is then
+**curated city leaf → max-overlap CMA → province** (`crosswalk.go`).
 
-```
-M, L1/3/4/5/6           → Toronto
-H                       → Montréal
-V5–7                    → Vancouver
-K1–2, J8–9              → Ottawa-Gatineau
-T2–3                    → Calgary
-T5–6                    → Edmonton
-L8–9                    → Hamilton
-```
+### FSA → CMA: max-overlap spatial join
 
-Non-CMA FSAs fall back to their province. The result: every
-Canadian FSA resolves to a curated region without licence
-contamination. A future slice can replace the prefix table with a
-per-FSA mapping when PCCF or open spatial-join data becomes
-available.
+StatsCan's per-postal-code mapping file (PCCF) is licence-restricted,
+so we never use it. Instead each FSA is anchored to the CMA it
+**overlaps most by area**, computed directly from the boundary
+polygons: the FSA `.shp` is clipped against each CMA `.shp`
+(`polyclip` intersection) and the FSA goes to the CMA with the
+largest intersection (`SpatialJoinFSAToCMA` in
+[`spatial.go`](../api/internal/etl/ca/spatial.go), GitHub #81).
+
+This replaced an earlier coarse FSA-prefix → CMA hand-table that
+covered only the seven biggest metros and couldn't separate adjacent
+CMAs sharing a prefix (Victoria and Nanaimo are both `V9`). All ~41
+CMAs now resolve; ~768 FSAs re-anchor province → CMA versus the old
+table, while `regions_ca_cmas.toml` is unchanged — only the postal
+routing improved.
+
+Three numerical details the join has to get right (each pinned by a
+unit test in `spatial_test.go`, and detailed in the design spec's
+[Open Question §4](./superpowers/specs/2026-05-19-postal-coverage-design.md)):
+
+- **Even-odd hole handling.** `polyclip`'s boolean output gives
+  result holes no guaranteed winding, so the area of an intersection
+  is measured by contour *nesting* (a contour inside an odd number of
+  others is a hole, subtracted), not by signed-area sign.
+- **Large-coordinate precision.** EPSG:3347 coordinates sit ~9e6 m
+  from the false origin, where the sweep-line / shoelace products
+  (~1e13–1e14) lose precision and a genuine overlap can compute as
+  ~0. Both polygons are **translated to a local origin before
+  intersecting** — mandatory; preserve this on any vintage bump or
+  reuse of `spatial.go`. Area is translation-invariant, so only the
+  numerics change.
+- **Noise floor.** Separately-digitized FSA and CMA boundaries leave
+  sub-square-metre slivers along shared edges. An FSA anchors to a
+  CMA only when its max overlap clears `minOverlapFraction` (0.1 %)
+  of the FSA's own area; below that it falls through to province.
+  0.1 % is calibrated to the empty gap between the ≤1e-4 % noise
+  cluster and the ≥0.1 % genuine-overlap cluster in the 2021 vintage.
+
+Ties break to the smallest CMA UID deterministically (CMAs are
+UID-sorted and only a strictly larger overlap displaces the
+incumbent). The cross-province Ottawa-Gatineau CMA dissolves its
+per-province `.shp` records by UID, and its FSAs route to the
+`ca:cma-portion` for the FSA's own **PRUID** — the province split is
+attribute-driven, not geometry-driven. FSAs with no curated leaf and
+no real CMA overlap fall back to their province, so every Canadian
+FSA still resolves to a curated region with no licence contamination.
+
+The join is **operator-side only** — it runs inside `etl regenerate`,
+never in the server — and reads the 296 MB FSA `.shp` once per postal
+regenerate (~25 s); a bounding-box pre-filter keeps the polygon-clip
+count small. Pure-Go dependencies, no cgo:
+[`github.com/jonas-p/go-shp`](https://github.com/jonas-p/go-shp)
+(read `.shp` geometry from inside the zip) +
+[`github.com/ctessum/polyclip-go`](https://github.com/ctessum/polyclip-go)
+(polygon-intersection area).
 
 ## Adding a country
 

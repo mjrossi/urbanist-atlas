@@ -8,19 +8,22 @@ import (
 	"path/filepath"
 	"testing"
 
+	shp "github.com/jonas-p/go-shp"
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
 
 var update = flag.Bool("update", false, "regenerate golden files")
 
 // TestRegenerate_CAGoldenDeterminism runs the full CA Regenerate
-// pipeline over synthetic CMA + FSA boundary DBFs (built in-memory and
-// zipped the way StatsCan ships them) and asserts byte-for-byte output
-// against committed goldens. This locks the CA generator logic — the
-// part the real-data seed-check gate doesn't cover (it gates only the
-// region TOML, and the 155 MB FSA source is never fetched in CI).
+// pipeline over synthetic CMA + FSA boundary shapefiles (polygon
+// geometry + attribute tables, zipped the way StatsCan ships them) and
+// asserts byte-for-byte output against committed goldens. This locks the
+// CA generator logic — the part the real-data seed-check gate doesn't
+// cover (it gates only the region TOML, and the 155 MB FSA source is
+// never fetched in CI).
 //
-// The fixtures exercise the CMA region paths and every FSA anchor path:
+// The fixtures exercise the CMA region paths and every FSA anchor path
+// (the CMA each FSA box sits inside drives the max-overlap spatial join):
 //
 //   - CMA 535 → toronto-cma         (override slug + name)
 //   - CMA 933 → metro-vancouver     (override slug + kind)
@@ -29,42 +32,63 @@ var update = flag.Bool("update", false, "regenerate golden files")
 //     rollup_states + on/qc portions)
 //   - FSA K1A → ottawa-gatineau-cma-on (cma-portion, Ontario side)
 //   - FSA J8X → ottawa-gatineau-cma-qc (cma-portion, Quebec side)
-//   - FSA M5V → toronto             (city-leaf)
-//   - FSA M1B → toronto-cma         (cma, via "M" prefix)
-//   - FSA V5Z → metro-vancouver     (cma, via "V5" prefix)
-//   - FSA V6X → richmond            (city-leaf)
-//   - FSA X0A → nu                  (province fallback, PRUID 62)
+//   - FSA M5V → toronto             (city-leaf, outranks its CMA)
+//   - FSA M1B → toronto-cma         (cma, via spatial join)
+//   - FSA V5Z → metro-vancouver     (cma, via spatial join)
+//   - FSA V6X → richmond            (city-leaf, outranks its CMA)
+//   - FSA X0A → nu                  (province fallback, no CMA overlap)
 func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 	srcDir := t.TempDir()
 	outDir := t.TempDir()
 	goldenDir := "testdata/golden/expected"
 
-	cmaDBF := buildDBF(t,
-		[]dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}, {"CMANAME", 30}, {"PRUID", 2}},
-		[][]string{
-			{"535", "B", "Toronto", "35"},
-			{"933", "B", "Vancouver", "59"},
-			{"421", "B", "Sherbrooke", "24"},
-			// Ottawa-Gatineau is multi-province (one row per province).
-			{"505", "B", "Ottawa - Gatineau", "35"},
-			{"505", "B", "Ottawa - Gatineau", "24"},
-		},
-	)
-	fsaDBF := buildDBF(t,
-		[]dbfFieldDef{{"CFSAUID", 3}, {"PRUID", 2}},
-		[][]string{
-			{"M5V", "35"},
-			{"M1B", "35"},
-			{"V5Z", "59"},
-			{"V6X", "59"},
-			{"X0A", "62"},
-			// Ottawa-Gatineau portions: K1A is Ontario, J8X is Quebec.
-			{"K1A", "35"},
-			{"J8X", "24"},
-		},
-	)
-	writeZipWithDBF(t, filepath.Join(srcDir, "lcma000b21a_e.zip"), "lcma000b21a_e.dbf", cmaDBF)
-	writeZipWithDBF(t, filepath.Join(srcDir, "lfsa000b21a_e.zip"), "lfsa000b21a_e.dbf", fsaDBF)
+	// Each CMA is a well-separated 100×100 box; Ottawa-Gatineau is two
+	// boxes (one per province row) sharing UID 505. Each FSA is a small
+	// box placed inside its target CMA so the max-overlap spatial join is
+	// unambiguous (X0A sits outside every CMA → province fallback). The
+	// FSA→CMA results match the prior prefix-table fixtures, so the golden
+	// outputs are unchanged.
+	cmaFields := []dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}, {"CMANAME", 30}, {"PRUID", 2}}
+	cmaRows := [][]string{
+		{"535", "B", "Toronto", "35"},
+		{"933", "B", "Vancouver", "59"},
+		{"421", "B", "Sherbrooke", "24"},
+		// Ottawa-Gatineau is multi-province (one row per province).
+		{"505", "B", "Ottawa - Gatineau", "35"},
+		{"505", "B", "Ottawa - Gatineau", "24"},
+	}
+	cmaRings := [][]shp.Point{
+		square(0, 0, 100, 100),   // 535 Toronto
+		square(200, 0, 300, 100), // 933 Vancouver
+		square(400, 0, 500, 100), // 421 Sherbrooke
+		square(600, 0, 700, 100), // 505 Ottawa-Gatineau (ON part)
+		square(700, 0, 800, 100), // 505 Ottawa-Gatineau (QC part)
+	}
+	fsaFields := []dbfFieldDef{{"CFSAUID", 3}, {"PRUID", 2}}
+	fsaRows := [][]string{
+		{"M5V", "35"},
+		{"M1B", "35"},
+		{"V5Z", "59"},
+		{"V6X", "59"},
+		{"X0A", "62"},
+		// Ottawa-Gatineau portions: K1A is Ontario, J8X is Quebec.
+		{"K1A", "35"},
+		{"J8X", "24"},
+	}
+	fsaRings := [][]shp.Point{
+		square(10, 10, 20, 20),         // M5V → Toronto box (city-leaf wins)
+		square(30, 30, 40, 40),         // M1B → Toronto box → toronto-cma
+		square(210, 10, 220, 20),       // V5Z → Vancouver box → metro-vancouver
+		square(230, 30, 240, 40),       // V6X → Vancouver box (city-leaf wins)
+		square(1000, 1000, 1010, 1010), // X0A → outside all CMAs → province
+		// Both K1A and J8X resolve to Ottawa-Gatineau (CMA UID 505) by the
+		// spatial join; the ON/QC portion split is then driven by each FSA's
+		// PRUID (35 vs 24) in Crosswalk, not by which box the polygon sits in.
+		square(610, 10, 620, 20), // K1A (PRUID 35) → on-portion
+		square(710, 10, 720, 20), // J8X (PRUID 24) → qc-portion
+	}
+	writeShapefileZip(t, filepath.Join(srcDir, "lcma000b21a_e.zip"), "lcma000b21a_e", cmaFields, cmaRows, cmaRings)
+	writeShapefileZip(t, filepath.Join(srcDir, "lfsa000b21a_e.zip"), "lfsa000b21a_e", fsaFields, fsaRows, fsaRings)
 
 	// Overrides are read from outDir (regions_ca_cma_overrides.toml), now
 	// data rather than the compiled cmaOverrides map. Stage the canonical

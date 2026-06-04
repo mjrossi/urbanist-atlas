@@ -89,7 +89,10 @@ func (r *dbfReader) next() (map[string]string, error) {
 		row := make(map[string]string, len(r.fields))
 		offset := 1
 		for _, f := range r.fields {
-			val := strings.TrimSpace(latin1ToUTF8(rec[offset : offset+f.Length]))
+			// Character fields are conventionally space-padded, but some
+			// encoders NUL-pad (StatsCan's real files use spaces; go-shp's
+			// writer, used by the test fixtures, uses NUL) — trim both.
+			val := strings.Trim(latin1ToUTF8(rec[offset:offset+f.Length]), " \x00")
 			row[f.Name] = val
 			offset += f.Length
 		}

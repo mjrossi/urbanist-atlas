@@ -3,9 +3,11 @@ module github.com/mjrossi/urbanist-atlas/api
 go 1.26.3
 
 require (
+	github.com/ctessum/polyclip-go v1.1.0
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
+	github.com/jonas-p/go-shp v0.1.1
 	github.com/oapi-codegen/runtime v1.4.1
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/pressly/goose/v3 v3.27.1
@@ -18,6 +20,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/gonum/floats v0.0.0-20181209220543-c233463c7e82 // indirect
+	github.com/gonum/internal v0.0.0-20181124074243-f884aa714029 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect

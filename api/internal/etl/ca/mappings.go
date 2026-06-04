@@ -56,60 +56,11 @@ var provinceUIDToSlug = map[string]string{
 	"62": "nu",          // Nunavut
 }
 
-// fsaPrefixToCMA hand-codes a coarse "FSA first-1-or-2-char →
-// curated CMA slug" mapping for the major Canadian metros where a
-// per-FSA spatial join (the kind the PCCF would give us) isn't
-// available without restricted-licence data.
-//
-// Coverage is intentionally limited to the highest-population CMAs
-// where prefix-based assignment is reasonably accurate:
-//
-//   - M*       — Toronto CMA (Toronto proper)
-//   - H*       — Montréal CMA (Montréal Island)
-//   - V5*..V7* — Metro Vancouver (Vancouver, Burnaby, Richmond, etc.)
-//   - K1*..K2* — Ottawa-Gatineau CMA (Ottawa side)
-//   - J8*..J9* — Ottawa-Gatineau CMA (Gatineau side)
-//   - T2*..T3* — Calgary CMA
-//   - T5*..T6* — Edmonton CMA
-//
-// Lookup logic in crosswalk.go: try the 2-character prefix first
-// (e.g., "M5"), then the 1-character (e.g., "M"). FSAs without a
-// match fall through to province.
-//
-// Future slices with PCCF or spatial-join data can replace this with
-// a per-FSA mapping for full CMA accuracy. The trade-off is discussed
-// in detail in docs/superpowers/specs/2026-05-19-postal-coverage-design.md
-// under "FSA → CMA mapping without PCCF" (Open Question §4).
-var fsaPrefixToCMA = map[string]string{
-	// Toronto CMA — M (Toronto proper) + suburbs in the L block
-	// (Pickering/Ajax/Whitby/Oshawa L1; Markham/Stouffville L3;
-	// Mississauga/Brampton/Vaughan L4-L6; Halton Hills/Burlington
-	// straddle L7 → leave to province for safety).
-	"M":  "toronto-cma",
-	"L1": "toronto-cma",
-	"L3": "toronto-cma",
-	"L4": "toronto-cma",
-	"L5": "toronto-cma",
-	"L6": "toronto-cma",
-	// Hamilton CMA — L8, L9 cover Hamilton proper.
-	"L8": "hamilton-cma",
-	"L9": "hamilton-cma",
-	// Montréal CMA — H is Montréal Island; J-suburbs straddle metros
-	// and are left to province for safety.
-	"H": "montreal-cma",
-	// Metro Vancouver — V5-V7 in the BC metro.
-	"V5": "metro-vancouver",
-	"V6": "metro-vancouver",
-	"V7": "metro-vancouver",
-	// Ottawa-Gatineau CMA — K1-K2 (Ontario side), J8-J9 (Quebec).
-	"K1": "ottawa-gatineau-cma",
-	"K2": "ottawa-gatineau-cma",
-	"J8": "ottawa-gatineau-cma",
-	"J9": "ottawa-gatineau-cma",
-	// Calgary CMA — T2-T3 cover Calgary proper.
-	"T2": "calgary-cma",
-	"T3": "calgary-cma",
-	// Edmonton CMA — T5-T6 cover Edmonton proper.
-	"T5": "edmonton-cma",
-	"T6": "edmonton-cma",
-}
+// The FSA → CMA assignment used to live here as a coarse
+// `fsaPrefixToCMA` table mapping an FSA's first one or two characters to
+// one of the seven biggest metros. It was replaced by a max-overlap
+// spatial join of the boundary-file polygons (spatial.go), which resolves
+// all ~41 CMAs and can separate adjacent metros that share an FSA prefix
+// (e.g. Victoria and Nanaimo, both V9). See issue #81 and
+// docs/superpowers/specs/2026-05-19-postal-coverage-design.md (Open
+// Question §4, now resolved).

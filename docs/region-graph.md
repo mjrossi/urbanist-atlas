@@ -309,6 +309,13 @@ elif ZCTA is in a curated MSA                       → anchor = MSA region
 else                                                → anchor = state/province
 ```
 
+Canada applies the same priority over **FSAs** (the 3-character forward
+sortation area — the smallest geography StatsCan publishes boundaries
+for): a curated city leaf wins, else the **max-overlap CMA** from a
+spatial join of the FSA + CMA boundary polygons
+(`api/internal/etl/ca/spatial.go`, #81), else the province. Multi-province
+CMAs (Ottawa-Gatineau) route to the FSA's own-province `ca:cma-portion`.
+
 Worked examples:
 
 | Postal code | Anchor       | Why                                                |

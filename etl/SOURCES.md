@@ -139,21 +139,38 @@ See `LICENSE-DATA` for attribution recommendation.
 Sources pinned by slice #7.5.4. Files live under `etl/sources/ca/`
 (gitignored). The Postal Code Conversion File (PCCF, 92-154-X) is
 licensed under restricted terms; we sidestep it by using the publicly
-licensed FSA and CMA boundary files instead. FSA → CMA mapping is
-done via a coarse prefix table in `api/internal/etl/ca/mappings.go`
-rather than per-FSA spatial join (which would require the PCCF or a
-shapefile-aware spatial library). A future slice can refine the
-mapping if the PCCF terms change or a spatial-join workflow is added.
+licensed FSA and CMA boundary files instead. FSA → CMA mapping is a
+per-FSA **max-overlap spatial join** of the two files' polygon
+geometry (`api/internal/etl/ca/spatial.go`, issue #81): each FSA
+anchors to the CMA it overlaps most by area, resolving all ~41 CMAs.
+This replaced an earlier coarse FSA-prefix table that covered only the
+seven biggest metros and couldn't separate adjacent CMAs sharing a
+prefix (Victoria and Nanaimo are both V9).
 
 | File                              | Vintage          | URL                                                                                                                  | sha256 |
 | --------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------- | ------ |
 | `lfsa000b21a_e.zip`               | StatsCan FSA boundary, 2021 census | https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip   | `9fd2b6adf66e5716d06f91ebdcdb5d8a4e8b9eeb520f8b4285030d34319959db` |
 | `lcma000b21a_e.zip`               | StatsCan CMA boundary, 2021 census | https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip   | `a12dd39b3262edb48f9490b435d2f43b0327cc4af7d829f32aebae4d4b9f8fa0` |
 
-The ETL parses only the DBF attribute table inside each zip (~150KB
-extracted from a ~162MB zip for FSAs); the shapefile geometry is
-ignored. Reading from inside the zip avoids polluting the repo with
-extracted multi-MB artifacts.
+The ETL reads both the DBF attribute table (region/province codes) and
+the `.shp` polygon geometry (the spatial join, `spatial.go`) directly
+from inside each zip — reading in place avoids polluting the repo with
+extracted multi-MB artifacts. The FSA `.shp` is the bulk of the zip
+(~300MB extracted), read once per postal regenerate; this never runs
+in the server, only operator-side ETL.
+
+> **Overlap-floor calibration (re-check on any CA boundary vintage
+> bump).** The FSA→CMA join drops sub-threshold boundary slivers via
+> `minOverlapFraction` in `spatial.go` (0.1 % of FSA area), calibrated to
+> the *2021*-vintage overlap distribution: noise slivers cluster at
+> ≤1e-4 % with a completely empty gap up to the ≥0.1 % genuine overlaps,
+> so 0.1 % sits in that gap. A new boundary vintage can shift that
+> distribution, and **CI cannot catch it** — the golden-determinism test
+> runs on synthetic fixtures, and the 296 MB FSA `.shp` is never fetched
+> in CI. So when bumping the CA boundary vintage, re-measure the
+> best-overlap histogram over the real data, confirm the noise/signal gap
+> still brackets 0.1 % (retune the constant if it moved), and only then
+> trust the regenerated `postal_codes_ca.csv`.
 
 ### Manual refresh workflow
 
