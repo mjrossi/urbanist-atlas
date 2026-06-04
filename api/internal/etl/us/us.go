@@ -299,7 +299,7 @@ func writeMSAs(path string, rows []RegionRow) error {
 		return fmt.Errorf("etl us: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WriteMSAsTOML(f, rows)
+	return etl.WriteRegionsTOML(f, msaTOMLHeader, rows)
 }
 
 func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {

@@ -1,7 +1,6 @@
 package us
 
 import (
-	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -176,18 +175,12 @@ func autoParents(m MSA) []string {
 	return parents
 }
 
-// RegionRow is one emitted [[region]] in regions_us_msas.toml: a metro
-// umbrella (Kind us:metro) or an auto-generated per-state portion (Kind
-// us:metro-portion). Comment is the trailing "# Census CBSA …" line for
-// umbrellas, empty for portions.
-type RegionRow struct {
-	Slug         string
-	Name         string
-	Kind         string
-	Parents      []string
-	RollupStates []string
-	Comment      string
-}
+// RegionRow aliases the shared etl.RegionRow. A US row is one emitted
+// [[region]] in regions_us_msas.toml: a metro umbrella (Kind us:metro)
+// or an auto-generated per-state portion (Kind us:metro-portion).
+// Comment is the trailing "# Census CBSA …" line for umbrellas, empty
+// for portions.
+type RegionRow = etl.RegionRow
 
 // BuildRegionRows expands per-CBSA assignments into the full set of
 // emitted region rows — one umbrella per MSA, plus one us:metro-portion
@@ -234,82 +227,6 @@ func BuildRegionRows(msas []MSA, assignments map[string]MSAOverride) ([]RegionRo
 		}
 	}
 	return rows, portionSlugs
-}
-
-// WriteMSAsTOML emits the regions_us_msas.toml file deterministically:
-// rows sorted by slug ASC, no embedded timestamps, LF line endings,
-// trailing newline. Because a portion slug is its umbrella's slug plus a
-// "-<state>" suffix, the slug sort places every portion immediately after
-// its umbrella — which is also the load-order the seedfiles loader
-// requires (a portion's umbrella parent must register first).
-func WriteMSAsTOML(w io.Writer, rows []RegionRow) error {
-	sorted := make([]RegionRow, len(rows))
-	copy(sorted, rows)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Slug < sorted[j].Slug })
-
-	bw := bufio.NewWriter(w)
-	if _, err := bw.WriteString(msaTOMLHeader); err != nil {
-		return err
-	}
-	for _, r := range sorted {
-		if r.Slug == "" {
-			return fmt.Errorf("write msas: empty slug (name %q)", r.Name)
-		}
-		kind := r.Kind
-		if kind == "" {
-			kind = "us:metro"
-		}
-		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %q\nkind = %q\nname = %q\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [", r.Slug, kind, r.Name); err != nil {
-			return err
-		}
-		for i, p := range r.Parents {
-			if i > 0 {
-				if _, err := bw.WriteString(", "); err != nil {
-					return err
-				}
-			}
-			if _, err := fmt.Fprintf(bw, "%q", p); err != nil {
-				return err
-			}
-		}
-		if _, err := bw.WriteString("]\n"); err != nil {
-			return err
-		}
-		if err := writeStringList(bw, "rollup_states", r.RollupStates); err != nil {
-			return err
-		}
-		if r.Comment != "" {
-			if _, err := fmt.Fprintf(bw, "%s\n", r.Comment); err != nil {
-				return err
-			}
-		}
-	}
-	return bw.Flush()
-}
-
-// writeStringList writes a TOML `key = ["a", "b"]` line (plus newline),
-// but ONLY when items is non-empty — an empty list emits nothing, so
-// region rows without the field stay byte-identical. Used for the
-// optional rollup_states field.
-func writeStringList(w *bufio.Writer, key string, items []string) error {
-	if len(items) == 0 {
-		return nil
-	}
-	if _, err := fmt.Fprintf(w, "%s = [", key); err != nil {
-		return err
-	}
-	for i, it := range items {
-		if i > 0 {
-			if _, err := w.WriteString(", "); err != nil {
-				return err
-			}
-		}
-		if _, err := fmt.Fprintf(w, "%q", it); err != nil {
-			return err
-		}
-	}
-	_, err := w.WriteString("]\n")
-	return err
 }
 
 const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated from the

@@ -1,7 +1,6 @@
 package ca
 
 import (
-	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -171,98 +170,28 @@ func buildCMAPortions(cmas []CMA, assignments []CMAAssignment) ([]CMAAssignment,
 	return portions, portionByCMA
 }
 
-// WriteCMAsTOML emits regions_ca_cmas.toml deterministically: rows
-// sorted by slug ASC (so each "<umbrella>-<province>" portion lands
-// right after its umbrella, satisfying the loader's parents-first order),
-// no embedded timestamps, LF line endings, trailing newline.
-func WriteCMAsTOML(w io.Writer, assignments []CMAAssignment) error {
-	sorted := make([]CMAAssignment, len(assignments))
-	copy(sorted, assignments)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Slug < sorted[j].Slug })
-
-	bw := bufio.NewWriter(w)
-	if _, err := bw.WriteString(cmaTOMLHeader); err != nil {
-		return err
-	}
-	for _, a := range sorted {
-		// TOML basic strings allow arbitrary UTF-8 — we just need to
-		// escape \ and " — so non-ASCII characters in CMA names (é, è
-		// in Montréal/Trois-Rivières/Québec) round-trip cleanly. Using
-		// Go's %q here would emit \xXX escapes that aren't valid TOML.
-		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %s\nkind = %s\nname = %s\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [",
-			tomlString(a.Slug), tomlString(a.Kind), tomlString(a.Name)); err != nil {
-			return err
-		}
-		for i, p := range a.Parents {
-			if i > 0 {
-				if _, err := bw.WriteString(", "); err != nil {
-					return err
-				}
-			}
-			if _, err := bw.WriteString(tomlString(p)); err != nil {
-				return err
-			}
-		}
-		if _, err := bw.WriteString("]\n"); err != nil {
-			return err
-		}
-		if len(a.RollupStates) > 0 {
-			if _, err := bw.WriteString("rollup_states = ["); err != nil {
-				return err
-			}
-			for i, s := range a.RollupStates {
-				if i > 0 {
-					if _, err := bw.WriteString(", "); err != nil {
-						return err
-					}
-				}
-				if _, err := bw.WriteString(tomlString(s)); err != nil {
-					return err
-				}
-			}
-			if _, err := bw.WriteString("]\n"); err != nil {
-				return err
-			}
-		}
-		// Portion rows carry no StatsCan UID, so they get no provenance
-		// comment; umbrellas keep theirs.
+// cmaRowsToRegionRows adapts the CA assignment shape to the shared
+// etl.RegionRow the common TOML writer consumes. The provenance comment
+// (# StatsCan CMA <UID> — <Name>) is attached only to umbrella rows
+// (UID set); portion rows carry no UID and so no comment, matching the
+// prior WriteCMAsTOML behavior.
+func cmaRowsToRegionRows(assignments []CMAAssignment) []etl.RegionRow {
+	rows := make([]etl.RegionRow, len(assignments))
+	for i, a := range assignments {
+		comment := ""
 		if a.UID != "" {
-			if _, err := fmt.Fprintf(bw, "# StatsCan CMA %s — %s\n", a.UID, a.Name); err != nil {
-				return err
-			}
+			comment = fmt.Sprintf("# StatsCan CMA %s — %s", a.UID, a.Name)
+		}
+		rows[i] = etl.RegionRow{
+			Slug:         a.Slug,
+			Name:         a.Name,
+			Kind:         a.Kind,
+			Parents:      a.Parents,
+			RollupStates: a.RollupStates,
+			Comment:      comment,
 		}
 	}
-	return bw.Flush()
-}
-
-// tomlString wraps s in TOML double-quoted basic-string syntax.
-// Backslashes and double quotes are escaped; UTF-8 multibyte chars
-// pass through unchanged (TOML basic strings accept any UTF-8). The
-// control-character handling (newline, tab, etc.) follows the TOML
-// spec — those become \n / \t. We don't emit \xXX or \uXXXX escapes
-// since the CMA names don't contain anything weirder than Latin-1.
-func tomlString(s string) string {
-	var b strings.Builder
-	b.Grow(len(s) + 2)
-	b.WriteByte('"')
-	for _, r := range s {
-		switch r {
-		case '\\':
-			b.WriteString(`\\`)
-		case '"':
-			b.WriteString(`\"`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\r':
-			b.WriteString(`\r`)
-		case '\t':
-			b.WriteString(`\t`)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
+	return rows
 }
 
 const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated from the

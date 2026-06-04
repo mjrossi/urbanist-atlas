@@ -156,7 +156,7 @@ func writeCMAsToFile(path string, assignments []CMAAssignment) error {
 		return fmt.Errorf("etl ca: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WriteCMAsTOML(f, assignments)
+	return etl.WriteRegionsTOML(f, cmaTOMLHeader, cmaRowsToRegionRows(assignments))
 }
 
 func writeCSVToFile(path string, anchors []PostalAnchor) error {
