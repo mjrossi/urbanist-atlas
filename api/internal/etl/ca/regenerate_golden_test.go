@@ -81,8 +81,11 @@ func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 		square(210, 10, 220, 20),       // V5Z → Vancouver box → metro-vancouver
 		square(230, 30, 240, 40),       // V6X → Vancouver box (city-leaf wins)
 		square(1000, 1000, 1010, 1010), // X0A → outside all CMAs → province
-		square(610, 10, 620, 20),       // K1A → Ottawa ON box → on-portion
-		square(710, 10, 720, 20),       // J8X → Ottawa QC box → qc-portion
+		// Both K1A and J8X resolve to Ottawa-Gatineau (CMA UID 505) by the
+		// spatial join; the ON/QC portion split is then driven by each FSA's
+		// PRUID (35 vs 24) in Crosswalk, not by which box the polygon sits in.
+		square(610, 10, 620, 20), // K1A (PRUID 35) → on-portion
+		square(710, 10, 720, 20), // J8X (PRUID 24) → qc-portion
 	}
 	writeShapefileZip(t, filepath.Join(srcDir, "lcma000b21a_e.zip"), "lcma000b21a_e", cmaFields, cmaRows, cmaRings)
 	writeShapefileZip(t, filepath.Join(srcDir, "lfsa000b21a_e.zip"), "lfsa000b21a_e", fsaFields, fsaRows, fsaRings)

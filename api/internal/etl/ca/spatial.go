@@ -32,9 +32,10 @@ import (
 // such as Ottawa-Gatineau appears as one record per province) — plus its
 // bounding box, used as the clip target in the spatial join.
 type cmaGeometry struct {
-	uid   string
-	parts []polyclip.Polygon // one polygon per source shapefile record
-	bbox  polyclip.Rectangle
+	uid      string
+	parts    []polyclip.Polygon   // one polygon per source shapefile record
+	partBBox []polyclip.Rectangle // bounding box of parts[i], precomputed at load
+	bbox     polyclip.Rectangle   // union of partBBox (whole-CMA bounding box)
 }
 
 // minOverlapFraction is the smallest share of an FSA's own area that must
@@ -92,14 +93,14 @@ func loadCMAGeometry(zipPath string) ([]cmaGeometry, error) {
 	var order []string
 	for zr.Next() {
 		_, shape := zr.Shape()
-		if strings.TrimSpace(zr.Attribute(iType)) != "B" {
+		if strings.Trim(zr.Attribute(iType), " \x00") != "B" {
 			continue
 		}
 		poly, ok := shapePolygon(shape)
 		if !ok {
 			continue
 		}
-		uid := strings.TrimSpace(zr.Attribute(iUID))
+		uid := strings.Trim(zr.Attribute(iUID), " \x00")
 		if uid == "" {
 			continue
 		}
@@ -118,7 +119,11 @@ func loadCMAGeometry(zipPath string) ([]cmaGeometry, error) {
 	out := make([]cmaGeometry, 0, len(order))
 	for _, uid := range order {
 		g := byUID[uid]
-		g.bbox = polygonsBBox(g.parts)
+		g.partBBox = make([]polyclip.Rectangle, len(g.parts))
+		for i, part := range g.parts {
+			g.partBBox[i] = part.BoundingBox()
+		}
+		g.bbox = unionBBoxes(g.partBBox)
 		out = append(out, *g)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].uid < out[j].uid })
@@ -144,7 +149,7 @@ func assignFSAsToCMAs(zipPath string, cmas []cmaGeometry) (map[string]string, er
 	out := map[string]string{}
 	for zr.Next() {
 		_, shape := zr.Shape()
-		fsa := strings.TrimSpace(zr.Attribute(iFSA))
+		fsa := strings.Trim(zr.Attribute(iFSA), " \x00")
 		if fsa == "" {
 			continue
 		}
@@ -176,8 +181,8 @@ func assignFSAsToCMAs(zipPath string, cmas []cmaGeometry) (map[string]string, er
 				continue
 			}
 			var area float64
-			for _, part := range c.parts {
-				if !bboxesOverlap(fbb, part.BoundingBox()) {
+			for pi, part := range c.parts {
+				if !bboxesOverlap(fbb, c.partBBox[pi]) {
 					continue
 				}
 				area += polygonArea(local.Construct(polyclip.INTERSECTION, translate(part, ox, oy)))
@@ -383,16 +388,21 @@ func contourAbsArea(c polyclip.Contour, ox, oy float64) float64 {
 }
 
 // nestingDepth counts how many other contours of p contain contour i. The
-// contours of a boolean-op result are pairwise non-crossing, so every vertex
-// of contour i lies strictly inside or strictly outside each other contour —
-// one vertex classifies the whole contour. Even depth ⇒ filled, odd ⇒ hole.
-// bboxes[j] is the precomputed bounding box of p[j]; a representative point
-// outside it can't be contained, so the O(vertices) Contains is skipped.
+// contours of a boolean-op result are pairwise non-crossing, so a point
+// strictly interior to contour i lies strictly inside or strictly outside
+// each other contour — one such point classifies the whole contour. Even
+// depth ⇒ filled, odd ⇒ hole. The representative must be strictly interior,
+// never a raw vertex: two result contours can touch at a vertex, and
+// Contour.Contains classifies points on a contour's top/right edge as
+// outside, so a shared boundary vertex would flip the parity (a hole counted
+// as fill, or vice-versa). bboxes[j] is the precomputed bounding box of p[j];
+// a representative outside it can't be contained, so the O(vertices) Contains
+// is skipped.
 func nestingDepth(p polyclip.Polygon, bboxes []polyclip.Rectangle, i int) int {
 	if len(p[i]) < 3 {
 		return 0
 	}
-	rep := p[i][0]
+	rep := interiorPoint(p[i])
 	depth := 0
 	for j := range p {
 		if j == i || len(p[j]) < 3 {
@@ -409,18 +419,42 @@ func nestingDepth(p polyclip.Polygon, bboxes []polyclip.Rectangle, i int) int {
 	return depth
 }
 
-// polygonsBBox returns the bounding box enclosing all of a CMA's polygon
-// parts.
-func polygonsBBox(polys []polyclip.Polygon) polyclip.Rectangle {
-	var box polyclip.Rectangle
-	first := true
-	for _, p := range polys {
-		bb := p.BoundingBox()
-		if first {
-			box = bb
-			first = false
-			continue
+// interiorPoint returns a point strictly inside the simple polygon contour c
+// (len(c) >= 3), never on its boundary — the property nestingDepth needs so
+// Contour.Contains can't misclassify it on another contour's half-open
+// top/right edge. The lowest-then-leftmost vertex v is always a convex corner
+// of c, so its interior wedge opens upward; the midpoint m of v's two
+// neighbours gives m - v = ½(a-v) + ½(b-v), a strictly-positive combination of
+// the two incident edge directions and thus a direction strictly inside that
+// wedge. A hair's step from v toward m lands strictly inside c, off every
+// edge. (Production calls this in FSA-local coordinates, so the step is well
+// conditioned numerically.)
+func interiorPoint(c polyclip.Contour) polyclip.Point {
+	n := len(c)
+	k := 0
+	for i := 1; i < n; i++ {
+		if c[i].Y < c[k].Y || (c[i].Y == c[k].Y && c[i].X < c[k].X) {
+			k = i
 		}
+	}
+	v := c[k]
+	a := c[(k-1+n)%n]
+	b := c[(k+1)%n]
+	const eps = 1e-6
+	return polyclip.Point{
+		X: v.X + eps*((a.X+b.X)/2-v.X),
+		Y: v.Y + eps*((a.Y+b.Y)/2-v.Y),
+	}
+}
+
+// unionBBoxes returns the bounding box enclosing every box in boxes (a CMA's
+// precomputed per-part boxes). Returns the zero Rectangle for an empty slice.
+func unionBBoxes(boxes []polyclip.Rectangle) polyclip.Rectangle {
+	if len(boxes) == 0 {
+		return polyclip.Rectangle{}
+	}
+	box := boxes[0]
+	for _, bb := range boxes[1:] {
 		if bb.Min.X < box.Min.X {
 			box.Min.X = bb.Min.X
 		}

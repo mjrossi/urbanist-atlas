@@ -50,7 +50,7 @@ func TestPolygonArea_SubtractsHoles(t *testing.T) {
 				boxContour(0, 0, 100, 100, outerCW),
 				boxContour(30, 30, 70, 70, holeCW),
 			}
-			if got := polygonArea(poly); got != want {
+			if got := polygonArea(poly); math.Abs(got-want) > 1e-9 {
 				t.Errorf("polygonArea(outerCW=%v, holeCW=%v) = %v, want %v",
 					outerCW, holeCW, got, want)
 			}
@@ -76,8 +76,32 @@ func TestPolygonArea_HoleThroughConstruct(t *testing.T) {
 	}
 
 	got := polygonArea(fp.Construct(polyclip.INTERSECTION, cp))
-	if got != 8400.0 {
+	if math.Abs(got-8400.0) > 1e-9 {
 		t.Errorf("intersection area = %v, want 8400 (hole subtracted)", got)
+	}
+}
+
+// TestPolygonArea_HoleVertexOnContourBoundary pins the nestingDepth fix: a
+// hole whose first vertex lies exactly on the outer ring's boundary must still
+// be subtracted. With the old raw-vertex representative, Contour.Contains
+// classified a point on the outer's top/right edge as outside, so the hole was
+// added (10800 instead of 9200). interiorPoint sidesteps the boundary.
+func TestPolygonArea_HoleVertexOnContourBoundary(t *testing.T) {
+	outer := polyclip.Contour{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 100, Y: 100}, {X: 0, Y: 100}}
+	// Each hole has area 800; net = 10000 - 800 = 9200. The hole's FIRST
+	// vertex sits on the outer ring — right edge (x=100) and top edge (y=100)
+	// respectively — the exact configuration that flipped the parity before.
+	cases := []struct {
+		name string
+		hole polyclip.Contour
+	}{
+		{"right-edge", polyclip.Contour{{X: 100, Y: 40}, {X: 60, Y: 40}, {X: 60, Y: 60}, {X: 100, Y: 60}}},
+		{"top-edge", polyclip.Contour{{X: 40, Y: 100}, {X: 40, Y: 60}, {X: 60, Y: 60}, {X: 60, Y: 100}}},
+	}
+	for _, tc := range cases {
+		if got := polygonArea(polyclip.Polygon{outer, tc.hole}); math.Abs(got-9200.0) > 1e-9 {
+			t.Errorf("polygonArea(hole first-vertex on %s) = %v, want 9200 (hole subtracted)", tc.name, got)
+		}
 	}
 }
 
@@ -108,6 +132,47 @@ func TestSpatialJoin_StraddleAssignsLargerOverlap(t *testing.T) {
 	}
 	if got["X1X"] != "200" {
 		t.Errorf("X1X assigned to %q, want 200 (larger overlap)", got["X1X"])
+	}
+}
+
+// TestSpatialJoin_LargeOffsetStraddle runs the full join end-to-end at the
+// ~9e6 m EPSG:3347 offset of real StatsCan coordinates, where polyclip's
+// sweep-line loses precision unless the geometry is translated to a local
+// origin first (which assignFSAsToCMAs does). Without that translation the
+// intersection areas collapse toward zero and the max-overlap winner is
+// arbitrary — so this guards the precision fix through SpatialJoinFSAToCMA,
+// not just the unit-level TestPolygonArea_AccurateAtLargeOffset. Same geometry
+// as the straddle test shifted by (9e6, 2e6): 40 wide in CMA 100, 60 wide in
+// CMA 200 → CMA 200 wins.
+func TestSpatialJoin_LargeOffsetStraddle(t *testing.T) {
+	const ox, oy = 9_000_000.0, 2_000_000.0
+	off := func(ring []shp.Point) []shp.Point {
+		out := make([]shp.Point, len(ring))
+		for i, p := range ring {
+			out[i] = shp.Point{X: p.X + ox, Y: p.Y + oy}
+		}
+		return out
+	}
+	dir := t.TempDir()
+	cmaFields := []dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}}
+	cmaRows := [][]string{{"100", "B"}, {"200", "B"}}
+	cmaRings := [][]shp.Point{
+		off(square(0, 0, 100, 100)),   // CMA 100 (west)
+		off(square(100, 0, 200, 100)), // CMA 200 (east)
+	}
+	writeShapefileZip(t, filepath.Join(dir, "cma.zip"), "cma", cmaFields, cmaRows, cmaRings)
+
+	fsaFields := []dbfFieldDef{{"CFSAUID", 3}}
+	fsaRows := [][]string{{"X1X"}}
+	fsaRings := [][]shp.Point{off(square(60, 0, 160, 100))}
+	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
+
+	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	if err != nil {
+		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+	}
+	if got["X1X"] != "200" {
+		t.Errorf("X1X assigned to %q at 9e6 offset, want 200 (larger overlap; precision fix)", got["X1X"])
 	}
 }
 
