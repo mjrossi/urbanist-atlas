@@ -27,8 +27,8 @@ func TestCrosswalkHUDBackfill_PicksMaxTotRatio(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1; got %+v", len(got), got)
 	}
-	if got[0].ZCTA != "20811" || got[0].AnchorSlug != "washington-dc-metro" || got[0].Reason != "hud:msa" {
-		t.Errorf("got %+v, want {ZCTA:20811, Anchor:washington-dc-metro, Reason:hud:msa}", got[0])
+	if got[0].PostalCode != "20811" || got[0].AnchorSlug != "washington-dc-metro" || got[0].Reason != "hud:msa" {
+		t.Errorf("got %+v, want {PostalCode:20811, Anchor:washington-dc-metro, Reason:hud:msa}", got[0])
 	}
 }
 
@@ -37,7 +37,7 @@ func TestCrosswalkHUDBackfill_SkipsZIPsAlreadyResolvedByZCTA(t *testing.T) {
 		{ZIP: "10001", County: "36061", TotRatio: 1.0},
 	}
 	zctaAnchors := []PostalAnchor{
-		{ZCTA: "10001", AnchorSlug: "manhattan", Reason: "nyc-borough"},
+		{PostalCode: "10001", AnchorSlug: "manhattan", Reason: "nyc-borough"},
 	}
 	countyToMSA := map[string]string{"36061": "35620"}
 	msaSlugs := map[string]string{"35620": "nyc-metro"}
@@ -146,7 +146,7 @@ func TestCrosswalkHUDBackfill_OutputSortedByZIP(t *testing.T) {
 	got, _ := CrosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
 	zips := make([]string, len(got))
 	for i, a := range got {
-		zips[i] = a.ZCTA
+		zips[i] = a.PostalCode
 	}
 	if !sort.StringsAreSorted(zips) {
 		t.Errorf("output not sorted by ZIP: %v", zips)

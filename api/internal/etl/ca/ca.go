@@ -165,5 +165,5 @@ func writeCSVToFile(path string, anchors []PostalAnchor) error {
 		return fmt.Errorf("etl ca: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WritePostalCodesCSV(f, anchors)
+	return etl.WritePostalCSV(f, "CA", anchors)
 }

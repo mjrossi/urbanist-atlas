@@ -266,7 +266,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {
-		got[a.ZCTA] = a
+		got[a.PostalCode] = a
 	}
 
 	type want struct {
@@ -299,8 +299,8 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 	}
 	// Output is sorted by ZCTA for deterministic CSV emission.
 	for i := 1; i < len(anchors); i++ {
-		if anchors[i-1].ZCTA > anchors[i].ZCTA {
-			t.Errorf("anchors not sorted: %q before %q", anchors[i-1].ZCTA, anchors[i].ZCTA)
+		if anchors[i-1].PostalCode > anchors[i].PostalCode {
+			t.Errorf("anchors not sorted: %q before %q", anchors[i-1].PostalCode, anchors[i].PostalCode)
 		}
 	}
 }
@@ -323,12 +323,12 @@ func TestWritePostalCodesCSV_MergesAndDedupsWithZCTAWinning(t *testing.T) {
 	// ASC by postal_code, with the ZCTA-source anchor for 10001
 	// winning the tie against the HUD entry.
 	zcta := []PostalAnchor{
-		{ZCTA: "10001", AnchorSlug: "manhattan", Reason: "nyc-borough"},
-		{ZCTA: "20002", AnchorSlug: "washington-dc", Reason: "city-leaf"},
+		{PostalCode: "10001", AnchorSlug: "manhattan", Reason: "nyc-borough"},
+		{PostalCode: "20002", AnchorSlug: "washington-dc", Reason: "city-leaf"},
 	}
 	hud := []PostalAnchor{
-		{ZCTA: "20811", AnchorSlug: "washington-dc-metro", Reason: "hud:msa"},
-		{ZCTA: "10001", AnchorSlug: "nyc-metro", Reason: "hud:msa"},
+		{PostalCode: "20811", AnchorSlug: "washington-dc-metro", Reason: "hud:msa"},
+		{PostalCode: "10001", AnchorSlug: "nyc-metro", Reason: "hud:msa"},
 	}
 	var buf strings.Builder
 	if err := WritePostalCodesCSV(&buf, zcta, hud); err != nil {
@@ -349,8 +349,8 @@ func TestWritePostalCodesCSV_NilHUDPreservesZCTAOnlyBehavior(t *testing.T) {
 	// pass nil for the HUD slice and get ZCTA-only output sorted by
 	// postal code.
 	zcta := []PostalAnchor{
-		{ZCTA: "20002", AnchorSlug: "washington-dc"},
-		{ZCTA: "10001", AnchorSlug: "manhattan"},
+		{PostalCode: "20002", AnchorSlug: "washington-dc"},
+		{PostalCode: "10001", AnchorSlug: "manhattan"},
 	}
 	var buf strings.Builder
 	if err := WritePostalCodesCSV(&buf, zcta, nil); err != nil {

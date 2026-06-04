@@ -29,8 +29,8 @@ var fsaToLeaf = map[string]string{
 // CMA editorial overrides (3-digit StatsCan CMA UID → curated
 // slug/name/kind) used to live here as a compiled
 // `cmaOverrides` map. They were lifted into data —
-// api/seed/regions_ca_cma_overrides.toml, read by ReadCMAOverrides in
-// output.go and applied by assignCMAs — so a CA metro slug correction
+// api/seed/regions_ca_cma_overrides.toml, read by etl.ReadOverrides
+// and applied by assignCMAs — so a CA metro slug correction
 // is a data edit (no Go change + recompile), symmetric with the US
 // side's regions_us_msa_overrides.toml. See ETL-04b / plan 03-04.
 

@@ -2,15 +2,14 @@ package ca
 
 import (
 	"sort"
+
+	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
 
-// PostalAnchor records the smallest-anchor decision for one FSA.
-// Reason is one of "city-leaf", "cma", "province", "unknown".
-type PostalAnchor struct {
-	FSA        string
-	AnchorSlug string
-	Reason     string
-}
+// PostalAnchor aliases the shared etl.PostalAnchor: the smallest-anchor
+// decision for one FSA. PostalCode is the FSA; Reason is one of
+// "city-leaf", "cma", "cma-portion", "province", "unknown".
+type PostalAnchor = etl.PostalAnchor
 
 // Crosswalk runs the smallest-anchor algorithm over the FSA rows:
 //
@@ -33,7 +32,7 @@ func Crosswalk(fsas []FSARow, cmaSlugByFSA map[string]string, portionByCMA map[s
 	reasonCounts := map[string]int{}
 
 	for _, f := range fsas {
-		anchor := PostalAnchor{FSA: f.CFSAUID, Reason: "unknown"}
+		anchor := PostalAnchor{PostalCode: f.CFSAUID, Reason: "unknown"}
 		switch {
 		case fsaToLeaf[f.CFSAUID] != "":
 			anchor.AnchorSlug = fsaToLeaf[f.CFSAUID]

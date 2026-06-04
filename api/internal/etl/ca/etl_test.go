@@ -137,7 +137,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 	anchors, reasons := Crosswalk(fsas, cmaSlugByFSA, portionByCMA)
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {
-		got[a.FSA] = a
+		got[a.PostalCode] = a
 	}
 
 	type want struct {
@@ -171,8 +171,8 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 	}
 	// Anchors sorted by FSA for deterministic CSV emission.
 	for i := 1; i < len(anchors); i++ {
-		if anchors[i-1].FSA > anchors[i].FSA {
-			t.Errorf("anchors not sorted: %q before %q", anchors[i-1].FSA, anchors[i].FSA)
+		if anchors[i-1].PostalCode > anchors[i].PostalCode {
+			t.Errorf("anchors not sorted: %q before %q", anchors[i-1].PostalCode, anchors[i].PostalCode)
 		}
 	}
 }

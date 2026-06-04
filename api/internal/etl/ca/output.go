@@ -1,9 +1,7 @@
 package ca
 
 import (
-	"encoding/csv"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 
@@ -226,20 +224,3 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 # provinces) and regions_ca.toml (children: curated cities). Cross-file
 # parent resolution lives in internal/seedfiles/regions.go.
 `
-
-// WritePostalCodesCSV emits postal_codes_ca.csv deterministically:
-// rows sorted by FSA ASC, LF line endings, trailing newline.
-func WritePostalCodesCSV(w io.Writer, anchors []PostalAnchor) error {
-	sort.Slice(anchors, func(i, j int) bool { return anchors[i].FSA < anchors[j].FSA })
-	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"postal_code", "country", "leaf_region_slug"}); err != nil {
-		return err
-	}
-	for _, a := range anchors {
-		if err := cw.Write([]string{a.FSA, "CA", a.AnchorSlug}); err != nil {
-			return err
-		}
-	}
-	cw.Flush()
-	return cw.Error()
-}

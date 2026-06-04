@@ -1,7 +1,6 @@
 package us
 
 import (
-	"encoding/csv"
 	"fmt"
 	"io"
 	"sort"
@@ -17,8 +16,8 @@ import (
 // replaced with the curated form (e.g., "nyc-metro").
 //
 // There is no kind override: every US CBSA is editorially a us:metro,
-// which WriteMSAsTOML emits as a literal. If a future CBSA ever needs a
-// different kind, add a Kind field here then — until that concrete need
+// which BuildRegionRows sets and etl.WriteRegionsTOML emits. If a future
+// CBSA ever needs a different kind, add a Kind field here then — until that concrete need
 // exists, the symmetry with CA's CMAOverride (which does carry Kind, for
 // Metro Vancouver → ca:regional-district) is deliberately left unbuilt
 // per the project's no-preemptive-abstraction convention.
@@ -269,43 +268,30 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 `
 
 // WritePostalCodesCSV emits the postal_codes_us.csv file
-// deterministically: rows sorted by postal_code ASC, LF line endings,
-// trailing newline. Accepts two anchor sources — the primary ZCTA
-// pass (slice #7.5.3) and the HUD non-ZCTA backfill (slice #7.5.5) —
-// and merges them with ZCTA winning any (country, postal_code) tie.
-// Pass nil or an empty slice for hudAnchors when running without HUD
-// data; the output reduces to ZCTA-only in that case, matching the
-// pre-#7.5.5 behavior.
+// deterministically. It merges the two anchor sources — the primary
+// ZCTA pass (slice #7.5.3) and the HUD non-ZCTA backfill (slice #7.5.5)
+// — with ZCTA winning any (country, postal_code) tie, then hands the
+// deduped set to the shared etl.WritePostalCSV writer (sorted by
+// postal_code ASC, LF endings, trailing newline). Pass nil or an empty
+// slice for hudAnchors when running without HUD data; the output
+// reduces to ZCTA-only in that case, matching the pre-#7.5.5 behavior.
 func WritePostalCodesCSV(w io.Writer, zctaAnchors, hudAnchors []PostalAnchor) error {
 	// Build a dedup map keyed by postal code; ZCTA inserted first so
 	// HUD rows with the same key are silently dropped at insertion.
 	merged := make(map[string]PostalAnchor, len(zctaAnchors)+len(hudAnchors))
 	for _, a := range zctaAnchors {
-		merged[a.ZCTA] = a
+		merged[a.PostalCode] = a
 	}
 	for _, a := range hudAnchors {
-		if _, ok := merged[a.ZCTA]; ok {
+		if _, ok := merged[a.PostalCode]; ok {
 			continue
 		}
-		merged[a.ZCTA] = a
+		merged[a.PostalCode] = a
 	}
 
-	zips := make([]string, 0, len(merged))
-	for z := range merged {
-		zips = append(zips, z)
+	deduped := make([]PostalAnchor, 0, len(merged))
+	for _, a := range merged {
+		deduped = append(deduped, a)
 	}
-	sort.Strings(zips)
-
-	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"postal_code", "country", "leaf_region_slug"}); err != nil {
-		return err
-	}
-	for _, z := range zips {
-		a := merged[z]
-		if err := cw.Write([]string{a.ZCTA, "US", a.AnchorSlug}); err != nil {
-			return err
-		}
-	}
-	cw.Flush()
-	return cw.Error()
+	return etl.WritePostalCSV(w, "US", deduped)
 }
