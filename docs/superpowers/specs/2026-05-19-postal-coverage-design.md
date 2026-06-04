@@ -715,9 +715,9 @@ directly but not FSA → CMA. A coarse hand-coded prefix table in
 `api/internal/etl/ca/mappings.go` (M, L1-L6, L8-L9, H, V5-V7,
 K1-K2, J8-J9, T2-T3, T5-T6) covers the major metros (Toronto,
 Hamilton, Montréal, Vancouver, Ottawa-Gatineau, Calgary, Edmonton).
-FSAs outside those prefixes fall through to province. A future
-slice can replace the prefix table with per-FSA spatial join data
-when access improves.
+FSAs outside those prefixes fall through to province. **(Superseded
+in #81: the prefix table was replaced by a per-FSA max-overlap spatial
+join of the boundary polygons — see Open Question #4 below.)**
 
 **Verification (as observed):**
 
@@ -754,12 +754,19 @@ when access improves.
    didn't warrant a separate TOML file). The dichotomy is
    intentional: US has 393 MSAs with editorial open-endedness;
    CA has 41 CMAs and the override set is bounded.
-4. **PCCF for finer CA granularity.** The current FSA-prefix
-   mapping is approximate (e.g., L7 straddles Toronto and Hamilton
-   CMAs but maps to province). A future slice could replace it
-   with per-FSA spatial join data via either (a) shelling out to
-   a Python+GeoPandas script during ETL or (b) negotiating PCCF
-   Open Licence access. Tracked but not blocking Phase 1.
+4. **PCCF for finer CA granularity — RESOLVED (#81).** The
+   FSA-prefix mapping was approximate (L7 straddled Toronto and
+   Hamilton but mapped to province; Victoria and Nanaimo are both V9
+   and a prefix rule can't separate them). It was replaced by a
+   per-FSA **max-overlap spatial join** of the FSA + CMA boundary
+   polygons (`api/internal/etl/ca/spatial.go`), using pure-Go geometry
+   libraries (`github.com/jonas-p/go-shp` to read the `.shp` geometry
+   the DBF pass ignored + `github.com/ctessum/polyclip-go` for
+   polygon-intersection area) — neither the Python+GeoPandas detour
+   nor PCCF Open Licence access was needed. All ~41 CMAs now resolve;
+   ~768 FSAs re-anchored province → CMA. `regions_ca_cmas.toml` is
+   unchanged (all CMAs were already emitted; only the postal routing
+   improved).
 5. **Phase 2 / API-keys impact**: none. The smallest-anchor model
    doesn't change the wire contract; lookup responses look the
    same to clients. Anchors that resolve to MSA or state regions

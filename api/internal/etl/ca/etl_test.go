@@ -152,60 +152,38 @@ func TestAssignCMAs_OverrideAndParents(t *testing.T) {
 	}
 }
 
-func TestLookupCMAPrefix(t *testing.T) {
-	known := map[string]bool{
-		"toronto-cma":         true,
-		"montreal-cma":        true,
-		"ottawa-gatineau-cma": true,
-		// hamilton-cma intentionally absent — even though fsaPrefixToCMA
-		// maps L8/L9 to it, this verifies the known-filter trims.
-	}
-
-	cases := []struct {
-		fsa  string
-		want string
-	}{
-		{"M5V", "toronto-cma"},         // M (1-char) wins
-		{"L1B", "toronto-cma"},         // L1 (2-char) takes priority over L (no rule)
-		{"L8N", ""},                    // L8 maps but not in `known`
-		{"H2X", "montreal-cma"},        // H (1-char) wins
-		{"K1A", "ottawa-gatineau-cma"}, // K1 (2-char) wins
-		{"A0A", ""},                    // No mapping at all
-		{"", ""},
-		{"V", ""}, // V alone isn't in fsaPrefixToCMA (only V5/V6/V7)
-	}
-	for _, c := range cases {
-		got := lookupCMAPrefix(c.fsa, known)
-		if got != c.want {
-			t.Errorf("lookupCMAPrefix(%q) = %q, want %q", c.fsa, got, c.want)
-		}
-	}
-}
-
 func TestCrosswalk_ReasonPriority(t *testing.T) {
 	fsas := []FSARow{
-		{CFSAUID: "M5V", PRUID: "35"}, // curated city leaf → toronto
-		{CFSAUID: "M3K", PRUID: "35"}, // M (no leaf) → toronto-cma via prefix
+		{CFSAUID: "M5V", PRUID: "35"}, // curated city leaf → toronto (outranks its CMA)
+		{CFSAUID: "M3K", PRUID: "35"}, // spatial join → toronto-cma
 		{CFSAUID: "H2X", PRUID: "24"}, // city-leaf → montreal
-		{CFSAUID: "L1B", PRUID: "35"}, // L1 prefix → toronto-cma
-		{CFSAUID: "L8N", PRUID: "35"}, // L8 prefix → hamilton-cma (not in known) → province
-		{CFSAUID: "A0A", PRUID: "10"}, // no prefix → province (nl-province)
-		{CFSAUID: "K1A", PRUID: "35"}, // K1 prefix, Ontario side → ottawa on-portion
-		{CFSAUID: "X9X", PRUID: "99"}, // no leaf, no prefix, unknown province → unknown
+		{CFSAUID: "V8W", PRUID: "59"}, // spatial join → victoria-cma (mid-size metro)
+		{CFSAUID: "B3H", PRUID: "12"}, // no join entry → province (ns)
+		{CFSAUID: "A0A", PRUID: "10"}, // no join entry → province (nl-province)
+		{CFSAUID: "K1A", PRUID: "35"}, // ottawa-gatineau, Ontario side → on-portion
+		{CFSAUID: "J8X", PRUID: "24"}, // ottawa-gatineau, Quebec side → qc-portion
+		{CFSAUID: "X9X", PRUID: "99"}, // no join, unknown province → unknown
 	}
-	known := map[string]bool{
-		"toronto-cma":         true,
-		"montreal-cma":        true,
-		"ottawa-gatineau-cma": true,
-		// hamilton-cma intentionally absent
+	// cmaSlugByFSA is what ca.go builds from the max-overlap spatial join,
+	// already filtered to generated CMA slugs (an FSA whose CMA wasn't
+	// emitted is simply absent → it falls through to province). M5V/H2X
+	// also overlap CMAs, but the city-leaf rule outranks the CMA.
+	cmaSlugByFSA := map[string]string{
+		"M5V": "toronto-cma",
+		"M3K": "toronto-cma",
+		"H2X": "montreal-cma",
+		"V8W": "victoria-cma",
+		"K1A": "ottawa-gatineau-cma",
+		"J8X": "ottawa-gatineau-cma",
 	}
-	// Ottawa-Gatineau is multi-province: its Ontario FSAs route to the
-	// on-portion rather than the bare umbrella.
+	// Ottawa-Gatineau is multi-province: its FSAs route to the per-province
+	// portion rather than the bare umbrella.
 	portionByCMA := map[string]string{
 		"ottawa-gatineau-cma:35": "ottawa-gatineau-cma-on",
+		"ottawa-gatineau-cma:24": "ottawa-gatineau-cma-qc",
 	}
 
-	anchors, reasons := Crosswalk(fsas, known, portionByCMA)
+	anchors, reasons := Crosswalk(fsas, cmaSlugByFSA, portionByCMA)
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {
 		got[a.FSA] = a
@@ -218,10 +196,11 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"M5V": {"toronto", "city-leaf"},
 		"M3K": {"toronto-cma", "cma"},
 		"H2X": {"montreal", "city-leaf"},
-		"L1B": {"toronto-cma", "cma"},
-		"L8N": {"on", "province"},
+		"V8W": {"victoria-cma", "cma"},
+		"B3H": {"ns", "province"},
 		"A0A": {"nl-province", "province"},
 		"K1A": {"ottawa-gatineau-cma-on", "cma-portion"},
+		"J8X": {"ottawa-gatineau-cma-qc", "cma-portion"},
 	}
 	for fsa, w := range expectations {
 		a, ok := got[fsa]

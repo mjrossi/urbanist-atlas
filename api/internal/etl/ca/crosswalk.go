@@ -15,18 +15,18 @@ type PostalAnchor struct {
 // Crosswalk runs the smallest-anchor algorithm over the FSA rows:
 //
 //  1. Exact FSA → curated city leaf (fsaToLeaf) — e.g., M5V → toronto.
-//  2. FSA prefix (2 then 1 char) → curated CMA slug
-//     (fsaPrefixToCMA) — e.g., M3K → toronto-cma via the "M" rule.
-//     The CMA must be in knownCMASlugs (i.e., one we actually wrote
-//     to regions_ca_cmas.toml).
+//  2. FSA → curated CMA slug via the max-overlap spatial join
+//     (cmaSlugByFSA, built in ca.go from SpatialJoinFSAToCMA) — e.g.,
+//     V8W → victoria-cma. Multi-province CMAs route to the FSA's own
+//     province portion.
 //  3. Province via PRUID (provinceUIDToSlug) — e.g., A0A → nl-province.
 //  4. Otherwise "unknown" (FSA is dropped from the output and counted
 //     in the unknown bucket).
 //
-// knownCMASlugs is built by the caller from the generated CMA list so
-// prefix overrides that point at a CMA we filtered out don't silently
-// fail.
-func Crosswalk(fsas []FSARow, knownCMASlugs map[string]bool, portionByCMA map[string]string) ([]PostalAnchor, map[string]int) {
+// cmaSlugByFSA contains only slugs the caller verified are in the
+// generated CMA list, so an FSA whose max-overlap CMA was somehow not
+// emitted falls through to province rather than dangling.
+func Crosswalk(fsas []FSARow, cmaSlugByFSA map[string]string, portionByCMA map[string]string) ([]PostalAnchor, map[string]int) {
 	sort.Slice(fsas, func(i, j int) bool { return fsas[i].CFSAUID < fsas[j].CFSAUID })
 
 	out := make([]PostalAnchor, 0, len(fsas))
@@ -39,7 +39,7 @@ func Crosswalk(fsas []FSARow, knownCMASlugs map[string]bool, portionByCMA map[st
 			anchor.AnchorSlug = fsaToLeaf[f.CFSAUID]
 			anchor.Reason = "city-leaf"
 		default:
-			if slug := lookupCMAPrefix(f.CFSAUID, knownCMASlugs); slug != "" {
+			if slug := cmaSlugByFSA[f.CFSAUID]; slug != "" {
 				// Multi-province CMA: route to the FSA's own-province
 				// portion so the ancestor walk reaches only its own
 				// province (leak-free). Single-province CMAs have no portion
@@ -64,21 +64,4 @@ func Crosswalk(fsas []FSARow, knownCMASlugs map[string]bool, portionByCMA map[st
 		out = append(out, anchor)
 	}
 	return out, reasonCounts
-}
-
-// lookupCMAPrefix tries the 2-character prefix first, then the
-// 1-character prefix. Returns "" if no match (or the match points at
-// a CMA we didn't generate, e.g., the curated slug doesn't exist).
-func lookupCMAPrefix(fsa string, known map[string]bool) string {
-	if len(fsa) >= 2 {
-		if slug := fsaPrefixToCMA[fsa[:2]]; slug != "" && known[slug] {
-			return slug
-		}
-	}
-	if len(fsa) >= 1 {
-		if slug := fsaPrefixToCMA[fsa[:1]]; slug != "" && known[slug] {
-			return slug
-		}
-	}
-	return ""
 }

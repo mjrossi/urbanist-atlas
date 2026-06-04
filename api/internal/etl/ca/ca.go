@@ -17,17 +17,17 @@
 //     "<slugified-name>-cma") and parents derived from the CMA's
 //     constituent provinces.
 //   - postal_codes_ca.csv — FSA → smallest-curated-anchor slug
-//     (curated city leaf → CMA via prefix rule → province).
+//     (curated city leaf → CMA via spatial join → province).
 //
 // Importing the package (or blank-importing it as cmd/server/etl.go
 // does) registers the CA plan with etl.Plans via init().
 //
-// FSA → CMA mapping caveat: without StatsCan's restricted-licence
-// Postal Code Conversion File (PCCF) we can't do per-FSA spatial join.
-// Slice #7.5.4 uses a coarse FSA prefix → CMA hand-mapping in
-// mappings.go covering Toronto, Montréal, Vancouver, Ottawa-Gatineau,
-// Calgary, and Edmonton; future slices can replace this with a
-// per-FSA mapping when PCCF or spatial-join data becomes available.
+// FSA → CMA assignment: each FSA is anchored to the CMA it overlaps
+// most by area, computed by a max-overlap spatial join of the two
+// boundary files' polygon geometry (spatial.go). This replaced an
+// earlier coarse FSA-prefix → CMA table that covered only the seven
+// biggest metros; the spatial join resolves all ~41 CMAs without the
+// restricted-licence Postal Code Conversion File (PCCF).
 package ca
 
 import (
@@ -88,8 +88,10 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 
 	assignments := assignCMAs(cmas, overrides)
 	knownCMASlugs := make(map[string]bool, len(assignments))
+	slugByCMAUID := make(map[string]string, len(assignments))
 	for _, a := range assignments {
 		knownCMASlugs[a.Slug] = true
+		slugByCMAUID[a.UID] = a.Slug
 	}
 	// Expand multi-province CMAs (Ottawa-Gatineau) into per-province
 	// portions + the portion anchor lookup the FSA crosswalk routes through.
@@ -119,7 +121,23 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl ca: parsed FSA boundary", "fsas", len(fsas), "path", fsaZipPath)
 
-	anchors, reasons := Crosswalk(fsas, knownCMASlugs, portionByCMA)
+	// Max-overlap spatial join of FSA polygons against CMA polygons
+	// (reads the .shp geometry the DBF parse above ignores). Resolve the
+	// returned CMA UIDs to region slugs, keeping only CMAs we actually
+	// generated so an unmapped UID falls through to province.
+	cmaUIDByFSA, err := SpatialJoinFSAToCMA(fsaZipPath, cmaZipPath)
+	if err != nil {
+		return err
+	}
+	cmaSlugByFSA := make(map[string]string, len(cmaUIDByFSA))
+	for fsa, uid := range cmaUIDByFSA {
+		if slug := slugByCMAUID[uid]; slug != "" && knownCMASlugs[slug] {
+			cmaSlugByFSA[fsa] = slug
+		}
+	}
+	logger.Info("etl ca: spatial join FSA→CMA", "assigned", len(cmaSlugByFSA), "of_fsas", len(fsas))
+
+	anchors, reasons := Crosswalk(fsas, cmaSlugByFSA, portionByCMA)
 	csvPath := filepath.Join(outDir, "postal_codes_ca.csv")
 	if err := writeCSVToFile(csvPath, anchors); err != nil {
 		return err
