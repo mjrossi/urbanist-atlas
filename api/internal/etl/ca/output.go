@@ -5,12 +5,10 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
-	"github.com/pelletier/go-toml/v2"
 )
 
 // CMAOverride is one editorial override read from
@@ -38,28 +36,6 @@ type CMAOverride struct {
 	Slug string `toml:"slug"`
 	Name string `toml:"name"`
 	Kind string `toml:"kind"`
-}
-
-type overrideFile struct {
-	Overrides []CMAOverride `toml:"override"`
-}
-
-// ReadCMAOverrides parses the overrides TOML file. Missing file is
-// not an error — the file is optional, and the auto-gen flow has a
-// sensible default for every CMA. Mirrors us.ReadMSAOverrides.
-func ReadCMAOverrides(path string) ([]CMAOverride, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read overrides: %w", err)
-	}
-	var f overrideFile
-	if err := toml.Unmarshal(data, &f); err != nil {
-		return nil, fmt.Errorf("parse overrides: %w", err)
-	}
-	return f.Overrides, nil
 }
 
 // CMAAssignment captures the per-CMA slug + kind + parents that the

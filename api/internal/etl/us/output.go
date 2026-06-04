@@ -5,12 +5,10 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
-	"github.com/pelletier/go-toml/v2"
 )
 
 // MSAOverride is one editorial override read from
@@ -38,28 +36,6 @@ type MSAOverride struct {
 	// nyc-metro → ["nj", "ny"]), matching what the auto-gen path computes
 	// for non-overridden multi-state metros.
 	RollupStates []string `toml:"rollup_states"`
-}
-
-type overrideFile struct {
-	Overrides []MSAOverride `toml:"override"`
-}
-
-// ReadMSAOverrides parses the overrides TOML file. Missing file is
-// not an error — the file is optional, and the auto-gen flow has a
-// sensible default for every MSA.
-func ReadMSAOverrides(path string) ([]MSAOverride, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read overrides: %w", err)
-	}
-	var f overrideFile
-	if err := toml.Unmarshal(data, &f); err != nil {
-		return nil, fmt.Errorf("parse overrides: %w", err)
-	}
-	return f.Overrides, nil
 }
 
 // AssignMSASlugs returns (slug, displayName, parents) for every MSA,

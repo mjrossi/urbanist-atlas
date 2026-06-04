@@ -80,7 +80,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	logger.Info("etl ca: parsed CMA boundary", "cmas", len(cmas), "path", cmaZipPath)
 
 	overridesPath := filepath.Join(outDir, "regions_ca_cma_overrides.toml")
-	overrides, err := ReadCMAOverrides(overridesPath)
+	overrides, err := etl.ReadOverrides[CMAOverride](overridesPath)
 	if err != nil {
 		return err
 	}
