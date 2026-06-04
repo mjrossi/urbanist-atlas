@@ -159,6 +159,19 @@ extracted multi-MB artifacts. The FSA `.shp` is the bulk of the zip
 (~300MB extracted), read once per postal regenerate; this never runs
 in the server, only operator-side ETL.
 
+> **Overlap-floor calibration (re-check on any CA boundary vintage
+> bump).** The FSA→CMA join drops sub-threshold boundary slivers via
+> `minOverlapFraction` in `spatial.go` (0.1 % of FSA area), calibrated to
+> the *2021*-vintage overlap distribution: noise slivers cluster at
+> ≤1e-4 % with a completely empty gap up to the ≥0.1 % genuine overlaps,
+> so 0.1 % sits in that gap. A new boundary vintage can shift that
+> distribution, and **CI cannot catch it** — the golden-determinism test
+> runs on synthetic fixtures, and the 296 MB FSA `.shp` is never fetched
+> in CI. So when bumping the CA boundary vintage, re-measure the
+> best-overlap histogram over the real data, confirm the noise/signal gap
+> still brackets 0.1 % (retune the constant if it moved), and only then
+> trust the regenerated `postal_codes_ca.csv`.
+
 ### Manual refresh workflow
 
 ```sh

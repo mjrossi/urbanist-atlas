@@ -788,6 +788,22 @@ join of the boundary polygons — see Open Question #4 below.)**
    ≤1e-4 % noise cluster and the ≥0.1 % genuine-overlap cluster. Net effect
    over the 2021 vintage: 95 FSAs corrected, `regions_ca_cmas.toml` still
    unchanged.
+
+   **Alternative considered — point-in-polygon (rejected).** A simpler join
+   would assign each FSA to whichever CMA contains a single representative
+   interior point, dropping the polygon clipping — and with it the
+   large-coordinate translation, the even-odd area math, and the noise
+   floor (~a third of `spatial.go`, and the three subtlest pieces — which
+   are exactly the (a)/(b)/(c) defects above). Max-overlap area was chosen
+   deliberately: it gives the principled answer for FSAs straddling two
+   adjacent metros (anchor to the larger overlap) and for multi-part
+   coastal FSAs (BC's V8/V9 archipelagos) whose interior point can land on
+   an uninhabited islet. The two approaches agree on the ~1,500 FSAs that
+   sit cleanly inside or outside a CMA and differ only on the ~120
+   partial-overlap FSAs, where "most of the FSA" is the defensible rule.
+   Recorded so the extra geometry reads as a deliberate trade-off, not
+   accidental complexity; a future simplification should re-weigh it rather
+   than assume the area math is incidental.
 5. **Phase 2 / API-keys impact**: none. The smallest-anchor model
    doesn't change the wire contract; lookup responses look the
    same to clients. Anchors that resolve to MSA or state regions

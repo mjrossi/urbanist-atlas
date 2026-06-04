@@ -26,6 +26,22 @@ import (
 // only the seven biggest metros: a prefix rule can't separate adjacent
 // CMAs sharing a prefix (Victoria and Nanaimo are both V9), whereas the
 // spatial join resolves all ~41 CMAs deterministically.
+//
+// Why max-overlap area, not a simpler point-in-polygon test: a
+// representative-interior-point lookup (which CMA contains the FSA's
+// interior point) was considered and rejected. It would drop the polygon
+// clipping entirely — and with it the large-coordinate translation, the
+// even-odd area math, and the noise floor below — for roughly a third
+// less code. Area-overlap is the deliberate choice because it gives the
+// principled answer for the FSAs that actually motivate this code: an FSA
+// straddling two adjacent metros anchors to the one it sits in *most*, and
+// a multi-part coastal FSA (BC's V8/V9 archipelagos) whose interior point
+// could land on an uninhabited islet is assigned by total land overlap,
+// not by where one point happens to fall. The two approaches agree on the
+// ~1,500 FSAs that sit cleanly inside or outside a CMA and differ only on
+// the ~120 partial-overlap FSAs, where "most of the FSA" is the defensible
+// rule. A future maintainer tempted to simplify to point-in-polygon should
+// weigh that trade-off, not just the line count.
 
 // cmaGeometry is the dissolved boundary of one Census Metropolitan Area —
 // every type-'B' shapefile record sharing a CMAUID (a multi-province CMA
