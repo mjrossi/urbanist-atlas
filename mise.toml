@@ -24,6 +24,10 @@ python = "3.14"
 "aqua:sqlc-dev/sqlc" = "1.28.0"
 "aqua:pressly/goose" = "3.24.0"
 "aqua:casey/just" = "1.51.0"
+# golangci-lint v2 is the api/ lint + format gate (govet + staticcheck +
+# gofumpt + goimports are all bundled). Config lives in api/.golangci.yml;
+# run via `just api-lint` / `just api-fmt`.
+"aqua:golangci/golangci-lint" = "2.12.2"
 "go:honnef.co/go/tools/cmd/staticcheck" = "2025.1.1"
 "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" = "2.7.0"
 # Python `openpyxl` is a library (no CLI entry point) so it can't be

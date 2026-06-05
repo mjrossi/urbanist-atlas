@@ -35,10 +35,10 @@ api-run:
 api-build:
     cd api && mkdir -p bin && go build -o bin/urbanist-atlas-server ./cmd/server
 
-# format Go code
+# format Go code (gofumpt + goimports, configured in api/.golangci.yml)
 [group('api')]
 api-fmt:
-    cd api && gofmt -w .
+    cd api && mise exec -- golangci-lint fmt
 
 # fail if any Go file would be rewritten by gofmt. `gofmt -l` lists
 # offenders and exits 0 even on drift, so the explicit non-empty
@@ -59,6 +59,21 @@ api-vet:
 [doc('run staticcheck (mise-pinned) over the api module')]
 api-staticcheck:
     cd api && mise exec -- staticcheck ./...
+
+# golangci-lint v2 over the api module (config: api/.golangci.yml). Bundles
+# govet + staticcheck + the gofumpt/goimports format check alongside the
+# curated standardization linter set, so it is the single api/ lint gate.
+[group('api')]
+[doc('run golangci-lint (mise-pinned) over the api module')]
+api-lint:
+    cd api && mise exec -- golangci-lint run
+
+# golangci-lint run --fix — apply every auto-fixable finding (and the
+# gofumpt/goimports formatting) in place.
+[group('api')]
+[doc('apply golangci-lint auto-fixes over the api module')]
+api-lint-fix:
+    cd api && mise exec -- golangci-lint run --fix
 
 # go test ./... with race detector, no cache (matches CI)
 [group('api')]
