@@ -478,7 +478,7 @@ func TestDeriveSlug(t *testing.T) {
 }
 
 func TestApiError_IncludesStatusAndBody(t *testing.T) {
-	resp := &http.Response{StatusCode: 502, Body: io.NopCloser(strings.NewReader("bad gateway"))}
+	resp := &http.Response{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader("bad gateway"))}
 	err := apiError("test op", resp)
 	if !strings.Contains(err.Error(), "502") || !strings.Contains(err.Error(), "bad gateway") {
 		t.Fatalf("apiError lost detail: %v", err)

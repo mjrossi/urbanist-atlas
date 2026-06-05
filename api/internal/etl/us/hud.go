@@ -10,6 +10,7 @@ package us
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -100,7 +101,7 @@ func ParseHUDZipCounty(r io.Reader) ([]HUDZipCounty, error) {
 	lineNum := 1
 	for {
 		fields, err := cr.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

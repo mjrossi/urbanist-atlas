@@ -1,6 +1,7 @@
 package us
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"log/slog"
@@ -59,7 +60,7 @@ func TestRegenerate_GoldenDeterminism(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read golden %s (run with -update first): %v", name, err)
 		}
-		if string(got) != string(want) {
+		if !bytes.Equal(got, want) {
 			t.Errorf("%s drifted from golden. Run `go test ./internal/etl/us -run GoldenDeterminism -update` and review the diff.", name)
 		}
 	}

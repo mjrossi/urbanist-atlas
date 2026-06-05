@@ -3,6 +3,7 @@ package ca
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -36,7 +37,7 @@ func ParseFSAs(zipPath string) ([]FSARow, error) {
 	rows := make([]FSARow, 0, 1700)
 	for {
 		row, err := dbf.next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

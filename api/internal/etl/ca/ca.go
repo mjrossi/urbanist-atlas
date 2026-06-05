@@ -27,7 +27,7 @@
 // boundary files' polygon geometry (spatial.go). This replaced an
 // earlier coarse FSA-prefix → CMA table that covered only the seven
 // biggest metros; the spatial join resolves all ~41 CMAs without the
-// restricted-licence Postal Code Conversion File (PCCF).
+// restricted-license Postal Code Conversion File (PCCF).
 package ca
 
 import (

@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -48,7 +49,7 @@ func ParseCMAs(zipPath string) ([]CMA, error) {
 	uidOrder := []string{}
 	for {
 		row, err := dbf.next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

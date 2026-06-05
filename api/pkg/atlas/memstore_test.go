@@ -48,7 +48,7 @@ func TestMemStore_GraphWalk(t *testing.T) {
 func TestMemStore_ResolveLeafRegion_NotFound(t *testing.T) {
 	s := NewMemStore()
 	_, err := s.ResolveLeafRegion(context.Background(), "US", "00000")
-	if err != ErrPostalCodeNotFound {
+	if !errors.Is(err, ErrPostalCodeNotFound) {
 		t.Errorf("err = %v, want ErrPostalCodeNotFound", err)
 	}
 }
