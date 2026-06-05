@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
 import { ApiError } from '../lib/api.ts';
 import { QueryState } from './QueryState.tsx';
 
-function mkQuery<T>(partial: Partial<UseQueryResult<T, ApiError>>): UseQueryResult<T, ApiError> {
+function mkQuery<T>(
+  partial: Partial<UseQueryResult<T, ApiError>>,
+): UseQueryResult<T, ApiError> {
   return partial as UseQueryResult<T, ApiError>;
 }
 
@@ -41,7 +44,7 @@ describe('QueryState', () => {
         {(d) => <p>{d}</p>}
       </QueryState>,
     );
-    expect(screen.queryByRole('alert')).not.toBeNull();
+    expect(screen.getByRole('alert')).not.toBeNull();
   });
 
   it('uses the error callback when it returns JSX', () => {
@@ -54,7 +57,7 @@ describe('QueryState', () => {
         {(d) => <p>{d}</p>}
       </QueryState>,
     );
-    expect(screen.queryByText('Custom 404')).not.toBeNull();
+    expect(screen.getByText('Custom 404')).not.toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -73,7 +76,7 @@ describe('QueryState', () => {
         )}
       </QueryState>,
     );
-    expect(screen.queryByText('Nothing here')).not.toBeNull();
+    expect(screen.getByText('Nothing here')).not.toBeNull();
   });
 
   it('renders children when data is present and not empty', () => {
@@ -82,7 +85,7 @@ describe('QueryState', () => {
         {(d) => <p>{d}</p>}
       </QueryState>,
     );
-    expect(screen.queryByText('hello')).not.toBeNull();
+    expect(screen.getByText('hello')).not.toBeNull();
   });
 
   it('applies an extra className to the default loading container', () => {

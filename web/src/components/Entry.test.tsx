@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { Entry } from './Entry.tsx';
+import { describe, expect, it } from 'vitest';
+
 import type { Org } from '../lib/api.ts';
+import { Entry } from './Entry.tsx';
 
 function makeOrg(overrides: Partial<Org> = {}): Org {
   return {
@@ -48,11 +49,7 @@ describe('Entry', () => {
   });
 
   it('renders each tag in the .tag-list', () => {
-    renderEntry(
-      <Entry
-        org={makeOrg({ tags: ['cycling', 'policy', 'grassroots'] })}
-      />,
-    );
+    renderEntry(<Entry org={makeOrg({ tags: ['cycling', 'policy', 'grassroots'] })} />);
     expect(screen.getByText('cycling')).toBeDefined();
     expect(screen.getByText('policy')).toBeDefined();
     expect(screen.getByText('grassroots')).toBeDefined();
@@ -105,18 +102,12 @@ describe('Entry', () => {
   });
 
   it('omits the Matched-via footer when matchedRegionSlugs is empty', () => {
-    const { container } = renderEntry(
-      <Entry org={makeOrg()} matchedRegionSlugs={[]} />,
-    );
+    const { container } = renderEntry(<Entry org={makeOrg()} matchedRegionSlugs={[]} />);
     expect(container.querySelector('.foot')).toBeNull();
   });
 
   it('percent-encodes the slug in the detail link', () => {
-    renderEntry(
-      <Entry
-        org={makeOrg({ slug: 'weird slug', name: 'Weird Org' })}
-      />,
-    );
+    renderEntry(<Entry org={makeOrg({ slug: 'weird slug', name: 'Weird Org' })} />);
     const link = screen.getByRole('link', { name: 'Weird Org' });
     expect(link.getAttribute('href')).toBe('/orgs/weird%20slug');
   });

@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { LookupResult } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
@@ -107,7 +108,7 @@ describe('Results', () => {
     ).toBeDefined();
     // Local + Regional + State / Provincial section h2s.
     const h2s = screen.getAllByRole('heading', { level: 2 });
-    const h2Text = h2s.map((h) => h.textContent ?? '').join(' | ');
+    const h2Text = h2s.map((h) => h.textContent).join(' | ');
     expect(h2Text).toMatch(/local/i);
     expect(h2Text).toMatch(/regional/i);
     expect(h2Text).toMatch(/state \/ provincial/i);
@@ -137,11 +138,9 @@ describe('Results', () => {
     );
     renderAt('/r/11217?country=US');
 
-    await waitFor(() => {
-      const alert = screen.getByRole('alert');
-      expect(alert.textContent).toContain('Database is on fire');
-      expect(alert.textContent).toContain('req-abc-123');
-    });
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Database is on fire');
+    expect(alert.textContent).toContain('req-abc-123');
   });
 
   it('defaults country to US when the search param is missing', async () => {

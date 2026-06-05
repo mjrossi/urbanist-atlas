@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { EntryList } from './EntryList.tsx';
+import { describe, expect, it } from 'vitest';
+
 import type { LookupOrg } from '../lib/api.ts';
+import { EntryList } from './EntryList.tsx';
 
 function renderList(node: React.ReactNode) {
   return render(<MemoryRouter>{node}</MemoryRouter>);

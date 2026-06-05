@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { Org as OrgT } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
@@ -267,10 +268,8 @@ describe('Org', () => {
     );
     renderAt('/orgs/transalt');
 
-    await waitFor(() => {
-      const alert = screen.getByRole('alert');
-      expect(alert.textContent).toContain('Database is on fire');
-      expect(alert.textContent).toContain('req-org-2');
-    });
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Database is on fire');
+    expect(alert.textContent).toContain('req-org-2');
   });
 });

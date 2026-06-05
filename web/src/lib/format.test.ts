@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { domainOf, formatAddedAt, groupCountLabel, prettyTag } from './format.ts';
 
 describe('groupCountLabel', () => {

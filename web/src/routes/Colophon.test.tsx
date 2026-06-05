@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { describe, expect, it } from 'vitest';
+
 import { Colophon } from './Colophon.tsx';
 
 function renderColophon() {
@@ -22,7 +23,7 @@ describe('Colophon', () => {
   it('renders the five section headings', () => {
     const { container } = renderColophon();
     const h2s = screen.getAllByRole('heading', { level: 2 });
-    const text = h2s.map((h) => h.textContent ?? '').join(' | ');
+    const text = h2s.map((h) => h.textContent).join(' | ');
     // Five new-style section h2s.
     expect(text).toMatch(/where the geography comes from/i);
     expect(text).toMatch(/how the atlas runs/i);
@@ -31,7 +32,7 @@ describe('Colophon', () => {
     expect(text).toMatch(/how the directory stays current/i);
     // And the kicker numerals carry the I/II/III/IV/V topic labels.
     const kickers = Array.from(container.querySelectorAll('.section-kicker'))
-      .map((k) => k.textContent ?? '')
+      .map((k) => k.textContent)
       .join(' | ');
     expect(kickers).toMatch(/data sources/i);
     expect(kickers).toMatch(/stack/i);
@@ -56,7 +57,9 @@ describe('Colophon', () => {
   it('shows the ODbL attribution headers verbatim', () => {
     renderColophon();
     expect(screen.getByText(/X-Data-License: ODbL-1\.0/)).toBeDefined();
-    expect(screen.getByText(/X-Data-Attribution: https:\/\/urbanistatlas\.com/)).toBeDefined();
+    expect(
+      screen.getByText(/X-Data-Attribution: https:\/\/urbanistatlas\.com/),
+    ).toBeDefined();
   });
 
   it('sets the browser tab title', async () => {

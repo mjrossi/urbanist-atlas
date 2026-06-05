@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { RegionCombobox } from './RegionCombobox.tsx';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
+import { RegionCombobox } from './RegionCombobox.tsx';
 
 const QUEENS = {
   region: {
@@ -40,9 +41,7 @@ describe('RegionCombobox', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(searchResponse([QUEENS]));
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(searchResponse([QUEENS]));
   });
 
   afterEach(() => {

@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
-import { BroadsheetNav } from './BroadsheetNav.tsx';
+import { describe, expect, it } from 'vitest';
+
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
+import { BroadsheetNav } from './BroadsheetNav.tsx';
 
 describe('BroadsheetNav', () => {
   it('marks the matching nav entry with aria-current="page"', () => {

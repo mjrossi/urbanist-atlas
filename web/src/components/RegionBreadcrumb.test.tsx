@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { RegionBreadcrumb } from './RegionBreadcrumb.tsx';
+import { describe, expect, it } from 'vitest';
+
 import type { Region } from '../lib/api.ts';
+import { RegionBreadcrumb } from './RegionBreadcrumb.tsx';
 
 function makeRegion(slug: string, name: string): Region {
   return {
@@ -21,7 +22,10 @@ describe('RegionBreadcrumb', () => {
     render(
       <MemoryRouter>
         <RegionBreadcrumb
-          prefix={[{ label: 'Atlas', to: '/' }, { label: 'Browse', to: '/browse' }]}
+          prefix={[
+            { label: 'Atlas', to: '/' },
+            { label: 'Browse', to: '/browse' },
+          ]}
           ancestors={[makeRegion('washington-state', 'Washington')]}
           current="Seattle, WA"
         />
@@ -53,10 +57,7 @@ describe('RegionBreadcrumb', () => {
     render(
       <MemoryRouter>
         <RegionBreadcrumb
-          prefix={[
-            { label: 'Atlas', to: '/' },
-            { label: 'Lookup · 11217' },
-          ]}
+          prefix={[{ label: 'Atlas', to: '/' }, { label: 'Lookup · 11217' }]}
           ancestors={[]}
           current="Brooklyn, NY"
         />

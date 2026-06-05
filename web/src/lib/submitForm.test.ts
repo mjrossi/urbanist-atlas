@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   buildIssueBody,
   buildIssueUrl,
   buildNewSubmissionRequest,
   SUBMIT_FORM_DEFAULTS,
-  titlePrefix,
   type SubmitForm,
+  titlePrefix,
 } from './submitForm.ts';
 
 // Per-type wire-shape coverage for the public submissions endpoint.
@@ -65,9 +66,7 @@ describe('buildNewSubmissionRequest', () => {
 
   it('every type rolls the free-text region fallback into submitter_note', () => {
     for (const type of ['new', 'correction', 'removal'] as const) {
-      const req = buildNewSubmissionRequest(
-        formFor(type, { region: 'Brooklyn, NY' }),
-      );
+      const req = buildNewSubmissionRequest(formFor(type, { region: 'Brooklyn, NY' }));
       expect(req.submitter_note).toMatch(/Brooklyn, NY/);
     }
   });
@@ -85,7 +84,9 @@ describe('buildNewSubmissionRequest', () => {
   });
 
   it('contact: an email-shaped value lands in submitter_email', () => {
-    const req = buildNewSubmissionRequest(formFor('new', { contact: 'jane@example.org' }));
+    const req = buildNewSubmissionRequest(
+      formFor('new', { contact: 'jane@example.org' }),
+    );
     expect(req.submitter_email).toBe('jane@example.org');
     expect(req.submitter_name).toBeUndefined();
   });
@@ -130,7 +131,9 @@ describe('buildIssueBody / buildIssueUrl (5xx fallback path)', () => {
   it('the issue URL is a github.com/new link with the title prefixed by the type', () => {
     const href = buildIssueUrl(formFor('correction', { name: 'Existing Org' }));
     const url = new URL(href);
-    expect(url.origin + url.pathname).toBe('https://github.com/mjrossi/urbanist-atlas/issues/new');
+    expect(url.origin + url.pathname).toBe(
+      'https://github.com/mjrossi/urbanist-atlas/issues/new',
+    );
     expect(url.searchParams.get('title')).toBe('[Correction] Existing Org');
   });
 });

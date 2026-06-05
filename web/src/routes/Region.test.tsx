@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { LookupOrg, Region as RegionT, RegionDetail } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
@@ -186,9 +187,7 @@ describe('Region', () => {
 
     // The city-tagged org is in Local; the metro-tagged org is in
     // Regional. We assert by role (both rendered as org-name links).
-    expect(
-      screen.getByRole('link', { name: 'Better Streets Chicago' }),
-    ).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Better Streets Chicago' })).toBeDefined();
     expect(
       screen.getByRole('link', { name: 'Active Transportation Alliance' }),
     ).toBeDefined();
@@ -380,10 +379,8 @@ describe('Region', () => {
     );
     renderAt('/region/nyc-metro');
 
-    await waitFor(() => {
-      const alert = screen.getByRole('alert');
-      expect(alert.textContent).toContain('Database is on fire');
-      expect(alert.textContent).toContain('req-region-2');
-    });
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Database is on fire');
+    expect(alert.textContent).toContain('req-region-2');
   });
 });

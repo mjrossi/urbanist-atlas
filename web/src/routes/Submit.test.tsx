@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Submit } from './Submit.tsx';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
+import { Submit } from './Submit.tsx';
 
 function renderSubmit() {
   return renderWithProviders(<Submit />, { initialEntries: ['/submit'] });
@@ -42,14 +43,18 @@ async function fillRequired(
 // Build a Response that the form's fetch helper will see. The
 // ApiError wrapper reads `Content-Type` to decide whether to parse
 // the body as a problem document, so we set it deliberately.
-function jsonResponse(body: unknown, init: ResponseInit & { problem?: boolean } = {}) {
+function jsonResponse(
+  body: unknown,
+  init: Omit<ResponseInit, 'headers'> & {
+    problem?: boolean;
+    headers?: Record<string, string>;
+  } = {},
+) {
   const { problem, headers, ...rest } = init;
   return new Response(JSON.stringify(body), {
     status: init.status ?? 200,
     headers: {
-      'Content-Type': problem
-        ? 'application/problem+json'
-        : 'application/json',
+      'Content-Type': problem ? 'application/problem+json' : 'application/json',
       ...(headers ?? {}),
     },
     ...rest,
@@ -127,7 +132,9 @@ describe('Submit', () => {
     // Receipt card appears, with the first 8 hex chars of the UUIDv7
     // surfaced as the human reference.
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: /tip received/i })).toBeDefined();
+      expect(
+        screen.getByRole('heading', { level: 1, name: /tip received/i }),
+      ).toBeDefined();
     });
     // Short id appears in both the headline and the receipt row — at
     // least one match is enough.
@@ -164,7 +171,7 @@ describe('Submit', () => {
       context_label: 'New York',
     };
     fetchSpy.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
+      const url = input instanceof Request ? input.url : input.toString();
       if (url.includes('/api/v1/regions/search')) {
         return Promise.resolve(jsonResponse({ data: [queens] }));
       }
@@ -215,7 +222,7 @@ describe('Submit', () => {
     // Search returns nothing: this test only needs leftover *typed*
     // text in the combobox, not a committed selection. Submissions 201.
     fetchSpy.mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
+      const url = input instanceof Request ? input.url : input.toString();
       if (url.includes('/api/v1/regions/search')) {
         return Promise.resolve(jsonResponse({ data: [] }));
       }
@@ -255,21 +262,22 @@ describe('Submit', () => {
     await user.click(screen.getByRole('button', { name: /file another tip/i }));
 
     // Back on a pristine form: the react-hook-form inputs are blank…
-    const nameInput = await screen.findByLabelText(/organization name/i);
-    expect((nameInput as HTMLInputElement).value).toBe('');
-    expect((screen.getByLabelText(/primary website/i) as HTMLInputElement).value).toBe('');
+    const nameInput =
+      await screen.findByLabelText<HTMLInputElement>(/organization name/i);
+    expect(nameInput.value).toBe('');
+    expect(screen.getByLabelText<HTMLInputElement>(/primary website/i).value).toBe('');
+    expect(screen.getByLabelText<HTMLInputElement>(/one-line description/i).value).toBe(
+      '',
+    );
     expect(
-      (screen.getByLabelText(/one-line description/i) as HTMLInputElement).value,
-    ).toBe('');
-    expect(
-      (screen.getByLabelText(/can.?t find your region/i) as HTMLInputElement).value,
+      screen.getByLabelText<HTMLInputElement>(/can.?t find your region/i).value,
     ).toBe('');
     // …and the combobox is pristine too: no leftover search text and no
     // chips carried over from the previous submission. Guards against a
     // future refactor that keeps the form mounted under the receipt
     // (e.g. an overlay), which would let the combobox's local state
     // survive the way the RHF fields do.
-    expect((screen.getByLabelText(/region served/i) as HTMLInputElement).value).toBe('');
+    expect(screen.getByLabelText<HTMLInputElement>(/region served/i).value).toBe('');
   });
 
   it('correction submissions hide the new-org fields and POST a valid wire shape', async () => {
@@ -284,14 +292,8 @@ describe('Submit', () => {
     expect(screen.queryByLabelText(/region served/i)).toBeNull();
     expect(screen.queryByLabelText(/one-line description/i)).toBeNull();
 
-    await user.type(
-      screen.getByLabelText(/organization name/i),
-      'Existing Org',
-    );
-    await user.type(
-      screen.getByLabelText(/primary website/i),
-      'https://example.org',
-    );
+    await user.type(screen.getByLabelText(/organization name/i), 'Existing Org');
+    await user.type(screen.getByLabelText(/primary website/i), 'https://example.org');
     await user.type(
       screen.getByLabelText(/what needs correcting/i),
       'Their website moved to example.org last March.',
@@ -338,9 +340,10 @@ describe('Submit', () => {
       expect(screen.getByText(/try again in 600 seconds/i)).toBeDefined();
     });
     // Submit button is disabled and reflects the same countdown.
-    expect(
-      screen.getByRole('button', { name: /retry in 600s/i }),
-    ).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: /retry in 600s/i })).toHaveProperty(
+      'disabled',
+      true,
+    );
   });
 
   it('falls back to the static "breather" copy when Retry-After is missing on a 429', async () => {

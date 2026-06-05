@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { RegionSummary } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
@@ -83,9 +84,9 @@ describe('Browse', () => {
     expect(
       screen.getByRole('link', { name: /san francisco bay area/i }).getAttribute('href'),
     ).toBe('/region/sf-bay-area');
-    expect(
-      screen.getByRole('link', { name: /toronto gta/i }).getAttribute('href'),
-    ).toBe('/region/toronto-gta');
+    expect(screen.getByRole('link', { name: /toronto gta/i }).getAttribute('href')).toBe(
+      '/region/toronto-gta',
+    );
   });
 
   it('each region row links to /region/:slug', async () => {
@@ -99,7 +100,9 @@ describe('Browse', () => {
       const nyc = screen.getByRole('link', { name: /new york metro/i });
       expect(nyc.getAttribute('href')).toBe('/region/nyc-metro');
     });
-    expect(screen.getByRole('link', { name: /^AML/i }).getAttribute('href')).toBe('/region/aml');
+    expect(screen.getByRole('link', { name: /^AML/i }).getAttribute('href')).toBe(
+      '/region/aml',
+    );
   });
 
   // Cities whose `browse_parent_slug` points at a visible anchor in
@@ -108,7 +111,10 @@ describe('Browse', () => {
   // "Toronto" + "Toronto CMA" pairs.
   it('nests cities under their parent metro via browse_parent_slug', async () => {
     listRegionsMock.mockResolvedValueOnce([
-      makeRegion({ id: 1, slug: 'chicago-metro', name: 'Chicago Metro', kind: 'us:metro' }, 4),
+      makeRegion(
+        { id: 1, slug: 'chicago-metro', name: 'Chicago Metro', kind: 'us:metro' },
+        4,
+      ),
       makeRegion(
         {
           id: 2,
@@ -119,7 +125,16 @@ describe('Browse', () => {
         },
         3,
       ),
-      makeRegion({ id: 3, slug: 'toronto-cma', name: 'Toronto CMA', kind: 'ca:cma', country: 'CA' }, 4),
+      makeRegion(
+        {
+          id: 3,
+          slug: 'toronto-cma',
+          name: 'Toronto CMA',
+          kind: 'ca:cma',
+          country: 'CA',
+        },
+        4,
+      ),
       makeRegion(
         {
           id: 4,
@@ -150,9 +165,7 @@ describe('Browse', () => {
     // Both Chicago Metro + Chicago live inside the same anchor group
     // (their DOM parent has class `.index-anchor-group`).
     const groups = Array.from(container.querySelectorAll('.index-anchor-group'));
-    const chicagoGroup = groups.find((g) =>
-      g.contains(chicagoMetroLink),
-    );
+    const chicagoGroup = groups.find((g) => g.contains(chicagoMetroLink));
     expect(chicagoGroup).toBeDefined();
     expect(chicagoGroup?.contains(chicagoLink)).toBe(true);
 
@@ -194,9 +207,15 @@ describe('Browse', () => {
   // behavior preserved for the unchanged-data case.
   it('renders city-kind entries (us:city, ca:city) alongside metros', async () => {
     listRegionsMock.mockResolvedValueOnce([
-      makeRegion({ id: 1, slug: 'chicago-metro', name: 'Chicago Metro', kind: 'us:metro' }, 4),
+      makeRegion(
+        { id: 1, slug: 'chicago-metro', name: 'Chicago Metro', kind: 'us:metro' },
+        4,
+      ),
       makeRegion({ id: 2, slug: 'chicago', name: 'Chicago', kind: 'us:city' }, 3),
-      makeRegion({ id: 3, slug: 'toronto-on', name: 'Toronto', kind: 'ca:city', country: 'CA' }, 2),
+      makeRegion(
+        { id: 3, slug: 'toronto-on', name: 'Toronto', kind: 'ca:city', country: 'CA' },
+        2,
+      ),
     ]);
     renderBrowse();
 
@@ -227,7 +246,7 @@ describe('Browse', () => {
       expect(screen.getByRole('link', { name: /new york metro/i })).toBeDefined();
     });
     const counts = Array.from(container.querySelectorAll('.icount')).map(
-      (n) => n.textContent ?? '',
+      (n) => n.textContent,
     );
     const joined = counts.join(' | ');
     expect(joined).toMatch(/12\s*groups/);

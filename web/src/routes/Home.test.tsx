@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import type { RegionSummary, Org } from '../lib/api.ts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { Org, RegionSummary } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
@@ -139,7 +140,9 @@ describe('Home', () => {
 
   it('links each recent org name to its /orgs/:slug detail page', async () => {
     listRegionsMock.mockReturnValue(new Promise(() => {}));
-    listRecentMock.mockResolvedValueOnce([makeOrg(1, 'transalt', 'Transportation Alternatives')]);
+    listRecentMock.mockResolvedValueOnce([
+      makeOrg(1, 'transalt', 'Transportation Alternatives'),
+    ]);
     renderHome();
 
     await waitFor(() => {
@@ -173,9 +176,7 @@ describe('Home', () => {
     renderHome();
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/region list isn.t loading right now/i),
-      ).toBeDefined();
+      expect(screen.getByText(/region list isn.t loading right now/i)).toBeDefined();
     });
   });
 
@@ -192,14 +193,14 @@ describe('Home', () => {
     renderHome();
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/recent entries aren.t loading right now/i),
-      ).toBeDefined();
+      expect(screen.getByText(/recent entries aren.t loading right now/i)).toBeDefined();
     });
   });
 
   it('links each region in the aside to /region/:slug', async () => {
-    listRegionsMock.mockResolvedValueOnce([makeRegion('nyc-metro', 'New York Metro', 12)]);
+    listRegionsMock.mockResolvedValueOnce([
+      makeRegion('nyc-metro', 'New York Metro', 12),
+    ]);
     listRecentMock.mockReturnValue(new Promise(() => {}));
     renderHome();
 
