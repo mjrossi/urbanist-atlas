@@ -58,7 +58,7 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
 Language runtimes and project tools are managed by
 [mise](https://mise.jdx.dev). Install mise once, then `mise install` at
 the repo root provisions everything pinned in `mise.toml`: Go, Node,
-staticcheck, oapi-codegen.
+golangci-lint, oapi-codegen.
 
 - **`mise.toml`** — base: tool versions + production-default env.
 - **`mise.development.toml`** — local dev overrides; activate with
@@ -96,7 +96,10 @@ The dev loop has no external dependencies: `mise install`, then
   `URBANIST_SEED_DIR`, `URBANIST_CLIENT_SECRET`, etc.). No `viper`.
 - **Layout:** standard. `cmd/` for binaries, `pkg/` for the public library,
   `internal/` for non-exported.
-- **Style:** `gofmt`, `go vet`, `staticcheck`. No custom linter config.
+- **Style:** golangci-lint v2 (config in `api/.golangci.yml`, run via
+  `just api-lint`) is the single lint + format gate — it bundles `govet`,
+  `staticcheck`, the `gofumpt` + `goimports` formatters, and a curated
+  standardization linter set. `just api-fmt` applies the formatters.
 - **Module path:** `github.com/mjrossi/urbanist-atlas/api`.
 
 The Go side is **library-first**: `pkg/atlas` is the importable surface,

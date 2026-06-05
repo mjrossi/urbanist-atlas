@@ -37,7 +37,7 @@ SQLite submission store are live (workflow at
 - Monorepo bones (`api/`, `web/`, `.github/`, READMEs, `.gitignore`)
 - `mise` tooling — `mise.toml` + dev/ci overlays +
   `mise.local.toml.example`. Pinned: Go, Node, sqlc, goose,
-  staticcheck, oapi-codegen.
+  golangci-lint, oapi-codegen.
 - CI workflow with auto-detect-and-gate logic; both `api` and `web`
   jobs now active.
 - Docker-based dev Postgres on `:55432` via `just pg-up` / `pg-down`

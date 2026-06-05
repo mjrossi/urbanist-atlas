@@ -3,7 +3,7 @@
 #
 # `just` itself is pinned in mise.toml (`aqua:casey/just`); a single
 # `mise install` at the repo root provisions it alongside go, node,
-# oapi-codegen, and staticcheck.
+# oapi-codegen, and golangci-lint.
 #
 # Groups: api, data, verify, web, preview, fly, submissions, smoke, ci.
 # Each group corresponds to a section comment below.
@@ -40,29 +40,10 @@ api-build:
 api-fmt:
     cd api && mise exec -- golangci-lint fmt
 
-# fail if any Go file would be rewritten by gofmt. `gofmt -l` lists
-# offenders and exits 0 even on drift, so the explicit non-empty
-# check turns that into a CI signal.
-[group('api')]
-[doc('fail if any Go file is not gofmt-clean')]
-api-fmt-check:
-    @cd api && drift="$(gofmt -l .)"; [ -z "$drift" ] || { echo "gofmt drift:"; echo "$drift"; echo "run \`just api-fmt\` and commit." >&2; exit 1; }
-
-# go vet ./...
-[group('api')]
-api-vet:
-    cd api && go vet ./...
-
-# staticcheck ./... — pinned in mise.toml. Catches bugs `go vet`
-# misses (unused fields, deprecated APIs, ineffective assignments).
-[group('api')]
-[doc('run staticcheck (mise-pinned) over the api module')]
-api-staticcheck:
-    cd api && mise exec -- staticcheck ./...
-
 # golangci-lint v2 over the api module (config: api/.golangci.yml). Bundles
-# govet + staticcheck + the gofumpt/goimports format check alongside the
-# curated standardization linter set, so it is the single api/ lint gate.
+# govet + staticcheck + the gofumpt/goimports format-drift check alongside
+# the curated standardization linter set, so it is the single api/ lint gate
+# (it subsumes the old api-vet / api-staticcheck / api-fmt-check recipes).
 [group('api')]
 [doc('run golangci-lint (mise-pinned) over the api module')]
 api-lint:
@@ -80,10 +61,11 @@ api-lint-fix:
 api-test:
     cd api && go test ./... -race -count=1
 
-# fmt-check + vet + staticcheck + test + gen-no-diff — the CI gate for
-# api/, run locally before pushing.
+# lint + test + gen-no-diff — the CI gate for api/, run locally before
+# pushing. golangci-lint (api-lint) covers vet, staticcheck, and the
+# gofumpt/goimports format-drift check in one pass.
 [group('api')]
-api-check: api-fmt-check api-vet api-staticcheck api-test api-gen-check
+api-check: api-lint api-test api-gen-check
 
 # go mod tidy
 [group('api')]

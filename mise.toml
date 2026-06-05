@@ -28,7 +28,6 @@ python = "3.14"
 # gofumpt + goimports are all bundled). Config lives in api/.golangci.yml;
 # run via `just api-lint` / `just api-fmt`.
 "aqua:golangci/golangci-lint" = "2.12.2"
-"go:honnef.co/go/tools/cmd/staticcheck" = "2025.1.1"
 "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" = "2.7.0"
 # Python `openpyxl` is a library (no CLI entry point) so it can't be
 # managed via mise's pipx backend — contributors install it on demand
