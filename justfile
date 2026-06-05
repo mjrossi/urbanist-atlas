@@ -147,7 +147,9 @@ seed-validate:
 # --target=regions so only the public Census files + 13 MB CA CMA are
 # fetched (HUD skipped as Optional; CA FSA skipped as off-target). The
 # Census ships the CBSA file as xlsx only, so a conversion step sits
-# between download and regenerate.
+# between download and regenerate. Downloads are sha256-idempotent and
+# retried with backoff, so a re-run skips the network when etl/sources/
+# already holds the pinned files (CI caches that dir between runs).
 [group('data')]
 [doc('fail if committed region seed drifts from a regen of public sources')]
 seed-check:

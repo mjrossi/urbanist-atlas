@@ -67,10 +67,18 @@ jobs:
               - *global
               - 'web/**'
               - 'api/openapi.yaml'
+            # Narrow to just the ETL/region surface: a Go-only PR that
+            # doesn't touch the pipeline or the committed region overrides /
+            # outputs skips the network-gated seed-determinism job entirely.
             data:
               - *global
-              - 'api/**'
               - 'etl/**'
+              - 'api/internal/etl/**'
+              - 'api/cmd/server/etl.go'
+              - 'api/seed/regions_us_msa_overrides.toml'
+              - 'api/seed/regions_ca_cma_overrides.toml'
+              - 'api/seed/regions_us_msas.toml'
+              - 'api/seed/regions_ca_cmas.toml'
 
   api:
     name: api (go)
@@ -147,12 +155,29 @@ jobs:
   data:
     name: seed determinism
     needs: detect
-    # Path gate (PRs only): api/** or etl/** — the regen pulls from ETL
-    # code and staged sources.
+    # Path gate (PRs only): the ETL pipeline + the committed region
+    # overrides/outputs (see the `data` filter in detect). The regen pulls
+    # from ETL code and staged sources.
     if: github.event_name != 'pull_request' || needs.detect.outputs.data == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # Cache the gitignored ETL download landing dir so the flaky external
+      # fetches (census.gov, statcan.gc.ca) are skipped on a cache hit. The
+      # downloader is sha256-idempotent — it re-verifies every cached file
+      # against the pinned checksum and re-fetches on mismatch — so a stale
+      # cache is self-healing: the cache only saves the network round-trip,
+      # it never bypasses validation. The key invalidates on a vintage bump
+      # because the pinned SHA256 values live in the two country-plan .go
+      # files; SOURCES.md is a hand-maintained mirror and deliberately NOT
+      # in the key.
+      - name: Cache ETL upstream sources
+        uses: actions/cache@v5
+        with:
+          path: etl/sources
+          key: ${{ runner.os }}-etl-sources-${{ hashFiles('api/internal/etl/us/us.go', 'api/internal/etl/ca/ca.go') }}
+          restore-keys: |
+            ${{ runner.os }}-etl-sources-
       - name: Cache Go modules + build cache
         uses: actions/cache@v5
         with:
@@ -207,7 +232,15 @@ jobs:
 
   deploy-api:
     name: deploy api → Fly
-    needs: [api, web, data, seed-validate]
+    # Deliberately NOT gated on `data` (seed-determinism). The deploy ships
+    # the COMMITTED api/seed/ bundle baked into the image; seed-check only
+    # proves a regen of *external* sources still matches — a reviewer drift
+    # signal, not a deploy-safety property. The real fail-closed deploy gate
+    # is `seed-validate` (offline, loads the embedded bundle the server
+    # boots from), which stays here. Keeping the network-gated `data` job in
+    # this list would let a transient census.gov/statcan.gc.ca blip block a
+    # prod deploy of already-merged seeds.
+    needs: [api, web, seed-validate]
     # Only deploy on merges to main (and on the workflow_dispatch
     # re-deploy escape hatch, also restricted to main). PR runs
     # validate but never deploy. The ref check on the dispatch arm
