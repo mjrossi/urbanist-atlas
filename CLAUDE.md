@@ -260,7 +260,13 @@ just api-run
 Source files live under `etl/sources/<cc>/` (gitignored). Generated
 outputs live under `api/seed/` and are committed. ETL is deterministic:
 the same upstream vintage produces byte-identical output, so git diffs
-are signal-rich.
+are signal-rich. A minimal committed subset of the *regions* inputs
+also lives under `etl/fixtures/` (the Census CBSA CSV + a DBF-only CMA
+zip) so the CI `seed determinism` gate (`just seed-check`) can
+regenerate the region files **offline** — StatsCan is unreachable from
+GitHub Actions, which made the old download-based gate flaky. Rebuild
+the fixtures with `just seed-fixtures` on a vintage bump; see
+[`etl/fixtures/README.md`](./etl/fixtures/README.md).
 
 ## Wire contract
 

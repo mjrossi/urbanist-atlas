@@ -1,0 +1,7 @@
+# The committed ETL fixtures are byte-exact data inputs whose sha256 is
+# pinned in etl/SOURCES.md / etl/fixtures/README.md and which generate the
+# committed api/seed/ region files. Never apply line-ending normalization
+# (the maintainer's core.autocrlf=input would otherwise rewrite the CRLF
+# CSV to LF, breaking the pinned checksum and reproducibility).
+etl/fixtures/us/list1_2023.csv -text
+etl/fixtures/ca/lcma000b21a_e.zip binary

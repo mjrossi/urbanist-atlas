@@ -57,6 +57,12 @@ api/.fly/
 # ── ETL: upstream source files (regenerated outputs live in api/seed/) ──
 etl/sources/
 
+# etl/fixtures/ IS committed (the offline seed-check inputs). The CA
+# fixture is a .zip, which the maintainer's global gitignore
+# (~/.gitignore_global) excludes — re-include it explicitly so a fresh
+# clone and `just seed-fixtures` track it.
+!etl/fixtures/ca/lcma000b21a_e.zip
+
 # ── Scratch / one-off script output (scripts/verify-org-urls.sh, etc.) ──
 tmp/
 

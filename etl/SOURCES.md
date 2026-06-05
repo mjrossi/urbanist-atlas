@@ -8,8 +8,13 @@ fails loudly — the defense against silent upstream changes between
 vintages.
 
 The corresponding `etl/sources/` directory is gitignored (see
-`.gitignore`); commit only the regenerated outputs under
-`api/seed/`.
+`.gitignore`); commit the regenerated outputs under `api/seed/`. A
+small, committed subset of the **regions** inputs also lives under
+[`etl/fixtures/`](./fixtures/README.md) — the CI `seed determinism`
+gate (`just seed-check`) regenerates the region files from those
+offline, because StatsCan is unreachable from GitHub Actions. Refresh
+the fixtures with `just seed-fixtures` whenever you bump a vintage
+below.
 
 Design at
 [`docs/superpowers/specs/2026-05-19-postal-coverage-design.md`](../docs/superpowers/specs/2026-05-19-postal-coverage-design.md).

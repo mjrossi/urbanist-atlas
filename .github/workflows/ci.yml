@@ -67,10 +67,18 @@ jobs:
               - *global
               - 'web/**'
               - 'api/openapi.yaml'
+            # Narrow to just the ETL/region surface: a Go-only PR that
+            # doesn't touch the pipeline or the committed region overrides /
+            # outputs skips the network-gated seed-determinism job entirely.
             data:
               - *global
-              - 'api/**'
               - 'etl/**'
+              - 'api/internal/etl/**'
+              - 'api/cmd/server/etl.go'
+              - 'api/seed/regions_us_msa_overrides.toml'
+              - 'api/seed/regions_ca_cma_overrides.toml'
+              - 'api/seed/regions_us_msas.toml'
+              - 'api/seed/regions_ca_cmas.toml'
 
   api:
     name: api (go)
@@ -147,8 +155,9 @@ jobs:
   data:
     name: seed determinism
     needs: detect
-    # Path gate (PRs only): api/** or etl/** — the regen pulls from ETL
-    # code and staged sources.
+    # Path gate (PRs only): the ETL pipeline + the committed region
+    # overrides/outputs/fixtures (see the `data` filter in detect). The
+    # regen reads the vendored etl/fixtures/ — no network.
     if: github.event_name != 'pull_request' || needs.detect.outputs.data == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -165,15 +174,12 @@ jobs:
       - uses: jdx/mise-action@v4
       - name: Export mise [env] to GITHUB_ENV
         run: mise env --dotenv >> "$GITHUB_ENV"
-      # `just seed-check` regenerates the HUD-free region files from the
-      # pinned public sources and fails on drift (mirrors api-gen-check).
-      # It downloads the public Census + StatsCan CMA sources (~30 MB,
-      # sha256-validated) on each run; HUD and the 155 MB CA FSA are
-      # skipped via --target=regions. The Census CBSA file ships as xlsx
-      # only, so the recipe's xlsx→csv step needs openpyxl (not in mise
-      # [tools]; pinned in etl/scripts/requirements.txt).
-      - name: Install xlsx→csv deps (openpyxl)
-        run: python3 -m pip install -r etl/scripts/requirements.txt
+      # `just seed-check` regenerates the region files and fails on drift
+      # (mirrors api-gen-check). It runs FULLY OFFLINE: the regions sources
+      # are vendored under etl/fixtures/ (the Census CBSA list as CSV + a
+      # DBF-only CMA zip), so there is no network download and no xlsx→csv
+      # step. This replaced a download-based gate that was chronically flaky
+      # because StatsCan is unreachable from GitHub Actions runners.
       - run: just seed-check
 
   seed-validate:
@@ -207,7 +213,15 @@ jobs:
 
   deploy-api:
     name: deploy api → Fly
-    needs: [api, web, data, seed-validate]
+    # Deliberately NOT gated on `data` (seed-determinism). The deploy ships
+    # the COMMITTED api/seed/ bundle baked into the image; seed-check only
+    # proves a regen of *external* sources still matches — a reviewer drift
+    # signal, not a deploy-safety property. The real fail-closed deploy gate
+    # is `seed-validate` (offline, loads the embedded bundle the server
+    # boots from), which stays here. Keeping the network-gated `data` job in
+    # this list would let a transient census.gov/statcan.gc.ca blip block a
+    # prod deploy of already-merged seeds.
+    needs: [api, web, seed-validate]
     # Only deploy on merges to main (and on the workflow_dispatch
     # re-deploy escape hatch, also restricted to main). PR runs
     # validate but never deploy. The ref check on the dispatch arm

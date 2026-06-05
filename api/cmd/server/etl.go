@@ -161,41 +161,114 @@ func runEtlDownload(ctx context.Context, c *cli.Command) error {
 	return nil
 }
 
-// downloadSource fetches src.URL, streams the body into dst while
-// computing sha256, and verifies the result against src.SHA256 (if
-// non-empty). A mismatch leaves the file on disk and returns an
-// error — the operator can re-review the upstream vintage rather
-// than losing the download.
+const (
+	// etlDownloadMaxAttempts bounds the retry loop for a single source.
+	// Census/StatsCan serve 200s normally; the retries absorb transient
+	// edge/CDN failures (5xx, 429, dropped connections) that would
+	// otherwise flake the seed-determinism CI job on an isolated blip.
+	etlDownloadMaxAttempts = 4
+	// etlDownloadBaseDelay is the first backoff; it doubles on each retry
+	// (1s, 2s, 4s).
+	etlDownloadBaseDelay = 1 * time.Second
+)
+
+// etlSleep waits d or until ctx is canceled, whichever comes first,
+// returning the context error if canceled. It is a package var so the
+// download tests can stub out the real wait and not spend backoff seconds.
+var etlSleep = func(ctx context.Context, d time.Duration) error {
+	select {
+	case <-time.After(d):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// downloadSource fetches src.URL into dst, verifying the result against
+// src.SHA256 (if non-empty). It is idempotent: when dst already exists
+// and already matches the pinned checksum, the network fetch is skipped
+// entirely, so re-runs and CI cache hits are offline. Transient failures
+// (transport errors, HTTP 5xx, 429) are retried with exponential backoff;
+// a complete-but-mismatched download is deterministic and is NOT retried —
+// the file is left on disk so the operator can re-review the upstream
+// vintage rather than losing the download.
 func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDescriptor, dst string, logger *slog.Logger) error {
+	// Idempotent skip: a previously downloaded file whose sha256 already
+	// matches the pin needs no fetch. A missing, partial, or corrupt file
+	// fails this check and falls through to a fresh download — self-healing.
+	if src.SHA256 != "" {
+		if got, err := fileSHA256(dst); err == nil && got == src.SHA256 {
+			logger.Info("etl download: cached (sha256 match, skipping fetch)",
+				"filename", src.Filename,
+				"sha256", got,
+				"dst", dst,
+			)
+			return nil
+		}
+	}
+
 	logger.Info("etl download: fetching",
 		"filename", src.Filename,
 		"url", src.URL,
 		"vintage", src.Vintage,
 	)
 
+	for attempt := 1; attempt <= etlDownloadMaxAttempts; attempt++ {
+		retryable, err := fetchOnce(ctx, client, src, dst, logger)
+		if err == nil {
+			return nil
+		}
+		if !retryable || attempt == etlDownloadMaxAttempts {
+			return err
+		}
+		delay := etlDownloadBaseDelay << (attempt - 1) // 1s, 2s, 4s
+		logger.Warn("etl download: transient failure, retrying",
+			"filename", src.Filename,
+			"attempt", attempt,
+			"max", etlDownloadMaxAttempts,
+			"delay", delay,
+			"err", err,
+		)
+		if serr := etlSleep(ctx, delay); serr != nil {
+			return serr
+		}
+	}
+	// Unreachable: the loop returns on success, on a non-retryable error,
+	// or when the final attempt's error is returned above.
+	return fmt.Errorf("etl download %s: exhausted %d attempts", src.Filename, etlDownloadMaxAttempts)
+}
+
+// fetchOnce performs a single GET of src.URL into dst, computing and
+// verifying the sha256. The bool reports whether a non-nil error is worth
+// retrying: transport errors and HTTP 5xx/429 are transient; any other
+// non-200 and a sha256 mismatch are deterministic.
+func fetchOnce(ctx context.Context, client *http.Client, src etl.SourceDescriptor, dst string, logger *slog.Logger) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.URL, nil)
 	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+		return false, fmt.Errorf("build request: %w", err)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("http get: %w", err)
+		// Transport-level failures (DNS, connection reset, timeout) are transient.
+		return true, fmt.Errorf("http get: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("http get: status %s", resp.Status)
+		transient := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
+		return transient, fmt.Errorf("http get: status %s", resp.Status)
 	}
 
 	f, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("create %s: %w", dst, err)
+		return false, fmt.Errorf("create %s: %w", dst, err)
 	}
 	defer f.Close()
 
 	h := sha256.New()
 	n, err := io.Copy(io.MultiWriter(f, h), resp.Body)
 	if err != nil {
-		return fmt.Errorf("write %s: %w", dst, err)
+		// A read cut short mid-stream (dropped connection) is transient.
+		return true, fmt.Errorf("write %s: %w", dst, err)
 	}
 	got := hex.EncodeToString(h.Sum(nil))
 
@@ -206,10 +279,24 @@ func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDesc
 	)
 
 	if src.SHA256 != "" && got != src.SHA256 {
-		return fmt.Errorf("sha256 mismatch for %s: got %s, want %s (upstream vintage may have changed — update SHA256 in the country plan + etl/SOURCES.md after reviewing the diff)",
+		return false, fmt.Errorf("sha256 mismatch for %s: got %s, want %s (upstream vintage may have changed — update SHA256 in the country plan + etl/SOURCES.md after reviewing the diff)",
 			src.Filename, got, src.SHA256)
 	}
-	return nil
+	return false, nil
+}
+
+// fileSHA256 returns the hex-encoded sha256 of the file at path.
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func runEtlRegenerate(ctx context.Context, c *cli.Command) error {

@@ -139,25 +139,41 @@ etl-regenerate country:
 seed-validate:
     cd api && go run ./cmd/server seed validate
 
-# Fail if the committed HUD-free seed (US/CA region files) drifts from a
-# fresh regenerate of the pinned public sources. Mirrors api-gen-check /
-# web-gen-check. HUD-dependent US postal + CA postal are covered by the
-# golden determinism tests under `just api-test`, not here (HUD is
-# account-gated; the CA FSA source is 155 MB). Downloads with
-# --target=regions so only the public Census files + 13 MB CA CMA are
-# fetched (HUD skipped as Optional; CA FSA skipped as off-target). The
-# Census ships the CBSA file as xlsx only, so a conversion step sits
-# between download and regenerate.
+# Fail if the committed US/CA region files drift from a fresh regenerate.
+# Mirrors api-gen-check / web-gen-check. Runs FULLY OFFLINE: it regenerates
+# from the minimal regions sources committed under etl/fixtures/ (the Census
+# CBSA list as CSV + a DBF-only CMA zip), NOT from a network download.
+# StatsCan (www12.statcan.gc.ca) is unreachable from GitHub Actions, which
+# made the download-based gate chronically flaky; the regions pass only
+# needs the 29 KB CMA attribute table, so it is vendored. The postal CSVs
+# (HUD-gated US, 155 MB CA FSA) stay covered by the golden determinism tests
+# under `just api-test`, not here. Refresh the fixtures with `just
+# seed-fixtures` alongside a vintage bump — see etl/fixtures/README.md.
 [group('data')]
-[doc('fail if committed region seed drifts from a regen of public sources')]
+[doc('fail if committed region seed drifts from an offline regen of etl/fixtures/')]
 seed-check:
-    @cd api && go run ./cmd/server etl download --country US --target regions --src ../etl/sources
-    @python3 etl/scripts/xlsx_to_csv.py etl/sources/us/list1_2023.xlsx etl/sources/us/list1_2023.csv
-    @cd api && go run ./cmd/server etl download --country CA --target regions --src ../etl/sources
-    @cd api && go run ./cmd/server etl regenerate --country US --target regions --src ../etl/sources --out seed
-    @cd api && go run ./cmd/server etl regenerate --country CA --target regions --src ../etl/sources --out seed
+    @cd api && go run ./cmd/server etl regenerate --country US --target regions --src ../etl/fixtures --out seed
+    @cd api && go run ./cmd/server etl regenerate --country CA --target regions --src ../etl/fixtures --out seed
     @git diff --exit-code -- api/seed/regions_us_msas.toml api/seed/regions_ca_cmas.toml \
-        || (echo "seed drift: region files differ from a fresh regen. Stage sources, run \`just etl-regenerate US\` / \`CA\`, and commit." && exit 1)
+        || (echo "seed drift: region files differ from a fresh regen of etl/fixtures/. Regenerate from your staged sources (\`just etl-regenerate US\` / \`CA\`), and if the upstream vintage changed also run \`just seed-fixtures\`; then commit." && exit 1)
+
+# Rebuild the committed offline regions fixtures (etl/fixtures/) from the
+# full staged sources under etl/sources/. Run after a vintage bump so
+# `seed-check` regenerates from current data. The CA fixture is a minimal
+# zip of just the CMA DBF (the geometry the 13 MB upstream zip also carries
+# is postal-only). Needs the same staged sources `just etl-download` fetches
+# plus openpyxl for the xlsx→csv step. See etl/fixtures/README.md.
+[group('data')]
+[doc('rebuild etl/fixtures/ (offline seed-check inputs) from staged etl/sources/')]
+seed-fixtures:
+    @mkdir -p etl/fixtures/us etl/fixtures/ca
+    @python3 etl/scripts/xlsx_to_csv.py etl/sources/us/list1_2023.xlsx etl/fixtures/us/list1_2023.csv
+    @tmp=$(mktemp -d); \
+        unzip -o etl/sources/ca/lcma000b21a_e.zip lcma000b21a_e.dbf -d "$tmp" >/dev/null; \
+        rm -f etl/fixtures/ca/lcma000b21a_e.zip; \
+        ( cd "$tmp" && zip -X -j "{{justfile_directory()}}/etl/fixtures/ca/lcma000b21a_e.zip" lcma000b21a_e.dbf >/dev/null ); \
+        rm -rf "$tmp"
+    @echo "rebuilt etl/fixtures/{us/list1_2023.csv, ca/lcma000b21a_e.zip} from etl/sources/"
 
 # ── verify: out-of-band data hygiene checks ───────────
 # These probe third-party URLs from the seed data. Because a handful
