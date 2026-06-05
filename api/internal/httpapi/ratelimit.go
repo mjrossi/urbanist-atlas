@@ -36,7 +36,7 @@ func newIPRateLimiter(maxPerWindow int, window time.Duration) *ipRateLimiter {
 		hits:       make(map[string][]time.Time),
 		window:     window,
 		maxPerWin:  maxPerWindow,
-		nowFunc:    func() time.Time { return time.Now() },
+		nowFunc:    time.Now,
 		sweepEvery: rateLimitSweepInterval,
 	}
 }
