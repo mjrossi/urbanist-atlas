@@ -1,0 +1,5 @@
+# Generated / vendored — not hand-edited, must not be reformatted.
+dist
+coverage
+src/lib/api.gen.ts
+package-lock.json
