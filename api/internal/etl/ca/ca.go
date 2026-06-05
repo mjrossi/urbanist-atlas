@@ -80,7 +80,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	logger.Info("etl ca: parsed CMA boundary", "cmas", len(cmas), "path", cmaZipPath)
 
 	overridesPath := filepath.Join(outDir, "regions_ca_cma_overrides.toml")
-	overrides, err := ReadCMAOverrides(overridesPath)
+	overrides, err := etl.ReadOverrides[CMAOverride](overridesPath)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func writeCMAsToFile(path string, assignments []CMAAssignment) error {
 		return fmt.Errorf("etl ca: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WriteCMAsTOML(f, assignments)
+	return etl.WriteRegionsTOML(f, cmaTOMLHeader, cmaRowsToRegionRows(assignments))
 }
 
 func writeCSVToFile(path string, anchors []PostalAnchor) error {
@@ -165,5 +165,5 @@ func writeCSVToFile(path string, anchors []PostalAnchor) error {
 		return fmt.Errorf("etl ca: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WritePostalCodesCSV(f, anchors)
+	return etl.WritePostalCSV(f, "CA", anchors)
 }

@@ -138,7 +138,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	logger.Info("etl us: parsed CBSA delineation", "msas", len(msas), "county_to_msa", len(countyToMSA))
 
 	overridesPath := filepath.Join(outDir, "regions_us_msa_overrides.toml")
-	overrides, err := ReadMSAOverrides(overridesPath)
+	overrides, err := etl.ReadOverrides[MSAOverride](overridesPath)
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ func writeMSAs(path string, rows []RegionRow) error {
 		return fmt.Errorf("etl us: create %s: %w", path, err)
 	}
 	defer f.Close()
-	return WriteMSAsTOML(f, rows)
+	return etl.WriteRegionsTOML(f, msaTOMLHeader, rows)
 }
 
 func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {

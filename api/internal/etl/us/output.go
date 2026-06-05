@@ -1,16 +1,12 @@
 package us
 
 import (
-	"bufio"
-	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
-	"unicode"
 
-	"github.com/pelletier/go-toml/v2"
+	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
 
 // MSAOverride is one editorial override read from
@@ -20,8 +16,8 @@ import (
 // replaced with the curated form (e.g., "nyc-metro").
 //
 // There is no kind override: every US CBSA is editorially a us:metro,
-// which WriteMSAsTOML emits as a literal. If a future CBSA ever needs a
-// different kind, add a Kind field here then — until that concrete need
+// which BuildRegionRows sets and etl.WriteRegionsTOML emits. If a future
+// CBSA ever needs a different kind, add a Kind field here then — until that concrete need
 // exists, the symmetry with CA's CMAOverride (which does carry Kind, for
 // Metro Vancouver → ca:regional-district) is deliberately left unbuilt
 // per the project's no-preemptive-abstraction convention.
@@ -38,28 +34,6 @@ type MSAOverride struct {
 	// nyc-metro → ["nj", "ny"]), matching what the auto-gen path computes
 	// for non-overridden multi-state metros.
 	RollupStates []string `toml:"rollup_states"`
-}
-
-type overrideFile struct {
-	Overrides []MSAOverride `toml:"override"`
-}
-
-// ReadMSAOverrides parses the overrides TOML file. Missing file is
-// not an error — the file is optional, and the auto-gen flow has a
-// sensible default for every MSA.
-func ReadMSAOverrides(path string) ([]MSAOverride, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read overrides: %w", err)
-	}
-	var f overrideFile
-	if err := toml.Unmarshal(data, &f); err != nil {
-		return nil, fmt.Errorf("parse overrides: %w", err)
-	}
-	return f.Overrides, nil
 }
 
 // AssignMSASlugs returns (slug, displayName, parents) for every MSA,
@@ -153,70 +127,8 @@ func firstCity(title string) string {
 	return strings.TrimSpace(title[:i])
 }
 
-// slugify lowercases, drops diacritics, removes punctuation, and
-// collapses whitespace + interior hyphens into single hyphens. Used
-// for MSA slug generation; doesn't try to match every potential
-// Unicode source — just the common Latin diacritics that appear in
-// PR/Mayagüez-style CBSA titles.
-func slugify(s string) string {
-	var b strings.Builder
-	prevDash := false
-	for _, r := range s {
-		r = unicode.ToLower(r)
-		// Fold common Latin diacritics: ü→u, é→e, etc. The diacritic
-		// is dropped; the base letter is kept.
-		if r >= 0x00C0 && r <= 0x017F {
-			r = foldDiacritic(r)
-		}
-		switch {
-		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
-			b.WriteRune(r)
-			prevDash = false
-		case r == ' ' || r == '-' || r == '_' || r == '/':
-			if !prevDash && b.Len() > 0 {
-				b.WriteByte('-')
-				prevDash = true
-			}
-		}
-		// All other runes (punctuation, etc.) are dropped silently.
-	}
-	out := b.String()
-	return strings.TrimRight(out, "-")
-}
-
-// foldDiacritic maps the Latin-1 Supplement + Latin Extended-A range
-// to ASCII letters. Coverage is good enough for the few diacritics
-// that appear in CBSA titles (mostly Spanish in PR rows).
-func foldDiacritic(r rune) rune {
-	switch r {
-	case 'à', 'á', 'â', 'ã', 'ä', 'å', 'ā', 'ă', 'ą':
-		return 'a'
-	case 'è', 'é', 'ê', 'ë', 'ē', 'ĕ', 'ė', 'ę', 'ě':
-		return 'e'
-	case 'ì', 'í', 'î', 'ï', 'ĩ', 'ī', 'ĭ', 'į':
-		return 'i'
-	case 'ñ', 'ń', 'ņ', 'ň':
-		return 'n'
-	case 'ò', 'ó', 'ô', 'õ', 'ö', 'ø', 'ō', 'ŏ', 'ő':
-		return 'o'
-	case 'ù', 'ú', 'û', 'ü', 'ũ', 'ū', 'ŭ', 'ů', 'ű', 'ų':
-		return 'u'
-	case 'ÿ', 'ý':
-		return 'y'
-	case 'ç', 'ć', 'ĉ', 'ċ', 'č':
-		return 'c'
-	case 'ł', 'ļ', 'ľ':
-		return 'l'
-	case 'ś', 'ŝ', 'ş', 'š':
-		return 's'
-	case 'ź', 'ż', 'ž':
-		return 'z'
-	}
-	return r
-}
-
 func autoSlug(m MSA) string {
-	city := slugify(firstCity(m.Title))
+	city := etl.Slugify(firstCity(m.Title))
 	if city == "" {
 		// Defensive: fall back to CBSA code so we always have *some*
 		// unique slug rather than blowing up the load.
@@ -262,18 +174,12 @@ func autoParents(m MSA) []string {
 	return parents
 }
 
-// RegionRow is one emitted [[region]] in regions_us_msas.toml: a metro
-// umbrella (Kind us:metro) or an auto-generated per-state portion (Kind
-// us:metro-portion). Comment is the trailing "# Census CBSA …" line for
-// umbrellas, empty for portions.
-type RegionRow struct {
-	Slug         string
-	Name         string
-	Kind         string
-	Parents      []string
-	RollupStates []string
-	Comment      string
-}
+// RegionRow aliases the shared etl.RegionRow. A US row is one emitted
+// [[region]] in regions_us_msas.toml: a metro umbrella (Kind us:metro)
+// or an auto-generated per-state portion (Kind us:metro-portion).
+// Comment is the trailing "# Census CBSA …" line for umbrellas, empty
+// for portions.
+type RegionRow = etl.RegionRow
 
 // BuildRegionRows expands per-CBSA assignments into the full set of
 // emitted region rows — one umbrella per MSA, plus one us:metro-portion
@@ -322,82 +228,6 @@ func BuildRegionRows(msas []MSA, assignments map[string]MSAOverride) ([]RegionRo
 	return rows, portionSlugs
 }
 
-// WriteMSAsTOML emits the regions_us_msas.toml file deterministically:
-// rows sorted by slug ASC, no embedded timestamps, LF line endings,
-// trailing newline. Because a portion slug is its umbrella's slug plus a
-// "-<state>" suffix, the slug sort places every portion immediately after
-// its umbrella — which is also the load-order the seedfiles loader
-// requires (a portion's umbrella parent must register first).
-func WriteMSAsTOML(w io.Writer, rows []RegionRow) error {
-	sorted := make([]RegionRow, len(rows))
-	copy(sorted, rows)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Slug < sorted[j].Slug })
-
-	bw := bufio.NewWriter(w)
-	if _, err := bw.WriteString(msaTOMLHeader); err != nil {
-		return err
-	}
-	for _, r := range sorted {
-		if r.Slug == "" {
-			return fmt.Errorf("write msas: empty slug (name %q)", r.Name)
-		}
-		kind := r.Kind
-		if kind == "" {
-			kind = "us:metro"
-		}
-		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %q\nkind = %q\nname = %q\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [", r.Slug, kind, r.Name); err != nil {
-			return err
-		}
-		for i, p := range r.Parents {
-			if i > 0 {
-				if _, err := bw.WriteString(", "); err != nil {
-					return err
-				}
-			}
-			if _, err := fmt.Fprintf(bw, "%q", p); err != nil {
-				return err
-			}
-		}
-		if _, err := bw.WriteString("]\n"); err != nil {
-			return err
-		}
-		if err := writeStringList(bw, "rollup_states", r.RollupStates); err != nil {
-			return err
-		}
-		if r.Comment != "" {
-			if _, err := fmt.Fprintf(bw, "%s\n", r.Comment); err != nil {
-				return err
-			}
-		}
-	}
-	return bw.Flush()
-}
-
-// writeStringList writes a TOML `key = ["a", "b"]` line (plus newline),
-// but ONLY when items is non-empty — an empty list emits nothing, so
-// region rows without the field stay byte-identical. Used for the
-// optional rollup_states field.
-func writeStringList(w *bufio.Writer, key string, items []string) error {
-	if len(items) == 0 {
-		return nil
-	}
-	if _, err := fmt.Fprintf(w, "%s = [", key); err != nil {
-		return err
-	}
-	for i, it := range items {
-		if i > 0 {
-			if _, err := w.WriteString(", "); err != nil {
-				return err
-			}
-		}
-		if _, err := fmt.Fprintf(w, "%q", it); err != nil {
-			return err
-		}
-	}
-	_, err := w.WriteString("]\n")
-	return err
-}
-
 const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated from the
 # Census Bureau's CBSA delineation file by api/cmd/server etl
 # regenerate --country=US.
@@ -438,43 +268,30 @@ const msaTOMLHeader = `# US Metropolitan Statistical Areas (MSAs), generated fro
 `
 
 // WritePostalCodesCSV emits the postal_codes_us.csv file
-// deterministically: rows sorted by postal_code ASC, LF line endings,
-// trailing newline. Accepts two anchor sources — the primary ZCTA
-// pass (slice #7.5.3) and the HUD non-ZCTA backfill (slice #7.5.5) —
-// and merges them with ZCTA winning any (country, postal_code) tie.
-// Pass nil or an empty slice for hudAnchors when running without HUD
-// data; the output reduces to ZCTA-only in that case, matching the
-// pre-#7.5.5 behavior.
+// deterministically. It merges the two anchor sources — the primary
+// ZCTA pass (slice #7.5.3) and the HUD non-ZCTA backfill (slice #7.5.5)
+// — with ZCTA winning any (country, postal_code) tie, then hands the
+// deduped set to the shared etl.WritePostalCSV writer (sorted by
+// postal_code ASC, LF endings, trailing newline). Pass nil or an empty
+// slice for hudAnchors when running without HUD data; the output
+// reduces to ZCTA-only in that case, matching the pre-#7.5.5 behavior.
 func WritePostalCodesCSV(w io.Writer, zctaAnchors, hudAnchors []PostalAnchor) error {
 	// Build a dedup map keyed by postal code; ZCTA inserted first so
 	// HUD rows with the same key are silently dropped at insertion.
 	merged := make(map[string]PostalAnchor, len(zctaAnchors)+len(hudAnchors))
 	for _, a := range zctaAnchors {
-		merged[a.ZCTA] = a
+		merged[a.PostalCode] = a
 	}
 	for _, a := range hudAnchors {
-		if _, ok := merged[a.ZCTA]; ok {
+		if _, ok := merged[a.PostalCode]; ok {
 			continue
 		}
-		merged[a.ZCTA] = a
+		merged[a.PostalCode] = a
 	}
 
-	zips := make([]string, 0, len(merged))
-	for z := range merged {
-		zips = append(zips, z)
+	deduped := make([]PostalAnchor, 0, len(merged))
+	for _, a := range merged {
+		deduped = append(deduped, a)
 	}
-	sort.Strings(zips)
-
-	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"postal_code", "country", "leaf_region_slug"}); err != nil {
-		return err
-	}
-	for _, z := range zips {
-		a := merged[z]
-		if err := cw.Write([]string{a.ZCTA, "US", a.AnchorSlug}); err != nil {
-			return err
-		}
-	}
-	cw.Flush()
-	return cw.Error()
+	return etl.WritePostalCSV(w, "US", deduped)
 }

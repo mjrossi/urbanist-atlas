@@ -2,18 +2,16 @@ package us
 
 import (
 	"sort"
+
+	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
 
-// PostalAnchor is the smallest-anchor decision for one ZCTA after
-// running the crosswalk. AnchorSlug is what the postal_codes row
-// points at; Reason is a debug-friendly label of which fallback won
-// ("city-leaf", "nyc-borough", "county-leaf", "msa", "state",
-// "unknown").
-type PostalAnchor struct {
-	ZCTA       string
-	AnchorSlug string
-	Reason     string
-}
+// PostalAnchor aliases the shared etl.PostalAnchor: the smallest-anchor
+// decision for one ZCTA after running the crosswalk. PostalCode is the
+// ZCTA; AnchorSlug is what the postal_codes row points at; Reason is a
+// debug-friendly label of which fallback won ("city-leaf",
+// "nyc-borough", "county-leaf", "msa", "state", "unknown").
+type PostalAnchor = etl.PostalAnchor
 
 // Crosswalk runs the smallest-anchor algorithm for every ZCTA in
 // zctaPlace ∪ zctaCounty:
@@ -57,7 +55,7 @@ func Crosswalk(
 	reasonCounts := map[string]int{}
 
 	for _, zcta := range sorted {
-		anchor := PostalAnchor{ZCTA: zcta, Reason: "unknown"}
+		anchor := PostalAnchor{PostalCode: zcta, Reason: "unknown"}
 
 		place, hasPlace := zctaPlace[zcta]
 		county, hasCounty := zctaCounty[zcta]
@@ -129,7 +127,7 @@ func CrosswalkHUDBackfill(
 	// Build set of ZIPs already resolved by ZCTA.
 	resolved := make(map[string]struct{}, len(zctaAnchors))
 	for _, a := range zctaAnchors {
-		resolved[a.ZCTA] = struct{}{}
+		resolved[a.PostalCode] = struct{}{}
 	}
 
 	// Pick the primary (max-TOT_RATIO) county per ZIP, then walk the
@@ -155,7 +153,7 @@ func CrosswalkHUDBackfill(
 		fullReason := "hud:" + reason
 		reasons[fullReason]++
 		out = append(out, PostalAnchor{
-			ZCTA:       z,
+			PostalCode: z,
 			AnchorSlug: slug,
 			Reason:     fullReason,
 		})
@@ -242,7 +240,7 @@ func ReconcileCTLegacyCounties(
 		if a.Reason != "state" {
 			continue
 		}
-		county, ok := zctaCounty[a.ZCTA]
+		county, ok := zctaCounty[a.PostalCode]
 		if !ok {
 			continue
 		}
@@ -250,7 +248,7 @@ func ReconcileCTLegacyCounties(
 			continue
 		}
 
-		hudFIPS, ok := primary[a.ZCTA]
+		hudFIPS, ok := primary[a.PostalCode]
 		if !ok {
 			counts["ct-skip:no-hud"]++
 			continue
