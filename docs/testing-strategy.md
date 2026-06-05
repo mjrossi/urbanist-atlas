@@ -185,7 +185,7 @@ What to skip:
 `just ci` is the union of the two halves and is what CI runs:
 
 ```sh
-just api-check   # api-fmt-check + api-vet + api-staticcheck + api-test + api-gen-check
+just api-check   # api-lint (golangci-lint) + api-test + api-gen-check
 just web-check   # web-deps + web-lint + web-test + web-build + web-gen-check
 ```
 

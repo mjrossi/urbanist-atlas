@@ -170,9 +170,9 @@ func (w *Worker) Run(ctx context.Context) {
 }
 
 // drainAndExit consumes any remaining jobs in the buffer with the
-// caveat that the parent ctx is already cancelled — GitHub I/O will
+// caveat that the parent ctx is already canceled — GitHub I/O will
 // fail fast, but the persist side will still record the error on
-// each affected row. Called only from the ctx-cancelled branch of
+// each affected row. Called only from the ctx-canceled branch of
 // Run; Stop's normal path goes through the channel-close branch.
 func (w *Worker) drainAndExit() {
 	for {
@@ -201,7 +201,7 @@ func (w *Worker) drainAndExit() {
 // can re-queue with `urbanist-atlas-server submissions retry-pr`.
 //
 // The droppedIDs list is **best-effort**: when the parent ctx is
-// also cancelled, Run.drainAndExit is consuming the same channel
+// also canceled, Run.drainAndExit is consuming the same channel
 // concurrently, so some IDs reported here may have been processed
 // (or attempted) by Run before the process exits. Conversely, IDs
 // drainAndExit pulled but whose GitHub call was cut off by process
@@ -338,7 +338,7 @@ func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, erro
 		return "", fmt.Errorf("put file on %q: %w", branchName, err)
 	}
 
-	prTitle := fmt.Sprintf("Add %s", sub.Payload.Name)
+	prTitle := "Add " + sub.Payload.Name
 	prBody := buildPRBody(sub)
 	prURL, err := w.createPR(ctx, prTitle, prBody, branchName, w.cfg.BaseBranch)
 	if err != nil {

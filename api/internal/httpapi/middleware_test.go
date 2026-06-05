@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -160,6 +161,7 @@ func TestRecoverer_AbortHandlerRepanics(t *testing.T) {
 		if rec == nil {
 			t.Fatal("expected http.ErrAbortHandler to re-panic out of the middleware")
 		}
+		//nolint:errorlint // rec is a recovered panic value (any), not a wrapped error chain — identity comparison to the sentinel is intended.
 		if rec != http.ErrAbortHandler {
 			t.Errorf("re-panic value: got %v, want http.ErrAbortHandler", rec)
 		}
@@ -426,10 +428,10 @@ func TestStatusRecorder_FlushNoopWhenInnerNotFlusher(t *testing.T) {
 func TestStatusRecorder_HijackPushReturnNotSupportedFallback(t *testing.T) {
 	sw := &statusRecorder{ResponseWriter: httptest.NewRecorder(), status: http.StatusOK}
 
-	if _, _, err := sw.Hijack(); err != http.ErrNotSupported {
+	if _, _, err := sw.Hijack(); !errors.Is(err, http.ErrNotSupported) {
 		t.Errorf("Hijack: got err=%v, want http.ErrNotSupported", err)
 	}
-	if err := sw.Push("/some-resource", nil); err != http.ErrNotSupported {
+	if err := sw.Push("/some-resource", nil); !errors.Is(err, http.ErrNotSupported) {
 		t.Errorf("Push: got err=%v, want http.ErrNotSupported", err)
 	}
 }

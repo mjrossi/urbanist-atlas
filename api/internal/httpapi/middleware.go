@@ -23,7 +23,7 @@ import (
 // against a timer and writes a 503 from a separate goroutine, which
 // (a) doesn't propagate cancellation to the original handler — it
 // keeps running until it notices — and (b) interferes with the
-// problem+json response shape this API standardizes on. Cancelling
+// problem+json response shape this API standardizes on. Canceling
 // the request context is the cleaner contract: handlers that already
 // forward ctx into pkg/atlas naturally inherit the deadline, and
 // nothing has to know the timeout exists.
@@ -88,6 +88,7 @@ func recovererMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 					// http.ErrAbortHandler is the documented "I handled
 					// this, drop the connection" signal; re-panic so
 					// net/http does its thing.
+					//nolint:errorlint // rec is a recovered panic value (any), not a wrapped error chain — an identity comparison to the sentinel is what we want.
 					if rec == http.ErrAbortHandler {
 						panic(rec)
 					}

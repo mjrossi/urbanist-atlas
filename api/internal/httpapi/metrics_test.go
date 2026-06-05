@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 // newMetricsTestServer mirrors newTestServer (lookup_test.go) but keeps

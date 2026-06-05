@@ -48,7 +48,7 @@ func TestMemStore_GraphWalk(t *testing.T) {
 func TestMemStore_ResolveLeafRegion_NotFound(t *testing.T) {
 	s := NewMemStore()
 	_, err := s.ResolveLeafRegion(context.Background(), "US", "00000")
-	if err != ErrPostalCodeNotFound {
+	if !errors.Is(err, ErrPostalCodeNotFound) {
 		t.Errorf("err = %v, want ErrPostalCodeNotFound", err)
 	}
 }
@@ -120,8 +120,10 @@ func BenchmarkMemStore_ListRegions(b *testing.B) {
 		cities = 600 // each a us:city under one metro at SortPriority 10
 	)
 	s := NewMemStore()
-	s.AddRegion(Region{ID: 1, Slug: "us-state", Kind: "us:state", Name: "Synthetic State",
-		Country: "US", ScopeTier: ScopeRegional, SortPriority: 60})
+	s.AddRegion(Region{
+		ID: 1, Slug: "us-state", Kind: "us:state", Name: "Synthetic State",
+		Country: "US", ScopeTier: ScopeRegional, SortPriority: 60,
+	})
 	for i := range metros {
 		slug := fmt.Sprintf("metro-%03d", i)
 		s.AddRegion(Region{

@@ -336,7 +336,7 @@ func TestPolygonGrossArea_CountsHolesPositiveAndIsOffsetStable(t *testing.T) {
 }
 
 // TestSpatialJoin_NoiseSliverFallsThrough is the decisive correctness case:
-// separately digitized FSA and CMA boundaries leave sub-square-metre slivers
+// separately digitized FSA and CMA boundaries leave sub-square-meter slivers
 // along shared edges, so an FSA merely running alongside a CMA boundary must
 // fall through to its province, not anchor to that metro on noise.
 func TestSpatialJoin_NoiseSliverFallsThrough(t *testing.T) {

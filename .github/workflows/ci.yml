@@ -114,7 +114,8 @@ jobs:
         # expects — avoids a fragile sed regex over `mise env`'s
         # bash output.
         run: mise env --dotenv >> "$GITHUB_ENV"
-      # `just api-check` = vet + test + go-generate drift check.
+      # `just api-check` = golangci-lint (vet + staticcheck + format
+      # drift) + test + go-generate drift check.
       # Single source of truth for "what CI runs"; same recipe a
       # contributor runs locally before pushing. With the file-backed
       # FileStore as the runtime store, the previous Postgres-only

@@ -24,6 +24,12 @@ import (
 )
 
 func main() {
+	// os.Exit is isolated here so run's deferred cleanup (signal stop)
+	// always executes before the process exits.
+	os.Exit(run())
+}
+
+func run() int {
 	cmd := newRootCommand()
 
 	// Cancel the context on SIGINT/SIGTERM so subcommands (especially
@@ -36,11 +42,12 @@ func main() {
 		// post-Action error case here. Treating context cancellation
 		// as a clean exit (Ctrl-C during `serve`).
 		if errors.Is(err, context.Canceled) {
-			return
+			return 0
 		}
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func newRootCommand() *cli.Command {

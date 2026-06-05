@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	shp "github.com/jonas-p/go-shp"
+
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
 
@@ -137,7 +139,7 @@ name = "Ottawa-Gatineau"
 		if err != nil {
 			t.Fatalf("read golden %s (run with -update first): %v", name, err)
 		}
-		if string(got) != string(want) {
+		if !bytes.Equal(got, want) {
 			t.Errorf("%s drifted from golden. Run `go test ./internal/etl/ca -run CAGoldenDeterminism -update` and review the diff.", name)
 		}
 	}

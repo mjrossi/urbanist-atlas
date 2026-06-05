@@ -65,7 +65,7 @@ One-time setup: install [mise](https://mise.jdx.dev) and add
 [`mise.development.toml`](./mise.development.toml) for the exact line).
 
 ```sh
-mise install                  # provision Go, Node, staticcheck, oapi-codegen
+mise install                  # provision Go, Node, golangci-lint, oapi-codegen
 just api-run                  # API on :8080 (text logs); also serves /healthz + /readyz
 
 # in another shell:

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func TestEmbeddedOpenAPISpecMatchesCanonical(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read canonical spec at %s: %v", canonical, err)
 	}
-	if string(openapiSpec) != string(want) {
+	if !bytes.Equal(openapiSpec, want) {
 		t.Fatalf("embedded openapi.yaml drifted from canonical %s.\n"+
 			"Run `just api-oapi-gen` to recopy the file alongside the "+
 			"handler before committing.", canonical)
@@ -58,7 +59,7 @@ func TestOpenAPIHandlerServesEmbeddedSpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
-	if string(body) != string(openapiSpec) {
+	if !bytes.Equal(body, openapiSpec) {
 		t.Errorf("response body did not match embedded spec (%d vs %d bytes)", len(body), len(openapiSpec))
 	}
 }

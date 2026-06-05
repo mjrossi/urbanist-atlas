@@ -2,6 +2,7 @@ package us
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -74,19 +75,19 @@ func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err erro
 					col[strings.TrimSpace(name)] = i
 				}
 				if _, ok := col["CBSA Code"]; !ok {
-					return nil, nil, fmt.Errorf("parse cbsa: missing CBSA Code column")
+					return nil, nil, errors.New("parse cbsa: missing CBSA Code column")
 				}
 				if _, ok := col["CBSA Title"]; !ok {
-					return nil, nil, fmt.Errorf("parse cbsa: missing CBSA Title column")
+					return nil, nil, errors.New("parse cbsa: missing CBSA Title column")
 				}
 				if _, ok := col["Metropolitan/Micropolitan Statistical Area"]; !ok {
-					return nil, nil, fmt.Errorf("parse cbsa: missing Metropolitan/Micropolitan Statistical Area column")
+					return nil, nil, errors.New("parse cbsa: missing Metropolitan/Micropolitan Statistical Area column")
 				}
 				if _, ok := col["FIPS State Code"]; !ok {
-					return nil, nil, fmt.Errorf("parse cbsa: missing FIPS State Code column")
+					return nil, nil, errors.New("parse cbsa: missing FIPS State Code column")
 				}
 				if _, ok := col["FIPS County Code"]; !ok {
-					return nil, nil, fmt.Errorf("parse cbsa: missing FIPS County Code column")
+					return nil, nil, errors.New("parse cbsa: missing FIPS County Code column")
 				}
 				headerSeen = true
 			}
@@ -121,7 +122,7 @@ func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err erro
 		v.Counties[geoID] = true
 	}
 	if !headerSeen {
-		return nil, nil, fmt.Errorf("parse cbsa: header row not found")
+		return nil, nil, errors.New("parse cbsa: header row not found")
 	}
 
 	countyToMSA = map[string]string{}

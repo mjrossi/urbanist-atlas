@@ -17,7 +17,7 @@ import (
 // the Census Metropolitan Area it overlaps most by area.
 //
 // Both StatsCan boundary files are published in EPSG:3347 (NAD83
-// Statistics Canada Lambert, metres), so planar intersection area is
+// Statistics Canada Lambert, meters), so planar intersection area is
 // directly comparable and no reprojection is needed. The .prj inside each
 // zip is identical (same product series); we trust that rather than
 // parsing the WKT.
@@ -58,7 +58,7 @@ type cmaGeometry struct {
 // fall inside a CMA for the FSA to anchor to that CMA rather than its
 // province. StatsCan digitizes the FSA and CMA boundaries separately, so
 // they don't perfectly coincide: a rural FSA running alongside a CMA
-// boundary picks up a sub-square-metre line-work sliver. Without this floor
+// boundary picks up a sub-square-meter line-work sliver. Without this floor
 // that noise wins the max-overlap and wrongly anchors the FSA to a metro it
 // isn't in. The floor is relative to FSA area so it is size-invariant — a
 // small urban FSA wholly inside a CMA (~100%) still clears it, while a
@@ -440,7 +440,7 @@ func nestingDepth(p polyclip.Polygon, bboxes []polyclip.Rectangle, i int) int {
 // Contour.Contains can't misclassify it on another contour's half-open
 // top/right edge. The lowest-then-leftmost vertex v is always a convex corner
 // of c, so its interior wedge opens upward; the midpoint m of v's two
-// neighbours gives m - v = ½(a-v) + ½(b-v), a strictly-positive combination of
+// neighbors gives m - v = ½(a-v) + ½(b-v), a strictly-positive combination of
 // the two incident edge directions and thus a direction strictly inside that
 // wedge. A hair's step from v toward m lands strictly inside c, off every
 // edge. (Production calls this in FSA-local coordinates, so the step is well

@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 // Metrics owns the Prometheus registry and the application counters/histograms

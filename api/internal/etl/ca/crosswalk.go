@@ -25,7 +25,7 @@ type PostalAnchor = etl.PostalAnchor
 // cmaSlugByFSA contains only slugs the caller verified are in the
 // generated CMA list, so an FSA whose max-overlap CMA was somehow not
 // emitted falls through to province rather than dangling.
-func Crosswalk(fsas []FSARow, cmaSlugByFSA map[string]string, portionByCMA map[string]string) ([]PostalAnchor, map[string]int) {
+func Crosswalk(fsas []FSARow, cmaSlugByFSA, portionByCMA map[string]string) ([]PostalAnchor, map[string]int) {
 	sort.Slice(fsas, func(i, j int) bool { return fsas[i].CFSAUID < fsas[j].CFSAUID })
 
 	out := make([]PostalAnchor, 0, len(fsas))

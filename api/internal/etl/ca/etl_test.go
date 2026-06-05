@@ -3,6 +3,7 @@ package ca
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"testing"
 
@@ -281,7 +282,7 @@ func TestDBFReader(t *testing.T) {
 	}
 
 	// Exhausted.
-	if _, err := dbf.next(); err != io.EOF {
+	if _, err := dbf.next(); !errors.Is(err, io.EOF) {
 		t.Errorf("expected io.EOF after exhausting records, got %v", err)
 	}
 }

@@ -58,7 +58,7 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
 Language runtimes and project tools are managed by
 [mise](https://mise.jdx.dev). Install mise once, then `mise install` at
 the repo root provisions everything pinned in `mise.toml`: Go, Node,
-staticcheck, oapi-codegen.
+golangci-lint, oapi-codegen.
 
 - **`mise.toml`** — base: tool versions + production-default env.
 - **`mise.development.toml`** — local dev overrides; activate with
@@ -87,6 +87,7 @@ The dev loop has no external dependencies: `mise install`, then
   - `github.com/oapi-codegen/oapi-codegen/v2` — Go types generated from `api/openapi.yaml` (types-only; no chi-server stubs)
   - `github.com/pelletier/go-toml/v2` — TOML loading for hand-curated seed data (regions + orgs)
   - `github.com/google/go-cmp/cmp` — diff-friendly test assertions
+  - `github.com/prometheus/client_golang` — Prometheus instrumentation for the `/metrics` endpoint (Phase 1 analytics/observability stack)
 - **Logging:** `log/slog` (stdlib). JSON in prod, text in dev.
 - **Errors:** stdlib `errors` + `fmt.Errorf("...: %w", err)`. No third-party
   errors libraries.
@@ -96,7 +97,10 @@ The dev loop has no external dependencies: `mise install`, then
   `URBANIST_SEED_DIR`, `URBANIST_CLIENT_SECRET`, etc.). No `viper`.
 - **Layout:** standard. `cmd/` for binaries, `pkg/` for the public library,
   `internal/` for non-exported.
-- **Style:** `gofmt`, `go vet`, `staticcheck`. No custom linter config.
+- **Style:** golangci-lint v2 (config in `api/.golangci.yml`, run via
+  `just api-lint`) is the single lint + format gate — it bundles `govet`,
+  `staticcheck`, the `gofumpt` + `goimports` formatters, and a curated
+  standardization linter set. `just api-fmt` applies the formatters.
 - **Module path:** `github.com/mjrossi/urbanist-atlas/api`.
 
 The Go side is **library-first**: `pkg/atlas` is the importable surface,
