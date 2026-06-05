@@ -1,5 +1,6 @@
-import { Link } from 'react-router';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
+
 import type { Region } from '../lib/api.ts';
 
 /**
@@ -44,8 +45,8 @@ export function RegionBreadcrumb({
   current,
   metaRight,
 }: {
-  prefix: ReadonlyArray<BreadcrumbItem>;
-  ancestors: ReadonlyArray<Region>;
+  prefix: readonly BreadcrumbItem[];
+  ancestors: readonly Region[];
   current: string;
   metaRight?: ReactNode;
 }) {
@@ -53,8 +54,8 @@ export function RegionBreadcrumb({
     <div className="kicker">
       <nav aria-label="Breadcrumb">
         <ol className="crumb-trail">
-          {prefix.map((item, i) => (
-            <CrumbLi key={`p-${i}`} item={item} />
+          {prefix.map((item) => (
+            <CrumbLi key={item.to ?? item.label} item={item} />
           ))}
           {ancestors.map((r) => (
             <CrumbLi

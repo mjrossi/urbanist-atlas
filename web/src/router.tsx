@@ -1,12 +1,13 @@
 import { createBrowserRouter } from 'react-router';
+
 import { App } from './App.tsx';
 import { About } from './routes/About.tsx';
 import { Browse } from './routes/Browse.tsx';
 import { Colophon } from './routes/Colophon.tsx';
 import { Home } from './routes/Home.tsx';
-import { Region } from './routes/Region.tsx';
 import { NotFoundWithLayout } from './routes/NotFound.tsx';
 import { Org } from './routes/Org.tsx';
+import { Region } from './routes/Region.tsx';
 import { Results } from './routes/Results.tsx';
 import { Submit } from './routes/Submit.tsx';
 

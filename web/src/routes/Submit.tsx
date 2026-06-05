@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react';
-import { Controller, useForm, useWatch, type FieldPath } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { Controller, type FieldPath, useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
+
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { RegionCombobox } from '../components/RegionCombobox.tsx';
-import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { ApiError, createSubmission, type Submission } from '../lib/api.ts';
 import {
   buildIssueUrl,
   buildNewSubmissionRequest,
+  type SubmissionType,
   SUBMIT_FORM_DEFAULTS,
   type SubmitForm,
 } from '../lib/submitForm.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 // Brief lockout after a successful submit so a triple-click can't
 // trigger duplicate POSTs.
@@ -42,6 +44,106 @@ const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
   submitter_name: 'contact',
   submitter_note: 'why',
 };
+
+/**
+ * Per-submission-type copy. The three flavors share one layout but swap
+ * hints, labels, and placeholders; a keyed table keeps the variants
+ * side-by-side instead of five parallel ternary chains.
+ */
+interface SubmissionCopy {
+  nameHint: string;
+  editorialLabel: string;
+  editorialHint: string;
+  editorialPlaceholder: string;
+  sourcesHint: string;
+}
+
+const SUBMISSION_COPY: Record<SubmissionType, SubmissionCopy> = {
+  new: {
+    nameHint: 'As it appears on their site, not what locals call them.',
+    editorialLabel: 'Why this org belongs',
+    editorialHint:
+      'What have they worked on recently? Who do they organize? Who do they push? Concrete examples help us more than superlatives.',
+    editorialPlaceholder:
+      'Defended the local fare against a hike; runs candidate forums.',
+    sourcesHint:
+      "Links to news coverage, their social accounts, or campaigns they've worked on. One per line.",
+  },
+  correction: {
+    nameHint: 'The entry you want corrected. Use the name as it appears in the Atlas.',
+    editorialLabel: 'What needs correcting',
+    editorialHint: 'What is incorrect, what should it say instead, and how do you know?',
+    editorialPlaceholder:
+      'Listed as rail-focused, but they pivoted to bus rapid transit in 2025.',
+    sourcesHint:
+      "Anything that shows what's changed: a press release, an organizational chart, a recent article.",
+  },
+  removal: {
+    nameHint: 'The entry you want removed. Use the name as it appears in the Atlas.',
+    editorialLabel: 'Why this organization should be removed',
+    editorialHint:
+      'Shut down, merged, domain hijacked — what happened, and roughly when?',
+    editorialPlaceholder: 'Domain expired in March 2025; last post was October 2024.',
+    sourcesHint:
+      'Anything that confirms the change: a dead site, an archived final post, a merger announcement.',
+  },
+};
+
+interface SubmitErrorView {
+  isRateLimited: boolean;
+  isServerErr: boolean;
+  showTopLevelValidationErr: boolean;
+  validationMessage: string;
+  unmappedFieldErrors: { field: string; message: string }[];
+}
+
+/**
+ * Collapse a failed submission into the flags the error banners need.
+ * Pulled out of the component so the precedence between per-field,
+ * top-level-validation, rate-limit, and server-error states stays
+ * readable (and unit-testable).
+ *
+ * `unmappedFieldErrors` are API field errors with no visible home in the
+ * form — an unmapped API key, or one mapped to a field this submission
+ * type hides (e.g. `region_slugs`/`short_desc` on a correction/removal,
+ * or `contact`/`why`, which have no inline error slot). They'd otherwise
+ * be swallowed, so the top-level banner surfaces them.
+ */
+function deriveSubmitError(
+  err: ApiError | null,
+  visibleFieldErrorSlots: ReadonlySet<FieldPath<SubmitForm>>,
+): SubmitErrorView {
+  if (!err) {
+    return {
+      isRateLimited: false,
+      isServerErr: false,
+      showTopLevelValidationErr: false,
+      validationMessage: '',
+      unmappedFieldErrors: [],
+    };
+  }
+
+  const isValidationErr = err.status === 400 || err.status === 422;
+  const unmappedFieldErrors = err.fieldErrors
+    ? Object.entries(err.fieldErrors)
+        .filter(([apiField]) => {
+          const formField = FIELD_NAME_MAP[apiField];
+          return !formField || !visibleFieldErrorSlots.has(formField);
+        })
+        .map(([field, message]) => ({ field, message }))
+    : [];
+  const hasMappedFieldErrors =
+    !!err.fieldErrors && Object.keys(err.fieldErrors).length > 0;
+
+  return {
+    isRateLimited: err.status === 429,
+    isServerErr: err.status >= 500,
+    showTopLevelValidationErr:
+      isValidationErr && (!hasMappedFieldErrors || unmappedFieldErrors.length > 0),
+    validationMessage: err.problem?.detail ?? err.message,
+    unmappedFieldErrors,
+  };
+}
 
 /**
  * `/submit` — accepts an org tip, POSTs it to `/api/v1/submissions`,
@@ -77,39 +179,12 @@ export function Submit() {
   // are folded into the API contract.
   //
   // useWatch (vs the destructured watch()) is the memoization-safe
-  // subscription per react-hook-form's API guidance. The `?? 'new'`
-  // is defensive: useWatch can briefly return undefined before
-  // defaultValues propagate, and we'd rather render the new-org
-  // variant in that window than render nothing.
-  const submissionType = useWatch({ control, name: 'type' }) ?? 'new';
+  // subscription per react-hook-form's API guidance; `defaultValue`
+  // covers the brief window before defaultValues propagate so we render
+  // the new-org variant rather than nothing.
+  const submissionType = useWatch({ control, name: 'type', defaultValue: 'new' });
   const isNewOrg = submissionType === 'new';
-  const isCorrection = submissionType === 'correction';
-  const isRemoval = submissionType === 'removal';
-  const nameHint = isCorrection
-    ? 'The entry you want corrected. Use the name as it appears in the Atlas.'
-    : isRemoval
-      ? 'The entry you want removed. Use the name as it appears in the Atlas.'
-      : 'As it appears on their site, not what locals call them.';
-  const editorialLabel = isCorrection
-    ? 'What needs correcting'
-    : isRemoval
-      ? 'Why this organization should be removed'
-      : 'Why this org belongs';
-  const editorialHint = isCorrection
-    ? 'What is incorrect, what should it say instead, and how do you know?'
-    : isRemoval
-      ? 'Shut down, merged, domain hijacked — what happened, and roughly when?'
-      : 'What have they worked on recently? Who do they organize? Who do they push? Concrete examples help us more than superlatives.';
-  const editorialPlaceholder = isCorrection
-    ? 'Listed as rail-focused, but they pivoted to bus rapid transit in 2025.'
-    : isRemoval
-      ? 'Domain expired in March 2025; last post was October 2024.'
-      : 'Defended the local fare against a hike; runs candidate forums.';
-  const sourcesHint = isCorrection
-    ? "Anything that shows what's changed: a press release, an organizational chart, a recent article."
-    : isRemoval
-      ? 'Anything that confirms the change: a dead site, an archived final post, a merger announcement.'
-      : "Links to news coverage, their social accounts, or campaigns they've worked on. One per line.";
+  const copy = SUBMISSION_COPY[submissionType];
 
   const [cooldown, setCooldown] = useState(false);
   // Seconds remaining on a 429 lockout. Initialized from
@@ -119,8 +194,12 @@ export function Submit() {
 
   useEffect(() => {
     if (!cooldown) return;
-    const id = setTimeout(() => setCooldown(false), SUBMIT_COOLDOWN_MS);
-    return () => clearTimeout(id);
+    const id = setTimeout(() => {
+      setCooldown(false);
+    }, SUBMIT_COOLDOWN_MS);
+    return () => {
+      clearTimeout(id);
+    };
   }, [cooldown]);
 
   useEffect(() => {
@@ -128,12 +207,16 @@ export function Submit() {
     const id = setInterval(() => {
       setRetryAfter((s) => (s <= 1 ? 0 : s - 1));
     }, 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+    };
   }, [retryAfter]);
 
   const mutation = useMutation<Submission, ApiError, SubmitForm>({
     mutationFn: (form) => createSubmission(buildNewSubmissionRequest(form)),
-    onSuccess: () => setCooldown(true),
+    onSuccess: () => {
+      setCooldown(true);
+    },
     onError: (err) => {
       // Per-field validation errors (W1.4): hand each known field
       // to react-hook-form so the input shows its own error. The
@@ -187,41 +270,19 @@ export function Submit() {
   }
 
   const submitErr = mutation.error;
-  const isRateLimited = submitErr?.status === 429;
-  const isValidationErr = submitErr?.status === 400 || submitErr?.status === 422;
-  const isServerErr = submitErr?.status !== undefined && submitErr.status >= 500;
-
-  // Per-field errors only become visible if they map to a form field
-  // that renders its own `field-error` slot AND that field is shown
-  // for the active submission type. Errors that don't (an unmapped
-  // API key, or a key mapped to a field this submission type hides —
-  // e.g. `region_slugs`/`short_desc` on a correction/removal, or
-  // `contact`/`why` which have no inline error slot) would otherwise
-  // be swallowed. Collect their messages so the top-level banner can
-  // surface them instead of dropping them on the floor.
+  // Which inline `field-error` slots actually render for this submission
+  // type — drives which API field errors have a visible home; the rest
+  // surface in the top-level banner (see deriveSubmitError).
   const visibleFieldErrorSlots = new Set<FieldPath<SubmitForm>>(
-    isNewOrg
-      ? ['name', 'website', 'regionSlugs', 'oneLineDesc']
-      : ['name', 'website'],
+    isNewOrg ? ['name', 'website', 'regionSlugs', 'oneLineDesc'] : ['name', 'website'],
   );
-  const unmappedFieldErrors = submitErr?.fieldErrors
-    ? Object.entries(submitErr.fieldErrors)
-        .filter(([apiField]) => {
-          const formField = FIELD_NAME_MAP[apiField];
-          return !formField || !visibleFieldErrorSlots.has(formField);
-        })
-        .map(([, message]) => message)
-    : [];
-
-  // When the API returned a per-field errors map, the individual
-  // fields render their own messages — the top-level banner would
-  // duplicate the same complaint. Show the banner when the server
-  // didn't break it down, or when it did but some of those errors
-  // have no visible home in the form (see `unmappedFieldErrors`).
-  const hasMappedFieldErrors =
-    !!submitErr?.fieldErrors && Object.keys(submitErr.fieldErrors).length > 0;
-  const showTopLevelValidationErr =
-    isValidationErr && (!hasMappedFieldErrors || unmappedFieldErrors.length > 0);
+  const {
+    isRateLimited,
+    isServerErr,
+    showTopLevelValidationErr,
+    validationMessage,
+    unmappedFieldErrors,
+  } = deriveSubmitError(submitErr, visibleFieldErrorSlots);
   const issueFallbackUrl = isServerErr
     ? buildIssueUrl({ ...SUBMIT_FORM_DEFAULTS, ...fallbackValues })
     : '';
@@ -238,16 +299,16 @@ export function Submit() {
         <div>
           <div className="lede">
             <div className="eyebrow">
-              № I — Submissions desk<span className="eyebrow-rule" />
+              № I — Submissions desk
+              <span className="eyebrow-rule" />
             </div>
             <h1>
               File a tip for <span className="accent">the editors.</span>
             </h1>
             <p className="deck">
-              Know an advocacy group that should be in the Atlas? Spotted a
-              stale entry? Tell us here. Your submission goes straight to
-              the editorial queue and we open a pull request against the
-              public dataset when we accept it.
+              Know an advocacy group that should be in the Atlas? Spotted a stale entry?
+              Tell us here. Your submission goes straight to the editorial queue and we
+              open a pull request against the public dataset when we accept it.
             </p>
           </div>
 
@@ -267,10 +328,16 @@ export function Submit() {
               </div>
               <div className="choices">
                 <label className="choice">
-                  <input type="radio" value="new" {...register('type', { required: true })} />
+                  <input
+                    type="radio"
+                    value="new"
+                    {...register('type', { required: true })}
+                  />
                   <span className="text">
                     A new organization to index
-                    <span className="sub">A group not yet in the Atlas — local or regional.</span>
+                    <span className="sub">
+                      A group not yet in the Atlas — local or regional.
+                    </span>
                   </span>
                 </label>
                 <label className="choice">
@@ -307,7 +374,7 @@ export function Submit() {
                 <label htmlFor="submit-name" className="field-label">
                   Organization name
                   <span className="required">*</span>
-                  <span className="hint">{nameHint}</span>
+                  <span className="hint">{copy.nameHint}</span>
                 </label>
               </div>
               <div>
@@ -360,8 +427,8 @@ export function Submit() {
                       Region served
                       <span className="required">*</span>
                       <span className="hint" id="submit-region-hint">
-                        Start typing a city, metro, or borough and pick from
-                        the list. Add more than one if they serve several.
+                        Start typing a city, metro, or borough and pick from the list. Add
+                        more than one if they serve several.
                       </span>
                     </label>
                   </div>
@@ -371,7 +438,7 @@ export function Submit() {
                       name="regionSlugs"
                       rules={{
                         validate: (val, formValues) =>
-                          (val && val.length > 0) ||
+                          val.length > 0 ||
                           formValues.region.trim().length > 0 ||
                           'Pick at least one region, or describe a new one below.',
                       }}
@@ -405,8 +472,8 @@ export function Submit() {
                     <label htmlFor="submit-region-new" className="field-label">
                       Can&rsquo;t find your region?
                       <span className="hint inline">
-                        Tell us the city or area and we&rsquo;ll add it. Skip
-                        this if you picked one above.
+                        Tell us the city or area and we&rsquo;ll add it. Skip this if you
+                        picked one above.
                       </span>
                     </label>
                   </div>
@@ -429,9 +496,7 @@ export function Submit() {
                     <label htmlFor="submit-oneline" className="field-label">
                       One-line description of what they actually do
                       <span className="required">*</span>
-                      <span className="hint inline">
-                        Plain English. ~140 characters.
-                      </span>
+                      <span className="hint inline">Plain English. ~140 characters.</span>
                     </label>
                   </div>
                   <textarea
@@ -453,15 +518,15 @@ export function Submit() {
             <div className="field stacked">
               <div>
                 <label htmlFor="submit-why" className="field-label">
-                  {editorialLabel}
-                  <span className="hint inline">{editorialHint}</span>
+                  {copy.editorialLabel}
+                  <span className="hint inline">{copy.editorialHint}</span>
                 </label>
               </div>
               <textarea
                 id="submit-why"
                 className="textarea tall"
                 rows={4}
-                placeholder={editorialPlaceholder}
+                placeholder={copy.editorialPlaceholder}
                 {...register('why')}
               />
             </div>
@@ -470,7 +535,7 @@ export function Submit() {
               <div>
                 <label htmlFor="submit-sources" className="field-label">
                   Sources
-                  <span className="hint inline">{sourcesHint}</span>
+                  <span className="hint inline">{copy.sourcesHint}</span>
                 </label>
               </div>
               <textarea
@@ -540,8 +605,8 @@ https://group.org/about"
 
             <div className="slip-foot">
               <p className="note">
-                We read every tip. The ones we accept open a public pull
-                request anyone can follow — usually within a week.
+                We read every tip. The ones we accept open a public pull request anyone
+                can follow — usually within a week.
               </p>
               {isRateLimited ? (
                 <p className="field-error" role="alert">
@@ -552,15 +617,11 @@ https://group.org/about"
               ) : null}
               {showTopLevelValidationErr ? (
                 <div className="field-error" role="alert">
-                  <p>
-                    {submitErr?.problem?.detail ??
-                      submitErr?.message ??
-                      'Validation failed.'}
-                  </p>
+                  <p>{validationMessage}</p>
                   {unmappedFieldErrors.length > 0 ? (
                     <ul>
-                      {unmappedFieldErrors.map((message, i) => (
-                        <li key={i}>{message}</li>
+                      {unmappedFieldErrors.map(({ field, message }) => (
+                        <li key={field}>{message}</li>
                       ))}
                     </ul>
                   ) : null}
@@ -569,11 +630,7 @@ https://group.org/about"
               {isServerErr ? (
                 <p className="field-error" role="alert">
                   Our submission queue is having a moment. You can{' '}
-                  <a
-                    href={issueFallbackUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                  <a href={issueFallbackUrl} target="_blank" rel="noopener noreferrer">
                     open this as a GitHub issue instead
                   </a>{' '}
                   while we look into it.
@@ -607,32 +664,32 @@ https://group.org/about"
                 <div className="num">i.</div>
                 <h4>You file the tip.</h4>
                 <p>
-                  Your submission lands in the editorial queue with a
-                  reference ID you can hold onto.
+                  Your submission lands in the editorial queue with a reference ID you can
+                  hold onto.
                 </p>
               </div>
               <div className="process-step">
                 <div className="num">ii.</div>
                 <h4>An editor reads it.</h4>
                 <p>
-                  We check the website, scan recent coverage, and weigh against
-                  the inclusion criteria.
+                  We check the website, scan recent coverage, and weigh against the
+                  inclusion criteria.
                 </p>
               </div>
               <div className="process-step">
                 <div className="num">iii.</div>
                 <h4>Verification.</h4>
                 <p>
-                  We confirm with public sources — news coverage, a council
-                  record, or a clear track of campaigns.
+                  We confirm with public sources — news coverage, a council record, or a
+                  clear track of campaigns.
                 </p>
               </div>
               <div className="process-step">
                 <div className="num">iv.</div>
                 <h4>Published or declined.</h4>
                 <p>
-                  Accepted orgs land in a public pull request anyone can read.
-                  When the PR merges, the org appears in the Atlas.
+                  Accepted orgs land in a public pull request anyone can read. When the PR
+                  merges, the org appears in the Atlas.
                 </p>
               </div>
             </div>
@@ -650,10 +707,7 @@ https://group.org/about"
           <div className="rail-block muted">
             <div className="rail-kicker">Other ways to reach us</div>
             <p>
-              Email{' '}
-              <a href="mailto:hello@urbanistatlas.com">
-                hello@urbanistatlas.com
-              </a>{' '}
+              Email <a href="mailto:hello@urbanistatlas.com">hello@urbanistatlas.com</a>{' '}
               for anything sensitive, or{' '}
               <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
                 open a GitHub issue
@@ -673,7 +727,7 @@ interface SubmissionReceivedProps {
 }
 
 function SubmissionReceived({ submission, onAnother }: SubmissionReceivedProps) {
-  const shortId = String(submission.id).replace(/-/g, '').slice(0, 8);
+  const shortId = submission.id.replace(/-/g, '').slice(0, 8);
   return (
     <>
       <PageBreadcrumb
@@ -685,16 +739,17 @@ function SubmissionReceived({ submission, onAnother }: SubmissionReceivedProps) 
         <div>
           <div className="lede">
             <div className="eyebrow">
-              № II — Submissions desk<span className="eyebrow-rule" />
+              № II — Submissions desk
+              <span className="eyebrow-rule" />
             </div>
             <h1>
               Tip received — <span className="accent">#{shortId}</span>
             </h1>
             <p className="deck">
-              Thanks. Your submission is in the editorial queue. When an
-              editor accepts it, you&rsquo;ll see the org appear in the
-              Atlas after the next deploy. If we have follow-up questions
-              and you left contact info, we&rsquo;ll reach out.
+              Thanks. Your submission is in the editorial queue. When an editor accepts
+              it, you&rsquo;ll see the org appear in the Atlas after the next deploy. If
+              we have follow-up questions and you left contact info, we&rsquo;ll reach
+              out.
             </p>
           </div>
 
@@ -721,10 +776,9 @@ function SubmissionReceived({ submission, onAnother }: SubmissionReceivedProps) 
           <div className="rail-block">
             <div className="rail-kicker">What happens next</div>
             <p>
-              When we accept your tip, the change shows up in a public
-              pull request against the dataset. When the PR merges, the
-              org appears in the Atlas after the next deploy — usually a
-              few minutes.
+              When we accept your tip, the change shows up in a public pull request
+              against the dataset. When the PR merges, the org appears in the Atlas after
+              the next deploy — usually a few minutes.
             </p>
           </div>
         </aside>

@@ -1,14 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
-import { ApiError, getOrg } from '../lib/api.ts';
-import type { Org as OrgT } from '../lib/api.ts';
-import { domainOf, formatAddedAt, prettyTag } from '../lib/format.ts';
-import { queryKeys } from '../lib/queryKeys.ts';
-import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
-import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
+
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
+import type { Org as OrgT } from '../lib/api.ts';
+import { ApiError, getOrg } from '../lib/api.ts';
+import { domainOf, formatAddedAt, prettyTag } from '../lib/format.ts';
+import { queryKeys } from '../lib/queryKeys.ts';
+import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 export function Org() {
   const params = useParams<{ slug: string }>();
@@ -57,15 +58,17 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
         e.status === 404 ? (
           <div className="lede mt-48">
             <div className="eyebrow">
-              § Organization file<span className="eyebrow-rule" />
+              § Organization file
+              <span className="eyebrow-rule" />
             </div>
             <h1>
-              This organization <span className="accent">isn&rsquo;t in the atlas yet.</span>
+              This organization{' '}
+              <span className="accent">isn&rsquo;t in the atlas yet.</span>
             </h1>
             <p className="deck">
-              Try <Link to="/browse">Browse</Link> for the metros we have indexed,
-              or <Link to="/submit">file a tip</Link> if you know who&rsquo;s
-              doing the work here.
+              Try <Link to="/browse">Browse</Link> for the metros we have indexed, or{' '}
+              <Link to="/submit">file a tip</Link> if you know who&rsquo;s doing the work
+              here.
             </p>
           </div>
         ) : undefined
@@ -249,10 +252,10 @@ function OrgContent({ org }: { org: OrgT }) {
           <div className="editors-note mt-16">
             <div className="label">Something off?</div>
             <p>
-              We check entries periodically, but the world moves faster than we
-              do. If a campaign listed here has wrapped, the leadership has
-              changed, or a fact looks wrong — <Link to="/submit">file a
-              correction</Link> and we&rsquo;ll fix it.
+              We check entries periodically, but the world moves faster than we do. If a
+              campaign listed here has wrapped, the leadership has changed, or a fact
+              looks wrong — <Link to="/submit">file a correction</Link> and we&rsquo;ll
+              fix it.
             </p>
           </div>
         </main>
@@ -263,8 +266,8 @@ function OrgContent({ org }: { org: OrgT }) {
             <div className="rail-kicker">Filed by</div>
             <p>
               An entry in the Urbanist Atlas, reviewed against the{' '}
-              <Link to="/about#methodology">inclusion criteria</Link> and
-              checked against public sources.
+              <Link to="/about#methodology">inclusion criteria</Link> and checked against
+              public sources.
             </p>
           </div>
           <div className="rail-block muted">
@@ -290,4 +293,3 @@ function OrgContent({ org }: { org: OrgT }) {
     </>
   );
 }
-

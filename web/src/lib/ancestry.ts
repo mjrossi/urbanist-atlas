@@ -16,6 +16,6 @@
  * The element type is generic so both `Region` and `RegionSummary`
  * lists pass through unchanged.
  */
-export function reverseAncestry<T>(ancestry: ReadonlyArray<T>): T[] {
+export function reverseAncestry<T>(ancestry: readonly T[]): T[] {
   return [...ancestry].reverse();
 }

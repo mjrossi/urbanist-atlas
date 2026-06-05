@@ -134,9 +134,20 @@ before adding any library not in this list.**
 - **Fonts:** Fraunces (display), Source Serif 4 (body), Inter (UI), all via
   `@fontsource-variable/*`. Self-hosted, no external font requests.
 - **Tests:** Vitest + React Testing Library.
-- **Lint/format:** ESLint (flat config: `@eslint/js` + `typescript-eslint` +
-  `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh`) + Prettier
-  (config inline in `package.json`'s `"prettier"` key).
+- **Lint/format:** ESLint flat config (`web/eslint.config.js`) with
+  **type-aware** linting: `@eslint/js` + `typescript-eslint`
+  (`strictTypeChecked` + `stylisticTypeChecked` via `projectService`) +
+  `@eslint-react/eslint-plugin` (React 19) + `eslint-plugin-react-hooks` +
+  `eslint-plugin-react-refresh` + `eslint-plugin-jsx-a11y` +
+  `eslint-plugin-simple-import-sort`, plus `@vitest/eslint-plugin` &
+  `eslint-plugin-testing-library` on test files, and `eslint-config-prettier`
+  last. `npm run lint` = `eslint . --max-warnings 0`. Formatting is
+  **Prettier** (`npm run format` / `format:check`; config inline in
+  `package.json`'s `"prettier"` key; `.prettierignore` skips generated
+  output). Type-check via `npm run typecheck` (`tsc -b`). `web/.npmrc` pins
+  `legacy-peer-deps=true` solely because `eslint-plugin-jsx-a11y`'s peer
+  range still caps at ESLint 9 (drop it once that's fixed). Adding any new
+  lint/format dependency needs maintainer sign-off (see above).
 - **Codegen:** `openapi-typescript` generates `src/lib/api.gen.ts` from
   `../api/openapi.yaml` via the `generate:api` npm script. All wire
   types in `src/lib/api.ts` import from there — **never hand-rolled**.

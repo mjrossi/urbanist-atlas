@@ -48,7 +48,8 @@
   --amber-soft: #c97d3e;
   --amber-tint: rgba(143, 85, 32, 0.08);
 
-  --serif: 'Fraunces Variable', 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --serif:
+    'Fraunces Variable', 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
   --serif-text: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
   --sans: 'Inter Variable', -apple-system, 'Segoe UI', system-ui, sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -59,23 +60,51 @@
    layout elements. The discrete pixel values match the
    broadsheet design system's vertical rhythm; the long
    list isn't a smell, it's the codified rhythm. */
-.mt-0   { margin-top: 0; }
-.mt-12  { margin-top: 12px; }
-.mt-14  { margin-top: 14px; }
-.mt-16  { margin-top: 16px; }
-.mt-22  { margin-top: 22px; }
-.mt-24  { margin-top: 24px; }
-.mt-32  { margin-top: 32px; }
-.mt-40  { margin-top: 40px; }
-.mt-48  { margin-top: 48px; }
-.mt-56  { margin-top: 56px; }
-.mb-0   { margin-bottom: 0; }
-.pt-6   { padding-top: 6px; }
-.gap-12 { gap: 12px; }
+.mt-0 {
+  margin-top: 0;
+}
+.mt-12 {
+  margin-top: 12px;
+}
+.mt-14 {
+  margin-top: 14px;
+}
+.mt-16 {
+  margin-top: 16px;
+}
+.mt-22 {
+  margin-top: 22px;
+}
+.mt-24 {
+  margin-top: 24px;
+}
+.mt-32 {
+  margin-top: 32px;
+}
+.mt-40 {
+  margin-top: 40px;
+}
+.mt-48 {
+  margin-top: 48px;
+}
+.mt-56 {
+  margin-top: 56px;
+}
+.mb-0 {
+  margin-bottom: 0;
+}
+.pt-6 {
+  padding-top: 6px;
+}
+.gap-12 {
+  gap: 12px;
+}
 
 /* Small-print body-copy size used in colophon/about
    footnotes (~14px instead of the default ~17px). */
-.text-sm { font-size: 14px; }
+.text-sm {
+  font-size: 14px;
+}
 
 /* The .hint default is block with capped width; .inline
    lets it flow alongside the label text. */
@@ -347,7 +376,9 @@ a {
   color: var(--ink-2);
   text-decoration: none;
   border-right: 1px solid var(--rule);
-  transition: color 120ms ease, background 120ms ease;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
   position: relative;
 }
 
@@ -588,7 +619,7 @@ a {
   font-weight: 600;
   font-variation-settings: 'opsz' 144;
   font-size: clamp(40px, 6.5vw, 72px);
-  line-height: 1.0;
+  line-height: 1;
   letter-spacing: -0.028em;
   margin: 0 0 22px;
   text-wrap: balance;
@@ -819,7 +850,9 @@ a {
   text-transform: uppercase;
   cursor: pointer;
   border-radius: 0;
-  transition: background 120ms ease, transform 80ms ease;
+  transition:
+    background 120ms ease,
+    transform 80ms ease;
   text-decoration: none;
   flex-shrink: 0;
 }
@@ -1306,7 +1339,9 @@ a.tag:hover::before {
   border-bottom: 1px solid var(--rule);
   text-decoration: none;
   color: inherit;
-  transition: background 120ms ease, padding 120ms ease;
+  transition:
+    background 120ms ease,
+    padding 120ms ease;
 }
 
 @media (hover: hover) {
@@ -1577,7 +1612,7 @@ a.tag:hover::before {
     padding-right: 0;
     border-left: 1px solid var(--rule);
   }
-  .org-strip .org-card:nth-last-child(-n+2) {
+  .org-strip .org-card:nth-last-child(-n + 2) {
     border-bottom: none;
   }
 }
@@ -1664,7 +1699,7 @@ a.tag:hover::before {
   font-weight: 600;
   font-variation-settings: 'opsz' 144;
   font-size: clamp(40px, 7vw, 84px);
-  line-height: 1.0;
+  line-height: 1;
   letter-spacing: -0.03em;
   margin: 0 0 14px;
   text-wrap: balance;
@@ -2731,7 +2766,9 @@ fieldset.field {
   outline: none;
   -webkit-appearance: none;
   appearance: none;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
 }
 
 @media (min-width: 720px) {
@@ -3332,7 +3369,9 @@ fieldset.field {
   height: 2px;
   background: var(--ink);
   border-radius: 1px;
-  transition: transform 160ms ease, opacity 160ms ease;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 
 .nav-open .nav-toggle-icon span:nth-child(1) {
@@ -3608,7 +3647,7 @@ fieldset.field {
   }
   .lede h1 {
     font-size: 38px;
-    line-height: 1.0;
+    line-height: 1;
   }
   .lede .deck {
     font-size: 17px;
@@ -3750,12 +3789,7 @@ fieldset.field {
       #000 calc(100% - 32px),
       transparent
     );
-    mask-image: linear-gradient(
-      90deg,
-      #000 0,
-      #000 calc(100% - 32px),
-      transparent
-    );
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 32px), transparent);
   }
   .topic-filters::-webkit-scrollbar {
     display: none;
@@ -4154,7 +4188,9 @@ fieldset.field {
   .org-card,
   .az-index a,
   .lookup-suggestions a {
-    transition: transform 80ms ease, opacity 80ms ease;
+    transition:
+      transform 80ms ease,
+      opacity 80ms ease;
   }
   .btn-primary:active,
   .tag:active,

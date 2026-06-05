@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { describe, expect, it } from 'vitest';
+
 import { NotFound } from './NotFound.tsx';
 
 function renderNotFound() {

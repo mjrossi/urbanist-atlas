@@ -1,10 +1,14 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+
 import { ApiError } from '../lib/api.ts';
 
-type Empty<T> = { when: (data: T) => boolean; render: ReactNode };
+interface Empty<T> {
+  when: (data: T) => boolean;
+  render: ReactNode;
+}
 
-type Props<T> = {
+interface Props<T> {
   query: UseQueryResult<T, ApiError>;
   /** Text or JSX rendered inside `<p className="results-state" role="status">` while pending. Defaults to "Loading…". */
   loading?: ReactNode;
@@ -24,7 +28,7 @@ type Props<T> = {
   className?: string;
   /** Renderer for the success state. */
   children: (data: T) => ReactNode;
-};
+}
 
 /**
  * QueryState collapses the loading / error / empty / success triad
@@ -73,7 +77,7 @@ export function QueryState<T>({
       </p>
     );
   }
-  if (empty && empty.when(query.data)) {
+  if (empty?.when(query.data)) {
     return empty.render;
   }
   return children(query.data);

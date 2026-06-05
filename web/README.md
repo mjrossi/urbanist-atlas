@@ -53,9 +53,11 @@ See the root `CLAUDE.md` and the approved plan. In short:
 
 ```
 npm install
-npm run dev       # Vite on http://localhost:5173
-npm test          # Vitest, watch mode (use `-- --run` for one-shot)
-npm run lint
+npm run dev        # Vite on http://localhost:5173
+npm test           # Vitest, watch mode (use `-- --run` for one-shot)
+npm run lint       # ESLint, type-aware, --max-warnings 0
+npm run format     # Prettier --write (format:check is the CI gate)
+npm run typecheck  # tsc -b
 npm run build
 ```
 

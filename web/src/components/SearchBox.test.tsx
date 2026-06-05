@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { describe, expect, it } from 'vitest';
+
 import { SearchBox } from './SearchBox.tsx';
 
 /**
@@ -13,11 +14,7 @@ function renderWithRouter() {
   function LocationProbe() {
     const loc = useLocation();
     return (
-      <div
-        data-testid="location"
-        data-pathname={loc.pathname}
-        data-search={loc.search}
-      />
+      <div data-testid="location" data-pathname={loc.pathname} data-search={loc.search} />
     );
   }
 
@@ -56,7 +53,7 @@ function getLocation() {
 }
 
 function getInput() {
-  return screen.getByLabelText(/postal code/i) as HTMLInputElement;
+  return screen.getByLabelText(/postal code/i);
 }
 
 function getButton() {

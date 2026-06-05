@@ -1,8 +1,9 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
-import { listRegions } from '../lib/api.ts';
+
 import type { RegionSummary } from '../lib/api.ts';
+import { listRegions } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 interface NavEntry {
@@ -11,12 +12,12 @@ interface NavEntry {
   label: string;
 }
 
-const NAV_ENTRIES: ReadonlyArray<NavEntry> = [
+const NAV_ENTRIES = [
   { to: '/', roman: 'i.', label: 'Front' },
   { to: '/browse', roman: 'ii.', label: 'Browse' },
   { to: '/submit', roman: 'iii.', label: 'Submit' },
   { to: '/about', roman: 'iv.', label: 'About' },
-];
+] as const satisfies readonly NavEntry[];
 
 function isActive(entry: NavEntry, pathname: string): boolean {
   if (entry.to === '/') return pathname === '/';
@@ -33,17 +34,19 @@ function isActive(entry: NavEntry, pathname: string): boolean {
 
 // The drawer label echoes the current page when collapsed and reads
 // "Close" when expanded. The fallback to NAV_ENTRIES[0] only matters on
-// routes that don't match any entry (e.g. /colophon, /r/*); the array
-// is a top-level const, so the non-null assertion is safe.
+// routes that don't match any entry (e.g. /colophon, /r/*); NAV_ENTRIES
+// is a non-empty tuple, so element 0 is always defined.
 function currentLabel(pathname: string): string {
   const active = NAV_ENTRIES.find((e) => isActive(e, pathname));
-  return active ? active.label : NAV_ENTRIES[0]!.label;
+  return active ? active.label : NAV_ENTRIES[0].label;
 }
 
 export function BroadsheetNav() {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => {
+    setMenuOpen(false);
+  };
 
   const regions = useQuery<RegionSummary[]>({
     queryKey: queryKeys.regions(),
@@ -64,7 +67,9 @@ export function BroadsheetNav() {
         aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={menuOpen}
         aria-controls="primary-nav-list"
-        onClick={() => setMenuOpen((o) => !o)}
+        onClick={() => {
+          setMenuOpen((o) => !o);
+        }}
       >
         <span className="nav-toggle-icon" aria-hidden="true">
           <span />

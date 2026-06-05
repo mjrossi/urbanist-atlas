@@ -1,5 +1,5 @@
-import { Link } from 'react-router';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 
 export interface PageBreadcrumbItem {
   label: string;
@@ -36,7 +36,7 @@ export function PageBreadcrumb({
   current,
   meta,
 }: {
-  prefix?: ReadonlyArray<PageBreadcrumbItem>;
+  prefix?: readonly PageBreadcrumbItem[];
   current: string;
   meta?: ReactNode;
 }) {
@@ -44,8 +44,8 @@ export function PageBreadcrumb({
     <div className="kicker">
       <nav aria-label="Breadcrumb">
         <ol className="crumb-trail">
-          {prefix.map((item, i) => (
-            <li key={`p-${i}`}>
+          {prefix.map((item) => (
+            <li key={item.to ?? item.label}>
               {item.to ? (
                 <Link to={item.to}>{item.label}</Link>
               ) : (

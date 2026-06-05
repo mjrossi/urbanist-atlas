@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  isBrowseableKind,
-  isMetroKind,
-  regionKindLabel,
-} from './regionKind.ts';
+
+import { isBrowseableKind, isMetroKind, regionKindLabel } from './regionKind.ts';
 
 // The dev-mode unknown-kind console.warn introduced for schema-drift
 // detection fires whenever a kind isn't in REGION_KINDS. Restore the
@@ -37,11 +34,10 @@ describe('regionKind', () => {
       'ca:province',
       'pt:municipio',
     ];
-    for (const k of knownKinds) {
-      if (isMetroKind(k) && !isBrowseableKind(k)) {
-        throw new Error(`${k} is metro but not browseable`);
-      }
-    }
+    const metroButNotBrowseable = knownKinds.filter(
+      (k) => isMetroKind(k) && !isBrowseableKind(k),
+    );
+    expect(metroButNotBrowseable).toEqual([]);
   });
 
   it('isBrowseableKind covers non-metro kinds the API resolves', () => {

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { describe, expect, it } from 'vitest';
+
 import { About } from './About.tsx';
 
 function renderAbout() {
@@ -21,7 +22,7 @@ describe('About', () => {
   it('renders the major section headings', () => {
     const { container } = renderAbout();
     const h2s = screen.getAllByRole('heading', { level: 2 });
-    const text = h2s.map((h) => h.textContent ?? '').join(' | ');
+    const text = h2s.map((h) => h.textContent).join(' | ');
     // Loosely assert mission + curation/methodology + acknowledgments
     // are present as h2s.
     expect(text).toMatch(/why this exists/i);
@@ -29,7 +30,9 @@ describe('About', () => {
     expect(text).toMatch(/who the directory rests on/i);
     // Section kickers carry the I/II/III labels.
     const kickers = container.querySelectorAll('.section-kicker');
-    const kickerText = Array.from(kickers).map((k) => k.textContent ?? '').join(' | ');
+    const kickerText = Array.from(kickers)
+      .map((k) => k.textContent)
+      .join(' | ');
     expect(kickerText).toMatch(/mission/i);
     expect(kickerText).toMatch(/methodology/i);
   });

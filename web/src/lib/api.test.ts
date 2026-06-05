@@ -4,14 +4,15 @@
  * (or throws {@link ApiError} on a non-2xx response).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
   ApiError,
   apiFetch,
-  getRegion,
   getOrg,
+  getRegion,
   isSupportedCountry,
-  listRegions,
   listRecent,
+  listRegions,
   lookup,
 } from './api.ts';
 
@@ -241,9 +242,7 @@ describe('listRegions / getRegion / listRecent', () => {
     expect(caught).toBeInstanceOf(ApiError);
     const apiErr = caught as ApiError;
     expect(apiErr.status).toBe(404);
-    expect(apiErr.problem?.type).toBe(
-      'https://urbanistatlas.com/problems/not-found',
-    );
+    expect(apiErr.problem?.type).toBe('https://urbanistatlas.com/problems/not-found');
   });
 
   it('getOrg percent-encodes the slug', async () => {
@@ -566,15 +565,11 @@ describe('ApiError — rich shape from problem+json', () => {
     expect(caught).toBeInstanceOf(ApiError);
     const apiErr = caught as ApiError;
     expect(apiErr.status).toBe(401);
-    expect(apiErr.problem?.type).toBe(
-      'https://urbanistatlas.com/problems/unauthorized',
-    );
+    expect(apiErr.problem?.type).toBe('https://urbanistatlas.com/problems/unauthorized');
     expect(apiErr.problem?.title).toBe('Unauthorized');
     // Pin the detail too so the fixture is actually load-bearing —
     // a future drift in the server-emitted string will fail here.
-    expect(apiErr.problem?.detail).toBe(
-      'missing or invalid X-Atlas-Client header',
-    );
+    expect(apiErr.problem?.detail).toBe('missing or invalid X-Atlas-Client header');
   });
 
   it('non-2xx with non-problem body: problem is undefined, message is `HTTP <status>`', async () => {
@@ -649,13 +644,10 @@ describe('ApiError — rich shape from problem+json', () => {
 
   it('leaves retryAfterSeconds undefined when Retry-After is missing on a 429', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ title: 'Too Many Requests', status: 429 }),
-        {
-          status: 429,
-          headers: { 'Content-Type': 'application/problem+json' },
-        },
-      ),
+      new Response(JSON.stringify({ title: 'Too Many Requests', status: 429 }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/problem+json' },
+      }),
     );
     let caught: unknown;
     try {
@@ -701,13 +693,10 @@ describe('ApiError — rich shape from problem+json', () => {
 
   it('leaves fieldErrors undefined when the envelope has no errors extension', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ title: 'Bad Request', status: 400, detail: 'bad' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/problem+json' },
-        },
-      ),
+      new Response(JSON.stringify({ title: 'Bad Request', status: 400, detail: 'bad' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/problem+json' },
+      }),
     );
     let caught: unknown;
     try {

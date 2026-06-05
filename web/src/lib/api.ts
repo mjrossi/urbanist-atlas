@@ -303,9 +303,7 @@ export function getOrg(slug: string, init?: RequestInit): Promise<Org> {
  * `data` so callers continue to receive the bare array.
  */
 export function listRecent(init?: RequestInit): Promise<Org[]> {
-  return apiFetch<RecentEnvelope>('/api/v1/recent', init).then(
-    (env) => env.data,
-  );
+  return apiFetch<RecentEnvelope>('/api/v1/recent', init).then((env) => env.data);
 }
 
 /**
@@ -321,13 +319,12 @@ export function createSubmission(
   body: NewSubmissionRequest,
   init?: RequestInit,
 ): Promise<Submission> {
+  const headers = new Headers(init?.headers);
+  headers.set('Content-Type', 'application/json');
   return apiFetch<Submission>('/api/v1/submissions', {
     ...init,
     method: 'POST',
-    headers: {
-      ...(init?.headers ?? {}),
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   });
 }

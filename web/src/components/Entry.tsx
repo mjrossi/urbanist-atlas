@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+
 import type { Org } from '../lib/api.ts';
 import { domainOf, prettyTag } from '../lib/format.ts';
 
@@ -31,7 +32,7 @@ export function Entry({
    * "Matched via X" footer is suppressed when this is undefined or
    * empty.
    */
-  matchedRegionSlugs?: ReadonlyArray<string>;
+  matchedRegionSlugs?: readonly string[];
   /**
    * Slug → display-name map for the matched-via footer. When a slug
    * is missing from the map, the raw slug renders.
@@ -41,9 +42,7 @@ export function Entry({
   const domain = domainOf(org.website_url);
   const matchedNames =
     matchedRegionSlugs && matchedRegionSlugs.length > 0
-      ? matchedRegionSlugs
-          .map((slug) => regionNameBySlug?.get(slug) ?? slug)
-          .join(' · ')
+      ? matchedRegionSlugs.map((slug) => regionNameBySlug?.get(slug) ?? slug).join(' · ')
       : null;
 
   return (

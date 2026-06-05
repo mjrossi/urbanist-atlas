@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router';
 
-const FOLIO_LABELS: ReadonlyArray<[RegExp, string]> = [
+const FOLIO_LABELS: readonly [RegExp, string][] = [
   [/^\/$/, "Today's reading"],
   [/^\/about$/, 'About the Atlas'],
   [/^\/browse$/, 'The index'],

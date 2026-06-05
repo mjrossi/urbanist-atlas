@@ -21,11 +21,11 @@
  * Adding a new country's kinds means editing this one record, not
  * three independent sets across the SPA.
  */
-type RegionKindInfo = {
+interface RegionKindInfo {
   label: string;
   browseable: boolean;
   metro: boolean;
-};
+}
 
 const REGION_KINDS: Record<string, RegionKindInfo> = {
   // Default browse set: metros + cities, surfaced by /api/v1/regions.
@@ -45,7 +45,11 @@ const REGION_KINDS: Record<string, RegionKindInfo> = {
   'us:county': { label: 'County', browseable: true, metro: false },
   'us:borough': { label: 'Borough', browseable: true, metro: false },
   'us:multi-state': { label: 'Multi-state region', browseable: true, metro: false },
-  'us:transit-federation': { label: 'Transit federation', browseable: true, metro: false },
+  'us:transit-federation': {
+    label: 'Transit federation',
+    browseable: true,
+    metro: false,
+  },
   'ca:province': { label: 'Province', browseable: true, metro: false },
   'ca:territory': { label: 'Territory', browseable: true, metro: false },
   'pt:distrito': { label: 'Distrito', browseable: true, metro: false },

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { describe, expect, it } from 'vitest';
+
 import { PageBreadcrumb } from './PageBreadcrumb.tsx';
 
 describe('PageBreadcrumb', () => {
@@ -42,7 +43,9 @@ describe('PageBreadcrumb', () => {
     );
 
     expect(screen.getByRole('link', { name: 'Atlas' }).getAttribute('href')).toBe('/');
-    expect(screen.getByRole('link', { name: 'Browse' }).getAttribute('href')).toBe('/browse');
+    expect(screen.getByRole('link', { name: 'Browse' }).getAttribute('href')).toBe(
+      '/browse',
+    );
   });
 
   it('renders prefix items without `to` as plain text (no link wrapper)', () => {

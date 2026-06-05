@@ -35,7 +35,9 @@ export function useScrollToTop(): void {
       const raf = requestAnimationFrame(() => {
         scrollToTarget();
       });
-      return () => cancelAnimationFrame(raf);
+      return () => {
+        cancelAnimationFrame(raf);
+      };
     }
     window.scrollTo(0, 0);
   }, [pathname, hash]);

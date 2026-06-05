@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { reverseAncestry } from './ancestry.ts';
 
 describe('reverseAncestry', () => {
