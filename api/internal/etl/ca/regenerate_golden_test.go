@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	shp "github.com/jonas-p/go-shp"
+
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
 

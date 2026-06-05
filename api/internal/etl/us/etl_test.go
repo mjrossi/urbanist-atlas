@@ -114,10 +114,14 @@ func TestAutoParents(t *testing.T) {
 
 func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 	msas := []MSA{
-		{CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ-PA", StateAbbrevs: []string{"NY", "NJ", "PA"},
-			Counties: []string{"34017", "36061", "42103"}},
-		{CBSACode: "47900", Title: "Washington-Arlington-Alexandria, DC-VA-MD-WV", StateAbbrevs: []string{"DC", "VA", "MD", "WV"},
-			Counties: []string{"11001", "24031", "51059", "54037"}},
+		{
+			CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ-PA", StateAbbrevs: []string{"NY", "NJ", "PA"},
+			Counties: []string{"34017", "36061", "42103"},
+		},
+		{
+			CBSACode: "47900", Title: "Washington-Arlington-Alexandria, DC-VA-MD-WV", StateAbbrevs: []string{"DC", "VA", "MD", "WV"},
+			Counties: []string{"11001", "24031", "51059", "54037"},
+		},
 	}
 	overrides := []MSAOverride{
 		{CBSACode: "35620", Slug: "nyc-metro", Name: "New York Metro", Parents: []string{"nyc-tristate"}},
@@ -156,12 +160,16 @@ func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 // A regression that re-introduces a flagship skip would fail here.
 func TestBuildRegionRows_OverriddenMultiStateGetsPortions(t *testing.T) {
 	msas := []MSA{
-		{CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ", StateAbbrevs: []string{"NY", "NJ"},
-			Counties: []string{"34017", "36061"}}, // Hudson County NJ + Manhattan NY
+		{
+			CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ", StateAbbrevs: []string{"NY", "NJ"},
+			Counties: []string{"34017", "36061"},
+		}, // Hudson County NJ + Manhattan NY
 	}
 	overrides := []MSAOverride{
-		{CBSACode: "35620", Slug: "nyc-metro", Name: "New York Metro",
-			Parents: []string{"nyc-tristate"}, RollupStates: []string{"nj", "ny"}},
+		{
+			CBSACode: "35620", Slug: "nyc-metro", Name: "New York Metro",
+			Parents: []string{"nyc-tristate"}, RollupStates: []string{"nj", "ny"},
+		},
 	}
 	rows, portionSlugs := BuildRegionRows(msas, AssignMSASlugs(msas, overrides))
 

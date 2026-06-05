@@ -17,7 +17,7 @@ import (
 // fixtureFS assembles an in-memory seed bundle: one region TOML per
 // suffix, one postal CSV per country code, and orgs.toml. Each value
 // in regionTOML is the full file body.
-func fixtureFS(regionTOML map[string]string, postalCSV map[string]string, orgsTOML string) fstest.MapFS {
+func fixtureFS(regionTOML, postalCSV map[string]string, orgsTOML string) fstest.MapFS {
 	fs := fstest.MapFS{}
 	for suffix, body := range regionTOML {
 		fs["regions_"+suffix+".toml"] = &fstest.MapFile{Data: []byte(body)}

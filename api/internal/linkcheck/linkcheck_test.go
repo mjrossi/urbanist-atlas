@@ -81,7 +81,7 @@ func TestCheck(t *testing.T) {
 
 	t.Run("HEAD 405 falls back to GET", func(t *testing.T) {
 		var headCount, getCount int
-		var mu = make(chan struct{}, 1)
+		mu := make(chan struct{}, 1)
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			mu <- struct{}{}
 			defer func() { <-mu }()
