@@ -87,6 +87,7 @@ The dev loop has no external dependencies: `mise install`, then
   - `github.com/oapi-codegen/oapi-codegen/v2` — Go types generated from `api/openapi.yaml` (types-only; no chi-server stubs)
   - `github.com/pelletier/go-toml/v2` — TOML loading for hand-curated seed data (regions + orgs)
   - `github.com/google/go-cmp/cmp` — diff-friendly test assertions
+  - `github.com/prometheus/client_golang` — Prometheus instrumentation for the `/metrics` endpoint (Phase 1 analytics/observability stack)
 - **Logging:** `log/slog` (stdlib). JSON in prod, text in dev.
 - **Errors:** stdlib `errors` + `fmt.Errorf("...: %w", err)`. No third-party
   errors libraries.
