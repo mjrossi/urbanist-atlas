@@ -200,6 +200,16 @@ web-deps:
 web-lint:
     cd web && npm run lint
 
+# check formatting without writing (prettier --check)
+[group('web')]
+web-format-check:
+    cd web && npm run format:check
+
+# auto-format the web sources (prettier --write)
+[group('web')]
+web-format:
+    cd web && npm run format
+
 # vitest --run (no watch, matches CI)
 [group('web')]
 web-test:
@@ -228,8 +238,8 @@ web-gen-check:
 # deps + lint + test + build + gen-no-diff — the CI gate for web/,
 # run locally
 [group('web')]
-[doc('deps + lint + test + build + gen-no-diff — CI gate for web/')]
-web-check: web-deps web-lint web-test web-build web-gen-check
+[doc('deps + lint + format + test + build + gen-no-diff — CI gate for web/')]
+web-check: web-deps web-lint web-format-check web-test web-build web-gen-check
 
 # ── preview: full-stack PR review against a local stack ─
 # Cloudflare Workers preview URLs target the *current* production
