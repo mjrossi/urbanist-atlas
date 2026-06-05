@@ -1,6 +1,7 @@
-import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { searchRegions, type RegionSearchResult } from '../lib/api.ts';
+import { type KeyboardEvent, useId, useRef, useState } from 'react';
+
+import { type RegionSearchResult, searchRegions } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDebouncedValue } from '../lib/useDebouncedValue.ts';
 
@@ -48,9 +49,9 @@ export function RegionCombobox({
   const [activeIndex, setActiveIndex] = useState(-1);
   // Display labels captured at selection time, so chips read "Queens ·
   // New York" without a second fetch. Keyed by slug.
-  const [labels, setLabels] = useState<
-    Record<string, { name: string; context: string }>
-  >({});
+  const [labels, setLabels] = useState<Record<string, { name: string; context: string }>>(
+    {},
+  );
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -96,8 +97,7 @@ export function RegionCombobox({
     // for regions no longer selected. A re-add re-captures it in select().
     setLabels((prev) => {
       if (!(slug in prev)) return prev;
-      const next = { ...prev };
-      delete next[slug];
+      const { [slug]: _removed, ...next } = prev;
       return next;
     });
   }
@@ -163,7 +163,9 @@ export function RegionCombobox({
                   type="button"
                   className="combobox-chip-remove"
                   aria-label={`Remove ${name}`}
-                  onClick={() => remove(slug)}
+                  onClick={() => {
+                    remove(slug);
+                  }}
                 >
                   ×
                 </button>
@@ -184,7 +186,7 @@ export function RegionCombobox({
         aria-autocomplete="list"
         aria-activedescendant={activeOptionId}
         aria-describedby={describedById}
-        aria-invalid={invalid || undefined}
+        aria-invalid={invalid ? true : undefined}
         autoComplete="off"
         placeholder={
           value.length > 0
@@ -197,7 +199,9 @@ export function RegionCombobox({
           setOpen(true);
           setActiveIndex(-1);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setOpen(true);
+        }}
         onBlur={() => {
           setOpen(false);
           onBlur?.();
@@ -220,7 +224,9 @@ export function RegionCombobox({
                 e.preventDefault();
                 select(r);
               }}
-              onMouseEnter={() => setActiveIndex(i)}
+              onMouseEnter={() => {
+                setActiveIndex(i);
+              }}
             >
               <span className="combobox-option-name">{r.region.name}</span>
               {r.context_label ? (
@@ -233,8 +239,8 @@ export function RegionCombobox({
 
       {searchFailed ? (
         <p className="combobox-status" role="status">
-          Region search is unavailable right now — describe your region in
-          the field below and we&rsquo;ll map it.
+          Region search is unavailable right now — describe your region in the field below
+          and we&rsquo;ll map it.
         </p>
       ) : null}
     </div>

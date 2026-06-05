@@ -139,7 +139,7 @@ export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionReques
       name: form.name.trim(),
       short_desc: shortDescForWire(form),
       website_url: form.website.trim(),
-      region_slugs: form.regionSlugs ?? [],
+      region_slugs: form.regionSlugs,
     },
     submitter_note: submitterNote,
     ...(form.contact.trim() ? maybeContact(form.contact) : {}),

@@ -1,14 +1,15 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { ApiError, listRegions } from '../lib/api.ts';
-import type { RegionSummary } from '../lib/api.ts';
-import { queryKeys } from '../lib/queryKeys.ts';
-import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
-import { regionKindLabel } from '../lib/regionKind.ts';
+
 import { EmptyState } from '../components/EmptyState.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
+import type { RegionSummary } from '../lib/api.ts';
+import { ApiError, listRegions } from '../lib/api.ts';
+import { queryKeys } from '../lib/queryKeys.ts';
+import { regionKindLabel } from '../lib/regionKind.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -34,7 +35,7 @@ interface ByCountry {
 }
 
 function letterOf(name: string): string {
-  const m = name.trim().toUpperCase().match(/[A-Z]/);
+  const m = /[A-Z]/.exec(name.trim().toUpperCase());
   return m ? m[0] : '#';
 }
 
@@ -51,14 +52,13 @@ function letterOf(name: string): string {
  * shares a first letter so this is moot in practice, but the
  * convention reads cleaner than splitting children across letters.
  */
-function groupForBrowse(all: ReadonlyArray<RegionSummary>): ByCountry[] {
+function groupForBrowse(all: readonly RegionSummary[]): ByCountry[] {
   const slugSet = new Set<string>(all.map((r) => r.region.slug));
 
   const byCountry: Record<string, RegionSummary[]> = {};
   for (const p of all) {
     const c = p.region.country;
-    if (!byCountry[c]) byCountry[c] = [];
-    byCountry[c].push(p);
+    (byCountry[c] ??= []).push(p);
   }
   return Object.entries(byCountry)
     .sort(([a], [b]) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)))
@@ -86,8 +86,7 @@ function groupForBrowse(all: ReadonlyArray<RegionSummary>): ByCountry[] {
       const grouped: Record<string, AnchorWithChildren[]> = {};
       for (const a of anchors) {
         const letter = letterOf(a.region.name);
-        if (!grouped[letter]) grouped[letter] = [];
-        grouped[letter].push({
+        (grouped[letter] ??= []).push({
           anchor: a,
           children: childrenByAnchor.get(a.region.slug) ?? [],
         });
@@ -124,31 +123,32 @@ export function Browse() {
       <div className="spread lede-first mt-48">
         <div className="lede mb-0">
           <div className="eyebrow">
-            § The index<span className="eyebrow-rule" />
+            § The index
+            <span className="eyebrow-rule" />
           </div>
           <h1>
             Every metro and city <span className="accent">we&rsquo;ve indexed</span> —
             alphabetical.
           </h1>
           <p className="deck">
-            Useful when you want to wander rather than search. Open a region
-            for the groups working there, or jump to a letter on the strip
-            below. Big cities appear alongside their parent metro — clicking
-            the city shows only its own groups, while clicking the metro
-            pulls in everything across the broader region.
+            Useful when you want to wander rather than search. Open a region for the
+            groups working there, or jump to a letter on the strip below. Big cities
+            appear alongside their parent metro — clicking the city shows only its own
+            groups, while clicking the metro pulls in everything across the broader
+            region.
           </p>
         </div>
         <div className="rail-block muted mt-12">
           <div className="rail-kicker">Sorting</div>
           <p>
-            Regions are sorted alphabetically within each country. The number
-            in italic is the count of organizations the Atlas currently lists
-            for that region (the metro count includes orgs tagged to its
-            cities and counties via the region graph).
+            Regions are sorted alphabetically within each country. The number in italic is
+            the count of organizations the Atlas currently lists for that region (the
+            metro count includes orgs tagged to its cities and counties via the region
+            graph).
           </p>
           <p className="mb-0">
-            Searching by ZIP or postal code?{' '}
-            <Link to="/">Use the front-page lookup</Link>.
+            Searching by ZIP or postal code? <Link to="/">Use the front-page lookup</Link>
+            .
           </p>
         </div>
       </div>
@@ -229,8 +229,8 @@ function CountrySection({ country }: { country: ByCountry }) {
         <h2 className="cname">{name}</h2>
         <div className="crule" />
         <div className="cnum">
-          <span className="em">{total}</span> regions ·{' '}
-          <span className="em">{orgs}</span> orgs
+          <span className="em">{total}</span> regions · <span className="em">{orgs}</span>{' '}
+          orgs
         </div>
       </header>
       {country.letters.map((group) => (

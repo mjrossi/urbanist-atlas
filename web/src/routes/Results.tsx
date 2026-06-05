@@ -1,18 +1,19 @@
-import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
-import type { Country, LookupResult } from '../lib/api.ts';
-import { reverseAncestry } from '../lib/ancestry.ts';
-import { normalizePostal } from '../lib/postal.ts';
-import { queryKeys } from '../lib/queryKeys.ts';
-import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
+
 import { EmptyState } from '../components/EmptyState.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { QueryState } from '../components/QueryState.tsx';
-import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
+import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
+import { reverseAncestry } from '../lib/ancestry.ts';
+import type { Country, LookupResult } from '../lib/api.ts';
+import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
+import { normalizePostal } from '../lib/postal.ts';
+import { queryKeys } from '../lib/queryKeys.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 function parseCountry(raw: string | null): Country | null {
   if (raw === null) return 'US';
@@ -51,7 +52,7 @@ export function Results() {
   // Breadcrumb prefix: "Atlas / Lookup · <ZIP>". The ZIP renders as
   // a non-clickable span (no `to`) so it shows context without
   // implying a clickable lookup-only landing page.
-  const breadcrumbPrefix: ReadonlyArray<BreadcrumbItem> = [
+  const breadcrumbPrefix: readonly BreadcrumbItem[] = [
     { label: 'Atlas', to: '/' },
     { label: `Lookup · ${postalCode || '—'}` },
   ];
@@ -131,24 +132,22 @@ function ResultsContent({
   data: LookupResult;
   postalCode: string;
 }) {
-  const placeLabel = data.resolved_place_label ?? postalCode;
+  const placeLabel = data.resolved_place_label;
   const { local, regional, statewide, resolved_ancestry } = data;
-  const empty =
-    local.length === 0 && regional.length === 0 && statewide.length === 0;
+  const empty = local.length === 0 && regional.length === 0 && statewide.length === 0;
 
   // EntryList needs a slug -> display name map for its "Matched
   // via X" footer. Build it from the resolved-ancestry walk; this
   // covers every slug an Org's matched_region_slugs can reference
   // for this lookup.
-  const regionNameBySlug = new Map(
-    resolved_ancestry.map((r) => [r.slug, r.name]),
-  );
+  const regionNameBySlug = new Map(resolved_ancestry.map((r) => [r.slug, r.name]));
 
   return (
     <>
       <div className="lede mt-48">
         <div className="eyebrow">
-          § Postal-code lookup<span className="eyebrow-rule" />
+          § Postal-code lookup
+          <span className="eyebrow-rule" />
         </div>
         <h1>
           {postalCode}
@@ -168,8 +167,8 @@ function ResultsContent({
           body={
             <>
               Know an organization that should be in the Atlas for {placeLabel}?{' '}
-              <Link to="/submit">File a tip at the submissions desk</Link> and
-              we&rsquo;ll go look.
+              <Link to="/submit">File a tip at the submissions desk</Link> and we&rsquo;ll
+              go look.
             </>
           }
         />

@@ -12,8 +12,8 @@ export function Footer() {
             A directory of the people fighting for better streets, where you live.
           </p>
           <p className="colophon-note">
-            An independent informational directory. Not affiliated with the
-            organizations listed.{' '}
+            An independent informational directory. Not affiliated with the organizations
+            listed.{' '}
             <a href="https://mjrossi.com/blog">
               A companion to <em>Urbanist Lexicon</em>
             </a>
@@ -53,9 +53,7 @@ export function Footer() {
               <Link to="/colophon">Colophon &amp; sources</Link>
             </li>
             <li>
-              <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">
-                OpenAPI spec
-              </a>
+              <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">OpenAPI spec</a>
             </li>
           </ul>
         </div>
@@ -71,9 +69,7 @@ export function Footer() {
               </a>
             </li>
             <li>
-              <a href="https://github.com/mjrossi/urbanist-atlas">
-                Source on GitHub
-              </a>
+              <a href="https://github.com/mjrossi/urbanist-atlas">Source on GitHub</a>
             </li>
           </ul>
         </div>

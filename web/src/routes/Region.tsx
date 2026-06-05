@@ -1,19 +1,20 @@
-import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
-import { ApiError, getRegion } from '../lib/api.ts';
-import type { LookupOrg, RegionDetail } from '../lib/api.ts';
-import { reverseAncestry } from '../lib/ancestry.ts';
-import { queryKeys } from '../lib/queryKeys.ts';
-import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
-import { regionKindLabel } from '../lib/regionKind.ts';
+
 import { EmptyState } from '../components/EmptyState.tsx';
 import { EntryList } from '../components/EntryList.tsx';
 import { QueryState } from '../components/QueryState.tsx';
-import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
+import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
+import { reverseAncestry } from '../lib/ancestry.ts';
+import type { LookupOrg, RegionDetail } from '../lib/api.ts';
+import { ApiError, getRegion } from '../lib/api.ts';
+import { queryKeys } from '../lib/queryKeys.ts';
+import { regionKindLabel } from '../lib/regionKind.ts';
+import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
-const BREADCRUMB_PREFIX: ReadonlyArray<BreadcrumbItem> = [
+const BREADCRUMB_PREFIX: readonly BreadcrumbItem[] = [
   { label: 'Atlas', to: '/' },
   { label: 'Browse', to: '/browse' },
 ];
@@ -37,14 +38,10 @@ export function Region() {
   // root → leaf), but the API hands them back closest-first.
   // `reverseAncestry` keeps the API contract leaf-centric and the
   // SPA owns its display ordering.
-  const ancestorsRootFirst = query.data
-    ? reverseAncestry(query.data.ancestry)
-    : [];
+  const ancestorsRootFirst = query.data ? reverseAncestry(query.data.ancestry) : [];
   const currentLabel = query.data ? query.data.region.name : 'Region';
   const totalOrgs = query.data
-    ? query.data.local.length +
-      query.data.regional.length +
-      query.data.statewide.length
+    ? query.data.local.length + query.data.regional.length + query.data.statewide.length
     : 0;
   const metaRight = query.data
     ? `${totalOrgs} ${totalOrgs === 1 ? 'org' : 'orgs'} indexed`
@@ -73,14 +70,15 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
         e.status === 404 ? (
           <div className="lede mt-48">
             <div className="eyebrow">
-              § Region report<span className="eyebrow-rule" />
+              § Region report
+              <span className="eyebrow-rule" />
             </div>
             <h1>
               This region <span className="accent">isn&rsquo;t in the atlas yet.</span>
             </h1>
             <p className="deck">
-              Try <Link to="/browse">Browse</Link> for the regions we have indexed,
-              or <Link to="/submit">file a tip</Link> if you know advocates here.
+              Try <Link to="/browse">Browse</Link> for the regions we have indexed, or{' '}
+              <Link to="/submit">file a tip</Link> if you know advocates here.
             </p>
           </div>
         ) : undefined
@@ -92,8 +90,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
 }
 
 function RegionContent({ data }: { data: RegionDetail }) {
-  const { region, local, regional, statewide, ancestry, descendant_region_names } =
-    data;
+  const { region, local, regional, statewide, ancestry, descendant_region_names } = data;
   const kindLabel = regionKindLabel(region.kind);
   const totalOrgs = local.length + regional.length + statewide.length;
 
@@ -150,7 +147,9 @@ function RegionContent({ data }: { data: RegionDetail }) {
             <EmptyState
               className="mt-24"
               title="No entries here yet"
-              body={<>Know a group organizing in {region.name}? It belongs in the Atlas.</>}
+              body={
+                <>Know a group organizing in {region.name}? It belongs in the Atlas.</>
+              }
               cta={<Link to="/submit">File a tip at the submissions desk.</Link>}
             />
           ) : (
@@ -166,10 +165,9 @@ function RegionContent({ data }: { data: RegionDetail }) {
           <div className="editors-note mt-32">
             <div className="label">Know a group we&rsquo;re missing?</div>
             <p>
-              Spotted a coalition that belongs here?{' '}
-              <Link to="/submit">File a tip</Link>, and see{' '}
-              <Link to="/about#methodology">our criteria</Link> for what makes
-              the cut.
+              Spotted a coalition that belongs here? <Link to="/submit">File a tip</Link>,
+              and see <Link to="/about#methodology">our criteria</Link> for what makes the
+              cut.
             </p>
           </div>
         </main>
@@ -182,13 +180,12 @@ function RegionContent({ data }: { data: RegionDetail }) {
               {parentNames.length > 0
                 ? `, sitting under ${parentNames.join(' · ')}.`
                 : '.'}{' '}
-              This page lists orgs anchored to {region.name} itself or to
-              regions it contains. For the wider footprint above (state,
-              multi-state coalitions), use the front-page postal lookup.
+              This page lists orgs anchored to {region.name} itself or to regions it
+              contains. For the wider footprint above (state, multi-state coalitions), use
+              the front-page postal lookup.
             </p>
             <p className="mb-0">
-              Looking up by postal code?{' '}
-              <Link to="/">Use the front-page lookup</Link>.
+              Looking up by postal code? <Link to="/">Use the front-page lookup</Link>.
             </p>
           </div>
           {totalOrgs > 0 ? (
@@ -208,7 +205,8 @@ function RegionContent({ data }: { data: RegionDetail }) {
                   {statewide.length === 1 ? 'entry' : 'entries'}
                 </li>
                 <li>
-                  <strong>{countTags([...local, ...regional, ...statewide])}</strong> distinct editorial tags
+                  <strong>{countTags([...local, ...regional, ...statewide])}</strong>{' '}
+                  distinct editorial tags
                 </li>
                 <li>
                   Region kind{' '}
@@ -239,7 +237,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
   );
 }
 
-function countTags(orgs: ReadonlyArray<LookupOrg>): number {
+function countTags(orgs: readonly LookupOrg[]): number {
   const s = new Set<string>();
   for (const o of orgs) for (const t of o.tags) s.add(t);
   return s.size;

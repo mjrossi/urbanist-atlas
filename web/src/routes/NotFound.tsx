@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+
 import { BroadsheetNav } from '../components/BroadsheetNav.tsx';
 import { Footer } from '../components/Footer.tsx';
 import { Masthead } from '../components/Masthead.tsx';
@@ -17,28 +18,26 @@ export function NotFound() {
       />
       <div className="lede mt-56">
         <div className="eyebrow">
-          § Retractions desk<span className="eyebrow-rule" />
+          § Retractions desk
+          <span className="eyebrow-rule" />
         </div>
         <h1>
           Page <span className="accent">not in this edition.</span>
         </h1>
         <p className="deck">
-          We couldn&rsquo;t find the page you were after. The link you followed
-          either never went to press, or has since been retired.
+          We couldn&rsquo;t find the page you were after. The link you followed either
+          never went to press, or has since been retired.
         </p>
       </div>
       <div className="spread mt-24">
         <div className="prose">
           <p>
-            If you followed a link from another site and you think this page
-            should still exist, please{' '}
-            <Link to="/submit">file a tip at the submissions desk</Link> with
-            the URL you tried — we&rsquo;ll either restore the entry or update
-            the redirect.
+            If you followed a link from another site and you think this page should still
+            exist, please <Link to="/submit">file a tip at the submissions desk</Link>{' '}
+            with the URL you tried — we&rsquo;ll either restore the entry or update the
+            redirect.
           </p>
-          <p>
-            Otherwise, the front page is the best place to start:
-          </p>
+          <p>Otherwise, the front page is the best place to start:</p>
           <p>
             <Link to="/" className="btn-primary not-found-return">
               Return to the front page <span className="arrow">→</span>

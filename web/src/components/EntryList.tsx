@@ -41,8 +41,9 @@ export function EntryList({
       {sections.map((s, i) => (
         <Section
           key={s.title}
-          // sections is a filter of 3 entries, so i < ROMAN.length always.
-          roman={ROMAN[i]!}
+          // sections is a filter of the 3 tiers, so i is always 0–2 and in
+          // range; the `?? ''` only satisfies noUncheckedIndexedAccess.
+          roman={ROMAN[i] ?? ''}
           title={s.title}
           orgs={s.orgs}
           regionNameBySlug={regionNameBySlug}

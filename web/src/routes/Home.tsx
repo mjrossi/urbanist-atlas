@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
+
 import { EmptyState } from '../components/EmptyState.tsx';
-import { SearchBox } from '../components/SearchBox.tsx';
 import { QueryState } from '../components/QueryState.tsx';
-import { ApiError, listRegions, listRecent } from '../lib/api.ts';
-import type { RegionSummary, Org } from '../lib/api.ts';
+import { SearchBox } from '../components/SearchBox.tsx';
+import type { Org, RegionSummary } from '../lib/api.ts';
+import { ApiError, listRecent, listRegions } from '../lib/api.ts';
 import { formatAddedAt } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -14,7 +15,7 @@ import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 const TOP_PLACES_LIMIT = 7;
 const RECENT_LIMIT = 4;
 
-const TOPIC_TAGS: ReadonlyArray<string> = [
+const TOPIC_TAGS: readonly string[] = [
   'Transit',
   'Safe streets',
   'Vision Zero',
@@ -54,27 +55,25 @@ export function Home() {
 
           <div className="prose mt-48">
             <p className="lead drop">
-              Across the country, the county, and around the corner, people show
-              up to transportation meetings patiently arguing for safer streets
-              and better transit. The Urbanist Atlas helps you find these
-              meetings and groups.
+              Across the country, the county, and around the corner, people show up to
+              transportation meetings patiently arguing for safer streets and better
+              transit. The Urbanist Atlas helps you find these meetings and groups.
             </p>
             <p>
-              How it works: type a US ZIP or a Canadian postal code and
-              we&rsquo;ll name the ones working where you live.
+              How it works: type a US ZIP or a Canadian postal code and we&rsquo;ll name
+              the ones working where you live.
             </p>
             <p>
-              We&rsquo;ll index local and regional advocates only. National
-              outfits do plenty of good work, but they&rsquo;re easier to find
-              on their own. The hard search is finding those right around you.
-              Who knows? They might be right behind your keyboard.
+              We&rsquo;ll index local and regional advocates only. National outfits do
+              plenty of good work, but they&rsquo;re easier to find on their own. The hard
+              search is finding those right around you. Who knows? They might be right
+              behind your keyboard.
             </p>
             <div className="editors-note">
               <div className="label">Editor&rsquo;s note · Vol. I</div>
               <p>
                 Every entry is reviewed against{' '}
-                <Link to="/about#methodology">our criteria</Link> before it goes
-                in.{' '}
+                <Link to="/about#methodology">our criteria</Link> before it goes in.{' '}
                 <Link to="/submit">File a tip</Link> if your region is missing.
               </p>
             </div>
@@ -92,8 +91,8 @@ export function Home() {
           <div className="rail-block amber desktop-only">
             <div className="rail-kicker">From the editors</div>
             <p className="pullquote-rail">
-              The most local thing on the internet is the meeting three blocks
-              from your door.
+              The most local thing on the internet is the meeting three blocks from your
+              door.
             </p>
           </div>
         </aside>
@@ -273,9 +272,7 @@ function ByTheNumbers({
           <div className="n">{formatNumber(placeCount)}</div>
           <div className="label">Regions indexed</div>
           <div className="sub">
-            {usCount !== null && caCount !== null
-              ? `${usCount} US · ${caCount} Canada`
-              : 'Two countries, v1'}
+            {usCount !== null ? `${usCount} US · ${caCount} Canada` : 'Two countries, v1'}
           </div>
         </div>
         <div className="stat">
@@ -297,7 +294,7 @@ function ByTheNumbers({
   );
 }
 
-function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
+function TopicIndex({ tags }: { tags: readonly string[] }) {
   return (
     <>
       <section className="section-break mt-56">
@@ -315,18 +312,18 @@ function TopicIndex({ tags }: { tags: ReadonlyArray<string> }) {
             ))}
           </ul>
           <p className="fineprint mt-22">
-            Tags are editorial labels — up to five per
-            organization. Filtering by topic arrives with Phase 2; until then,{' '}
-            <Link to="/browse">the region index</Link> is how you wander.
+            Tags are editorial labels — up to five per organization. Filtering by topic
+            arrives with Phase 2; until then, <Link to="/browse">the region index</Link>{' '}
+            is how you wander.
           </p>
         </div>
         <aside className="rail desktop-only">
           <div className="rail-block">
             <div className="rail-kicker">For developers</div>
             <p>
-              The dataset is published under the Open Database License (ODbL
-              1.0). Phase 2 opens self-serve free API keys; until then, ask and
-              an editor will set one up by hand.
+              The dataset is published under the Open Database License (ODbL 1.0). Phase 2
+              opens self-serve free API keys; until then, ask and an editor will set one
+              up by hand.
             </p>
             <Link to="/about#for-developers" className="read-on">
               Developer preview <span className="arrow">→</span>

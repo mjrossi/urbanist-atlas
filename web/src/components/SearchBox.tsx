@@ -1,6 +1,7 @@
+import type { SyntheticEvent } from 'react';
 import { useId, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
+
 import type { Country } from '../lib/api.ts';
 import { normalizePostal } from '../lib/postal.ts';
 
@@ -34,7 +35,7 @@ function validate(normalized: string, country: Country): string | null {
   return null;
 }
 
-const SUGGESTIONS: ReadonlyArray<{ label: string; postal: string; country: Country }> = [
+const SUGGESTIONS: readonly { label: string; postal: string; country: Country }[] = [
   { label: '10027', postal: '10027', country: 'US' },
   { label: '94110', postal: '94110', country: 'US' },
   { label: 'M5V 1J1', postal: 'M5V1J1', country: 'CA' },
@@ -50,7 +51,7 @@ export function SearchBox() {
   const effectiveCountry: Country = detectCountry(raw) ?? 'US';
   const normalized = useMemo(() => normalizePostal(raw), [raw]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const err = validate(normalized, effectiveCountry);
     if (err) {
@@ -59,7 +60,7 @@ export function SearchBox() {
     }
     setSubmitError(null);
     const search = new URLSearchParams({ country: effectiveCountry }).toString();
-    navigate(`/r/${encodeURIComponent(normalized)}?${search}`);
+    void navigate(`/r/${encodeURIComponent(normalized)}?${search}`);
   }
 
   return (
@@ -96,8 +97,8 @@ export function SearchBox() {
         </p>
       ) : (
         <p id={`${inputId}-hint`} className="lookup-hint">
-          US ZIP (5 digits) or Canadian postal code (FSA or full). We&rsquo;ll
-          name your metro and the groups working there.
+          US ZIP (5 digits) or Canadian postal code (FSA or full). We&rsquo;ll name your
+          metro and the groups working there.
         </p>
       )}
       <div className="lookup-suggestions">
