@@ -171,8 +171,7 @@ func buildCMAPortions(cmas []CMA, assignments []CMAAssignment) ([]CMAAssignment,
 // cmaRowsToRegionRows adapts the CA assignment shape to the shared
 // etl.RegionRow the common TOML writer consumes. The provenance comment
 // (# StatsCan CMA <UID> — <Name>) is attached only to umbrella rows
-// (UID set); portion rows carry no UID and so no comment, matching the
-// prior WriteCMAsTOML behavior.
+// (UID set); portion rows carry no UID and so no comment.
 func cmaRowsToRegionRows(assignments []CMAAssignment) []etl.RegionRow {
 	rows := make([]etl.RegionRow, len(assignments))
 	for i, a := range assignments {

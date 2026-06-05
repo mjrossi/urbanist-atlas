@@ -57,6 +57,31 @@ func TestSlugify_DoesNotPropagateInteriorWhitespace(t *testing.T) {
 	}
 }
 
+// TestSlugify_FoldsLatinExtendedASuperset locks in the C1 consolidation
+// decision: the shared fold table covers the full Latin-1 Supplement +
+// Latin Extended-A range, not just Latin-1. Every accented letter below
+// is Latin Extended-A (U+0100–U+017F) — characters the pre-consolidation
+// CA slugifier folded only over Latin-1 and so silently *dropped*. With a
+// narrowed table "Łódź" would slug to "ld" (the diacritic letters fall
+// through as non-[a-z] runes and get removed), not "lodz". These cases
+// fail loudly if a future change re-narrows the range, guarding the
+// superset choice end-to-end through Slugify rather than retyping the
+// table (which TestFoldDiacritic already samples).
+func TestSlugify_FoldsLatinExtendedASuperset(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"Łódź", "lodz"},       // ł, ź — Extended-A; ó is Latin-1
+		{"Gdańsk", "gdansk"},   // ń — Extended-A
+		{"Plzeň", "plzen"},     // ň — Extended-A
+		{"Ōtsu", "otsu"},       // ō — Extended-A macron (uppercase folds via ToLower)
+		{"Kraśnik", "krasnik"}, // ś — Extended-A
+	}
+	for _, c := range cases {
+		if got := Slugify(c.in); got != c.want {
+			t.Errorf("Slugify(%q) = %q, want %q (Latin Extended-A must fold, not drop)", c.in, got, c.want)
+		}
+	}
+}
+
 func TestFoldDiacritic(t *testing.T) {
 	// Spot-check one rune per Latin diacritic group. The full table
 	// covers Latin-1 Supplement + Latin Extended-A, but exhaustive

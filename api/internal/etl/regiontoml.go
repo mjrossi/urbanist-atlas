@@ -44,6 +44,14 @@ func WriteRegionsTOML(w io.Writer, header string, rows []RegionRow) error {
 		if r.Slug == "" {
 			return fmt.Errorf("write regions: empty slug (name %q)", r.Name)
 		}
+		// kind is country-specific (us:metro, ca:cma, …) and must be set
+		// by the caller's row builder; emitting kind = "" would write an
+		// invalid region the loader rejects. The old per-country US writer
+		// defaulted empty kind to "us:metro", but that default can't live
+		// in this shared cross-country writer — error out instead.
+		if r.Kind == "" {
+			return fmt.Errorf("write regions: empty kind (slug %q)", r.Slug)
+		}
 		if _, err := fmt.Fprintf(bw, "\n[[region]]\nslug = %s\nkind = %s\nname = %s\nscope_tier = \"regional\"\nsort_priority = 40\nparents = [",
 			tomlString(r.Slug), tomlString(r.Kind), tomlString(r.Name)); err != nil {
 			return err
