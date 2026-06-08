@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/coverage"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
@@ -51,6 +52,16 @@ type Config struct {
 	// and product counters. The /metrics endpoint itself is served on a
 	// separate private listener (see cmd/server), not on this mux.
 	Metrics *Metrics
+
+	// Coverage, when non-nil, captures sampled empty-result lookups and
+	// searches for coverage-gap analysis (see internal/coverage). Nil
+	// disables capture; handlers call it unconditionally (it is nil-safe).
+	Coverage *coverage.Recorder
+
+	// CoverageGaps, when non-nil, backs the admin GET
+	// /api/v1/admin/coverage-gaps read endpoint. Satisfied by the same
+	// SQLite store as Submissions.
+	CoverageGaps atlas.CoverageGapReader
 }
 
 // New builds the full middleware stack and route table.
@@ -122,13 +133,13 @@ func New(cfg Config) http.Handler {
 		getHead(r, "/openapi.yaml", openapiHandler())
 		r.Group(func(r chi.Router) {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
-			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics))
+			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage))
 			getHead(r, "/regions", listRegionsHandler(cfg.Store, logger))
 			// Static "/regions/search" before the "/regions/{slug}"
 			// param route. chi prefers static segments over params, so
 			// order here is for readers, not the matcher — but a router
 			// test pins that "search" never resolves as a slug.
-			getHead(r, "/regions/search", searchRegionsHandler(cfg.Store, logger, cfg.Metrics))
+			getHead(r, "/regions/search", searchRegionsHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage))
 			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger, cfg.Metrics))
 			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger, cfg.Metrics))
 			getHead(r, "/recent", recentHandler(cfg.Store, logger))
@@ -141,6 +152,9 @@ func New(cfg Config) http.Handler {
 					r.Get("/submissions", listSubmissionsHandler(cfg.Submissions, logger))
 					r.Post("/submissions/{id}/approve", approveSubmissionHandler(cfg.Submissions, cfg.PromotionEnqueuer, logger, cfg.Metrics))
 					r.Post("/submissions/{id}/reject", rejectSubmissionHandler(cfg.Submissions, logger, cfg.Metrics))
+					if cfg.CoverageGaps != nil {
+						r.Get("/coverage-gaps", listCoverageGapsHandler(cfg.CoverageGaps, logger))
+					}
 				})
 			}
 		})

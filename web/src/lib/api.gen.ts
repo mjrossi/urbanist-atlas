@@ -410,6 +410,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/coverage-gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sampled empty-result lookups and searches.
+         * @description Returns recent coverage gaps — sampled lookups and searches that
+         *     resolved to no organizations. This is the editorial "which input
+         *     returns nothing?" signal for deciding where to expand coverage.
+         *
+         *     Capture is sampled and row-capped server-side
+         *     (`URBANIST_COVERAGE_SAMPLE_RATE` / `URBANIST_COVERAGE_MAX_ROWS`),
+         *     so this is a recent, partial sample — not an exhaustive log.
+         *     Results are newest-first.
+         */
+        get: operations["listCoverageGaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -421,6 +448,36 @@ export interface components {
          * @example US
          */
         Country: string;
+        /**
+         * @description One sampled empty-result lookup or search — an editorial signal
+         *     of where the directory has no coverage yet. Admin-only; capture
+         *     is sampled, so the set is a recent partial sample.
+         */
+        CoverageGap: {
+            /**
+             * @description `lookup` — a postal-code lookup that resolved a region but
+             *     surfaced no organizations. `search` — a region type-ahead
+             *     query that matched nothing.
+             * @enum {string}
+             */
+            kind: "lookup" | "search";
+            /**
+             * @description Lookup country (e.g. `US`, `CA`). Empty/omitted for `search`
+             *     gaps, which have no country axis.
+             * @example US
+             */
+            country?: string;
+            /**
+             * @description The normalized postal code (`lookup`) or the search query
+             *     (`search`) that returned nothing.
+             */
+            input: string;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp when the gap was recorded.
+             */
+            created_at: string;
+        };
         /**
          * @description Attribution block included on every collection response.
          *     Carries the ODbL license obligation in-band so consumers
@@ -1539,6 +1596,32 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCoverageGaps: {
+        parameters: {
+            query?: {
+                /** @description Maximum number of coverage gaps to return. Capped at 200. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent coverage gaps, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageGap"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
