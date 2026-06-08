@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/coverage"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
@@ -49,7 +50,7 @@ func listRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc
 // Ranking, the national-tier exclusion, and the context label live in
 // pkg/atlas (MemStore.SearchRegions); this handler is the thin
 // parse-validate-encode adapter.
-func searchRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
+func searchRegionsHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *coverage.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -69,6 +70,14 @@ func searchRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFu
 			writeInternalProblem(w, r, rid)
 			return
 		}
+		m.incRegionSearch(len(q), len(results))
+		// A non-blank query that matched nothing is a coverage gap worth
+		// sampling. Skip blank queries (the SPA's empty-input state).
+		if len(results) == 0 && q != "" {
+			rec.RecordEmpty("search", "", q)
+		}
+		logger.DebugContext(r.Context(), "region search",
+			"query_len", len(q), "result_count", len(results), "rid", rid)
 		respondCollection(w, toOAPIRegionSearchResults(results))
 	}
 }
@@ -78,7 +87,7 @@ func searchRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFu
 // multi-state coalitions. Returns 404 with a problem+json document
 // for unknown slugs and for national-tier slugs (atlas.GetRegion
 // signals both with (nil, nil)).
-func getRegionHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
+func getRegionHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		slug := strings.TrimSpace(chi.URLParam(r, "slug"))
@@ -89,10 +98,14 @@ func getRegionHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 		if detail == nil {
+			m.incRegionView(false)
+			logger.DebugContext(r.Context(), "region view", "slug", slug, "found", false, "rid", rid)
 			writeProblem(w, r, http.StatusNotFound, problemNotFound, "Region Not Found",
 				"No region matches that slug.", rid)
 			return
 		}
+		m.incRegionView(true)
+		logger.DebugContext(r.Context(), "region view", "slug", slug, "found", true, "rid", rid)
 		writeJSON(w, http.StatusOK, toOAPIRegionDetail(*detail))
 	}
 }

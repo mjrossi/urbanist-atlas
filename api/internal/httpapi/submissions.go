@@ -140,6 +140,9 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 
 		if len(fieldErrs) > 0 {
 			m.incSubmissions("rejected_validation")
+			for field := range fieldErrs {
+				m.incSubmissionValidationFailure(field)
+			}
 			writeProblemWithErrors(w, r, http.StatusBadRequest, problemValidation,
 				"Submission Validation Failed",
 				"One or more fields in the submission failed validation. See the errors map for per-field messages.",
@@ -213,7 +216,7 @@ func listSubmissionsHandler(subs atlas.SubmissionStore, logger *slog.Logger) htt
 }
 
 // approveSubmissionHandler answers POST /api/v1/admin/submissions/{id}/approve.
-func approveSubmissionHandler(subs atlas.SubmissionStore, enq PromotionEnqueuer, logger *slog.Logger) http.HandlerFunc {
+func approveSubmissionHandler(subs atlas.SubmissionStore, enq PromotionEnqueuer, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		publicID, ok := readSubmissionID(w, r, rid)
@@ -222,6 +225,7 @@ func approveSubmissionHandler(subs atlas.SubmissionStore, enq PromotionEnqueuer,
 		}
 		sub, err := subs.Approve(r.Context(), publicID)
 		if err != nil {
+			m.incAdminAction("approve", adminOutcome(err))
 			writeSubmissionStateErr(w, r, err, rid, logger, "approve submission")
 			return
 		}
@@ -240,12 +244,16 @@ func approveSubmissionHandler(subs atlas.SubmissionStore, enq PromotionEnqueuer,
 			}
 		}
 
+		// The approval itself succeeded even when the best-effort enqueue
+		// above failed (the failure is captured in promotion_error).
+		m.incAdminAction("approve", "ok")
+		logger.InfoContext(r.Context(), "submission approved", "public_id", sub.PublicID, "rid", rid)
 		writeJSON(w, http.StatusOK, toOAPISubmission(sub))
 	}
 }
 
 // rejectSubmissionHandler answers POST /api/v1/admin/submissions/{id}/reject.
-func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger) http.HandlerFunc {
+func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		publicID, ok := readSubmissionID(w, r, rid)
@@ -270,9 +278,12 @@ func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger) ht
 		}
 		sub, err := subs.Reject(r.Context(), publicID, reason)
 		if err != nil {
+			m.incAdminAction("reject", adminOutcome(err))
 			writeSubmissionStateErr(w, r, err, rid, logger, "reject submission")
 			return
 		}
+		m.incAdminAction("reject", "ok")
+		logger.InfoContext(r.Context(), "submission rejected", "public_id", sub.PublicID, "rid", rid)
 		writeJSON(w, http.StatusOK, toOAPISubmission(sub))
 	}
 }
@@ -302,6 +313,22 @@ func writeSubmissionStateErr(w http.ResponseWriter, r *http.Request, err error, 
 	default:
 		logger.ErrorContext(r.Context(), op+" failed", "err", err, "rid", rid)
 		writeInternalProblem(w, r, rid)
+	}
+}
+
+// adminOutcome maps a submission state-transition error to a bounded
+// metric outcome label, mirroring the cases writeSubmissionStateErr
+// switches on. err == nil yields "ok".
+func adminOutcome(err error) string {
+	switch {
+	case err == nil:
+		return "ok"
+	case errors.Is(err, atlas.ErrSubmissionNotFound):
+		return "not_found"
+	case errors.Is(err, atlas.ErrSubmissionNotPending):
+		return "conflict"
+	default:
+		return "error"
 	}
 }
 

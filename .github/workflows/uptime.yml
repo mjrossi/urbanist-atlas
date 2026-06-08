@@ -1,0 +1,82 @@
+name: Uptime probe
+
+# External synthetic check: hit the public /healthz from outside Fly so
+# an outage is visible even when Fly's own machine health checks (which
+# recycle unhealthy machines in place) can't tell us the app is
+# unreachable from the public internet / behind a DNS or TLS problem.
+#
+# /healthz is exempt from the X-Atlas-Client shared-secret gate and needs
+# no auth (see api/internal/httpapi/router.go + the ci.yml smoke test).
+#
+# On failure it opens — or comments on an existing — GitHub issue. This is
+# the launch alerting path (no Grafana/SaaS); metric-threshold alerts can
+# be layered into Fly Grafana later (see ops/grafana/README.md).
+#
+# Caveat: GitHub disables scheduled workflows on a repo with no commit
+# activity for 60 days. If alerts go quiet, check the workflow is still
+# enabled, or move uptime to a dedicated external monitor.
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub bills each scheduled run as ~1 minute, so
+    # ~48 runs/day keeps comfortably inside the free private-repo budget
+    # (a public repo has unlimited Actions minutes — tighten to */15 or
+    # */5 there). GitHub disallows sub-5-minute schedules and may delay
+    # runs under load; this is best-effort external visibility, not an SLA.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /healthz
+        run: |
+          set -euo pipefail
+          # Retry so a single transient blip doesn't open an issue.
+          for i in 1 2 3 4 5; do
+            if curl -fsS --max-time 10 https://api.urbanistatlas.com/healthz; then
+              echo "healthz OK on attempt $i"
+              exit 0
+            fi
+            echo "attempt $i failed; retrying in 10s" >&2
+            sleep 10
+          done
+          echo "healthz did not respond OK after 5 attempts" >&2
+          exit 1
+
+      - name: Open an issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = 'API uptime probe failed';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              'The external `/healthz` probe failed (5 attempts over ~50s).',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'Triage (docs/deploy.md §Monitoring & incident response):',
+              '- `flyctl status -a urbanist-atlas` — are the machines up?',
+              '- `flyctl logs -a urbanist-atlas` — recent errors?',
+              '- Check DNS / TLS for api.urbanistatlas.com.',
+            ].join('\n');
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', per_page: 100,
+            });
+            const hit = open.data.find(i => !i.pull_request && i.title.startsWith(marker));
+            if (hit) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: hit.number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: `${marker} (${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC)`, body,
+              });
+            }

@@ -13,6 +13,24 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "BearerAuth.Scopes"
 )
 
+// Defines values for CoverageGapKind.
+const (
+	CoverageGapKindLookup CoverageGapKind = "lookup"
+	CoverageGapKindSearch CoverageGapKind = "search"
+)
+
+// Valid indicates whether the value is a known member of the CoverageGapKind enum.
+func (e CoverageGapKind) Valid() bool {
+	switch e {
+	case CoverageGapKindLookup:
+		return true
+	case CoverageGapKindSearch:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScopeTier.
 const (
 	ScopeTierLocal    ScopeTier = "local"
@@ -59,6 +77,32 @@ func (e SubmissionStatus) Valid() bool {
 // countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
 // changes as data is loaded.
 type Country = string
+
+// CoverageGap One sampled empty-result lookup or search — an editorial signal
+// of where the directory has no coverage yet. Admin-only; capture
+// is sampled, so the set is a recent partial sample.
+type CoverageGap struct {
+	// Country Lookup country (e.g. `US`, `CA`). Empty/omitted for `search`
+	// gaps, which have no country axis.
+	Country *string `json:"country,omitempty"`
+
+	// CreatedAt RFC 3339 timestamp when the gap was recorded.
+	CreatedAt time.Time `json:"created_at"`
+
+	// Input The normalized postal code (`lookup`) or the search query
+	// (`search`) that returned nothing.
+	Input string `json:"input"`
+
+	// Kind `lookup` — a postal-code lookup that resolved a region but
+	// surfaced no organizations. `search` — a region type-ahead
+	// query that matched nothing.
+	Kind CoverageGapKind `json:"kind"`
+}
+
+// CoverageGapKind `lookup` — a postal-code lookup that resolved a region but
+// surfaced no organizations. `search` — a region type-ahead
+// query that matched nothing.
+type CoverageGapKind string
 
 // LookupOrg defines model for LookupOrg.
 type LookupOrg struct {
@@ -795,6 +839,12 @@ type Unauthorized = ProblemDetails
 
 // bearerAuthContextKey is the context key for BearerAuth security scheme
 type bearerAuthContextKey string
+
+// ListCoverageGapsParams defines parameters for ListCoverageGaps.
+type ListCoverageGapsParams struct {
+	// Limit Maximum number of coverage gaps to return. Capped at 200.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
 
 // ListSubmissionsParams defines parameters for ListSubmissions.
 type ListSubmissionsParams struct {

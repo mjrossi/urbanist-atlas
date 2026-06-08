@@ -633,6 +633,48 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/admin/coverage-gaps:
+    get:
+      tags: [admin]
+      summary: List sampled empty-result lookups and searches.
+      description: |
+        Returns recent coverage gaps — sampled lookups and searches that
+        resolved to no organizations. This is the editorial "which input
+        returns nothing?" signal for deciding where to expand coverage.
+
+        Capture is sampled and row-capped server-side
+        (`URBANIST_COVERAGE_SAMPLE_RATE` / `URBANIST_COVERAGE_MAX_ROWS`),
+        so this is a recent, partial sample — not an exhaustive log.
+        Results are newest-first.
+      operationId: listCoverageGaps
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          description: Maximum number of coverage gaps to return. Capped at 200.
+      responses:
+        '200':
+          description: Recent coverage gaps, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CoverageGap'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
 
   securitySchemes:
@@ -774,6 +816,37 @@ components:
         countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
         changes as data is loaded.
       example: US
+
+    CoverageGap:
+      type: object
+      description: |
+        One sampled empty-result lookup or search — an editorial signal
+        of where the directory has no coverage yet. Admin-only; capture
+        is sampled, so the set is a recent partial sample.
+      required: [kind, input, created_at]
+      properties:
+        kind:
+          type: string
+          enum: [lookup, search]
+          description: |
+            `lookup` — a postal-code lookup that resolved a region but
+            surfaced no organizations. `search` — a region type-ahead
+            query that matched nothing.
+        country:
+          type: string
+          description: |
+            Lookup country (e.g. `US`, `CA`). Empty/omitted for `search`
+            gaps, which have no country axis.
+          example: US
+        input:
+          type: string
+          description: |
+            The normalized postal code (`lookup`) or the search query
+            (`search`) that returned nothing.
+        created_at:
+          type: string
+          format: date-time
+          description: RFC 3339 timestamp when the gap was recorded.
 
     Meta:
       type: object

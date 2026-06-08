@@ -15,6 +15,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/coverage"
 	"github.com/mjrossi/urbanist-atlas/api/internal/githubpr"
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
 	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
@@ -101,6 +102,18 @@ func serveCommand() *cli.Command {
 				Value:   5,
 				Sources: cli.EnvVars("URBANIST_SUBMISSIONS_RATE_PER_HOUR"),
 			},
+			&cli.FloatFlag{
+				Name:    "coverage-sample-rate",
+				Usage:   "probability (0..1) of persisting an empty-result lookup/search for coverage-gap analysis; 0 disables capture",
+				Value:   0,
+				Sources: cli.EnvVars("URBANIST_COVERAGE_SAMPLE_RATE"),
+			},
+			&cli.IntFlag{
+				Name:    "coverage-max-rows",
+				Usage:   "cap on retained coverage_gaps rows (pruned after each write); 0 leaves it unbounded",
+				Value:   5000,
+				Sources: cli.EnvVars("URBANIST_COVERAGE_MAX_ROWS"),
+			},
 		},
 		Action: runServe,
 	}
@@ -137,6 +150,14 @@ func runServe(ctx context.Context, c *cli.Command) error {
 
 	metrics := httpapi.NewMetrics()
 
+	// Coverage-gap recorder shares the SQLite store with submissions, so
+	// it only exists when that store does. Disabled by default
+	// (sample-rate 0) — capturing raw empty-result input is opt-in.
+	var recorder *coverage.Recorder
+	if subs != nil {
+		recorder = coverage.New(subs, c.Float("coverage-sample-rate"), c.Int("coverage-max-rows"), logger)
+	}
+
 	origins := splitCSV(c.String("cors-origins"))
 
 	// One consolidated boot line so an operator can confirm the effective
@@ -152,6 +173,8 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		"metrics_port", c.String("metrics-port"),
 		"submissions_enabled", subs != nil,
 		"submissions_rate_per_hour", c.Int("submissions-rate-per-hour"),
+		"coverage_sample_rate", c.Float("coverage-sample-rate"),
+		"coverage_max_rows", c.Int("coverage-max-rows"),
 		"client_secret_set", c.String("client-secret") != "",
 		"admin_token_set", c.String("admin-token") != "",
 		"github_token_set", c.String("github-token") != "",
@@ -168,6 +191,8 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		AdminToken:             c.String("admin-token"),
 		SubmissionsRatePerHour: c.Int("submissions-rate-per-hour"),
 		Metrics:                metrics,
+		Coverage:               recorder,
+		CoverageGaps:           coverageReaderOrNil(subs),
 	})
 
 	addr := net.JoinHostPort("", c.String("port"))
@@ -233,6 +258,14 @@ func runServe(ctx context.Context, c *cli.Command) error {
 					"dropped_count", len(dropped),
 					"dropped_ids", dropped)
 			}
+		}
+		// Drain in-flight coverage-gap writes before the deferred store
+		// Close runs, so sampled rows aren't lost on shutdown. Bounded by
+		// the shared shutdownCtx so a wedged write can't overrun the
+		// shutdown budget; stragglers (sampled, best-effort) are dropped.
+		// Nil-safe.
+		if err := recorder.Wait(shutdownCtx); err != nil {
+			logger.Warn("coverage: drain incomplete on shutdown", "err", err)
 		}
 		// Wait for ListenAndServe to return (it will, with ErrServerClosed).
 		<-serverErr
@@ -334,6 +367,17 @@ func buildSubmissionStore(ctx context.Context, c *cli.Command, logger *slog.Logg
 // can detect the "disabled" case (a typed nil would route to handlers
 // that then segfault on store calls).
 func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
+	if s == nil {
+		return nil
+	}
+	return s
+}
+
+// coverageReaderOrNil converts the concrete *sqlite.Store into the
+// atlas.CoverageGapReader interface, preserving nil-ness (same typed-nil
+// guard as submissionsOrNil) so the router skips registering the admin
+// coverage-gaps route when there is no store.
+func coverageReaderOrNil(s *sqlite.Store) atlas.CoverageGapReader {
 	if s == nil {
 		return nil
 	}

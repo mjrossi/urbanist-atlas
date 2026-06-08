@@ -8,6 +8,14 @@ import (
 	"database/sql"
 )
 
+type CoverageGap struct {
+	ID        int64
+	Kind      string
+	Country   string
+	Input     string
+	CreatedAt string
+}
+
 type Submission struct {
 	ID              int64
 	PublicID        string

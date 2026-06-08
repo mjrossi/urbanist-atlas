@@ -7,7 +7,7 @@ app = 'urbanist-atlas'
 primary_region = 'iad'
 
 [build]
-  dockerfile = 'Dockerfile'
+dockerfile = 'Dockerfile'
 
 # Persistent volume for the SQLite submissions DB. The Fly volume
 # survives machine recycles; the binary opens /data/atlas.db at boot
@@ -26,77 +26,78 @@ primary_region = 'iad'
 #   flyctl volumes create atlas_data --size 1 --region iad -a urbanist-atlas
 # See docs/deploy.md §Bring-up.
 [[mounts]]
-  source = 'atlas_data'
-  destination = '/data'
+source = 'atlas_data'
+destination = '/data'
 
 [env]
-  # CORS allowlist for Phase 1.
-  # - https://urbanistatlas.com — the apex SPA hostname (custom domain on the Workers project)
-  # - *.link00seven.workers.dev — Cloudflare Workers preview versions (account-scoped subdomain;
-  #   the Workers Static Assets analog of the old Pages `*.pages.dev` previews; Cloudflare's
-  #   Pages-into-Workers consolidation means previews now live under `<account>.workers.dev`)
-  URBANIST_CORS_ORIGINS = 'https://urbanistatlas.com,*.link00seven.workers.dev'
-  URBANIST_LOG_FORMAT = 'json'
-  URBANIST_PORT = '8080'
-  # URBANIST_SEED_DIR is intentionally unset — the binary falls back
-  # to the seed bundle embedded at build time via //go:embed. To pin
-  # a deployed instance to an on-disk override, set this to the
-  # directory path here (and add a matching COPY to the Dockerfile).
-  #
-  # The submission write path lives on the mounted volume:
-  URBANIST_DB_PATH = '/data/atlas.db'
-  # Submissions per IP per hour (in-process limiter; the WAF rule at
-  # the edge is the first defense).
-  URBANIST_SUBMISSIONS_RATE_PER_HOUR = '5'
-  # URBANIST_ADMIN_TOKEN and URBANIST_GITHUB_TOKEN are Fly secrets, set
-  # via:  flyctl secrets set URBANIST_ADMIN_TOKEN=… URBANIST_GITHUB_TOKEN=…
-  # Without ADMIN_TOKEN, admin endpoints return 503; without
-  # GITHUB_TOKEN, approval still flips status but the PR worker
-  # records promotion_error="worker disabled (no token configured)".
+# CORS allowlist for Phase 1.
+# - https://urbanistatlas.com — the apex SPA hostname (custom domain on the Workers project)
+# - *.link00seven.workers.dev — Cloudflare Workers preview versions (account-scoped subdomain;
+#   the Workers Static Assets analog of the old Pages `*.pages.dev` previews; Cloudflare's
+#   Pages-into-Workers consolidation means previews now live under `<account>.workers.dev`)
+URBANIST_CORS_ORIGINS = 'https://urbanistatlas.com,*.link00seven.workers.dev'
+URBANIST_LOG_FORMAT = 'json'
+URBANIST_PORT = '8080'
+# URBANIST_SEED_DIR is intentionally unset — the binary falls back
+# to the seed bundle embedded at build time via //go:embed. To pin
+# a deployed instance to an on-disk override, set this to the
+# directory path here (and add a matching COPY to the Dockerfile).
+#
+# The submission write path lives on the mounted volume:
+URBANIST_DB_PATH = '/data/atlas.db'
+# Submissions per IP per hour (in-process limiter; the WAF rule at
+# the edge is the first defense).
+URBANIST_SUBMISSIONS_RATE_PER_HOUR = '5'
+# URBANIST_ADMIN_TOKEN and URBANIST_GITHUB_TOKEN are Fly secrets, set
+# via:  flyctl secrets set URBANIST_ADMIN_TOKEN=… URBANIST_GITHUB_TOKEN=…
+# Without ADMIN_TOKEN, admin endpoints return 503; without
+# GITHUB_TOKEN, approval still flips status but the PR worker
+# records promotion_error="worker disabled (no token configured)".
+URBANIST_COVERAGE_SAMPLE_RATE = "0.1" # 10% of empty lookups/searches
 
 # Fly's managed Prometheus scrapes this over the private 6PN network. The
 # port is intentionally NOT in [http_service], so it is never
 # internet-routable. Managed-Prometheus retention is ~30 days; longer
 # history would mean remote-write to Grafana Cloud (out of scope for v1).
 [metrics]
-  port = 9091
-  path = "/metrics"
+port = 9091
+path = "/metrics"
 
 [http_service]
-  internal_port = 8080
-  force_https = true
-  # auto_stop_machines=false (and auto_start_machines=false) is
-  # load-bearing: see the [[mounts]] comment above. The in-process
-  # rate limiter (internal/httpapi/ratelimit.go) and the GitHub PR
-  # worker's job channel (internal/githubpr/worker.go) both keep state
-  # in RAM, so any suspend/resume cycle drops queued PR jobs and resets
-  # the per-IP submission window.
-  auto_stop_machines = false
-  auto_start_machines = false
-  min_machines_running = 1
-  processes = ['app']
+internal_port = 8080
+force_https = true
+# auto_stop_machines=false (and auto_start_machines=false) is
+# load-bearing: see the [[mounts]] comment above. The in-process
+# rate limiter (internal/httpapi/ratelimit.go) and the GitHub PR
+# worker's job channel (internal/githubpr/worker.go) both keep state
+# in RAM, so any suspend/resume cycle drops queued PR jobs and resets
+# the per-IP submission window.
+auto_stop_machines = false
+auto_start_machines = false
+min_machines_running = 1
+processes = ['app']
 
-  # Liveness: process-level. Doesn't touch the DB so a transient
-  # downstream blip doesn't trigger a machine recycle.
-  [[http_service.checks]]
-    interval = '30s'
-    timeout = '5s'
-    grace_period = '10s'
-    method = 'GET'
-    path = '/healthz'
+# Liveness: process-level. Doesn't touch the DB so a transient
+# downstream blip doesn't trigger a machine recycle.
+[[http_service.checks]]
+interval = '30s'
+timeout = '5s'
+grace_period = '10s'
+method = 'GET'
+path = '/healthz'
 
-  # Readiness: traffic-gating. The file-backed store has no external
-  # dependency, so /readyz collapses to a process-up check. Kept
-  # separate from /healthz so it stays a meaningful traffic gate if
-  # a write surface (SQLite) is added later.
-  [[http_service.checks]]
-    interval = '15s'
-    timeout = '5s'
-    grace_period = '15s'
-    method = 'GET'
-    path = '/readyz'
+# Readiness: traffic-gating. The file-backed store has no external
+# dependency, so /readyz collapses to a process-up check. Kept
+# separate from /healthz so it stays a meaningful traffic gate if
+# a write surface (SQLite) is added later.
+[[http_service.checks]]
+interval = '15s'
+timeout = '5s'
+grace_period = '15s'
+method = 'GET'
+path = '/readyz'
 
 [[vm]]
-  cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 256
+cpu_kind = 'shared'
+cpus = 1
+memory_mb = 256

@@ -4,8 +4,8 @@ import { App } from './App.tsx';
 import { About } from './routes/About.tsx';
 import { Browse } from './routes/Browse.tsx';
 import { Colophon } from './routes/Colophon.tsx';
+import { RouteErrorBoundary } from './routes/ErrorBoundary.tsx';
 import { Home } from './routes/Home.tsx';
-import { NotFoundWithLayout } from './routes/NotFound.tsx';
 import { Org } from './routes/Org.tsx';
 import { Region } from './routes/Region.tsx';
 import { Results } from './routes/Results.tsx';
@@ -20,14 +20,17 @@ import { Submit } from './routes/Submit.tsx';
  *
  * `errorElement` on the root route catches both unmatched URLs (404)
  * and any unhandled error thrown by a descendant route's component
- * or loader. It renders **instead of** `App`, so the chrome-wrapping
- * lives inside `NotFoundWithLayout` (see `routes/NotFound.tsx`).
+ * or loader. `RouteErrorBoundary` (see `routes/ErrorBoundary.tsx`)
+ * branches: 404s keep the newspaper "not in this edition" page;
+ * genuine errors render a distinct "stop press" page that surfaces the
+ * request id for log correlation. Both render **instead of** `App` and
+ * wrap their own chrome.
  */
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: App,
-    errorElement: <NotFoundWithLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, Component: Home },
       { path: 'r/:postalCode', Component: Results },

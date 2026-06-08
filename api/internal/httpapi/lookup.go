@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/mjrossi/urbanist-atlas/api/internal/coverage"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
@@ -18,7 +19,7 @@ import (
 // OpenAPI shape.
 //
 // Error responses are RFC 9457 problem documents (see problem.go).
-func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.HandlerFunc {
+func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *coverage.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		rawPostalIn := r.URL.Query().Get("postal_code")
@@ -82,7 +83,23 @@ func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.Hand
 			return
 		}
 
+		tier := lookupTier(len(result.Local), len(result.Regional), len(result.Statewide))
 		m.incLookup(string(country), "hit")
+		m.incLookupTier(string(country), tier)
+		// A resolved region with zero orgs in every tier is the coverage
+		// gap worth capturing (sampled). The raw normalized postal is the
+		// privacy bar's sanctioned "sampled empties" input.
+		if tier == "empty" {
+			rec.RecordEmpty("lookup", string(country), postal)
+		}
+		logger.DebugContext(r.Context(), "lookup ok",
+			"country", country,
+			"tier", tier,
+			"local_count", len(result.Local),
+			"regional_count", len(result.Regional),
+			"statewide_count", len(result.Statewide),
+			"rid", rid,
+		)
 		writeJSON(w, http.StatusOK, toOAPILookupResult(result))
 	}
 }

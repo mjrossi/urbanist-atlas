@@ -99,8 +99,8 @@ func buildSubmissionRoutes(subs atlas.SubmissionStore, store atlas.Store, enq Pr
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(bearerAuthMiddleware(testAdminToken))
 			r.Get("/submissions", listSubmissionsHandler(subs, logger))
-			r.Post("/submissions/{id}/approve", approveSubmissionHandler(subs, enq, logger))
-			r.Post("/submissions/{id}/reject", rejectSubmissionHandler(subs, logger))
+			r.Post("/submissions/{id}/approve", approveSubmissionHandler(subs, enq, logger, m))
+			r.Post("/submissions/{id}/reject", rejectSubmissionHandler(subs, logger, m))
 		})
 	})
 	return r
