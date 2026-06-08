@@ -400,7 +400,7 @@ for the why.
 ### What pages you (GitHub Issues, no SaaS)
 
 - **API down** — [`uptime.yml`](../.github/workflows/uptime.yml) probes
-  `/healthz` from outside Fly every ~15 min and opens an issue if it's
+  `/healthz` from outside Fly every ~30 min and opens an issue if it's
   down for ~50s. (Fly's own machine health checks recycle unhealthy VMs
   but can't see DNS/TLS/edge problems — this catches those.)
 - **Backup failure** — [`backup-sqlite.yml`](../.github/workflows/backup-sqlite.yml)

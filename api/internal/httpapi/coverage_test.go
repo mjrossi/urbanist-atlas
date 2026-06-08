@@ -58,7 +58,7 @@ func TestCoverageGaps_EmptySearchCapturedAndListed(t *testing.T) {
 		t.Fatalf("search: %v", err)
 	}
 	resp.Body.Close()
-	rec.Wait() // flush the fire-and-forget write
+	rec.Wait(context.Background()) // flush the fire-and-forget write
 
 	// Unauthenticated read is rejected.
 	resp, err = http.Get(srv.URL + "/api/v1/admin/coverage-gaps")

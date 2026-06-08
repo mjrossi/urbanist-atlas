@@ -18,6 +18,14 @@ import (
 // can't leak goroutines. Generous for a local SQLite write.
 const writeTimeout = 2 * time.Second
 
+// maxConcurrentWrites caps in-flight background coverage writes. The SQLite
+// store serializes writes through a single connection shared with the
+// submission path, so an unbounded fan-out of sampled empties — easy to
+// provoke at a high sample rate — could pile up goroutines and starve that
+// connection. Samples over the cap are dropped (capture is best-effort),
+// which also keeps the shutdown drain bounded.
+const maxConcurrentWrites = 4
+
 // GapStore is the persistence seam the Recorder writes through —
 // satisfied by *sqlite.Store.
 type GapStore interface {
@@ -35,6 +43,7 @@ type Recorder struct {
 	maxRows    int
 	logger     *slog.Logger
 	rng        func() float64
+	sem        chan struct{} // bounds concurrent background writes; see maxConcurrentWrites
 	wg         sync.WaitGroup
 }
 
@@ -52,6 +61,7 @@ func New(store GapStore, sampleRate float64, maxRows int, logger *slog.Logger) *
 		maxRows:    maxRows,
 		logger:     logger,
 		rng:        rand.Float64,
+		sem:        make(chan struct{}, maxConcurrentWrites),
 	}
 }
 
@@ -78,9 +88,22 @@ func (r *Recorder) RecordEmpty(kind, country, input string) {
 	if r.rng() >= r.sampleRate {
 		return
 	}
-	r.wg.Add(1)
-	go func() {
-		defer r.wg.Done()
+	// Acquire a write slot without blocking the caller. When the writer is
+	// saturated, drop the sample: the request path must never wait on a
+	// coverage write, and capture is best-effort (sampled + row-capped).
+	select {
+	case r.sem <- struct{}{}:
+	default:
+		r.logger.Debug("coverage: sample dropped, writer saturated", "kind", kind)
+		return
+	}
+	r.wg.Go(func() {
+		defer func() { <-r.sem }()
+		defer func() {
+			if p := recover(); p != nil {
+				r.logger.Error("coverage: write panicked", "panic", p, "kind", kind)
+			}
+		}()
 		ctx, cancel := context.WithTimeout(context.Background(), writeTimeout)
 		defer cancel()
 		if err := r.store.RecordCoverageGap(ctx, kind, country, input); err != nil {
@@ -90,15 +113,29 @@ func (r *Recorder) RecordEmpty(kind, country, input string) {
 		if err := r.store.PruneCoverageGaps(ctx, r.maxRows); err != nil {
 			r.logger.WarnContext(ctx, "coverage: prune failed", "err", err)
 		}
-	}()
+	})
 }
 
-// Wait blocks until all in-flight coverage writes have finished. Called
-// during graceful shutdown (and by tests) so sampled rows aren't lost.
+// Wait blocks until all in-flight coverage writes have finished, or until
+// ctx is done — whichever comes first. Called during graceful shutdown
+// (with the shutdown context) so sampled rows aren't lost, while the
+// shared deadline keeps a wedged write from overrunning the shutdown
+// budget. Returns ctx.Err() if the deadline wins; in-flight writes are
+// detached and best-effort, so abandoned stragglers are acceptable.
 // Nil-safe.
-func (r *Recorder) Wait() {
+func (r *Recorder) Wait(ctx context.Context) error {
 	if r == nil {
-		return
+		return nil
 	}
-	r.wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		r.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

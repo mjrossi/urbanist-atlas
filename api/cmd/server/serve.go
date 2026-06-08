@@ -260,8 +260,13 @@ func runServe(ctx context.Context, c *cli.Command) error {
 			}
 		}
 		// Drain in-flight coverage-gap writes before the deferred store
-		// Close runs, so sampled rows aren't lost on shutdown. Nil-safe.
-		recorder.Wait()
+		// Close runs, so sampled rows aren't lost on shutdown. Bounded by
+		// the shared shutdownCtx so a wedged write can't overrun the
+		// shutdown budget; stragglers (sampled, best-effort) are dropped.
+		// Nil-safe.
+		if err := recorder.Wait(shutdownCtx); err != nil {
+			logger.Warn("coverage: drain incomplete on shutdown", "err", err)
+		}
 		// Wait for ListenAndServe to return (it will, with ErrServerClosed).
 		<-serverErr
 		return nil
