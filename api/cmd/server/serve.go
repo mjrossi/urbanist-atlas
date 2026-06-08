@@ -205,12 +205,12 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	// Private Prometheus listener. Bound to the Fly 6PN private address
-	// (FLY_PRIVATE_IP) when present so /metrics is never internet-routable
-	// — Fly's managed Prometheus scrapes it over that private network. Off
-	// the main mux on purpose; nil when disabled. ListenAndServe errors on
-	// this listener are logged, never fatal: losing metrics must not take
-	// the request path down.
+	// Private Prometheus listener. Binds all interfaces on Fly (see
+	// newMetricsServer) so Fly's managed Prometheus can scrape it; the
+	// port is never internet-routable because it isn't declared in
+	// [http_service]/[[services]]. Off the main mux on purpose; nil when
+	// disabled. ListenAndServe errors on this listener are logged, never
+	// fatal: losing metrics must not take the request path down.
 	metricsSrv := newMetricsServer(c.String("metrics-port"), metrics, logger)
 	if metricsSrv != nil {
 		go func() {
@@ -429,17 +429,25 @@ func splitCSV(s string) []string {
 
 // newMetricsServer builds the private Prometheus listener for the given
 // port, or returns nil when metrics are disabled (empty port or "0").
-// It binds to the Fly private IP when available so the endpoint stays
-// off the public internet, falling back to loopback for local dev.
+//
+// On Fly it binds ALL interfaces (":port"), NOT FLY_PRIVATE_IP. Fly's
+// managed-Prometheus scraper reaches the instance on a different
+// interface than the 6PN address, so binding only to FLY_PRIVATE_IP
+// leaves /metrics reachable via `fly proxy` (6PN) yet never scraped — no
+// atlas_* series ever land in Fly's Prometheus. The endpoint stays
+// private regardless of bind address: Fly's edge only routes ports
+// declared in [http_service]/[[services]], and the metrics port
+// deliberately isn't one. Locally (no FLY_PRIVATE_IP) it binds loopback
+// so a dev machine doesn't expose it on the LAN.
 func newMetricsServer(port string, metrics *httpapi.Metrics, logger *slog.Logger) *http.Server {
 	port = strings.TrimSpace(port)
 	if port == "" || port == "0" {
 		logger.Info("metrics server disabled")
 		return nil
 	}
-	host := os.Getenv("FLY_PRIVATE_IP")
-	if host == "" {
-		host = "127.0.0.1"
+	host := "127.0.0.1"
+	if os.Getenv("FLY_PRIVATE_IP") != "" {
+		host = "" // all interfaces, so Fly's metrics scraper can reach it
 	}
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", metrics.Handler())

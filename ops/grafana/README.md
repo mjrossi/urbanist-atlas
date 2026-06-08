@@ -7,10 +7,12 @@ code so the dashboard is reproducible and reviewable; this tree parallels
 ## Where the metrics come from
 
 The API exposes a **private** Prometheus endpoint (`/metrics` on
-`--metrics-port`, default `9091`), bound to the Fly 6PN private address so
-it is never internet-routable. Fly's **managed Prometheus** scrapes it
-automatically (`[metrics]` in [`fly.toml`](../../fly.toml)); retention is
-~30 days. Metric names and labels are defined in
+`--metrics-port`, default `9091`). It binds all interfaces on Fly so the
+managed-Prometheus scraper can reach it, yet stays private because the
+port is **not** declared in `[http_service]`/`[[services]]`, so Fly's edge
+never routes it to the public internet. Fly's **managed Prometheus**
+scrapes it automatically (`[metrics]` in [`fly.toml`](../../fly.toml));
+retention is ~30 days. Metric names and labels are defined in
 [`api/internal/httpapi/metrics.go`](../../api/internal/httpapi/metrics.go).
 
 ## Dashboard: `dashboards/atlas-overview.json`
