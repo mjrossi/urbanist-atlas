@@ -354,6 +354,69 @@ flyctl ssh console -a urbanist-atlas -C \
 The retry uses the current `URBANIST_GITHUB_TOKEN` Fly secret and
 overwrites `promotion_pr_url` / `promotion_error` on the row.
 
+## Monitoring & incident response
+
+Solo-dev posture: **reactive + manual.** There is no paging stack — the
+job is to be able to *look* when something is reported, and to get a
+nudge when the two things that fail silently fail. See the observability
+design spec
+([`superpowers/specs/2026-06-08-observability-design.md`](./superpowers/specs/2026-06-08-observability-design.md))
+for the why.
+
+### Where to look
+
+- **Logs (primary debugging surface).** `flyctl logs -a urbanist-atlas`
+  (or `just fly-logs`). Logs are structured slog (JSON in prod). Every
+  request carries a request id; every error and admin action logs it as
+  `rid`. When a user reports a problem, ask for the request ID shown in
+  the error UI and grep for it:
+
+  ```sh
+  flyctl logs -a urbanist-atlas | grep '<rid>'
+  ```
+
+  Successful reads log at DEBUG (`lookup ok`, `region view`, `org view`,
+  `region search`) — set `URBANIST_LOG_LEVEL=debug` (Fly secret) to see
+  them; prod runs at `info`.
+
+- **Metrics dashboard.** Fly's managed Grafana (Monitoring → Grafana, or
+  `https://fly-metrics.net`) reads the managed Prometheus that scrapes the
+  private `/metrics`. Import
+  [`ops/grafana/dashboards/atlas-overview.json`](../ops/grafana/dashboards/atlas-overview.json);
+  see [`ops/grafana/README.md`](../ops/grafana/README.md). Use it for
+  latency/error trends, lookup hit/miss/**empty**, and the submission
+  funnel.
+
+- **Coverage gaps (editorial).** Which inputs return nothing:
+  `GET /api/v1/admin/coverage-gaps` (bearer-gated). Capture is **off by
+  default** — set `URBANIST_COVERAGE_SAMPLE_RATE` (e.g. `0.1`) to start
+  sampling empty-result lookups/searches.
+
+  ```sh
+  curl -fsS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+    https://api.urbanistatlas.com/api/v1/admin/coverage-gaps | jq
+  ```
+
+### What pages you (GitHub Issues, no SaaS)
+
+- **API down** — [`uptime.yml`](../.github/workflows/uptime.yml) probes
+  `/healthz` from outside Fly every ~15 min and opens an issue if it's
+  down for ~50s. (Fly's own machine health checks recycle unhealthy VMs
+  but can't see DNS/TLS/edge problems — this catches those.)
+- **Backup failure** — [`backup-sqlite.yml`](../.github/workflows/backup-sqlite.yml)
+  opens an issue if the nightly SQLite→R2 snapshot fails.
+
+Both reuse one open issue (comment, not spam) until you close it.
+
+### Triage
+
+| Symptom | First moves |
+|---------|-------------|
+| Uptime issue opened | `flyctl status -a urbanist-atlas` (machines up?), `flyctl logs`, check DNS/TLS for the apex. |
+| `/readyz` 503 / `atlas_store_ping_failures_total` climbing | The SQLite volume is unreachable. `flyctl status`, `flyctl volumes list -a urbanist-atlas`; reads still work (they're in-memory), writes (submissions) don't. |
+| 5xx spike on the dashboard | Grab a recent `rid` from `flyctl logs`, follow it; check a recent deploy — `flyctl releases -a urbanist-atlas`, roll back if needed (see §Rollback). |
+| Backup issue opened | Not an outage. Re-run the workflow (Actions → SQLite nightly backup → Run workflow); if it keeps failing, check the Fly token / R2 creds (§GitHub Actions secrets) and take a manual snapshot (§Backups). |
+
 ## QA hostname retirement (historical, 2026-05-27)
 
 `qa.urbanistatlas.com` + `qa-api.urbanistatlas.com` were the
