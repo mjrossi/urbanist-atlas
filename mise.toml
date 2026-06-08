@@ -10,7 +10,7 @@
 
 [tools]
 # Language runtimes — patch-pinned so reproducibility > convenience.
-go = "1.26.3"
+go = "1.26.4"
 node = "22.22.3"
 # Python is used by the etl pipeline (slice #7.5.3+) to convert the
 # Census CBSA delineation xlsx into CSV before the Go regenerate step

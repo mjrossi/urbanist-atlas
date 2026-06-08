@@ -1,6 +1,6 @@
 module github.com/mjrossi/urbanist-atlas/api
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/ctessum/polyclip-go v1.1.0
