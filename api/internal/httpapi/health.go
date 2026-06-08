@@ -43,15 +43,15 @@ type pinger interface {
 // at boot, so it does not implement pinger. When submissions are
 // disabled (no --db-path), the passed-in value is a nil interface and
 // /readyz resolves to "200 ok" — same shape as /healthz.
-func readyHandler(pingable any, logger *slog.Logger) http.HandlerFunc {
+func readyHandler(pingable any, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	p, _ := pingable.(pinger)
 	return func(w http.ResponseWriter, r *http.Request) {
 		if p != nil {
 			ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 			defer cancel()
 			if err := p.Ping(ctx); err != nil {
-				logger.WarnContext(r.Context(), "readyz: store ping failed",
-					slog.String("error", err.Error()))
+				m.incStorePingFailure()
+				logger.WarnContext(r.Context(), "readyz: store ping failed", "err", err)
 				writeProblem(w, r, http.StatusServiceUnavailable,
 					"https://urbanistatlas.com/problems/not-ready",
 					"Service not ready",

@@ -32,7 +32,7 @@ func TestHealthz_ReturnsPlainOk(t *testing.T) {
 // place for a future network-bound store (see readyHandler).
 func TestReadyz_WithoutPingerReturnsOk(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
-	h := readyHandler(struct{}{}, logger) // not a pinger
+	h := readyHandler(struct{}{}, logger, nil) // not a pinger
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
@@ -51,7 +51,7 @@ func (f fakePinger) Ping(context.Context) error { return f.err }
 
 func TestReadyz_PingerOk(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
-	h := readyHandler(fakePinger{}, logger)
+	h := readyHandler(fakePinger{}, logger, nil)
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
@@ -63,7 +63,7 @@ func TestReadyz_PingerOk(t *testing.T) {
 
 func TestReadyz_PingerFails_ReturnsProblem503(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
-	h := readyHandler(fakePinger{err: errors.New("dial tcp: connection refused")}, logger)
+	h := readyHandler(fakePinger{err: errors.New("dial tcp: connection refused")}, logger, nil)
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))

@@ -112,7 +112,7 @@ func New(cfg Config) http.Handler {
 	})
 
 	getHead(r, healthzPath, healthHandler())
-	getHead(r, readyzPath, readyHandler(cfg.Submissions, logger))
+	getHead(r, readyzPath, readyHandler(cfg.Submissions, logger, cfg.Metrics))
 
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
 		r.Use(odblHeadersMiddleware)
@@ -128,9 +128,9 @@ func New(cfg Config) http.Handler {
 			// param route. chi prefers static segments over params, so
 			// order here is for readers, not the matcher — but a router
 			// test pins that "search" never resolves as a slug.
-			getHead(r, "/regions/search", searchRegionsHandler(cfg.Store, logger))
-			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger))
-			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger))
+			getHead(r, "/regions/search", searchRegionsHandler(cfg.Store, logger, cfg.Metrics))
+			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger, cfg.Metrics))
+			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger, cfg.Metrics))
 			getHead(r, "/recent", recentHandler(cfg.Store, logger))
 
 			if cfg.Submissions != nil {
@@ -139,8 +139,8 @@ func New(cfg Config) http.Handler {
 				r.Route("/admin", func(r chi.Router) {
 					r.Use(bearerAuthMiddleware(cfg.AdminToken))
 					r.Get("/submissions", listSubmissionsHandler(cfg.Submissions, logger))
-					r.Post("/submissions/{id}/approve", approveSubmissionHandler(cfg.Submissions, cfg.PromotionEnqueuer, logger))
-					r.Post("/submissions/{id}/reject", rejectSubmissionHandler(cfg.Submissions, logger))
+					r.Post("/submissions/{id}/approve", approveSubmissionHandler(cfg.Submissions, cfg.PromotionEnqueuer, logger, cfg.Metrics))
+					r.Post("/submissions/{id}/reject", rejectSubmissionHandler(cfg.Submissions, logger, cfg.Metrics))
 				})
 			}
 		})

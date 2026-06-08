@@ -16,13 +16,15 @@ import (
 // stays thin: parse → call store → encode. Hydration of Org.Regions
 // happens in the Store layer; the wire-shape adapter is the same
 // toOAPIOrg used by /regions/{slug} and /recent.
-func getOrgHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
+func getOrgHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		slug := strings.TrimSpace(chi.URLParam(r, "slug"))
 		org, err := store.GetOrgBySlug(r.Context(), slug)
 		if err != nil {
 			if errors.Is(err, atlas.ErrOrgNotFound) {
+				m.incOrgView(false)
+				logger.DebugContext(r.Context(), "org view", "slug", slug, "found", false, "rid", rid)
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Organization Not Found",
 					"No organization matches that slug.", rid)
 				return
@@ -36,6 +38,8 @@ func getOrgHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 			writeInternalProblem(w, r, rid)
 			return
 		}
+		m.incOrgView(true)
+		logger.DebugContext(r.Context(), "org view", "slug", slug, "found", true, "rid", rid)
 		writeJSON(w, http.StatusOK, toOAPIOrg(*org))
 	}
 }

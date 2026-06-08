@@ -24,8 +24,22 @@ type Metrics struct {
 	httpRequests *prometheus.CounterVec
 	httpDuration *prometheus.HistogramVec
 	lookupTotal  *prometheus.CounterVec
-	submissions  *prometheus.CounterVec
-	rateLimit    *prometheus.CounterVec
+	// lookupResults partitions resolved (hit) lookups by the most-specific
+	// result tier so we can see, e.g., the empty-result rate — the editorial
+	// coverage-gap signal. See incLookupTier / lookupTier.
+	lookupResults        *prometheus.CounterVec
+	regionViews          *prometheus.CounterVec
+	orgViews             *prometheus.CounterVec
+	regionSearch         *prometheus.CounterVec
+	regionSearchResults  prometheus.Histogram
+	regionSearchQueryLen prometheus.Histogram
+	submissions          *prometheus.CounterVec
+	// submissionValidationFailures breaks down rejected submissions by the
+	// offending field (bounded via metricSubmissionField).
+	submissionValidationFailures *prometheus.CounterVec
+	adminActions                 *prometheus.CounterVec
+	rateLimit                    *prometheus.CounterVec
+	storePingFailures            prometheus.Counter
 }
 
 // NewMetrics builds a Metrics with a fresh registry, the standard Go runtime
@@ -66,6 +80,53 @@ func NewMetrics() *Metrics {
 			Name:      "rate_limit_hits_total",
 			Help:      "Total requests rejected by the per-IP rate limiter, by endpoint.",
 		}, []string{"endpoint"}),
+		lookupResults: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "atlas",
+			Name:      "lookup_results_total",
+			Help:      "Resolved lookups by country and most-specific result tier (local|regional|statewide|empty). Sums to lookup_total{result=hit}.",
+		}, []string{"country", "tier"}),
+		regionViews: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "atlas",
+			Name:      "region_views_total",
+			Help:      "Region detail fetches (GET /regions/{slug}) by whether the slug resolved.",
+		}, []string{"found"}),
+		orgViews: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "atlas",
+			Name:      "org_views_total",
+			Help:      "Org detail fetches (GET /orgs/{slug}) by whether the slug resolved.",
+		}, []string{"found"}),
+		regionSearch: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "atlas",
+			Name:      "region_search_total",
+			Help:      "Region type-ahead searches by whether any result was returned (nonempty|empty).",
+		}, []string{"result"}),
+		regionSearchResults: factory.NewHistogram(prometheus.HistogramOpts{
+			Namespace: "atlas",
+			Name:      "region_search_results",
+			Help:      "Number of results returned per region type-ahead search.",
+			Buckets:   []float64{0, 1, 2, 5, 10, 20, 50},
+		}),
+		regionSearchQueryLen: factory.NewHistogram(prometheus.HistogramOpts{
+			Namespace: "atlas",
+			Name:      "region_search_query_length",
+			Help:      "Length in characters of the region type-ahead query. The query text itself is never recorded.",
+			Buckets:   []float64{1, 2, 3, 5, 8, 13, 21, 34},
+		}),
+		submissionValidationFailures: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "atlas",
+			Name:      "submission_validation_failures_total",
+			Help:      "Per-field submission validation failures, by field (bounded set; unknown keys collapse to other).",
+		}, []string{"field"}),
+		adminActions: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "atlas",
+			Name:      "admin_actions_total",
+			Help:      "Admin submission state transitions by action (approve|reject) and outcome (ok|not_found|conflict|error).",
+		}, []string{"action", "outcome"}),
+		storePingFailures: factory.NewCounter(prometheus.CounterOpts{
+			Namespace: "atlas",
+			Name:      "store_ping_failures_total",
+			Help:      "Total /readyz store ping failures.",
+		}),
 	}
 }
 
@@ -108,6 +169,106 @@ func (m *Metrics) incRateLimit(endpoint string) {
 		return
 	}
 	m.rateLimit.WithLabelValues(endpoint).Inc()
+}
+
+// incLookupTier records the result tier of a resolved (hit) lookup.
+// Pair with incLookup(country, "hit") — there is exactly one tier
+// increment per hit, so lookup_results_total sums to
+// lookup_total{result="hit"}.
+func (m *Metrics) incLookupTier(country, tier string) {
+	if m == nil {
+		return
+	}
+	m.lookupResults.WithLabelValues(metricCountry(country), tier).Inc()
+}
+
+// lookupTier picks the most-specific bucket that carried at least one
+// org (local ≻ regional ≻ statewide), or "empty" when a resolved region
+// surfaced no orgs in any tier. The "empty" bucket is the high-value
+// coverage-gap signal that also drives the sampled-empty capture.
+func lookupTier(local, regional, statewide int) string {
+	switch {
+	case local > 0:
+		return "local"
+	case regional > 0:
+		return "regional"
+	case statewide > 0:
+		return "statewide"
+	default:
+		return "empty"
+	}
+}
+
+// incRegionView records a GET /regions/{slug} fetch, labeled by whether
+// the slug resolved.
+func (m *Metrics) incRegionView(found bool) {
+	if m == nil {
+		return
+	}
+	m.regionViews.WithLabelValues(strconv.FormatBool(found)).Inc()
+}
+
+// incOrgView records a GET /orgs/{slug} fetch, labeled by whether the
+// slug resolved.
+func (m *Metrics) incOrgView(found bool) {
+	if m == nil {
+		return
+	}
+	m.orgViews.WithLabelValues(strconv.FormatBool(found)).Inc()
+}
+
+// incRegionSearch records a region type-ahead query: the empty/nonempty
+// counter, the result-count histogram, and the query-length histogram.
+// The query text is never recorded — only its length.
+func (m *Metrics) incRegionSearch(queryLen, resultCount int) {
+	if m == nil {
+		return
+	}
+	result := "nonempty"
+	if resultCount == 0 {
+		result = "empty"
+	}
+	m.regionSearch.WithLabelValues(result).Inc()
+	m.regionSearchResults.Observe(float64(resultCount))
+	m.regionSearchQueryLen.Observe(float64(queryLen))
+}
+
+// incSubmissionValidationFailure records one rejected field, bounded to
+// the known SubmissionPayload field set via metricSubmissionField.
+func (m *Metrics) incSubmissionValidationFailure(field string) {
+	if m == nil {
+		return
+	}
+	m.submissionValidationFailures.WithLabelValues(metricSubmissionField(field)).Inc()
+}
+
+// metricSubmissionField clamps an arbitrary field-error key to the known
+// SubmissionPayload field set so the validation-failures cardinality
+// can't be inflated by unexpected keys. Mirrors metricCountry.
+func metricSubmissionField(field string) string {
+	switch field {
+	case "name", "short_desc", "website_url", "contact_url",
+		"region_slugs", "submitter_name", "submitter_email", "submitter_note":
+		return field
+	default:
+		return "other"
+	}
+}
+
+// incAdminAction records an admin submission state transition.
+func (m *Metrics) incAdminAction(action, outcome string) {
+	if m == nil {
+		return
+	}
+	m.adminActions.WithLabelValues(action, outcome).Inc()
+}
+
+// incStorePingFailure records a /readyz store ping failure.
+func (m *Metrics) incStorePingFailure() {
+	if m == nil {
+		return
+	}
+	m.storePingFailures.Inc()
 }
 
 // Handler returns the Prometheus exposition handler bound to this registry.

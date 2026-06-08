@@ -82,7 +82,17 @@ func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.Hand
 			return
 		}
 
+		tier := lookupTier(len(result.Local), len(result.Regional), len(result.Statewide))
 		m.incLookup(string(country), "hit")
+		m.incLookupTier(string(country), tier)
+		logger.DebugContext(r.Context(), "lookup ok",
+			"country", country,
+			"tier", tier,
+			"local_count", len(result.Local),
+			"regional_count", len(result.Regional),
+			"statewide_count", len(result.Statewide),
+			"rid", rid,
+		)
 		writeJSON(w, http.StatusOK, toOAPILookupResult(result))
 	}
 }
