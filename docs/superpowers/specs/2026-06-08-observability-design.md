@@ -1,10 +1,11 @@
 # Observability & usage analytics
 
-**Status:** In progress (2026-06-08). Phases 1–3 (server-side usage
-metrics + success logging, sampled coverage-gap capture, and the
-consumption layer — dashboard + GitHub-Actions alerts + this runbook) are
-shipped. Phase 4 (web instrumentation) is planned. The operator runbook
-is [`docs/deploy.md`](../../deploy.md) §Monitoring & incident response.
+**Status:** Shipped (2026-06-08). Phases 1–3 (server-side usage metrics +
+success logging, sampled coverage-gap capture, and the consumption layer
+— dashboard + GitHub-Actions alerts + runbook) and Phase 4 (web error
+visibility + request-ID correlation) are live. Client funnel analytics
+are deferred — see §Deferred. The operator runbook is
+[`docs/deploy.md`](../../deploy.md) §Monitoring & incident response.
 
 **Related:**
 - [`../../../CLAUDE.md`](../../../CLAUDE.md) §Tech conventions §Go —
@@ -68,15 +69,32 @@ bearer-gated `GET /api/v1/admin/coverage-gaps` (wire-contract change;
 issue) and a failure-notify step in `backup-sqlite.yml`; `docs/deploy.md`
 §Monitoring & incident response.
 
-## Planned
+**Phase 4 — web error visibility** (no SaaS, no new runtime deps). A
+graceful error boundary (`web/src/routes/ErrorBoundary.tsx`) that
+branches 404 vs unexpected error and surfaces the request id on the
+error page so a user can quote it; `web/src/lib/clientErrors.ts` —
+`requestIdOf` + dev-only `reportClientError` + `installGlobalErrorLogging`
+(window `error`/`unhandledrejection`); react-query `QueryCache` /
+`MutationCache` `onError` in `main.tsx` logging the `rid` centrally in
+dev. Web Vitals piggyback on Cloudflare RUM (no code). This is the
+SaaS-free realization of the "error tracking" the maintainer opted into:
+the request id is the bridge from a user report to the server logs.
 
-**Phase 4 — web instrumentation** (no SaaS, no new runtime deps): a
-graceful reporting error boundary that surfaces the request ID;
-dev-only `window.onerror`/`unhandledrejection` + react-query `onError`
-that log the `rid` for log correlation; cookieless Cloudflare Web
-Analytics custom events for the funnels the server can't see (form
-abandonment, search→click). Web Vitals via Cloudflare RUM. A first-party
-error-beacon-to-logs endpoint is noted but out of scope.
+## Deferred
+
+**Client usage funnels** (form abandonment, search→result click-through,
+bounce) — the signals the server genuinely cannot see. The original plan
+sketched these on "Cloudflare Web Analytics custom events," but CWA (the
+cookieless RUM beacon this app uses) has **no JS custom-event API** —
+custom events are a Zaraz / Analytics Engine capability, and both pull in
+infrastructure (a tag-manager layer, or a Worker) that the no-SaaS /
+pure-static-assets posture rejects for v1. CWA's automatic pageviews
+(per-route popularity) plus the Phase 1 server metrics already cover the
+bulk of "how is it used," so funnels wait for a deliberate sink choice:
+either a minimal Cloudflare **Analytics Engine** Worker, or a first-party
+`POST /api/v1/events`-style endpoint landing in Prometheus/SQLite. The
+latter is also the path if client-side render crashes ever need to reach
+the server logs.
 
 ## Verification
 
