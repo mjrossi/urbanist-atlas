@@ -47,6 +47,12 @@ type fakeGitHub struct {
 	// openPR attempt left behind. createBranch must treat that as success
 	// (idempotent whole-pipeline retry, issue #24).
 	createRefAlreadyExists bool
+
+	// getRefBlockUntilCtx makes the get-ref endpoint hang until the
+	// request's context is canceled (simulating a wedged GitHub call).
+	// Used by the issue #25 shutdown-drain-deadline test to prove a
+	// stuck remote can't pin process exit past shutdownDrainTimeout.
+	getRefBlockUntilCtx bool
 }
 
 func newFakeGitHub(t *testing.T, fileContent string) *fakeGitHub {
@@ -63,15 +69,23 @@ func (f *fakeGitHub) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/git/ref/heads/main", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
-		defer f.mu.Unlock()
 		f.getRefCalled++
+		block := f.getRefBlockUntilCtx
 		if f.getRefTransientFailures > 0 {
 			f.getRefTransientFailures--
 			status := f.getRefTransientStatus
 			if status == 0 {
 				status = http.StatusServiceUnavailable
 			}
+			f.mu.Unlock()
 			http.Error(w, "transient", status)
+			return
+		}
+		f.mu.Unlock()
+		if block {
+			// Hang until the client cancels (the request ctx fires when
+			// the worker's per-call deadline elapses). Never respond.
+			<-r.Context().Done()
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -640,6 +654,87 @@ func TestWorker_CreateBranch_AlreadyExistsIsIdempotent(t *testing.T) {
 	}
 	if gh.createPRBody == nil {
 		t.Fatal("create-PR not called after tolerated 422")
+	}
+}
+
+// TestWorker_ShutdownDrain_BoundsWedgedCall pins issue #25: a job
+// drained on the hard-cancel path (drainAndExit) runs under
+// shutdownDrainTimeout, so a wedged GitHub call can't pin process exit
+// for the full openPRTimeout (30s). The fake's get-ref hangs forever;
+// without the bounded drain ctx, Run would block ~30s. We shrink
+// shutdownDrainTimeout to keep the test fast and assert Run returns
+// well under openPRTimeout.
+func TestWorker_ShutdownDrain_BoundsWedgedCall(t *testing.T) {
+	prev := shutdownDrainTimeout
+	shutdownDrainTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { shutdownDrainTimeout = prev })
+
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.getRefBlockUntilCtx = true // every get-ref hangs until ctx fires
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Job A will be picked up by Run and wedge in getBranchSHA. Job B
+	// sits in the buffer so it's still there when ctx cancels, forcing
+	// it through drainAndExit (the issue #25 code path).
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue A: %v", err)
+	}
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue B: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() { w.Run(ctx); close(done) }()
+
+	// Wait until Run is actually wedged inside job A's get-ref before
+	// canceling, so cancellation lands while a call is in flight and
+	// job B is still buffered.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		gh.mu.Lock()
+		started := gh.getRefCalled > 0
+		gh.mu.Unlock()
+		if started {
+			break
+		}
+		if time.Now().After(deadline) {
+			cancel()
+			t.Fatal("get-ref never reached; worker did not start processing")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	cancel()
+
+	// Both jobs (A in-flight under the now-canceled parent ctx, B under
+	// the bounded drain ctx) must resolve and Run must return. Budget:
+	// comfortably above 2*shutdownDrainTimeout but far below
+	// openPRTimeout — that gap is the regression guard.
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("Run did not return after cancel; wedged call pinned shutdown "+
+			"(shutdownDrainTimeout=%v, openPRTimeout=%v)", shutdownDrainTimeout, openPRTimeout)
+	}
+
+	// Both jobs should have recorded a (failed) promotion result — the
+	// detached persist write lands even though the GitHub call was cut
+	// off. This proves the drain still records outcomes under the bound.
+	calls := persist.wait(t, 2)
+	for _, c := range calls {
+		if c.Err == "" {
+			t.Errorf("expected promotion_error on wedged-then-canceled job, got success url=%q", c.URL)
+		}
 	}
 }
 

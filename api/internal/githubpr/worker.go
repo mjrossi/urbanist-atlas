@@ -169,11 +169,29 @@ func (w *Worker) Run(ctx context.Context) {
 	}
 }
 
+// shutdownDrainTimeout bounds a single job's process() during the
+// hard-cancel drain. The parent ctx is already canceled on this path,
+// so process() runs against a *detached* context (so the persist write
+// still lands) — but a detached context would otherwise re-derive
+// openPR's fresh 30s deadline, letting one wedged GitHub call pin
+// process exit for up to 30s. This tighter budget caps that: a slow
+// remote trips it, openPR returns ctx.Err(), and the row records the
+// failure for operator retry. Kept under openPRTimeout deliberately.
+//
+// A var, not a const, solely so the shutdown-drain test can shrink it;
+// production never reassigns it.
+var shutdownDrainTimeout = 5 * time.Second
+
 // drainAndExit consumes any remaining jobs in the buffer with the
 // caveat that the parent ctx is already canceled — GitHub I/O will
 // fail fast, but the persist side will still record the error on
 // each affected row. Called only from the ctx-canceled branch of
 // Run; Stop's normal path goes through the channel-close branch.
+//
+// Each job is processed under a fresh, detached context bounded by
+// shutdownDrainTimeout (issue #25) so a wedged GitHub call can't pin
+// process exit past that budget regardless of openPR's own 30s
+// deadline.
 func (w *Worker) drainAndExit() {
 	for {
 		select {
@@ -181,7 +199,9 @@ func (w *Worker) drainAndExit() {
 			if !ok {
 				return
 			}
-			w.process(context.Background(), job)
+			drainCtx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+			w.process(drainCtx, job)
+			cancel()
 		default:
 			w.cfg.Logger.Info("githubpr: worker shutting down")
 			return
