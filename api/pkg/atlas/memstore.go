@@ -395,6 +395,9 @@ func (s *MemStore) GetOrgBySlug(_ context.Context, slug string) (*Org, error) {
 		out := org
 		out.Regions = s.regionsForOrg(org.ID)
 		out.MatchedRegionSlugs = nil
+		// Clone Tags so the returned copy doesn't alias the stored
+		// backing array under RLock (see OrgsForRegions). nil stays nil.
+		out.Tags = append([]Tag(nil), out.Tags...)
 		return &out, nil
 	}
 	return nil, ErrOrgNotFound
@@ -427,6 +430,9 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 		out := org
 		out.Regions = s.regionsForOrg(org.ID)
 		out.MatchedRegionSlugs = nil
+		// Clone Tags so the returned copy doesn't alias the stored
+		// backing array under RLock (see OrgsForRegions). nil stays nil.
+		out.Tags = append([]Tag(nil), out.Tags...)
 		candidates = append(candidates, out)
 	}
 	// Sort newest-first; ID DESC breaks ties so same-day orgs order
