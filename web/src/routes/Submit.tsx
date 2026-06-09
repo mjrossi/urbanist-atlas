@@ -1,5 +1,4 @@
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
 import { Controller, type FieldPath, useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 
@@ -13,6 +12,7 @@ import {
   SUBMIT_FORM_DEFAULTS,
   type SubmitForm,
 } from '../lib/submitForm.ts';
+import { useCooldown, useCountdown } from '../lib/timers.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 // Brief lockout after a successful submit so a triple-click can't
@@ -143,47 +143,6 @@ function deriveSubmitError(
     validationMessage: err.problem?.detail ?? err.message,
     unmappedFieldErrors,
   };
-}
-
-/**
- * A latch that goes true when `trigger()` is called, then clears itself
- * after `ms`. Backs the brief post-submit lockout that stops a
- * triple-click from firing duplicate POSTs.
- */
-function useCooldown(ms: number) {
-  const [active, setActive] = useState(false);
-  useEffect(() => {
-    if (!active) return;
-    const id = setTimeout(() => {
-      setActive(false);
-    }, ms);
-    return () => {
-      clearTimeout(id);
-    };
-  }, [active, ms]);
-  const trigger = () => {
-    setActive(true);
-  };
-  return [active, trigger] as const;
-}
-
-/**
- * A per-second countdown. `seconds` ticks down to zero; the returned
- * setter (re)arms it from a server-provided Retry-After. Backs the 429
- * lockout — the submit button stays disabled until it reaches zero.
- */
-function useCountdown() {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    if (seconds <= 0) return;
-    const id = setInterval(() => {
-      setSeconds((s) => (s <= 1 ? 0 : s - 1));
-    }, 1000);
-    return () => {
-      clearInterval(id);
-    };
-  }, [seconds]);
-  return [seconds, setSeconds] as const;
 }
 
 /**
