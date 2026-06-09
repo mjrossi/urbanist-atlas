@@ -632,6 +632,41 @@ func TestReject_RequiresReason(t *testing.T) {
 	}
 }
 
+// TestReject_EmptyBody_Returns400WithPointedTitle pins that the reject
+// handler distinguishes an empty body from malformed JSON — mirroring
+// the create handler — so an admin sees "Empty Request Body" rather than
+// a generic "not valid JSON".
+func TestReject_EmptyBody_Returns400WithPointedTitle(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", goodSubmissionBody(), nil)
+	var created map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&created)
+	_ = resp.Body.Close()
+	id := created["id"].(string)
+
+	req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/v1/admin/submissions/"+id+"/reject", http.NoBody)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
+	r, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST reject: %v", err)
+	}
+	defer r.Body.Close()
+
+	if r.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", r.StatusCode)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		t.Fatalf("decode problem: %v", err)
+	}
+	if body["title"] != "Empty Request Body" {
+		t.Errorf("title: got %v, want %q (empty body must be distinguished from malformed JSON)", body["title"], "Empty Request Body")
+	}
+}
+
 func TestReject_HappyPath(t *testing.T) {
 	rig := newSubmissionsTestServer(t)
 	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", goodSubmissionBody(), nil)

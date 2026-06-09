@@ -326,8 +326,21 @@ func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger, m 
 		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&body); err != nil {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Request Body",
-				"The request body is not valid JSON for RejectSubmissionRequest.", rid)
+			// Distinguish empty / oversize / malformed the same way the
+			// create handler does (see parseSubmission), so an admin gets a
+			// pointed message instead of a generic "not valid JSON".
+			title := "Invalid Request Body"
+			detail := "The request body is not valid JSON for RejectSubmissionRequest."
+			if errors.Is(err, io.EOF) {
+				title = "Empty Request Body"
+				detail = "The request body is empty; expected a RejectSubmissionRequest JSON object."
+			}
+			var mbErr *http.MaxBytesError
+			if errors.As(err, &mbErr) {
+				title = "Request Body Too Large"
+				detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
+			}
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, title, detail, rid)
 			return
 		}
 		// Reject trailing content after the object (see the create handler

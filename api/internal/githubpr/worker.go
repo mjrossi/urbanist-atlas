@@ -521,8 +521,9 @@ func retryableStatus(status int) bool {
 // limit 403 from a terminal authorization 403. GitHub flags the former
 // with a Retry-After header and/or a body containing "secondary rate
 // limit" / "rate limit" (see GitHub REST API "Rate limits" docs). body
-// is the already-read response body (retryBody buffers it so it can be
-// classified here and still restored for apiError on the no-retry path).
+// is the already-read response body (doIdempotentRequest buffers it so it
+// can be classified here and still restored for apiError on the no-retry
+// path).
 func isSecondaryRateLimit(resp *http.Response, body []byte) bool {
 	if resp.StatusCode != http.StatusForbidden {
 		return false
@@ -530,9 +531,16 @@ func isSecondaryRateLimit(resp *http.Response, body []byte) bool {
 	if resp.Header.Get("Retry-After") != "" {
 		return true
 	}
-	// x-ratelimit-remaining: 0 is GitHub's primary-rate-limit signal on
-	// a 403; treat it as retryable too (the backoff gives the window
-	// time to roll over).
+	// x-ratelimit-remaining: 0 is GitHub's primary-rate-limit signal on a
+	// 403. We treat it as retryable but deliberately do NOT consult
+	// x-ratelimit-reset: a primary limit can reset up to an hour out, far
+	// beyond our bounded backoff, so honoring the reset would just mean
+	// failing immediately. Retrying instead is cheap (still capped by
+	// retryMaxAttempts and the openPRTimeout ctx deadline) and costs only a
+	// few hundred ms before the same terminal error the operator would
+	// retry anyway — while transparently recovering the case where
+	// remaining:0 coincides with a short, self-clearing secondary limit
+	// that set no Retry-After header.
 	if resp.Header.Get("X-RateLimit-Remaining") == "0" {
 		return true
 	}
