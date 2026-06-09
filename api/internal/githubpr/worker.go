@@ -446,6 +446,20 @@ func (w *Worker) doRequest(ctx context.Context, method, path string, body any) (
 	return w.cfg.HTTPClient.Do(req)
 }
 
+// expectStatus closes nothing — the caller owns resp.Body via defer —
+// but it consolidates the "did GitHub return the status I wanted?"
+// check that every plumbing method repeated. On a status mismatch it
+// returns the shared apiError (op + status + truncated body); on a
+// match it returns nil so the caller can proceed to decode. want is
+// the single accepted status; methods that accept two (putFile) keep
+// their own inline check.
+func expectStatus(resp *http.Response, want int, op string) error {
+	if resp.StatusCode != want {
+		return apiError(op, resp)
+	}
+	return nil
+}
+
 func (w *Worker) getBranchSHA(ctx context.Context, branch string) (string, error) {
 	resp, err := w.doRequest(ctx, http.MethodGet,
 		fmt.Sprintf("/repos/%s/%s/git/ref/heads/%s", w.cfg.Owner, w.cfg.Repo, branch), nil)
@@ -453,8 +467,8 @@ func (w *Worker) getBranchSHA(ctx context.Context, branch string) (string, error
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", apiError("get ref", resp)
+	if err := expectStatus(resp, http.StatusOK, "get ref"); err != nil {
+		return "", err
 	}
 	var out struct {
 		Object struct {
@@ -477,8 +491,8 @@ func (w *Worker) getFile(ctx context.Context, path, branch string) (fileContents
 		return fileContents{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fileContents{}, apiError("get contents", resp)
+	if err := expectStatus(resp, http.StatusOK, "get contents"); err != nil {
+		return fileContents{}, err
 	}
 	var out struct {
 		Content  string `json:"content"`
@@ -510,10 +524,7 @@ func (w *Worker) createBranch(ctx context.Context, branch, sha string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		return apiError("create ref", resp)
-	}
-	return nil
+	return expectStatus(resp, http.StatusCreated, "create ref")
 }
 
 func (w *Worker) putFile(ctx context.Context, path, branch, content, sha, message string) error {
@@ -548,8 +559,8 @@ func (w *Worker) createPR(ctx context.Context, title, body, head, base string) (
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		return "", apiError("create PR", resp)
+	if err := expectStatus(resp, http.StatusCreated, "create PR"); err != nil {
+		return "", err
 	}
 	var out struct {
 		HTMLURL string `json:"html_url"`
