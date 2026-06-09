@@ -40,6 +40,18 @@ function letterOf(name: string): string {
   return m ? m[0] : '#';
 }
 
+/** Groups items into a record keyed by `keyOf`, preserving input order. */
+function groupBy<T>(
+  items: readonly T[],
+  keyOf: (item: T) => string,
+): Record<string, T[]> {
+  const grouped: Record<string, T[]> = {};
+  for (const item of items) {
+    (grouped[keyOf(item)] ??= []).push(item);
+  }
+  return grouped;
+}
+
 /**
  * Groups the flat /regions response into the broadsheet's
  * country → letter → anchor → children shape. Cities whose
@@ -56,11 +68,7 @@ function letterOf(name: string): string {
 function groupForBrowse(all: readonly RegionSummary[]): ByCountry[] {
   const slugSet = new Set<string>(all.map((r) => r.region.slug));
 
-  const byCountry: Record<string, RegionSummary[]> = {};
-  for (const p of all) {
-    const c = p.region.country;
-    (byCountry[c] ??= []).push(p);
-  }
+  const byCountry = groupBy(all, (p) => p.region.country);
   return Object.entries(byCountry)
     .sort(([a], [b]) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)))
     .map(([country, regions]) => {
@@ -84,14 +92,13 @@ function groupForBrowse(all: readonly RegionSummary[]): ByCountry[] {
       }
       // Sort anchors alphabetically (within-letter rule); letter-group.
       anchors.sort((a, b) => a.region.name.localeCompare(b.region.name));
-      const grouped: Record<string, AnchorWithChildren[]> = {};
-      for (const a of anchors) {
-        const letter = letterOf(a.region.name);
-        (grouped[letter] ??= []).push({
+      const grouped = groupBy(
+        anchors.map((a) => ({
           anchor: a,
           children: childrenByAnchor.get(a.region.slug) ?? [],
-        });
-      }
+        })),
+        (entry) => letterOf(entry.anchor.region.name),
+      );
       const letters = Object.entries(grouped)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([letter, anchors]) => ({ letter, anchors }));
