@@ -1,5 +1,6 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { EmptyState } from '../components/EmptyState.tsx';
@@ -93,6 +94,10 @@ function RegionContent({ data }: { data: RegionDetail }) {
   const { region, local, regional, statewide, ancestry, descendant_region_names } = data;
   const kindLabel = regionKindLabel(region.kind);
   const totalOrgs = totalEntries(data);
+  const tagCount = useMemo(
+    () => countTags([...local, ...regional, ...statewide]),
+    [local, regional, statewide],
+  );
 
   // Build a slug → display-name map so Entry can render "Matched
   // via Brooklyn" instead of "Matched via brooklyn-ny". Seeded from
@@ -205,7 +210,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
                   {pluralize(statewide.length, 'entry', 'entries')}
                 </li>
                 <li>
-                  <strong>{countTags([...local, ...regional, ...statewide])}</strong>{' '}
+                  <strong>{tagCount}</strong>{' '}
                   distinct editorial tags
                 </li>
                 <li>
