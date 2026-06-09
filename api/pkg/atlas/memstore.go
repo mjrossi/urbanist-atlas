@@ -194,20 +194,27 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	// parent edges) — at v1 scale (~5k of each) that's noticeable in
 	// tests that hammer the endpoint. Hoisted, the whole call is O(R + P).
 	childrenOf := s.buildChildrenOf()
+	// Build the region->orgs inverted index once for the whole call too.
+	// The old code counted orgs by scanning every org (and each org's
+	// attachments) once per browseable region for OrgCount AND a second
+	// time for DirectOrgCount — O(R · O · A). With the inverted index,
+	// each region's counts are a set-union over its descendant ids and a
+	// single map lookup, so the whole call is O(O · A + R + P) instead.
+	orgsByRegion := s.buildOrgsByRegion()
 	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
 		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
 			continue
 		}
 		descendants := s.descendantRegionIDsWith(id, childrenOf)
-		count := s.countOrgsForRegions(descendants)
+		count := countDistinctOrgs(orgsByRegion, descendants)
 		if count == 0 {
 			continue
 		}
 		out = append(out, RegionSummary{
 			Region:           r,
 			OrgCount:         int64(count),
-			DirectOrgCount:   int64(s.countOrgsForRegions([]int64{id})),
+			DirectOrgCount:   int64(len(orgsByRegion[id])),
 			BrowseParentSlug: s.nearestBrowseableAncestorSlug(id),
 		})
 	}
@@ -610,26 +617,42 @@ func (s *MemStore) descendantRegionIDsWith(rootID int64, childrenOf map[int64][]
 	return out
 }
 
-// countOrgsForRegions returns the number of distinct orgs with at least
-// one attachment in regionIDs. Must be called with s.mu held.
-func (s *MemStore) countOrgsForRegions(regionIDs []int64) int {
+// buildOrgsByRegion returns a fresh inverted index (region id → set of
+// the org ids attached to it). O(O · A) in the org count × attachments
+// per org — one pass over the org→regions adjacency. Caller must hold
+// s.mu. ListRegions builds it once per request so org counts become a
+// set-union over a region's descendant ids plus a map lookup for the
+// direct count, instead of re-scanning every org per browseable region.
+func (s *MemStore) buildOrgsByRegion() map[int64]map[int64]struct{} {
+	out := map[int64]map[int64]struct{}{}
+	for _, org := range s.orgs {
+		for _, rid := range s.orgRegions[org.ID] {
+			set := out[rid]
+			if set == nil {
+				set = map[int64]struct{}{}
+				out[rid] = set
+			}
+			set[org.ID] = struct{}{}
+		}
+	}
+	return out
+}
+
+// countDistinctOrgs returns the number of distinct orgs attached to any
+// region in regionIDs, reading the precomputed orgsByRegion inverted
+// index. Equivalent to the old per-region full org scan, but O(sum of
+// per-region set sizes) instead of O(O · A) per region.
+func countDistinctOrgs(orgsByRegion map[int64]map[int64]struct{}, regionIDs []int64) int {
 	if len(regionIDs) == 0 {
 		return 0
 	}
-	wanted := make(map[int64]bool, len(regionIDs))
-	for _, id := range regionIDs {
-		wanted[id] = true
-	}
-	count := 0
-	for _, org := range s.orgs {
-		for _, rid := range s.orgRegions[org.ID] {
-			if wanted[rid] {
-				count++
-				break
-			}
+	seen := map[int64]struct{}{}
+	for _, rid := range regionIDs {
+		for orgID := range orgsByRegion[rid] {
+			seen[orgID] = struct{}{}
 		}
 	}
-	return count
+	return len(seen)
 }
 
 // regionsForOrg gathers the Region rows for an org's attachments,
