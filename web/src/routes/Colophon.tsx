@@ -1,16 +1,11 @@
 import { Link } from 'react-router';
 
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
-import { apiBase } from '../lib/api.ts';
+import { openapiUrl } from '../lib/api.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 export function Colophon() {
   useDocumentTitle('Colophon — Urbanist Atlas');
-  // Match the env-aware OpenAPI link in About.tsx so QA-served builds
-  // point at the QA API and production builds point at production.
-  // Phase 1's `api.urbanistatlas.com` isn't live yet; hardcoding it
-  // would break the link for friends loading qa.urbanistatlas.com.
-  const openapiUrl = `${apiBase}/api/v1/openapi.yaml`;
   return (
     <>
       <PageBreadcrumb

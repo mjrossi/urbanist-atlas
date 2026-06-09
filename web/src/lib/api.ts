@@ -55,6 +55,16 @@ const DEFAULT_API_BASE = 'http://localhost:8080';
 export const apiBase: string = import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE;
 
 /**
+ * Canonical URL of the served OpenAPI document, derived from
+ * {@link apiBase} so a QA-served build points at the QA API and a
+ * production build at production. The "For developers" copy on /about,
+ * the /colophon quick links, and the footer all render this — one
+ * source of truth instead of three call sites (one of which used to
+ * hardcode production and broke on QA builds).
+ */
+export const openapiUrl = `${apiBase}/api/v1/openapi.yaml`;
+
+/**
  * Shared secret bundled into the build during Phase 1 lockdown
  * (slice #23 / CLAUDE.md § Launch strategy). The backend's
  * `URBANIST_CLIENT_SECRET` checks for the matching `X-Atlas-Client`
