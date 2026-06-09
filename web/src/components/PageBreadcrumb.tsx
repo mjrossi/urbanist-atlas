@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
 
-export interface PageBreadcrumbItem {
-  label: string;
-  to?: string;
-}
+import { type BreadcrumbItem, BreadcrumbTrail } from './BreadcrumbTrail.tsx';
 
 /**
  * The broadsheet `.kicker` row at the top of a static-route page.
@@ -22,48 +18,19 @@ export interface PageBreadcrumbItem {
  * `meta` is the optional right-side metadata slot (volume number,
  * region count, etc.).
  *
- * A11y: renders as `<nav aria-label="Breadcrumb"><ol class="crumb-trail">...</ol></nav>`.
- * The trailing crumb is marked `aria-current="page"`; visual `/`
- * separators are `aria-hidden` so screen readers don't speak
- * punctuation.
- *
  * For region-shaped pages with a dynamic ancestor walk, use
  * `RegionBreadcrumb` instead — it accepts a `Region[]` and renders
- * each ancestor as a `/region/:slug` link.
+ * each ancestor as a `/region/:slug` link. Both render the shared
+ * {@link BreadcrumbTrail} markup + a11y contract.
  */
 export function PageBreadcrumb({
   prefix = [],
   current,
   meta,
 }: {
-  prefix?: readonly PageBreadcrumbItem[];
+  prefix?: readonly BreadcrumbItem[];
   current: string;
   meta?: ReactNode;
 }) {
-  return (
-    <div className="kicker">
-      <nav aria-label="Breadcrumb">
-        <ol className="crumb-trail">
-          {prefix.map((item) => (
-            <li key={item.to ?? item.label}>
-              {item.to ? (
-                <Link to={item.to}>{item.label}</Link>
-              ) : (
-                <span>{item.label}</span>
-              )}
-              <span className="crumb-sep" aria-hidden="true">
-                /
-              </span>
-            </li>
-          ))}
-          <li>
-            <span className="crumb-here" aria-current="page">
-              {current}
-            </span>
-          </li>
-        </ol>
-      </nav>
-      {meta !== undefined ? <div>{meta}</div> : null}
-    </div>
-  );
+  return <BreadcrumbTrail items={prefix} current={current} right={meta} />;
 }
