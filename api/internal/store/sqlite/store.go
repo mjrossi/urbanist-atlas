@@ -306,22 +306,40 @@ func (s *Store) Reject(ctx context.Context, publicID, reason string) (atlas.Subm
 }
 
 // AttachPromotionResult implements atlas.SubmissionStore.
+//
+// The existence check and the UPDATE run inside a single transaction so
+// they're atomic (issue #28): without it, a concurrent delete landing
+// between the two statements could let the UPDATE no-op against a row the
+// check saw, or surface ErrSubmissionNotFound for a row that existed when
+// we looked. Not reachable today (maxconns=1 serializes writers) but
+// correct-by-construction if the connection cap is ever lifted.
 func (s *Store) AttachPromotionResult(ctx context.Context, publicID, prURL, prErr string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlite.AttachPromotionResult: begin: %w", err)
+	}
+	// Rollback is a no-op once Commit succeeds; safe to always defer.
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.q.WithTx(tx)
+
 	// We need to know whether the id exists so the worker can log a
 	// loud error if approvals raced with a delete (not a current code
 	// path, but the contract promises ErrSubmissionNotFound).
-	if _, err := s.q.SubmissionStatusByPublicID(ctx, publicID); err != nil {
+	if _, err := qtx.SubmissionStatusByPublicID(ctx, publicID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return atlas.ErrSubmissionNotFound
 		}
 		return fmt.Errorf("sqlite.AttachPromotionResult: status check: %w", err)
 	}
-	if err := s.q.AttachPromotionResult(ctx, sqlitegen.AttachPromotionResultParams{
+	if err := qtx.AttachPromotionResult(ctx, sqlitegen.AttachPromotionResultParams{
 		PromotionPrUrl: prURL,
 		PromotionError: prErr,
 		PublicID:       publicID,
 	}); err != nil {
 		return fmt.Errorf("sqlite.AttachPromotionResult: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sqlite.AttachPromotionResult: commit: %w", err)
 	}
 	return nil
 }
