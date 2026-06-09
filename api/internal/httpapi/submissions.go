@@ -51,104 +51,15 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 			return
 		}
 
-		var body oapi.NewSubmissionRequest
-		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&body); err != nil {
-			title := "Invalid Request Body"
-			detail := "The request body is not valid JSON for NewSubmissionRequest."
-			if errors.Is(err, io.EOF) {
-				title = "Empty Request Body"
-				detail = "The request body is empty; expected a NewSubmissionRequest JSON object."
-			}
-			// http.MaxBytesReader surfaces an oversize body as a
-			// MaxBytesError; surface that with the 413-shape title even
-			// though we keep the 400 status (oversize submissions are a
-			// validation failure from the client's perspective).
-			var mbErr *http.MaxBytesError
-			if errors.As(err, &mbErr) {
-				title = "Request Body Too Large"
-				detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
-			}
+		in, fieldErrs, parseErr := parseSubmission(w, r, regions)
+		if parseErr != nil {
+			// Malformed body (bad JSON / empty / oversize / trailing
+			// content): one problem document with a parse-specific
+			// title+detail, counted as a validation rejection.
 			m.incSubmissions("rejected_validation")
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, title, detail, rid)
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, parseErr.title, parseErr.detail, rid)
 			return
 		}
-		// DisallowUnknownFields rejects unknown keys inside the object but
-		// not trailing content after it; dec.More() catches a second JSON
-		// value (e.g. `{...}{...}` or `{...} garbage`) so the body must be
-		// exactly one object.
-		if dec.More() {
-			m.incSubmissions("rejected_validation")
-			writeProblem(w, r, http.StatusBadRequest, problemValidation,
-				"Invalid Request Body",
-				"The request body must contain exactly one NewSubmissionRequest JSON object.", rid)
-			return
-		}
-
-		// region_slugs is optional on the wire; the SPA's region field
-		// is free-form text and most submissions don't carry a
-		// canonical slug. nil pointer and empty slice both flow through
-		// as zero-length input to ValidateSubmissionPayload.
-		var rawRegionSlugs []string
-		if body.Payload.RegionSlugs != nil {
-			rawRegionSlugs = *body.Payload.RegionSlugs
-		}
-		// Tags are intentionally not read from the wire: the public form
-		// doesn't collect them (an editor assigns tags in the promotion
-		// PR), and `tags` was dropped from SubmissionPayload. payload.Tags
-		// stays nil; the PR worker renders it as an empty `tags = []`
-		// placeholder for the editor to fill.
-		payload := atlas.SubmissionPayload{
-			Name:        strings.TrimSpace(body.Payload.Name),
-			ShortDesc:   strings.TrimSpace(body.Payload.ShortDesc),
-			WebsiteURL:  strings.TrimSpace(body.Payload.WebsiteUrl),
-			RegionSlugs: normalizeStringSlice(rawRegionSlugs),
-		}
-		if body.Payload.ContactUrl != nil {
-			payload.ContactURL = strings.TrimSpace(*body.Payload.ContactUrl)
-		}
-
-		in := atlas.NewSubmissionInput{Payload: payload}
-		if body.SubmitterName != nil {
-			in.SubmitterName = strings.TrimSpace(*body.SubmitterName)
-		}
-		if body.SubmitterEmail != nil {
-			in.SubmitterEmail = strings.TrimSpace(string(*body.SubmitterEmail))
-		}
-		if body.SubmitterNote != nil {
-			in.SubmitterNote = *body.SubmitterNote
-		}
-
-		fieldErrs := seedfiles.ValidateSubmissionPayload(
-			seedfiles.SubmissionPayloadInput{
-				Name:        payload.Name,
-				ShortDesc:   payload.ShortDesc,
-				WebsiteURL:  payload.WebsiteURL,
-				ContactURL:  payload.ContactURL,
-				RegionSlugs: payload.RegionSlugs,
-			},
-			seedfiles.SubmitterInput{
-				Name:  in.SubmitterName,
-				Email: in.SubmitterEmail,
-				Note:  in.SubmitterNote,
-			},
-		)
-
-		// Region-slug existence is the one check the shared validator
-		// can't do (it needs the store + context). Run it only when
-		// shape validation already passed for `region_slugs`, then merge
-		// the result into the field-errors map so the client receives a
-		// single per-field response.
-		if _, alreadyBad := fieldErrs["region_slugs"]; !alreadyBad {
-			if msg := checkRegionSlugsExist(r.Context(), regions, payload.RegionSlugs); msg != "" {
-				if fieldErrs == nil {
-					fieldErrs = map[string]string{}
-				}
-				fieldErrs["region_slugs"] = msg
-			}
-		}
-
 		if len(fieldErrs) > 0 {
 			m.incSubmissions("rejected_validation")
 			for field := range fieldErrs {
@@ -171,6 +82,132 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 		m.incSubmissions("created")
 		writeJSON(w, http.StatusCreated, toOAPISubmission(sub))
 	}
+}
+
+// fieldErrors maps a request field name to a human-readable validation
+// message, mirroring the `errors` object in the problem+json envelope.
+type fieldErrors = map[string]string
+
+// submissionParseError carries the problem-document title+detail for a
+// malformed POST /submissions body. It is returned (not written) by
+// parseSubmission so the handler stays the single response-writing
+// site and owns the metric increment.
+type submissionParseError struct {
+	title  string
+	detail string
+}
+
+func (e *submissionParseError) Error() string { return e.title + ": " + e.detail }
+
+// parseSubmission decodes, trims, assembles, and validates a
+// NewSubmissionRequest body, returning the ready-to-store input. It
+// performs no I/O of its own beyond the region-existence store lookup
+// and writes nothing to w (it needs w only for http.MaxBytesReader's
+// oversize accounting) — the caller maps the outcome onto a response.
+//
+// Exactly one of the three result shapes is meaningful at a time:
+//   - parseErr != nil  → the body was malformed (bad JSON, empty,
+//     oversize, or had trailing content); in and fieldErrs are zero.
+//   - len(fieldErrs) > 0 → the body parsed but one or more fields
+//     failed shape or region-existence validation.
+//   - otherwise → in is a valid, validated NewSubmissionInput.
+func parseSubmission(w http.ResponseWriter, r *http.Request, regions atlas.Store) (atlas.NewSubmissionInput, fieldErrors, *submissionParseError) {
+	var body oapi.NewSubmissionRequest
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		title := "Invalid Request Body"
+		detail := "The request body is not valid JSON for NewSubmissionRequest."
+		if errors.Is(err, io.EOF) {
+			title = "Empty Request Body"
+			detail = "The request body is empty; expected a NewSubmissionRequest JSON object."
+		}
+		// http.MaxBytesReader surfaces an oversize body as a
+		// MaxBytesError; surface that with the 413-shape title even
+		// though we keep the 400 status (oversize submissions are a
+		// validation failure from the client's perspective).
+		var mbErr *http.MaxBytesError
+		if errors.As(err, &mbErr) {
+			title = "Request Body Too Large"
+			detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
+		}
+		return atlas.NewSubmissionInput{}, nil, &submissionParseError{title: title, detail: detail}
+	}
+	// DisallowUnknownFields rejects unknown keys inside the object but
+	// not trailing content after it; dec.More() catches a second JSON
+	// value (e.g. `{...}{...}` or `{...} garbage`) so the body must be
+	// exactly one object.
+	if dec.More() {
+		return atlas.NewSubmissionInput{}, nil, &submissionParseError{
+			title:  "Invalid Request Body",
+			detail: "The request body must contain exactly one NewSubmissionRequest JSON object.",
+		}
+	}
+
+	// region_slugs is optional on the wire; the SPA's region field
+	// is free-form text and most submissions don't carry a
+	// canonical slug. nil pointer and empty slice both flow through
+	// as zero-length input to ValidateSubmissionPayload.
+	var rawRegionSlugs []string
+	if body.Payload.RegionSlugs != nil {
+		rawRegionSlugs = *body.Payload.RegionSlugs
+	}
+	// Tags are intentionally not read from the wire: the public form
+	// doesn't collect them (an editor assigns tags in the promotion
+	// PR), and `tags` was dropped from SubmissionPayload. payload.Tags
+	// stays nil; the PR worker renders it as an empty `tags = []`
+	// placeholder for the editor to fill.
+	payload := atlas.SubmissionPayload{
+		Name:        strings.TrimSpace(body.Payload.Name),
+		ShortDesc:   strings.TrimSpace(body.Payload.ShortDesc),
+		WebsiteURL:  strings.TrimSpace(body.Payload.WebsiteUrl),
+		RegionSlugs: normalizeStringSlice(rawRegionSlugs),
+	}
+	if body.Payload.ContactUrl != nil {
+		payload.ContactURL = strings.TrimSpace(*body.Payload.ContactUrl)
+	}
+
+	in := atlas.NewSubmissionInput{Payload: payload}
+	if body.SubmitterName != nil {
+		in.SubmitterName = strings.TrimSpace(*body.SubmitterName)
+	}
+	if body.SubmitterEmail != nil {
+		in.SubmitterEmail = strings.TrimSpace(string(*body.SubmitterEmail))
+	}
+	if body.SubmitterNote != nil {
+		in.SubmitterNote = *body.SubmitterNote
+	}
+
+	fieldErrs := seedfiles.ValidateSubmissionPayload(
+		seedfiles.SubmissionPayloadInput{
+			Name:        payload.Name,
+			ShortDesc:   payload.ShortDesc,
+			WebsiteURL:  payload.WebsiteURL,
+			ContactURL:  payload.ContactURL,
+			RegionSlugs: payload.RegionSlugs,
+		},
+		seedfiles.SubmitterInput{
+			Name:  in.SubmitterName,
+			Email: in.SubmitterEmail,
+			Note:  in.SubmitterNote,
+		},
+	)
+
+	// Region-slug existence is the one check the shared validator
+	// can't do (it needs the store + context). Run it only when
+	// shape validation already passed for `region_slugs`, then merge
+	// the result into the field-errors map so the client receives a
+	// single per-field response.
+	if _, alreadyBad := fieldErrs["region_slugs"]; !alreadyBad {
+		if msg := checkRegionSlugsExist(r.Context(), regions, payload.RegionSlugs); msg != "" {
+			if fieldErrs == nil {
+				fieldErrs = map[string]string{}
+			}
+			fieldErrs["region_slugs"] = msg
+		}
+	}
+
+	return in, fieldErrs, nil
 }
 
 // listSubmissionsHandler answers GET /api/v1/admin/submissions.
