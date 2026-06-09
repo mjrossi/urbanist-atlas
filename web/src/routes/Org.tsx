@@ -80,8 +80,12 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 }
 
 function OrgContent({ org }: { org: OrgT }) {
-  const domain = domainOf(org.website_url);
   const primaryMetro = org.regions.find((r) => isMetroKind(r.kind));
+  // "Primary metro, else first region served" — the dateline and the
+  // country stat fall back to the first region when an org has no
+  // metro-kind region. The Primary-metro affordances below stay strict
+  // (they only render for a real metro).
+  const displayRegion = primaryMetro ?? org.regions[0];
   const tagsTopline = org.tags.slice(0, 3).map(prettyTag).join(' · ');
 
   const atAGlance = (
@@ -122,19 +126,14 @@ function OrgContent({ org }: { org: OrgT }) {
             </>
           ) : null}
           <span>
-            {primaryMetro
-              ? `${primaryMetro.name}, ${primaryMetro.country}`
-              : org.regions[0]
-                ? `${org.regions[0].name}, ${org.regions[0].country}`
-                : 'See entry'}
+            {displayRegion
+              ? `${displayRegion.name}, ${displayRegion.country}`
+              : 'See entry'}
           </span>
         </div>
         <h1 className="name">{org.name}</h1>
         <p className="url-line">
-          →{' '}
-          <a href={org.website_url} target="_blank" rel="noopener noreferrer">
-            {domain ?? org.website_url}
-          </a>
+          → <OrgWebsiteLink url={org.website_url} />
         </p>
         <div className="deck-row">
           <p className="deck">{org.short_desc}</p>
@@ -165,9 +164,7 @@ function OrgContent({ org }: { org: OrgT }) {
           ) : null}
           <div className="item">
             <div>Country</div>
-            <span className="val">
-              {primaryMetro?.country ?? org.regions[0]?.country ?? '—'}
-            </span>
+            <span className="val">{displayRegion?.country ?? '—'}</span>
           </div>
           <div className="item">
             <div>Regions served</div>
@@ -209,10 +206,7 @@ function OrgContent({ org }: { org: OrgT }) {
           <p className="lead drop">{org.short_desc}</p>
           <p>
             For current campaigns and ways to plug in, open{' '}
-            <a href={org.website_url} target="_blank" rel="noopener noreferrer">
-              {domain ?? org.website_url}
-            </a>
-            .
+            <OrgWebsiteLink url={org.website_url} />.
           </p>
           {org.regions.length === 0 ? (
             <p>
@@ -291,5 +285,19 @@ function OrgContent({ org }: { org: OrgT }) {
         </aside>
       </div>
     </>
+  );
+}
+
+/**
+ * The org's website as a compact external link: the bare domain (or the
+ * raw URL when it can't be parsed), opening in a new tab. Rendered in
+ * both the feature header and the prose body.
+ */
+function OrgWebsiteLink({ url }: { url: string }) {
+  const domain = domainOf(url);
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer">
+      {domain ?? url}
+    </a>
   );
 }
