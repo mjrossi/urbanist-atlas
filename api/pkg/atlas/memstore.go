@@ -238,10 +238,29 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 // browseable parents share the minimum depth, ties are broken by
 // slug ASC (depth ASC, then slug ASC) so the choice is deterministic.
 func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
+	if r, ok := s.bfsUpwardFirstMatch(rootID, func(r Region) bool {
+		return defaultBrowseKinds[r.Kind]
+	}); ok {
+		return r.Slug
+	}
+	return ""
+}
+
+// bfsUpwardFirstMatch walks the parents map upward from rootID
+// depth-by-depth and returns the first Region satisfying match. "First"
+// is the shallowest level that contains any match; ties within that
+// level are broken by slug ASC so the choice is deterministic. National-
+// tier rows are skipped entirely — never matched and never expanded —
+// mirroring the ancestor-walk exclusion, so they can neither be returned
+// nor act as a transit hop to a deeper match. rootID itself is excluded
+// (seeded into the visited set), matching the "ancestor, not self"
+// semantics both callers want. Returns (zero Region, false) when no
+// ancestor matches. Caller must hold s.mu.RLock().
+func (s *MemStore) bfsUpwardFirstMatch(rootID int64, match func(Region) bool) (Region, bool) {
 	visited := map[int64]bool{rootID: true}
 	current := append([]int64{}, s.parents[rootID]...)
 	for len(current) > 0 {
-		var hits []string
+		var hits []Region
 		var next []int64
 		for _, id := range current {
 			if visited[id] {
@@ -249,25 +268,22 @@ func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
 			}
 			visited[id] = true
 			r, ok := s.regionsByID[id]
-			if !ok {
+			if !ok || r.ScopeTier == ScopeNational {
 				continue
 			}
-			if r.ScopeTier == ScopeNational {
-				continue
-			}
-			if defaultBrowseKinds[r.Kind] {
-				hits = append(hits, r.Slug)
+			if match(r) {
+				hits = append(hits, r)
 				continue
 			}
 			next = append(next, s.parents[id]...)
 		}
 		if len(hits) > 0 {
-			sort.Strings(hits)
-			return hits[0]
+			sort.Slice(hits, func(i, j int) bool { return hits[i].Slug < hits[j].Slug })
+			return hits[0], true
 		}
 		current = next
 	}
-	return ""
+	return Region{}, false
 }
 
 // Region-search ranking tiers (lower sorts earlier) and result caps.
@@ -367,34 +383,12 @@ func regionSearchRank(nameLower, slugLower, q string) (int, bool) {
 // resolvable parents (a state itself, or a top-level region). Caller
 // must hold s.mu.RLock().
 func (s *MemStore) regionContextLabel(rootID int64) string {
-	fallback := s.firstParentName(rootID)
-	visited := map[int64]bool{rootID: true}
-	current := append([]int64{}, s.parents[rootID]...)
-	for len(current) > 0 {
-		var hits []Region
-		var next []int64
-		for _, id := range current {
-			if visited[id] {
-				continue
-			}
-			visited[id] = true
-			r, ok := s.regionsByID[id]
-			if !ok || r.ScopeTier == ScopeNational {
-				continue
-			}
-			if IsStateKind(r.Kind) {
-				hits = append(hits, r)
-				continue
-			}
-			next = append(next, s.parents[id]...)
-		}
-		if len(hits) > 0 {
-			sort.Slice(hits, func(i, j int) bool { return hits[i].Slug < hits[j].Slug })
-			return hits[0].Name
-		}
-		current = next
+	if r, ok := s.bfsUpwardFirstMatch(rootID, func(r Region) bool {
+		return IsStateKind(r.Kind)
+	}); ok {
+		return r.Name
 	}
-	return fallback
+	return s.firstParentName(rootID)
 }
 
 // firstParentName returns the Name of rootID's alphabetically-first
