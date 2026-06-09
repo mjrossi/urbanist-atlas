@@ -44,7 +44,7 @@ import "sort"
 func BucketOrgsByScope(inScope map[int64]Region, orgs []Org) (local, regional, statewide []Org) {
 	var localBuckets, regionalBuckets, statewideBuckets []scopeBucketed
 	for _, org := range orgs {
-		matched := make([]Region, 0)
+		matched := make([]Region, 0, len(org.Regions))
 		for _, r := range org.Regions {
 			if mr, ok := inScope[r.ID]; ok {
 				matched = append(matched, mr)
