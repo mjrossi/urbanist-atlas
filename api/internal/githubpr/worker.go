@@ -474,7 +474,7 @@ func (w *Worker) doRequest(ctx context.Context, method, path string, body any) (
 // not on wall-clock — a slow remote just trips the deadline mid-sleep
 // and returns ctx.Err().
 const (
-	retryMaxAttempts = 4               // 1 initial try + up to 3 retries
+	retryMaxAttempts = 4 // 1 initial try + up to 3 retries
 	retryBaseBackoff = 250 * time.Millisecond
 )
 
