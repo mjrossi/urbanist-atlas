@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 )
 
@@ -23,7 +22,7 @@ const (
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	encodeJSON(w, body)
 }
 
 // problemBody is the on-the-wire shape for an RFC 9457 Problem
@@ -79,5 +78,5 @@ func writeProblemWithErrors(w http.ResponseWriter, r *http.Request, status int, 
 
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	encodeJSON(w, body)
 }

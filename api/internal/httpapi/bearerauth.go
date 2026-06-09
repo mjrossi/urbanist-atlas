@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"net/http"
 	"strings"
@@ -27,15 +28,22 @@ func bearerAuthMiddleware(adminToken string) func(http.Handler) http.Handler {
 			})
 		}
 	}
-	expected := []byte(adminToken)
+	// Hash the configured token once at construction. Comparing fixed-width
+	// SHA-256 digests (rather than the raw bytes) keeps the compare
+	// constant-time regardless of the supplied token's length: a raw
+	// subtle.ConstantTimeCompare returns immediately when the two slices
+	// differ in length, which leaks the secret's length through timing.
+	expectedHash := sha256.Sum256([]byte(adminToken))
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			got := extractBearerToken(r.Header.Get("Authorization"))
 			// Identical title/detail for missing AND wrong tokens so the
-			// response shape doesn't leak which case the server hit. The
-			// constant-time compare above gives the same property at the
-			// byte level.
-			if subtle.ConstantTimeCompare([]byte(got), expected) != 1 {
+			// response shape doesn't leak which case the server hit. Both
+			// sides are hashed to a fixed 32 bytes first so the
+			// constant-time compare never short-circuits on a length
+			// mismatch (which would leak the token length via timing).
+			gotHash := sha256.Sum256([]byte(got))
+			if subtle.ConstantTimeCompare(gotHash[:], expectedHash[:]) != 1 {
 				writeProblem(w, r, http.StatusUnauthorized, problemUnauthorized,
 					"Unauthorized",
 					"Authentication is required for this endpoint.",

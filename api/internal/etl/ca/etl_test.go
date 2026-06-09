@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -184,6 +185,57 @@ func TestLatin1ToUTF8(t *testing.T) {
 	got := latin1ToUTF8([]byte{0x4D, 0x6F, 0x6E, 0x74, 0x72, 0xE9, 0x61, 0x6C}) // "Montréal" Latin-1
 	if got != "Montréal" {
 		t.Errorf("latin1ToUTF8(Montréal) = %q, want %q", got, "Montréal")
+	}
+}
+
+// TestDBFReader_RejectsUndersizedRecord pins issue #21's guard: when the
+// header's record size is smaller than the field layout requires (1
+// deletion flag + every field's fixed width), newDBFReader fails with a
+// clear error instead of letting next() slice past the record buffer and
+// panic. We build a valid 2-field header but understate recordSize by one
+// byte — the smallest deviation that would still corrupt next().
+func TestDBFReader_RejectsUndersizedRecord(t *testing.T) {
+	const (
+		codeLen = 3
+		nameLen = 12
+	)
+	correctRecordLen := 1 + codeLen + nameLen // 1 = deletion flag
+
+	var buf bytes.Buffer
+
+	header := make([]byte, 32)
+	header[0] = 0x03                                                         // dBASE III
+	binary.LittleEndian.PutUint32(header[4:8], 1)                            // 1 record
+	binary.LittleEndian.PutUint16(header[8:10], uint16(32+32+32+1))          // header size
+	binary.LittleEndian.PutUint16(header[10:12], uint16(correctRecordLen-1)) // UNDERSTATED by one byte
+	buf.Write(header)
+
+	fa := make([]byte, 32)
+	copy(fa[0:11], "CODE")
+	fa[11] = 'C'
+	fa[16] = codeLen
+	buf.Write(fa)
+
+	fb := make([]byte, 32)
+	copy(fb[0:11], "NAME")
+	fb[11] = 'C'
+	fb[16] = nameLen
+	buf.Write(fb)
+
+	buf.WriteByte(0x0D) // field descriptor terminator
+	// newDBFReader reads field descriptors in 32-byte chunks and only
+	// looks at byte[0] for the 0x0D terminator, so the terminator must be
+	// followed by at least 31 more bytes or the descriptor read hits EOF
+	// before the size guard runs. A dummy record's worth of padding (the
+	// reader never reads records — the guard returns first) suffices.
+	buf.Write(make([]byte, 32))
+
+	_, err := newDBFReader(bytes.NewReader(buf.Bytes()))
+	if err == nil {
+		t.Fatal("expected an error for an undersized record size, got nil (guard would let next() panic)")
+	}
+	if !strings.Contains(err.Error(), "record size") {
+		t.Errorf("error should explain the record-size mismatch, got %q", err)
 	}
 }
 

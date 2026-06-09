@@ -306,22 +306,40 @@ func (s *Store) Reject(ctx context.Context, publicID, reason string) (atlas.Subm
 }
 
 // AttachPromotionResult implements atlas.SubmissionStore.
+//
+// The existence check and the UPDATE run inside a single transaction so
+// they're atomic (issue #28): without it, a concurrent delete landing
+// between the two statements could let the UPDATE no-op against a row the
+// check saw, or surface ErrSubmissionNotFound for a row that existed when
+// we looked. Not reachable today (maxconns=1 serializes writers) but
+// correct-by-construction if the connection cap is ever lifted.
 func (s *Store) AttachPromotionResult(ctx context.Context, publicID, prURL, prErr string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlite.AttachPromotionResult: begin: %w", err)
+	}
+	// Rollback is a no-op once Commit succeeds; safe to always defer.
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.q.WithTx(tx)
+
 	// We need to know whether the id exists so the worker can log a
 	// loud error if approvals raced with a delete (not a current code
 	// path, but the contract promises ErrSubmissionNotFound).
-	if _, err := s.q.SubmissionStatusByPublicID(ctx, publicID); err != nil {
+	if _, err := qtx.SubmissionStatusByPublicID(ctx, publicID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return atlas.ErrSubmissionNotFound
 		}
 		return fmt.Errorf("sqlite.AttachPromotionResult: status check: %w", err)
 	}
-	if err := s.q.AttachPromotionResult(ctx, sqlitegen.AttachPromotionResultParams{
+	if err := qtx.AttachPromotionResult(ctx, sqlitegen.AttachPromotionResultParams{
 		PromotionPrUrl: prURL,
 		PromotionError: prErr,
 		PublicID:       publicID,
 	}); err != nil {
 		return fmt.Errorf("sqlite.AttachPromotionResult: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sqlite.AttachPromotionResult: commit: %w", err)
 	}
 	return nil
 }
@@ -402,15 +420,20 @@ func dsnWithPragmas(path string) string {
 func escapePragmas(in []string) []string {
 	out := make([]string, len(in))
 	for i, p := range in {
-		// Pragmas are key=value where the value may contain '(' / ')'.
-		// modernc accepts the raw form, but going through url.QueryEscape
-		// for the value half keeps any future caller-supplied path safe.
+		// Pragmas are key=value (e.g. `_pragma=journal_mode(WAL)`) where
+		// the value may contain '(' / ')'. modernc accepts the raw form,
+		// but escape BOTH halves through url.QueryEscape (issue #29) so the
+		// whole pair is well-formed query-string regardless of input —
+		// previously only the value was escaped, leaving the key trusted.
+		// The keys today are a fixed in-package set (_pragma), so this is
+		// defensive completeness rather than a live fix, but it keeps the
+		// function correct for anything it's handed.
 		eq := strings.IndexByte(p, '=')
 		if eq < 0 {
-			out[i] = p
+			out[i] = url.QueryEscape(p)
 			continue
 		}
-		out[i] = p[:eq+1] + url.QueryEscape(p[eq+1:])
+		out[i] = url.QueryEscape(p[:eq]) + "=" + url.QueryEscape(p[eq+1:])
 	}
 	return out
 }

@@ -194,20 +194,27 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	// parent edges) — at v1 scale (~5k of each) that's noticeable in
 	// tests that hammer the endpoint. Hoisted, the whole call is O(R + P).
 	childrenOf := s.buildChildrenOf()
+	// Build the region->orgs inverted index once for the whole call too.
+	// The old code counted orgs by scanning every org (and each org's
+	// attachments) once per browseable region for OrgCount AND a second
+	// time for DirectOrgCount — O(R · O · A). With the inverted index,
+	// each region's counts are a set-union over its descendant ids and a
+	// single map lookup, so the whole call is O(O · A + R + P) instead.
+	orgsByRegion := s.buildOrgsByRegion()
 	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
 		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
 			continue
 		}
 		descendants := s.descendantRegionIDsWith(id, childrenOf)
-		count := s.countOrgsForRegions(descendants)
+		count := countDistinctOrgs(orgsByRegion, descendants)
 		if count == 0 {
 			continue
 		}
 		out = append(out, RegionSummary{
 			Region:           r,
 			OrgCount:         int64(count),
-			DirectOrgCount:   int64(s.countOrgsForRegions([]int64{id})),
+			DirectOrgCount:   int64(len(orgsByRegion[id])),
 			BrowseParentSlug: s.nearestBrowseableAncestorSlug(id),
 		})
 	}
@@ -231,10 +238,29 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 // browseable parents share the minimum depth, ties are broken by
 // slug ASC (depth ASC, then slug ASC) so the choice is deterministic.
 func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
+	if r, ok := s.bfsUpwardFirstMatch(rootID, func(r Region) bool {
+		return defaultBrowseKinds[r.Kind]
+	}); ok {
+		return r.Slug
+	}
+	return ""
+}
+
+// bfsUpwardFirstMatch walks the parents map upward from rootID
+// depth-by-depth and returns the first Region satisfying match. "First"
+// is the shallowest level that contains any match; ties within that
+// level are broken by slug ASC so the choice is deterministic. National-
+// tier rows are skipped entirely — never matched and never expanded —
+// mirroring the ancestor-walk exclusion, so they can neither be returned
+// nor act as a transit hop to a deeper match. rootID itself is excluded
+// (seeded into the visited set), matching the "ancestor, not self"
+// semantics both callers want. Returns (zero Region, false) when no
+// ancestor matches. Caller must hold s.mu.RLock().
+func (s *MemStore) bfsUpwardFirstMatch(rootID int64, match func(Region) bool) (Region, bool) {
 	visited := map[int64]bool{rootID: true}
 	current := append([]int64{}, s.parents[rootID]...)
 	for len(current) > 0 {
-		var hits []string
+		var hits []Region
 		var next []int64
 		for _, id := range current {
 			if visited[id] {
@@ -242,45 +268,30 @@ func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
 			}
 			visited[id] = true
 			r, ok := s.regionsByID[id]
-			if !ok {
+			if !ok || r.ScopeTier == ScopeNational {
 				continue
 			}
-			if r.ScopeTier == ScopeNational {
-				continue
-			}
-			if defaultBrowseKinds[r.Kind] {
-				hits = append(hits, r.Slug)
+			if match(r) {
+				hits = append(hits, r)
 				continue
 			}
 			next = append(next, s.parents[id]...)
 		}
 		if len(hits) > 0 {
-			sort.Strings(hits)
-			return hits[0]
+			sort.Slice(hits, func(i, j int) bool { return hits[i].Slug < hits[j].Slug })
+			return hits[0], true
 		}
 		current = next
 	}
-	return ""
+	return Region{}, false
 }
-
-// Region-search ranking tiers (lower sorts earlier) and result caps.
-// A zero/negative limit selects the default; anything above the hard
-// max is clamped so a client can't ask the type-ahead to materialize
-// the whole graph.
-const (
-	rankExactSlug  = 0
-	rankExactName  = 1
-	rankNamePrefix = 2
-	rankSlugPrefix = 3
-	rankSubstring  = 4
-
-	defaultRegionSearchLimit = 10
-	maxRegionSearchLimit     = 20
-)
 
 // SearchRegions implements Store. Case-insensitive name/slug match over
 // the full non-national region graph, ranked for type-ahead relevance,
-// each result carrying a state-ancestor disambiguation label.
+// each result carrying a state-ancestor disambiguation label. The
+// ranking/collection/labeling cluster lives on regionSearcher
+// (regionsearch.go); this method owns query normalization, limit
+// clamping, and the read lock, then delegates the locked body.
 func (s *MemStore) SearchRegions(_ context.Context, query string, limit int) ([]RegionSearchResult, error) {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
@@ -296,119 +307,7 @@ func (s *MemStore) SearchRegions(_ context.Context, query string, limit int) ([]
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	type scored struct {
-		region Region
-		rank   int
-	}
-	var hits []scored
-	for _, r := range s.regionsByID {
-		if r.ScopeTier == ScopeNational {
-			continue
-		}
-		rank, ok := regionSearchRank(strings.ToLower(r.Name), strings.ToLower(r.Slug), q)
-		if !ok {
-			continue
-		}
-		hits = append(hits, scored{region: r, rank: rank})
-	}
-	sort.Slice(hits, func(i, j int) bool {
-		if hits[i].rank != hits[j].rank {
-			return hits[i].rank < hits[j].rank
-		}
-		if hits[i].region.Name != hits[j].region.Name {
-			return hits[i].region.Name < hits[j].region.Name
-		}
-		return hits[i].region.Slug < hits[j].region.Slug
-	})
-	if len(hits) > limit {
-		hits = hits[:limit]
-	}
-	out := make([]RegionSearchResult, 0, len(hits))
-	for _, h := range hits {
-		out = append(out, RegionSearchResult{
-			Region:       h.region,
-			ContextLabel: s.regionContextLabel(h.region.ID),
-		})
-	}
-	return out, nil
-}
-
-// regionSearchRank scores a region against a lowercased query, returning
-// the best (lowest) matching tier and whether it matched at all.
-func regionSearchRank(nameLower, slugLower, q string) (int, bool) {
-	switch {
-	case slugLower == q:
-		return rankExactSlug, true
-	case nameLower == q:
-		return rankExactName, true
-	case strings.HasPrefix(nameLower, q):
-		return rankNamePrefix, true
-	case strings.HasPrefix(slugLower, q):
-		return rankSlugPrefix, true
-	case strings.Contains(nameLower, q) || strings.Contains(slugLower, q):
-		return rankSubstring, true
-	default:
-		return 0, false
-	}
-}
-
-// regionContextLabel returns a disambiguation hint for a search result:
-// the name of the nearest state/province-equivalent ancestor (BFS
-// upward via the parents map; ties at the same depth broken by slug
-// ASC). Falls back to the alphabetically-first direct parent's name
-// when no state ancestor exists, and to "" when the region has no
-// resolvable parents (a state itself, or a top-level region). Caller
-// must hold s.mu.RLock().
-func (s *MemStore) regionContextLabel(rootID int64) string {
-	fallback := s.firstParentName(rootID)
-	visited := map[int64]bool{rootID: true}
-	current := append([]int64{}, s.parents[rootID]...)
-	for len(current) > 0 {
-		var hits []Region
-		var next []int64
-		for _, id := range current {
-			if visited[id] {
-				continue
-			}
-			visited[id] = true
-			r, ok := s.regionsByID[id]
-			if !ok || r.ScopeTier == ScopeNational {
-				continue
-			}
-			if IsStateKind(r.Kind) {
-				hits = append(hits, r)
-				continue
-			}
-			next = append(next, s.parents[id]...)
-		}
-		if len(hits) > 0 {
-			sort.Slice(hits, func(i, j int) bool { return hits[i].Slug < hits[j].Slug })
-			return hits[0].Name
-		}
-		current = next
-	}
-	return fallback
-}
-
-// firstParentName returns the Name of rootID's alphabetically-first
-// (slug ASC) direct, non-national parent, or "" when none resolves.
-// Caller must hold s.mu.RLock().
-func (s *MemStore) firstParentName(rootID int64) string {
-	var best *Region
-	for _, pid := range s.parents[rootID] {
-		r, ok := s.regionsByID[pid]
-		if !ok || r.ScopeTier == ScopeNational {
-			continue
-		}
-		if best == nil || r.Slug < best.Slug {
-			rr := r
-			best = &rr
-		}
-	}
-	if best == nil {
-		return ""
-	}
-	return best.Name
+	return regionSearcher{store: s}.collect(q, limit), nil
 }
 
 // ResolveRegionBySlug implements Store. Returns ErrRegionNotFound for
@@ -496,6 +395,9 @@ func (s *MemStore) GetOrgBySlug(_ context.Context, slug string) (*Org, error) {
 		out := org
 		out.Regions = s.regionsForOrg(org.ID)
 		out.MatchedRegionSlugs = nil
+		// Clone Tags so the returned copy doesn't alias the stored
+		// backing array under RLock (see OrgsForRegions). nil stays nil.
+		out.Tags = append([]Tag(nil), out.Tags...)
 		return &out, nil
 	}
 	return nil, ErrOrgNotFound
@@ -528,6 +430,9 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 		out := org
 		out.Regions = s.regionsForOrg(org.ID)
 		out.MatchedRegionSlugs = nil
+		// Clone Tags so the returned copy doesn't alias the stored
+		// backing array under RLock (see OrgsForRegions). nil stays nil.
+		out.Tags = append([]Tag(nil), out.Tags...)
 		candidates = append(candidates, out)
 	}
 	// Sort newest-first; ID DESC breaks ties so same-day orgs order
@@ -610,26 +515,42 @@ func (s *MemStore) descendantRegionIDsWith(rootID int64, childrenOf map[int64][]
 	return out
 }
 
-// countOrgsForRegions returns the number of distinct orgs with at least
-// one attachment in regionIDs. Must be called with s.mu held.
-func (s *MemStore) countOrgsForRegions(regionIDs []int64) int {
+// buildOrgsByRegion returns a fresh inverted index (region id → set of
+// the org ids attached to it). O(O · A) in the org count × attachments
+// per org — one pass over the org→regions adjacency. Caller must hold
+// s.mu. ListRegions builds it once per request so org counts become a
+// set-union over a region's descendant ids plus a map lookup for the
+// direct count, instead of re-scanning every org per browseable region.
+func (s *MemStore) buildOrgsByRegion() map[int64]map[int64]struct{} {
+	out := map[int64]map[int64]struct{}{}
+	for _, org := range s.orgs {
+		for _, rid := range s.orgRegions[org.ID] {
+			set := out[rid]
+			if set == nil {
+				set = map[int64]struct{}{}
+				out[rid] = set
+			}
+			set[org.ID] = struct{}{}
+		}
+	}
+	return out
+}
+
+// countDistinctOrgs returns the number of distinct orgs attached to any
+// region in regionIDs, reading the precomputed orgsByRegion inverted
+// index. Equivalent to the old per-region full org scan, but O(sum of
+// per-region set sizes) instead of O(O · A) per region.
+func countDistinctOrgs(orgsByRegion map[int64]map[int64]struct{}, regionIDs []int64) int {
 	if len(regionIDs) == 0 {
 		return 0
 	}
-	wanted := make(map[int64]bool, len(regionIDs))
-	for _, id := range regionIDs {
-		wanted[id] = true
-	}
-	count := 0
-	for _, org := range s.orgs {
-		for _, rid := range s.orgRegions[org.ID] {
-			if wanted[rid] {
-				count++
-				break
-			}
+	seen := map[int64]struct{}{}
+	for _, rid := range regionIDs {
+		for orgID := range orgsByRegion[rid] {
+			seen[orgID] = struct{}{}
 		}
 	}
-	return count
+	return len(seen)
 }
 
 // regionsForOrg gathers the Region rows for an org's attachments,
@@ -673,6 +594,12 @@ func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, 
 			continue
 		}
 		org.Regions = s.regionsForOrg(org.ID)
+		// Clone Tags so the returned copy's slice header does not alias
+		// the stored backing array — a caller mutating the result must
+		// not reach into the store (which is read under RLock here, with
+		// no write coordination). Mirrors the defensive copy AddOrg makes
+		// of the attachment ids. A nil Tags stays nil.
+		org.Tags = append([]Tag(nil), org.Tags...)
 		out = append(out, org)
 	}
 	return out, nil

@@ -2,7 +2,6 @@ package seedfiles
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 	"unicode/utf8"
 )
@@ -140,48 +139,44 @@ func looksLikeEmail(addr string) bool {
 }
 
 // checkHTTPURL mirrors validateHTTPURL but returns the message as a
-// caller-renderable sentence (or "" on success). Kept separate to
-// avoid disturbing the existing error wrapping in the loader path.
+// caller-renderable sentence (or "" on success). It shares the core
+// classifyURL validator so the loader and submissions paths accept and
+// reject exactly the same URLs; only the message form differs.
 func checkHTTPURL(raw string) string {
-	if len(raw) > MaxURLLen {
+	reason, _ := classifyURL(raw, false)
+	switch reason {
+	case urlOK:
+		return ""
+	case urlTooLong:
 		return fmt.Sprintf("Website URL must be at most %d characters.", MaxURLLen)
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
+	case urlParseFailed:
 		return "Website URL is not a valid URL."
-	}
-	scheme := strings.ToLower(u.Scheme)
-	if scheme != "http" && scheme != "https" {
+	case urlMissingHost:
+		return "Website URL must include a host."
+	default:
+		// urlBadScheme (and the unreachable urlMailtoNoAddress, since
+		// allowMailto=false classifies mailto as urlBadScheme).
 		return "Website URL must use http or https."
 	}
-	if u.Host == "" {
-		return "Website URL must include a host."
-	}
-	return ""
 }
 
 // checkContactURL mirrors validateContactURL but returns a
 // caller-renderable sentence. mailto: is accepted alongside http(s).
+// Backed by the same classifyURL core as the loader path.
 func checkContactURL(raw string) string {
-	if len(raw) > MaxURLLen {
+	reason, _ := classifyURL(raw, true)
+	switch reason {
+	case urlOK:
+		return ""
+	case urlTooLong:
 		return fmt.Sprintf("Contact URL must be at most %d characters.", MaxURLLen)
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
+	case urlParseFailed:
 		return "Contact URL is not a valid URL."
-	}
-	switch strings.ToLower(u.Scheme) {
-	case "http", "https":
-		if u.Host == "" {
-			return "Contact URL must include a host."
-		}
-		return ""
-	case "mailto":
-		if u.Opaque == "" {
-			return "Contact URL mailto: must include an address."
-		}
-		return ""
-	default:
+	case urlMissingHost:
+		return "Contact URL must include a host."
+	case urlMailtoNoAddress:
+		return "Contact URL mailto: must include an address."
+	default: // urlBadScheme
 		return "Contact URL must use http, https, or mailto."
 	}
 }

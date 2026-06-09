@@ -28,11 +28,31 @@ type fakeGitHub struct {
 
 	getRefCalled         int
 	getContentsCalled    int
+	createRefCalled      int
 	createRefBody        map[string]string
 	putContentsBody      map[string]string
 	createPRBody         map[string]string
 	createPRResponseURL  string
 	failOnCreatePRStatus int
+
+	// getRefTransientFailures: while > 0, the get-ref endpoint answers
+	// with getRefTransientStatus (default 503) and decrements, so a
+	// test can exercise the idempotent-GET retry path before the call
+	// finally succeeds.
+	getRefTransientFailures int
+	getRefTransientStatus   int
+
+	// createRefAlreadyExists makes the create-ref endpoint answer with a
+	// 422 "Reference already exists" body, simulating a branch a prior
+	// openPR attempt left behind. createBranch must treat that as success
+	// (idempotent whole-pipeline retry, issue #24).
+	createRefAlreadyExists bool
+
+	// getRefBlockUntilCtx makes the get-ref endpoint hang until the
+	// request's context is canceled (simulating a wedged GitHub call).
+	// Used by the issue #25 shutdown-drain-deadline test to prove a
+	// stuck remote can't pin process exit past shutdownDrainTimeout.
+	getRefBlockUntilCtx bool
 }
 
 func newFakeGitHub(t *testing.T, fileContent string) *fakeGitHub {
@@ -49,8 +69,25 @@ func (f *fakeGitHub) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/git/ref/heads/main", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
-		defer f.mu.Unlock()
 		f.getRefCalled++
+		block := f.getRefBlockUntilCtx
+		if f.getRefTransientFailures > 0 {
+			f.getRefTransientFailures--
+			status := f.getRefTransientStatus
+			if status == 0 {
+				status = http.StatusServiceUnavailable
+			}
+			f.mu.Unlock()
+			http.Error(w, "transient", status)
+			return
+		}
+		f.mu.Unlock()
+		if block {
+			// Hang until the client cancels (the request ctx fires when
+			// the worker's per-call deadline elapses). Never respond.
+			<-r.Context().Done()
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"object": map[string]string{"sha": f.branchSHA, "type": "commit"},
 		})
@@ -79,7 +116,15 @@ func (f *fakeGitHub) handler() http.Handler {
 	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/git/refs", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		f.createRefCalled++
 		f.createRefBody = readJSONStringMap(f.t, r.Body)
+		if f.createRefAlreadyExists {
+			// Shape mirrors GitHub's real 422 for a duplicate ref.
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+				"message": "Reference already exists",
+			})
+			return
+		}
 		writeJSON(w, http.StatusCreated, map[string]any{"ref": f.createRefBody["ref"]})
 	})
 	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/pulls", func(w http.ResponseWriter, r *http.Request) {
@@ -488,5 +533,356 @@ func TestApiError_IncludesStatusAndBody(t *testing.T) {
 	// 4 KiB.
 	if !strings.HasPrefix(err.Error(), "test op: github returned 502") {
 		t.Fatalf("apiError prefix wrong: %v", err)
+	}
+}
+
+// errReader returns some bytes then a non-EOF error, exercising the
+// issue #27 truncated-read marker path in apiError.
+type errReader struct {
+	data []byte
+	pos  int
+}
+
+func (e *errReader) Read(p []byte) (int, error) {
+	if e.pos < len(e.data) {
+		n := copy(p, e.data[e.pos:])
+		e.pos += n
+		return n, nil
+	}
+	return 0, errors.New("simulated mid-body read failure")
+}
+
+func TestApiError_MarksTruncatedRead(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+		Body:       io.NopCloser(&errReader{data: []byte("partial body")}),
+	}
+	err := apiError("flaky op", resp)
+	// Status must survive — it's the load-bearing signal.
+	if !strings.Contains(err.Error(), "503") {
+		t.Fatalf("apiError dropped status on read error: %v", err)
+	}
+	// Whatever bytes arrived before the error must still be present.
+	if !strings.Contains(err.Error(), "partial body") {
+		t.Fatalf("apiError dropped partial body: %v", err)
+	}
+	// And the read failure must be visible, not silently swallowed.
+	if !strings.Contains(err.Error(), "body read truncated") {
+		t.Fatalf("apiError did not mark the truncated read: %v", err)
+	}
+}
+
+// TestWorker_RetriesTransientGET pins the issue #24 idempotent-GET
+// retry: the first two get-ref calls return 503, the third succeeds,
+// and the pipeline opens the PR without the moderator seeing an error.
+// Proves doIdempotentRequest retries a retryable status on a GET.
+func TestWorker_RetriesTransientGET(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.getRefTransientFailures = 2 // two 503s, then succeed
+	gh.getRefTransientStatus = http.StatusServiceUnavailable
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Run(ctx)
+
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	calls := persist.wait(t, 1)
+	if calls[0].Err != "" {
+		t.Fatalf("expected success after retries, got err %q", calls[0].Err)
+	}
+	if calls[0].URL == "" {
+		t.Fatal("expected PR URL after retries")
+	}
+	gh.mu.Lock()
+	got := gh.getRefCalled
+	gh.mu.Unlock()
+	if got != 3 {
+		t.Fatalf("get-ref called %d times, want 3 (2 retried 503 + 1 success)", got)
+	}
+}
+
+// TestWorker_NonRetryableGET pins that a non-retryable GET status (404)
+// fails fast — no retry storm against caller-state errors.
+func TestWorker_NonRetryableGET(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.getRefTransientFailures = 5 // would exceed retryMaxAttempts if retried
+	gh.getRefTransientStatus = http.StatusNotFound
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Run(ctx)
+
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	calls := persist.wait(t, 1)
+	if calls[0].Err == "" {
+		t.Fatal("expected error on non-retryable 404")
+	}
+	gh.mu.Lock()
+	got := gh.getRefCalled
+	gh.mu.Unlock()
+	if got != 1 {
+		t.Fatalf("get-ref called %d times, want 1 (404 not retried)", got)
+	}
+}
+
+// TestWorker_RetriesExhaustGET pins the retry-exhaustion boundary: a
+// retryable status (503) that never recovers stops after exactly
+// retryMaxAttempts calls and surfaces a terminal error (recorded via
+// PersistResult), rather than retrying unboundedly. TestWorker_RetriesTransientGET
+// covers recover-before-exhaustion; this covers the give-up edge.
+func TestWorker_RetriesExhaustGET(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.getRefTransientFailures = 99 // never recovers
+	gh.getRefTransientStatus = http.StatusServiceUnavailable
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Run(ctx)
+
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	calls := persist.wait(t, 1)
+	if calls[0].Err == "" {
+		t.Fatal("expected a terminal error after retries exhaust, got success")
+	}
+	gh.mu.Lock()
+	got := gh.getRefCalled
+	gh.mu.Unlock()
+	if got != retryMaxAttempts {
+		t.Fatalf("get-ref called %d times, want %d (1 initial + %d retries, then give up)",
+			got, retryMaxAttempts, retryMaxAttempts-1)
+	}
+}
+
+// TestWorker_CreateBranch_AlreadyExistsIsIdempotent pins issue #24's
+// whole-pipeline idempotency: when the deterministic submission branch
+// already exists (a prior attempt got that far then failed), the 422
+// "Reference already exists" is treated as success and the pipeline
+// proceeds to put-contents + create-PR.
+func TestWorker_CreateBranch_AlreadyExistsIsIdempotent(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.createRefAlreadyExists = true
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Run(ctx)
+
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	calls := persist.wait(t, 1)
+	if calls[0].Err != "" {
+		t.Fatalf("422 already-exists should be tolerated, got err %q", calls[0].Err)
+	}
+	if calls[0].URL == "" {
+		t.Fatal("expected PR URL despite pre-existing branch")
+	}
+	// The pipeline must still have PUT the file and opened the PR.
+	gh.mu.Lock()
+	defer gh.mu.Unlock()
+	if gh.putContentsBody == nil {
+		t.Fatal("put-contents not called after tolerated 422")
+	}
+	if gh.createPRBody == nil {
+		t.Fatal("create-PR not called after tolerated 422")
+	}
+}
+
+// TestWorker_ShutdownDrain_BoundsWedgedCall pins issue #25: a job
+// drained on the hard-cancel path (drainAndExit) runs under
+// shutdownDrainTimeout, so a wedged GitHub call can't pin process exit
+// for the full openPRTimeout (30s). The fake's get-ref hangs forever;
+// without the bounded drain ctx, Run would block ~30s. We shrink
+// shutdownDrainTimeout to keep the test fast and assert Run returns
+// well under openPRTimeout.
+func TestWorker_ShutdownDrain_BoundsWedgedCall(t *testing.T) {
+	prev := shutdownDrainTimeout
+	shutdownDrainTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { shutdownDrainTimeout = prev })
+
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.getRefBlockUntilCtx = true // every get-ref hangs until ctx fires
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Job A will be picked up by Run and wedge in getBranchSHA. Job B
+	// sits in the buffer so it's still there when ctx cancels, forcing
+	// it through drainAndExit (the issue #25 code path).
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue A: %v", err)
+	}
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue B: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() { w.Run(ctx); close(done) }()
+
+	// Wait until Run is actually wedged inside job A's get-ref before
+	// canceling, so cancellation lands while a call is in flight and
+	// job B is still buffered.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		gh.mu.Lock()
+		started := gh.getRefCalled > 0
+		gh.mu.Unlock()
+		if started {
+			break
+		}
+		if time.Now().After(deadline) {
+			cancel()
+			t.Fatal("get-ref never reached; worker did not start processing")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	cancel()
+
+	// Both jobs (A in-flight under the now-canceled parent ctx, B under
+	// the bounded drain ctx) must resolve and Run must return. Budget:
+	// comfortably above 2*shutdownDrainTimeout but far below
+	// openPRTimeout — that gap is the regression guard.
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("Run did not return after cancel; wedged call pinned shutdown "+
+			"(shutdownDrainTimeout=%v, openPRTimeout=%v)", shutdownDrainTimeout, openPRTimeout)
+	}
+
+	// Both jobs should have recorded a (failed) promotion result — the
+	// detached persist write lands even though the GitHub call was cut
+	// off. This proves the drain still records outcomes under the bound.
+	calls := persist.wait(t, 2)
+	for _, c := range calls {
+		if c.Err == "" {
+			t.Errorf("expected promotion_error on wedged-then-canceled job, got success url=%q", c.URL)
+		}
+	}
+}
+
+func TestRetryableStatus(t *testing.T) {
+	retryable := []int{http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable}
+	for _, s := range retryable {
+		if !retryableStatus(s) {
+			t.Errorf("retryableStatus(%d) = false, want true", s)
+		}
+	}
+	notRetryable := []int{
+		http.StatusOK, http.StatusCreated, http.StatusNotFound,
+		http.StatusUnprocessableEntity, http.StatusConflict, http.StatusForbidden,
+		http.StatusInternalServerError, // 500 is ambiguous; we don't blind-retry it
+	}
+	for _, s := range notRetryable {
+		if retryableStatus(s) {
+			t.Errorf("retryableStatus(%d) = true, want false", s)
+		}
+	}
+}
+
+func TestIsSecondaryRateLimit(t *testing.T) {
+	mk := func(status int, header http.Header, body string) (*http.Response, []byte) {
+		if header == nil {
+			header = http.Header{}
+		}
+		return &http.Response{StatusCode: status, Header: header}, []byte(body)
+	}
+
+	// Non-403 is never a secondary rate limit.
+	if resp, body := mk(http.StatusServiceUnavailable, nil, "rate limit"); isSecondaryRateLimit(resp, body) {
+		t.Error("503 should not classify as secondary rate limit")
+	}
+	// Plain authorization 403 (no signal) is terminal.
+	if resp, body := mk(http.StatusForbidden, nil, "Bad credentials"); isSecondaryRateLimit(resp, body) {
+		t.Error("403 without rate-limit signal should be terminal")
+	}
+	// Retry-After header -> retryable.
+	if resp, body := mk(http.StatusForbidden, http.Header{"Retry-After": {"30"}}, ""); !isSecondaryRateLimit(resp, body) {
+		t.Error("403 with Retry-After should be retryable")
+	}
+	// X-RateLimit-Remaining: 0 -> retryable.
+	if resp, body := mk(http.StatusForbidden, http.Header{"X-Ratelimit-Remaining": {"0"}}, ""); !isSecondaryRateLimit(resp, body) {
+		t.Error("403 with X-RateLimit-Remaining:0 should be retryable")
+	}
+	// Body mentions a rate limit (case-insensitive) -> retryable.
+	if resp, body := mk(http.StatusForbidden, nil, "You have exceeded a secondary RATE LIMIT"); !isSecondaryRateLimit(resp, body) {
+		t.Error("403 with rate-limit body should be retryable")
+	}
+}
+
+// TestBackoffSleep_HonorsCancellation pins that a wedged backoff aborts
+// promptly when ctx is canceled (the graceful-shutdown guarantee) rather
+// than sleeping out the full duration.
+func TestBackoffSleep_HonorsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already canceled
+	start := time.Now()
+	err := backoffSleep(ctx, 10*time.Second)
+	if err == nil {
+		t.Fatal("backoffSleep returned nil on canceled ctx, want ctx.Err()")
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("backoffSleep slept %v despite cancellation; want near-immediate return", elapsed)
+	}
+}
+
+// TestBackoffSleep_CompletesNormally pins the non-canceled path returns
+// nil after the timer fires.
+func TestBackoffSleep_CompletesNormally(t *testing.T) {
+	if err := backoffSleep(context.Background(), 5*time.Millisecond); err != nil {
+		t.Fatalf("backoffSleep returned %v on clean completion, want nil", err)
 	}
 }

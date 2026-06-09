@@ -132,6 +132,72 @@ func TestCheck(t *testing.T) {
 		}
 	})
 
+	t.Run("context cancellation short-circuits dispatch", func(t *testing.T) {
+		// A server that blocks until its request ctx fires, so with
+		// Concurrency=1 the first probe pins the only slot and the
+		// dispatch loop blocks trying to enqueue the second org. Issue
+		// #31: canceling the parent ctx must unblock the dispatch loop's
+		// semaphore send (not hang past cancellation) and mark every
+		// not-yet-dispatched org with the cancellation cause.
+		started := make(chan struct{}, 1)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			<-r.Context().Done()
+		}))
+		t.Cleanup(srv.Close)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		orgs := []seedfiles.OrgEntry{
+			{Org: atlas.Org{Slug: "a", Name: "A", WebsiteURL: srv.URL}},
+			{Org: atlas.Org{Slug: "b", Name: "B", WebsiteURL: srv.URL}},
+			{Org: atlas.Org{Slug: "c", Name: "C", WebsiteURL: srv.URL}},
+		}
+
+		done := make(chan []Result, 1)
+		go func() { done <- Check(ctx, orgs, Options{Concurrency: 1}) }()
+
+		// Wait until the first probe is actually in flight (holding the
+		// single slot), then cancel so the dispatch loop is blocked on
+		// the semaphore send when cancellation lands.
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			cancel()
+			t.Fatal("first probe never started")
+		}
+		cancel()
+
+		var got []Result
+		select {
+		case got = <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Check did not return after cancellation (dispatch loop pinned)")
+		}
+
+		if len(got) != 3 {
+			t.Fatalf("want 3 results (input-order contract), got %d", len(got))
+		}
+		// Every row must carry an error and preserve input order/slug.
+		for i, want := range []string{"a", "b", "c"} {
+			if got[i].Slug != want {
+				t.Errorf("results[%d].Slug: want %q, got %q", i, want, got[i].Slug)
+			}
+			if got[i].Err == "" {
+				t.Errorf("results[%d] (%s): want non-empty Err after cancel, got empty", i, want)
+			}
+		}
+		// The not-yet-dispatched orgs (b, c) must specifically carry the
+		// context cancellation cause, not some unrelated transport error.
+		for _, i := range []int{1, 2} {
+			if !strings.Contains(got[i].Err, context.Canceled.Error()) {
+				t.Errorf("results[%d].Err = %q, want it to mention %q", i, got[i].Err, context.Canceled.Error())
+			}
+		}
+	})
+
 	t.Run("results returned in input order", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)

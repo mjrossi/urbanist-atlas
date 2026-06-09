@@ -72,6 +72,75 @@ func TestRequestID_EchoesInbound(t *testing.T) {
 	}
 }
 
+// TestRequestID_RejectsMalformedInbound: an inbound X-Request-ID that
+// fails the cap+charset guard (control chars, CRLF, over-long, illegal
+// punctuation) must NOT be echoed back or threaded into context —
+// otherwise a client could inject CRLFs into response headers or forge
+// log lines. The middleware substitutes a fresh generated id instead.
+func TestRequestID_RejectsMalformedInbound(t *testing.T) {
+	malformed := []string{
+		"has space",
+		"with\nnewline",
+		"with\r\ncrlf",
+		"semi;colon",
+		"slash/path",
+		"<script>",
+		strings.Repeat("a", maxRequestIDLen+1),
+	}
+	for _, bad := range malformed {
+		var ridFromCtx string
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ridFromCtx = requestIDFromContext(r.Context())
+			w.WriteHeader(http.StatusOK)
+		})
+
+		handler := requestIDMiddleware(next)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Request-ID", bad)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		respRID := rec.Header().Get("X-Request-ID")
+		if respRID == bad {
+			t.Errorf("malformed inbound rid %q was echoed back verbatim", bad)
+		}
+		if respRID == "" {
+			t.Errorf("malformed inbound rid %q: expected a fresh generated id, got empty", bad)
+		}
+		if respRID != ridFromCtx {
+			t.Errorf("rid %q: response rid %q != context rid %q", bad, respRID, ridFromCtx)
+		}
+		if !validRequestID(respRID) {
+			t.Errorf("substituted rid %q is itself not well-formed", respRID)
+		}
+	}
+}
+
+// TestRequestID_AcceptsWellFormedInbound: the guard must keep accepting
+// the legitimate cross-hop-correlation case — short ids drawn from the
+// unreserved charset [A-Za-z0-9._-], including a UUID-shaped value.
+func TestRequestID_AcceptsWellFormedInbound(t *testing.T) {
+	for _, good := range []string{
+		"client-supplied-rid-1234",
+		"my-rid-123",
+		"0192f6c0-1c2c-7000-9000-000000000099",
+		"Trace.v1_42",
+	} {
+		next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+		handler := requestIDMiddleware(next)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Request-ID", good)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if got := rec.Header().Get("X-Request-ID"); got != good {
+			t.Errorf("well-formed inbound rid %q: got %q, want echo", good, got)
+		}
+	}
+}
+
 // TestRequestIDFromContext_NoValue documents the helper's fallback for
 // callers that build a context without going through the middleware
 // (e.g. background workers or older tests). Returns "" rather than

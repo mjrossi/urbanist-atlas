@@ -185,6 +185,46 @@ func TestCreateSubmission_RejectsTagsField(t *testing.T) {
 	}
 }
 
+// TestCreateSubmission_RejectsTrailingGarbage pins that the decoder
+// accepts exactly one JSON object: a second value or junk after the
+// object is a 400, not silently ignored. Guards the dec.More() check.
+// Uses a dedicated server with a generous limiter so the multi-request
+// loop isn't tripped by the shared rig's tight per-IP ceiling.
+func TestCreateSubmission_RejectsTrailingGarbage(t *testing.T) {
+	subs, err := sqlite.Open("file::memory:?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = subs.Close() })
+	if err := subs.Migrate(context.Background()); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	store := atlas.NewMemStore()
+	atlas.LoadDevFixtures(store)
+	limiter := newIPRateLimiter(50, time.Hour)
+	r := buildSubmissionRoutes(subs, store, &recordingEnqueuer{}, limiter, slog.New(slog.DiscardHandler), NewMetrics())
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	raw, err := json.Marshal(goodSubmissionBody())
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, suffix := range []string{`{"extra":1}`, `garbage`, `[]`} {
+		body := append(append([]byte(nil), raw...), []byte(suffix)...)
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/submissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("do %q: %v", suffix, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("trailing %q: status want 400, got %d", suffix, resp.StatusCode)
+		}
+	}
+}
+
 func TestCreateSubmission_MissingField_Returns400Validation(t *testing.T) {
 	rig := newSubmissionsTestServer(t)
 	body := goodSubmissionBody()
@@ -589,6 +629,41 @@ func TestReject_RequiresReason(t *testing.T) {
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status: want 400, got %d", r.StatusCode)
+	}
+}
+
+// TestReject_EmptyBody_Returns400WithPointedTitle pins that the reject
+// handler distinguishes an empty body from malformed JSON — mirroring
+// the create handler — so an admin sees "Empty Request Body" rather than
+// a generic "not valid JSON".
+func TestReject_EmptyBody_Returns400WithPointedTitle(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", goodSubmissionBody(), nil)
+	var created map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&created)
+	_ = resp.Body.Close()
+	id := created["id"].(string)
+
+	req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/v1/admin/submissions/"+id+"/reject", http.NoBody)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
+	r, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST reject: %v", err)
+	}
+	defer r.Body.Close()
+
+	if r.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", r.StatusCode)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		t.Fatalf("decode problem: %v", err)
+	}
+	if body["title"] != "Empty Request Body" {
+		t.Errorf("title: got %v, want %q (empty body must be distinguished from malformed JSON)", body["title"], "Empty Request Body")
 	}
 }
 

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"net/http"
 )
@@ -19,15 +20,18 @@ func clientSecretMiddleware(secret string) func(http.Handler) http.Handler {
 	if secret == "" {
 		return func(next http.Handler) http.Handler { return next }
 	}
-	expected := []byte(secret)
+	// Hash the configured secret once. Comparing fixed-width SHA-256
+	// digests rather than the raw bytes keeps the compare constant-time
+	// regardless of the supplied value's length and matches the admin
+	// bearer gate (bearerauth.go), so the two credential checks don't
+	// diverge in rationale. This secret is low-stakes — it ships in the
+	// frontend bundle — but a uniform, length-leak-free compare is free
+	// and removes a "why is this one different?" maintenance snag.
+	expectedHash := sha256.Sum256([]byte(secret))
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			got := []byte(r.Header.Get("X-Atlas-Client"))
-			// ConstantTimeCompare returns 0 for length mismatch or
-			// differing bytes, 1 only on full equality. The timing-
-			// safe compare matters less than `subtle.ConstantTimeEq`-
-			// for-real-credentials but it's idiomatic and free.
-			if subtle.ConstantTimeCompare(got, expected) != 1 {
+			gotHash := sha256.Sum256([]byte(r.Header.Get("X-Atlas-Client")))
+			if subtle.ConstantTimeCompare(gotHash[:], expectedHash[:]) != 1 {
 				// Use the context-sourced rid (set by requestIDMiddleware
 				// upstream) so the problem document's request_id matches
 				// the X-Request-ID response header even when the client

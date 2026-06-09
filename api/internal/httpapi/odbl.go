@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -85,5 +84,5 @@ func respondCollection[T any](w http.ResponseWriter, items []T) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(body)
+	encodeJSON(w, body)
 }
