@@ -214,12 +214,16 @@ func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDesc
 		"vintage", src.Vintage,
 	)
 
-	for attempt := 1; attempt <= etlDownloadMaxAttempts; attempt++ {
+	// Attempts 1..max-1 may retry; each transient failure backs off and
+	// loops. The final attempt runs after the loop, so its return is the
+	// genuine "every attempt failed" path rather than dead code following
+	// an in-loop return. A non-retryable error short-circuits out directly.
+	for attempt := 1; attempt < etlDownloadMaxAttempts; attempt++ {
 		retryable, err := fetchOnce(ctx, client, src, dst, logger)
 		if err == nil {
 			return nil
 		}
-		if !retryable || attempt == etlDownloadMaxAttempts {
+		if !retryable {
 			return err
 		}
 		delay := etlDownloadBaseDelay << (attempt - 1) // 1s, 2s, 4s
@@ -234,9 +238,10 @@ func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDesc
 			return serr
 		}
 	}
-	// Unreachable: the loop returns on success, on a non-retryable error,
-	// or when the final attempt's error is returned above.
-	return fmt.Errorf("etl download %s: exhausted %d attempts", src.Filename, etlDownloadMaxAttempts)
+	// Final attempt: no backoff follows it, so its result is terminal —
+	// nil on success, otherwise the error (retryable or not) is returned.
+	_, err := fetchOnce(ctx, client, src, dst, logger)
+	return err
 }
 
 // fetchOnce performs a single GET of src.URL into dst, computing and
