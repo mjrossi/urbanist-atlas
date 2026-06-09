@@ -210,8 +210,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
                   {pluralize(statewide.length, 'entry', 'entries')}
                 </li>
                 <li>
-                  <strong>{tagCount}</strong>{' '}
-                  distinct editorial tags
+                  <strong>{tagCount}</strong> distinct editorial tags
                 </li>
                 <li>
                   Region kind{' '}
