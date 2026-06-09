@@ -208,7 +208,8 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 				ctReconciled += n
 			}
 		}
-		logger.Info(fmt.Sprintf("etl us: ct legacy-county reconcile: %+v", ctReasons),
+		logger.Info("etl us: ct legacy-county reconcile",
+			"reasons", ctReasons,
 			"reconciled_total", ctReconciled,
 			"reconciled_msa", ctReasons["ct-reconciled:msa"],
 			"skip_no_hud", ctReasons["ct-skip:no-hud"],
@@ -216,7 +217,8 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 		)
 
 		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug, portionSlugs)
-		logger.Info(fmt.Sprintf("etl us: hud backfill: added %d anchors across %+v", len(hudAnchors), hudReasons),
+		logger.Info("etl us: hud backfill",
+			"reasons", hudReasons,
 			"added", len(hudAnchors),
 			"borough_count", hudReasons["hud:nyc-borough"],
 			"county_leaf_count", hudReasons["hud:county-leaf"],
@@ -235,8 +237,8 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 		"zcta_count", len(anchors),
 		"hud_count", len(hudAnchors),
 		"total", len(anchors)+len(hudAnchors),
-		"by_reason", fmt.Sprintf("%+v", reasons),
-		"by_hud_reason", fmt.Sprintf("%+v", hudReasons),
+		"by_reason", reasons,
+		"by_hud_reason", hudReasons,
 	)
 
 	return nil

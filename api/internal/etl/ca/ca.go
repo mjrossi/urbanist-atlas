@@ -145,7 +145,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	logger.Info("etl ca: wrote postal codes",
 		"path", csvPath,
 		"count", len(anchors),
-		"by_reason", fmt.Sprintf("%+v", reasons),
+		"by_reason", reasons,
 	)
 	return nil
 }
