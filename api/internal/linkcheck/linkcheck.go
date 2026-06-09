@@ -44,7 +44,14 @@ const (
 // connection pool. Cloned from DefaultTransport so we get the stdlib
 // proxy/dialer defaults, then sized for a small concurrent crawl.
 var sharedTransport = func() *http.Transport {
-	t := http.DefaultTransport.(*http.Transport).Clone()
+	// DefaultTransport is always *http.Transport in the stdlib; the
+	// comma-ok guards the assertion so a non-default runtime override
+	// degrades to a plain transport instead of panicking.
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return &http.Transport{}
+	}
+	t := base.Clone()
 	// Probes hit many distinct hosts; keep a modest idle pool so
 	// back-to-back checks against the same host reuse a connection
 	// without holding sockets open indefinitely.
