@@ -163,26 +163,81 @@ func ValidateOrgFields(name, shortDesc, websiteURL, contactURL string, tags, reg
 	return nil
 }
 
+// urlReason is the typed outcome of the shared URL validator. The two
+// caller styles — error-returning (loader) and sentence-returning
+// (submissions handler) — each map these codes to their own message
+// form, so the parse logic lives in exactly one place.
+type urlReason int
+
+const (
+	urlOK urlReason = iota
+	urlTooLong
+	urlParseFailed
+	urlBadScheme
+	urlMissingHost
+	urlMailtoNoAddress
+)
+
+// classifyURL is the single core URL validator behind validateHTTPURL /
+// checkHTTPURL (allowMailto=false) and validateContactURL /
+// checkContactURL (allowMailto=true). It enforces the length cap, an
+// absolute http(s) (or mailto, when allowed) scheme, a non-empty host
+// for http(s), and a non-empty address for mailto.
+//
+// The returned error is non-nil only for urlParseFailed and carries the
+// underlying url.Parse error so the loader callers can wrap it with
+// "%w"; the sentence callers ignore it. Any change here changes what
+// every caller accepts/rejects — this is the security-relevant parse
+// boundary for org URLs.
+func classifyURL(raw string, allowMailto bool) (urlReason, error) {
+	if len(raw) > MaxURLLen {
+		return urlTooLong, nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return urlParseFailed, err
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		if u.Host == "" {
+			return urlMissingHost, nil
+		}
+		return urlOK, nil
+	case "mailto":
+		if !allowMailto {
+			return urlBadScheme, nil
+		}
+		if u.Opaque == "" {
+			return urlMailtoNoAddress, nil
+		}
+		return urlOK, nil
+	default:
+		return urlBadScheme, nil
+	}
+}
+
 // validateHTTPURL accepts only absolute http(s) URLs with a host. Used
 // for website_url. The length cap is generous (500 chars) but caps
 // the worst case so an attacker can't store megabytes of nonsense in
 // orgs.toml.
 func validateHTTPURL(field, raw string) error {
-	if len(raw) > MaxURLLen {
+	reason, perr := classifyURL(raw, false)
+	switch reason {
+	case urlOK:
+		return nil
+	case urlTooLong:
 		return fmt.Errorf("%s must be at most %d characters", field, MaxURLLen)
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("%s is not a valid URL: %w", field, err)
-	}
-	scheme := strings.ToLower(u.Scheme)
-	if scheme != "http" && scheme != "https" {
+	case urlParseFailed:
+		return fmt.Errorf("%s is not a valid URL: %w", field, perr)
+	case urlBadScheme:
+		return fmt.Errorf("%s must use http or https", field)
+	case urlMissingHost:
+		return fmt.Errorf("%s must include a host", field)
+	default:
+		// urlMailtoNoAddress is unreachable here (allowMailto=false
+		// classifies mailto as urlBadScheme), but keep a defensive arm.
 		return fmt.Errorf("%s must use http or https", field)
 	}
-	if u.Host == "" {
-		return fmt.Errorf("%s must include a host", field)
-	}
-	return nil
 }
 
 // validateContactURL is contact_url's looser cousin: http(s) for
@@ -190,25 +245,19 @@ func validateHTTPURL(field, raw string) error {
 // expose only a mailbox). mailto must include an address; opaque
 // schemes without one ("mailto:" alone) are rejected.
 func validateContactURL(raw string) error {
-	if len(raw) > MaxURLLen {
+	reason, perr := classifyURL(raw, true)
+	switch reason {
+	case urlOK:
+		return nil
+	case urlTooLong:
 		return fmt.Errorf("contact_url must be at most %d characters", MaxURLLen)
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("contact_url is not a valid URL: %w", err)
-	}
-	switch strings.ToLower(u.Scheme) {
-	case "http", "https":
-		if u.Host == "" {
-			return errors.New("contact_url must include a host")
-		}
-		return nil
-	case "mailto":
-		if u.Opaque == "" {
-			return errors.New("contact_url mailto: must include an address")
-		}
-		return nil
-	default:
+	case urlParseFailed:
+		return fmt.Errorf("contact_url is not a valid URL: %w", perr)
+	case urlMissingHost:
+		return errors.New("contact_url must include a host")
+	case urlMailtoNoAddress:
+		return errors.New("contact_url mailto: must include an address")
+	default: // urlBadScheme
 		return errors.New("contact_url must use http, https, or mailto")
 	}
 }
