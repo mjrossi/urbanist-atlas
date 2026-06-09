@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -105,25 +104,52 @@ func etlCommand() *cli.Command {
 	}
 }
 
-func runEtlDownload(ctx context.Context, c *cli.Command) error {
+// resolvedPlan bundles the pieces both etl subcommands derive from the
+// shared flags before doing their subcommand-specific work.
+type resolvedPlan struct {
+	country string
+	logger  *slog.Logger
+	plan    etl.Country
+	srcDir  string
+	target  etl.Target
+}
+
+// resolvePlan parses the flags common to both etl subcommands: it
+// requires --country, looks up the registered plan, joins the
+// per-country source directory, and parses --target. op is the
+// subcommand label ("etl download" / "etl regenerate") so the error
+// prefixes stay identical to the inlined versions. The download
+// subcommand's mkdir and the regenerate subcommand's Regenerate-nil /
+// out-dir handling remain in their respective callers.
+func resolvePlan(c *cli.Command, op string) (resolvedPlan, error) {
 	country := c.String("country")
 	if country == "" {
-		return errors.New("etl download: --country is required")
+		return resolvedPlan{}, fmt.Errorf("%s: --country is required", op)
 	}
 	logger := buildLogger(c.String("log-format"), c.String("log-level"))
 
 	plan, ok := etl.Plans[country]
 	if !ok {
-		return fmt.Errorf("etl download: no plan registered for country %q (known: %s)", country, strings.Join(planCodes(), ", "))
+		return resolvedPlan{}, fmt.Errorf("%s: no plan registered for country %q (known: %s)", op, country, strings.Join(planCodes(), ", "))
 	}
 
 	srcDir := filepath.Join(c.String("src"), plan.SourcesDir)
-	if err := os.MkdirAll(srcDir, 0o755); err != nil {
-		return fmt.Errorf("etl download: create %s: %w", srcDir, err)
-	}
 	target, err := etl.ParseTarget(c.String("target"))
 	if err != nil {
-		return fmt.Errorf("etl download: %w", err)
+		return resolvedPlan{}, fmt.Errorf("%s: %w", op, err)
+	}
+	return resolvedPlan{country: country, logger: logger, plan: plan, srcDir: srcDir, target: target}, nil
+}
+
+func runEtlDownload(ctx context.Context, c *cli.Command) error {
+	r, err := resolvePlan(c, "etl download")
+	if err != nil {
+		return err
+	}
+	country, logger, plan, srcDir, target := r.country, r.logger, r.plan, r.srcDir, r.target
+
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		return fmt.Errorf("etl download: create %s: %w", srcDir, err)
 	}
 
 	logger.Info("etl download: start",
@@ -306,16 +332,12 @@ func fileSHA256(path string) (string, error) {
 }
 
 func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
-	country := c.String("country")
-	if country == "" {
-		return errors.New("etl regenerate: --country is required")
+	r, err := resolvePlan(c, "etl regenerate")
+	if err != nil {
+		return err
 	}
-	logger := buildLogger(c.String("log-format"), c.String("log-level"))
+	country, logger, plan, srcDir, target := r.country, r.logger, r.plan, r.srcDir, r.target
 
-	plan, ok := etl.Plans[country]
-	if !ok {
-		return fmt.Errorf("etl regenerate: no plan registered for country %q (known: %s)", country, strings.Join(planCodes(), ", "))
-	}
 	if plan.Regenerate == nil {
 		// Defensive: a country plan may register itself but defer
 		// implementing Regenerate to a follow-up slice. US and CA both
@@ -326,12 +348,7 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 		return nil
 	}
 
-	srcDir := filepath.Join(c.String("src"), plan.SourcesDir)
 	outDir := c.String("out")
-	target, err := etl.ParseTarget(c.String("target"))
-	if err != nil {
-		return fmt.Errorf("etl regenerate: %w", err)
-	}
 
 	logger.Info("etl regenerate: start",
 		"country", country,
