@@ -138,6 +138,32 @@ X-Data-Attribution: https://urbanistatlas.com
             <Link to="/submit">submissions desk</Link> today, and a moderated in-app queue
             ships with the Phase 2 API-key program.
           </p>
+
+          <div className="section-kicker">§ VI — Keeping it running</div>
+          <h2>Who pays for the servers.</h2>
+          <div className="h2-rule" />
+          <p>
+            The Atlas is independent and unfunded. Hosting is cheap but not free — the
+            Fly.io instance, the Cloudflare plan, and the domain run a few dollars a month,
+            paid out of pocket. If you&rsquo;d like to help cover the bill, there&rsquo;s a{' '}
+            <a
+              href="https://liberapay.com/urbanist-atlas/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Liberapay
+            </a>{' '}
+            tip jar.
+          </p>
+          <p>
+            Two caveats, both load-bearing. First: give to your local advocacy organization
+            before you give here — they&rsquo;re the entire point of this directory, and a
+            few dollars goes much further with them than with our server bill. Second:
+            donations buy nothing on this side. They don&rsquo;t influence which
+            organizations are listed, how they&rsquo;re ordered, or anything else editorial.
+            The directory grows one editorial decision at a time, and money is not one of the
+            inputs.
+          </p>
         </main>
 
         <aside className="rail">
@@ -166,6 +192,20 @@ X-Data-Attribution: https://urbanistatlas.com
               <li>Dataset · ODbL 1.0 (share-alike)</li>
               <li>Attribution required in headers</li>
             </ul>
+          </div>
+          <div className="rail-block amber">
+            <div className="rail-kicker">Support the server bill</div>
+            <p className="text-sm">
+              <a
+                className="read-on"
+                href="https://liberapay.com/urbanist-atlas/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Chip in on Liberapay →
+              </a>
+            </p>
+            <p className="text-sm">Local orgs first. Hosting only — never editorial.</p>
           </div>
           <div className="rail-block muted">
             <div className="rail-kicker">Type</div>
