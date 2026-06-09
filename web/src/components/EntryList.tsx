@@ -1,4 +1,5 @@
 import type { LookupOrg } from '../lib/api.ts';
+import { pluralize } from '../lib/format.ts';
 import { Entry } from './Entry.tsx';
 
 /**
@@ -73,7 +74,7 @@ function Section({
           <span className="accent">.</span>
         </h2>
         <span className="aside">
-          {orgs.length} {orgs.length === 1 ? 'entry' : 'entries'}
+          {orgs.length} {pluralize(orgs.length, 'entry', 'entries')}
         </span>
       </header>
       {orgs.map((org) => (

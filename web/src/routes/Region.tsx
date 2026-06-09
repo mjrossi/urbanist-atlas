@@ -10,6 +10,7 @@ import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import { reverseAncestry } from '../lib/ancestry.ts';
 import type { LookupOrg, RegionDetail } from '../lib/api.ts';
 import { ApiError, getRegion } from '../lib/api.ts';
+import { groupCountLabel, pluralize } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -44,7 +45,7 @@ export function Region() {
     ? query.data.local.length + query.data.regional.length + query.data.statewide.length
     : 0;
   const metaRight = query.data
-    ? `${totalOrgs} ${totalOrgs === 1 ? 'org' : 'orgs'} indexed`
+    ? `${totalOrgs} ${pluralize(totalOrgs, 'org', 'orgs')} indexed`
     : 'Region report';
 
   return (
@@ -130,7 +131,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
         <p className="deck">
           {totalOrgs === 0
             ? `No groups in scope for ${region.name} yet — but the region is on the map.`
-            : `${totalOrgs} ${totalOrgs === 1 ? 'group' : 'groups'} working in or covering ${region.name}. Local entries are nearest; regional entries cover wider footprints that include this region.`}
+            : `${groupCountLabel(totalOrgs)} working in or covering ${region.name}. Local entries are nearest; regional entries cover wider footprints that include this region.`}
         </p>
         <div className="byline">
           <span>{region.country}</span>
@@ -194,15 +195,15 @@ function RegionContent({ data }: { data: RegionDetail }) {
               <ul>
                 <li>
                   <strong>{local.length}</strong> local{' '}
-                  {local.length === 1 ? 'entry' : 'entries'}
+                  {pluralize(local.length, 'entry', 'entries')}
                 </li>
                 <li>
                   <strong>{regional.length}</strong> regional{' '}
-                  {regional.length === 1 ? 'entry' : 'entries'}
+                  {pluralize(regional.length, 'entry', 'entries')}
                 </li>
                 <li>
                   <strong>{statewide.length}</strong> state / provincial{' '}
-                  {statewide.length === 1 ? 'entry' : 'entries'}
+                  {pluralize(statewide.length, 'entry', 'entries')}
                 </li>
                 <li>
                   <strong>{countTags([...local, ...regional, ...statewide])}</strong>{' '}

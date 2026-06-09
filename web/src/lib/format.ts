@@ -6,12 +6,22 @@
  */
 
 /**
- * Renders an org count with the matching singular / plural noun.
- * Used in the homepage Browse aside and on the /browse listing —
- * one canonical wording so the two surfaces don't drift.
+ * Picks the singular or plural form for a count — the single home for
+ * the `n === 1` check behind the count labels scattered through the
+ * listing UI ("3 groups", "1 entry", …). The number itself is the
+ * caller's to render, since several surfaces style it separately.
+ */
+export function pluralize(n: number, singular: string, plural: string): string {
+  return n === 1 ? singular : plural;
+}
+
+/**
+ * Renders an org count with its matching noun ("1 group" / "42
+ * groups") as one string — used in the Region report deck where the
+ * count is inline in a sentence.
  */
 export function groupCountLabel(n: number): string {
-  return n === 1 ? '1 group' : `${n} groups`;
+  return `${n} ${pluralize(n, 'group', 'groups')}`;
 }
 
 /**

@@ -7,6 +7,7 @@ import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import type { RegionSummary } from '../lib/api.ts';
 import { ApiError, listRegions } from '../lib/api.ts';
+import { pluralize } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -286,7 +287,8 @@ function IndexRow({ region: r, isChild }: { region: RegionSummary; isChild?: boo
         </span>
       </div>
       <span className="icount">
-        {org_count} <span className="total">{org_count === 1 ? 'group' : 'groups'}</span>
+        {org_count}{' '}
+        <span className="total">{pluralize(org_count, 'group', 'groups')}</span>
       </span>
     </Link>
   );
