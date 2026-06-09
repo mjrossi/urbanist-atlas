@@ -83,43 +83,8 @@ func placeLabel(ancestry []Region) string {
 		return ""
 	}
 	leaf := ancestry[0]
-
-	// r := ancestry[i] inside each loop body is a fresh local each
-	// iteration — taking &r is safe and escapes to the heap, so callers
-	// keep a valid pointer after break.
-	var broad *Region
-	for i := 1; i < len(ancestry); i++ {
-		r := ancestry[i]
-		if IsMetroKind(r.Kind) {
-			broad = &r
-			break
-		}
-	}
-	if broad == nil {
-		for i := 1; i < len(ancestry); i++ {
-			r := ancestry[i]
-			if r.ScopeTier == ScopeRegional {
-				broad = &r
-				break
-			}
-		}
-	}
-
-	var inner *Region
-	for i := 1; i < len(ancestry); i++ {
-		r := ancestry[i]
-		if r.Slug == leaf.Slug {
-			continue
-		}
-		if broad != nil && r.Slug == broad.Slug {
-			continue
-		}
-		if r.SortPriority >= 60 { // state-tier or higher: excludes state/multi-state.
-			continue
-		}
-		inner = &r
-		break
-	}
+	broad := pickBroadAncestor(ancestry)
+	inner := pickInnerAncestor(ancestry, leaf, broad)
 
 	switch {
 	case inner != nil && broad != nil:
@@ -131,4 +96,53 @@ func placeLabel(ancestry []Region) string {
 	default:
 		return leaf.Name
 	}
+}
+
+// pickBroadAncestor selects placeLabel's "broad" slot: the most-specific
+// metro-kind ancestor, or — when no metro-kind ancestor exists — the
+// first regional-tier ancestor (so transit federations and other
+// non-metro regional contexts still fill the slot). Scans ancestry[1:]
+// (skipping the leaf). Returns nil when neither match exists.
+//
+// r := ancestry[i] inside each loop body is a fresh local each iteration
+// — taking &r is safe and escapes to the heap, so the caller keeps a
+// valid pointer after the return.
+func pickBroadAncestor(ancestry []Region) *Region {
+	for i := 1; i < len(ancestry); i++ {
+		r := ancestry[i]
+		if IsMetroKind(r.Kind) {
+			return &r
+		}
+	}
+	for i := 1; i < len(ancestry); i++ {
+		r := ancestry[i]
+		if r.ScopeTier == ScopeRegional {
+			return &r
+		}
+	}
+	return nil
+}
+
+// pickInnerAncestor selects placeLabel's "inner" slot: the first
+// non-leaf ancestor below state tier (SortPriority < 60) that is
+// distinct from the leaf and the already-chosen broad slot, so the label
+// captures local civic context (NYC for a borough, Cook County for a
+// Chicago neighborhood) without repeating the broad slot or padding with
+// state/multi-state geography. broad may be nil. Returns nil when no
+// such ancestor exists.
+func pickInnerAncestor(ancestry []Region, leaf Region, broad *Region) *Region {
+	for i := 1; i < len(ancestry); i++ {
+		r := ancestry[i]
+		if r.Slug == leaf.Slug {
+			continue
+		}
+		if broad != nil && r.Slug == broad.Slug {
+			continue
+		}
+		if r.SortPriority >= 60 { // state-tier or higher: excludes state/multi-state.
+			continue
+		}
+		return &r
+	}
+	return nil
 }
