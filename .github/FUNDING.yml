@@ -6,6 +6,6 @@
 # is not one of the inputs. Please support your local advocacy organization
 # first; this is just for the server bill.
 #
-# TODO(maintainer): replace with your actual Liberapay username, then enable
-# Liberapay in the repo's GitHub funding settings for the Sponsor button.
+# Note: Liberapay must also be enabled in the repo's GitHub funding settings
+# for the Sponsor button to render.
 liberapay: urbanist-atlas
