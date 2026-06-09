@@ -286,10 +286,16 @@ func metricsMiddleware(m *Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			// Reuse the access-log middleware's status recorder when it is
-			// already in the chain (loggingMiddleware runs just outside this
-			// one) so a request carries at most one wrapper; only allocate
-			// our own when this middleware is used standalone.
+			// LOAD-BEARING ORDERING: this type-assert succeeds only because
+			// loggingMiddleware is registered BEFORE metricsMiddleware in
+			// router.go's r.Use chain, so it wraps w in a *statusRecorder
+			// before this middleware sees it. We reuse that recorder (rather
+			// than allocate a second wrapper) so a request carries at most
+			// one. If the r.Use order is ever flipped the assert simply
+			// fails and we fall back to our own recorder below — still
+			// correct, just an extra allocation — but keep the ordering so
+			// the common path stays single-wrapper. See the matching note at
+			// the r.Use site in router.go.
 			rec, ok := w.(*statusRecorder)
 			if !ok {
 				rec = &statusRecorder{ResponseWriter: w, status: http.StatusOK}
