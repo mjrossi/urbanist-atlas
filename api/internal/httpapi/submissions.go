@@ -278,26 +278,40 @@ func approveSubmissionHandler(subs atlas.SubmissionStore, enq PromotionEnqueuer,
 			return
 		}
 
-		// Best-effort enqueue. The row is already approved; the worker
-		// is free to fail without un-doing the moderator's decision.
-		enqErr := enqueueOrDisabled(r.Context(), enq, sub)
-		if enqErr != nil {
-			attachErr := subs.AttachPromotionResult(r.Context(), sub.PublicID, "", enqErr.Error())
-			if attachErr != nil {
-				logger.ErrorContext(r.Context(), "attach promotion_error after enqueue failure", "err", attachErr, "rid", rid)
-			}
-			// Re-read so the response reflects the persisted error.
-			if reread, rerr := subs.Get(r.Context(), sub.PublicID); rerr == nil {
-				sub = reread
-			}
-		}
+		sub = enqueuePromotion(r.Context(), subs, enq, logger, sub, rid)
 
 		// The approval itself succeeded even when the best-effort enqueue
-		// above failed (the failure is captured in promotion_error).
+		// inside enqueuePromotion failed (the failure is captured in
+		// promotion_error on the re-read row).
 		m.incAdminAction("approve", "ok")
 		logger.InfoContext(r.Context(), "submission approved", "public_id", sub.PublicID, "rid", rid)
 		writeJSON(w, http.StatusOK, toOAPISubmission(sub))
 	}
+}
+
+// enqueuePromotion hands an already-approved submission off to the
+// GitHub PR worker, best-effort. The row is already approved by the
+// time this runs, so the worker is free to fail without un-doing the
+// moderator's decision: on enqueue failure it records the reason in
+// promotion_error (a compensating write) and re-reads the row so the
+// returned submission reflects the persisted error. Both the attach
+// and the re-read are themselves best-effort — an attach failure is
+// logged and a failed re-read leaves the in-memory sub untouched.
+// Returns the submission the caller should encode.
+func enqueuePromotion(ctx context.Context, subs atlas.SubmissionStore, enq PromotionEnqueuer, logger *slog.Logger, sub atlas.Submission, rid string) atlas.Submission {
+	enqErr := enqueueOrDisabled(ctx, enq, sub)
+	if enqErr == nil {
+		return sub
+	}
+	attachErr := subs.AttachPromotionResult(ctx, sub.PublicID, "", enqErr.Error())
+	if attachErr != nil {
+		logger.ErrorContext(ctx, "attach promotion_error after enqueue failure", "err", attachErr, "rid", rid)
+	}
+	// Re-read so the response reflects the persisted error.
+	if reread, rerr := subs.Get(ctx, sub.PublicID); rerr == nil {
+		sub = reread
+	}
+	return sub
 }
 
 // rejectSubmissionHandler answers POST /api/v1/admin/submissions/{id}/reject.
