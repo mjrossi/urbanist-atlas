@@ -29,6 +29,50 @@ const (
 	storeKindMemory = "memory"
 )
 
+// serveConfig is the fully-resolved serve configuration, read once from
+// the CLI flags by parseServeConfig. Holding every value in one struct
+// keeps each flag (and its env fallback) read exactly once and lets
+// runServe and its build helpers read as orchestration over a plain
+// value rather than re-querying *cli.Command at every use site.
+type serveConfig struct {
+	port                   string
+	metricsPort            string
+	logFormat              string
+	logLevel               string
+	corsOrigins            string // raw CSV; split via splitCSV at use
+	store                  string
+	seedDir                string
+	clientSecret           string
+	dbPath                 string
+	adminToken             string
+	githubToken            string
+	submissionsRatePerHour int
+	coverageSampleRate     float64
+	coverageMaxRows        int
+}
+
+// parseServeConfig reads every serve flag exactly once. Flag names,
+// env-var fallbacks, and defaults all live on the cli.Command flag set
+// (serveCommand); this only snapshots the resolved values.
+func parseServeConfig(c *cli.Command) serveConfig {
+	return serveConfig{
+		port:                   c.String("port"),
+		metricsPort:            c.String("metrics-port"),
+		logFormat:              c.String("log-format"),
+		logLevel:               c.String("log-level"),
+		corsOrigins:            c.String("cors-origins"),
+		store:                  c.String("store"),
+		seedDir:                c.String("seed-dir"),
+		clientSecret:           c.String("client-secret"),
+		dbPath:                 c.String("db-path"),
+		adminToken:             c.String("admin-token"),
+		githubToken:            c.String("github-token"),
+		submissionsRatePerHour: c.Int("submissions-rate-per-hour"),
+		coverageSampleRate:     c.Float("coverage-sample-rate"),
+		coverageMaxRows:        c.Int("coverage-max-rows"),
+	}
+}
+
 func serveCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "serve",
@@ -120,15 +164,16 @@ func serveCommand() *cli.Command {
 }
 
 func runServe(ctx context.Context, c *cli.Command) error {
-	logger := buildLogger(c.String("log-format"), c.String("log-level"))
+	cfg := parseServeConfig(c)
+	logger := buildLogger(cfg.logFormat, cfg.logLevel)
 
-	store, closeStore, err := buildStore(ctx, c, logger)
+	store, closeStore, err := buildStore(cfg, logger)
 	if err != nil {
 		return err
 	}
 	defer closeStore()
 
-	subs, closeSubs, err := buildSubmissionStore(ctx, c, logger)
+	subs, closeSubs, err := buildSubmissionStore(ctx, cfg, logger)
 	if err != nil {
 		return err
 	}
@@ -140,7 +185,7 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	)
 	if subs != nil {
 		worker = githubpr.New(githubpr.Config{
-			Token:         c.String("github-token"),
+			Token:         cfg.githubToken,
 			Logger:        logger,
 			PersistResult: subs.AttachPromotionResult,
 		})
@@ -155,47 +200,28 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	// (sample-rate 0) — capturing raw empty-result input is opt-in.
 	var recorder *coverage.Recorder
 	if subs != nil {
-		recorder = coverage.New(subs, c.Float("coverage-sample-rate"), c.Int("coverage-max-rows"), logger)
+		recorder = coverage.New(subs, cfg.coverageSampleRate, cfg.coverageMaxRows, logger)
 	}
 
-	origins := splitCSV(c.String("cors-origins"))
-
-	// One consolidated boot line so an operator can confirm the effective
-	// non-secret config from the first lines of the log. Secrets are
-	// reported as presence booleans only — never their values.
-	logger.Info("startup config",
-		"port", c.String("port"),
-		"store", c.String("store"),
-		"seed_source", seedSourceLabel(c.String("seed-dir")),
-		"cors_origins", origins,
-		"log_format", c.String("log-format"),
-		"log_level", c.String("log-level"),
-		"metrics_port", c.String("metrics-port"),
-		"submissions_enabled", subs != nil,
-		"submissions_rate_per_hour", c.Int("submissions-rate-per-hour"),
-		"coverage_sample_rate", c.Float("coverage-sample-rate"),
-		"coverage_max_rows", c.Int("coverage-max-rows"),
-		"client_secret_set", c.String("client-secret") != "",
-		"admin_token_set", c.String("admin-token") != "",
-		"github_token_set", c.String("github-token") != "",
-	)
+	origins := splitCSV(cfg.corsOrigins)
+	logServeConfig(logger, cfg, origins, subs != nil)
 
 	handler := httpapi.New(httpapi.Config{
 		Store:                  store,
 		Logger:                 logger,
 		CORSOrigins:            origins,
 		APIVersion:             "v1",
-		ClientSecret:           c.String("client-secret"),
+		ClientSecret:           cfg.clientSecret,
 		Submissions:            submissionsOrNil(subs),
 		PromotionEnqueuer:      enqueuer,
-		AdminToken:             c.String("admin-token"),
-		SubmissionsRatePerHour: c.Int("submissions-rate-per-hour"),
+		AdminToken:             cfg.adminToken,
+		SubmissionsRatePerHour: cfg.submissionsRatePerHour,
 		Metrics:                metrics,
 		Coverage:               recorder,
 		CoverageGaps:           coverageReaderOrNil(subs),
 	})
 
-	addr := net.JoinHostPort("", c.String("port"))
+	addr := net.JoinHostPort("", cfg.port)
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
@@ -211,13 +237,15 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	// the main mux on purpose; nil when disabled. ListenAndServe errors on
 	// this listener are logged, never fatal: losing metrics must not take
 	// the request path down.
-	metricsSrv := newMetricsServer(c.String("metrics-port"), metrics, logger)
+	metricsSrv := newMetricsServer(cfg.metricsPort, metrics, logger)
+	metricsDone := make(chan struct{}, 1)
 	if metricsSrv != nil {
 		go func() {
 			logger.Info("metrics listening", "addr", metricsSrv.Addr)
 			if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				logger.Error("metrics server error", "err", err)
 			}
+			metricsDone <- struct{}{}
 		}()
 	}
 
@@ -231,27 +259,81 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		serverErr <- nil
 	}()
 
+	return awaitShutdown(ctx, logger, shutdownDeps{
+		srv:         srv,
+		serverErr:   serverErr,
+		metricsSrv:  metricsSrv,
+		metricsDone: metricsDone,
+		worker:      worker,
+		recorder:    recorder,
+	})
+}
+
+// logServeConfig emits the single consolidated boot line so an operator
+// can confirm the effective non-secret config from the first lines of
+// the log. Secrets are reported as presence booleans only — never their
+// values.
+func logServeConfig(logger *slog.Logger, cfg serveConfig, origins []string, submissionsEnabled bool) {
+	logger.Info("startup config",
+		"port", cfg.port,
+		"store", cfg.store,
+		"seed_source", seedSourceLabel(cfg.seedDir),
+		"cors_origins", origins,
+		"log_format", cfg.logFormat,
+		"log_level", cfg.logLevel,
+		"metrics_port", cfg.metricsPort,
+		"submissions_enabled", submissionsEnabled,
+		"submissions_rate_per_hour", cfg.submissionsRatePerHour,
+		"coverage_sample_rate", cfg.coverageSampleRate,
+		"coverage_max_rows", cfg.coverageMaxRows,
+		"client_secret_set", cfg.clientSecret != "",
+		"admin_token_set", cfg.adminToken != "",
+		"github_token_set", cfg.githubToken != "",
+	)
+}
+
+// shutdownDeps groups the running servers and background workers
+// awaitShutdown tears down, so the orchestration in runServe passes one
+// value instead of a long parameter list.
+type shutdownDeps struct {
+	srv         *http.Server
+	serverErr   <-chan error
+	metricsSrv  *http.Server
+	metricsDone <-chan struct{}
+	worker      *githubpr.Worker
+	recorder    *coverage.Recorder
+}
+
+// awaitShutdown blocks until either the OS signal (ctx cancellation) or
+// the main HTTP listener errors, then performs the dependency-ordered
+// teardown. The order is load-bearing: stop accepting new HTTP traffic
+// first, then drain GitHub-PR jobs queued by approvals that landed in the
+// last few seconds (reversing it would let a fresh approval squeeze in
+// after the worker stopped), then flush sampled coverage-gap writes
+// before the deferred store Close runs. Every teardown step shares one
+// shutdownCtx deadline; whichever step hits it first wins.
+func awaitShutdown(ctx context.Context, logger *slog.Logger, d shutdownDeps) error {
 	select {
 	case <-ctx.Done():
 		logger.Info("shutdown signal received")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		// Order: stop accepting new HTTP traffic first, then drain
-		// any GitHub-PR jobs already queued by approvals that landed
-		// in the last few seconds. Reversing this would let a fresh
-		// approval squeeze in after the worker stopped accepting.
-		// Both calls share the same shutdownCtx deadline; whichever
-		// hits it first wins.
-		if err := srv.Shutdown(shutdownCtx); err != nil {
+
+		if err := d.srv.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("graceful shutdown: %w", err)
 		}
-		if metricsSrv != nil {
-			if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		if d.metricsSrv != nil {
+			if err := d.metricsSrv.Shutdown(shutdownCtx); err != nil {
 				logger.Warn("metrics graceful shutdown incomplete", "err", err)
 			}
+			// Join the metrics goroutine so a slow drain can't race
+			// process exit. Shutdown already closed the listener, so
+			// ListenAndServe has returned (or is about to); this is the
+			// symmetric counterpart to the <-serverErr join below.
+			<-d.metricsDone
 		}
-		if worker != nil {
-			dropped, stopErr := worker.Stop(shutdownCtx)
+		if d.worker != nil {
+			dropped, stopErr := d.worker.Stop(shutdownCtx)
 			if stopErr != nil {
 				logger.Warn("githubpr: drain incomplete on shutdown",
 					"err", stopErr,
@@ -264,13 +346,13 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		// the shared shutdownCtx so a wedged write can't overrun the
 		// shutdown budget; stragglers (sampled, best-effort) are dropped.
 		// Nil-safe.
-		if err := recorder.Wait(shutdownCtx); err != nil {
+		if err := d.recorder.Wait(shutdownCtx); err != nil {
 			logger.Warn("coverage: drain incomplete on shutdown", "err", err)
 		}
 		// Wait for ListenAndServe to return (it will, with ErrServerClosed).
-		<-serverErr
+		<-d.serverErr
 		return nil
-	case err := <-serverErr:
+	case err := <-d.serverErr:
 		if err != nil {
 			return fmt.Errorf("listen: %w", err)
 		}
@@ -288,8 +370,8 @@ func runServe(ctx context.Context, c *cli.Command) error {
 // it reads from os.DirFS(seedDir). The latter is what mise.development
 // activates (URBANIST_SEED_DIR=api/seed) so dev iterates against
 // the on-disk files without rebuilds.
-func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.Store, func(), error) {
-	kind := strings.ToLower(strings.TrimSpace(c.String("store")))
+func buildStore(cfg serveConfig, logger *slog.Logger) (atlas.Store, func(), error) {
+	kind := strings.ToLower(strings.TrimSpace(cfg.store))
 	switch kind {
 	case storeKindMemory:
 		s := atlas.NewMemStore()
@@ -297,7 +379,7 @@ func buildStore(_ context.Context, c *cli.Command, logger *slog.Logger) (atlas.S
 		logger.Info("store initialized", "kind", storeKindMemory, "fixtures", "dev")
 		return s, func() {}, nil
 	case storeKindFile, "":
-		seedDir := c.String("seed-dir")
+		seedDir := cfg.seedDir
 		var (
 			source string
 			seedFS fs.FS
@@ -335,8 +417,8 @@ func seedSourceLabel(seedDir string) string {
 // migrations. An empty --db-path is treated as "no submissions" — the
 // returned store is nil and the /submissions endpoints stay
 // unregistered.
-func buildSubmissionStore(ctx context.Context, c *cli.Command, logger *slog.Logger) (*sqlite.Store, func(), error) {
-	path := strings.TrimSpace(c.String("db-path"))
+func buildSubmissionStore(ctx context.Context, cfg serveConfig, logger *slog.Logger) (*sqlite.Store, func(), error) {
+	path := strings.TrimSpace(cfg.dbPath)
 	if path == "" {
 		logger.Info("submission store disabled (empty --db-path)")
 		return nil, func() {}, nil
