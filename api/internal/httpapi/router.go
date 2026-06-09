@@ -92,8 +92,16 @@ func New(cfg Config) http.Handler {
 	}
 	// metricsMiddleware sits inside corsMiddleware so the preflight
 	// OPTIONS that CORS short-circuits with a 204 aren't recorded as
-	// "unmatched" request noise. It reuses loggingMiddleware's status
-	// recorder rather than wrapping the writer a second time.
+	// "unmatched" request noise.
+	//
+	// LOAD-BEARING ORDERING: metricsMiddleware MUST be registered after
+	// (i.e. nested inside) loggingMiddleware above. metricsMiddleware
+	// type-asserts the http.ResponseWriter to *statusRecorder to reuse
+	// loggingMiddleware's wrapper instead of allocating a second one; that
+	// assert only succeeds while loggingMiddleware runs outside it. Flip
+	// the order and the assert silently falls back to a private recorder
+	// (still correct, one extra allocation per request). See the matching
+	// note at the type-assert in metricsMiddleware (metrics.go).
 	if cfg.Metrics != nil {
 		r.Use(metricsMiddleware(cfg.Metrics))
 	}
