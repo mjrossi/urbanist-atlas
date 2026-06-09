@@ -536,6 +536,42 @@ func TestApiError_IncludesStatusAndBody(t *testing.T) {
 	}
 }
 
+// errReader returns some bytes then a non-EOF error, exercising the
+// issue #27 truncated-read marker path in apiError.
+type errReader struct {
+	data []byte
+	pos  int
+}
+
+func (e *errReader) Read(p []byte) (int, error) {
+	if e.pos < len(e.data) {
+		n := copy(p, e.data[e.pos:])
+		e.pos += n
+		return n, nil
+	}
+	return 0, errors.New("simulated mid-body read failure")
+}
+
+func TestApiError_MarksTruncatedRead(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+		Body:       io.NopCloser(&errReader{data: []byte("partial body")}),
+	}
+	err := apiError("flaky op", resp)
+	// Status must survive — it's the load-bearing signal.
+	if !strings.Contains(err.Error(), "503") {
+		t.Fatalf("apiError dropped status on read error: %v", err)
+	}
+	// Whatever bytes arrived before the error must still be present.
+	if !strings.Contains(err.Error(), "partial body") {
+		t.Fatalf("apiError dropped partial body: %v", err)
+	}
+	// And the read failure must be visible, not silently swallowed.
+	if !strings.Contains(err.Error(), "body read truncated") {
+		t.Fatalf("apiError did not mark the truncated read: %v", err)
+	}
+}
+
 // TestWorker_RetriesTransientGET pins the issue #24 idempotent-GET
 // retry: the first two get-ref calls return 503, the third succeeds,
 // and the pipeline opens the PR without the moderator seeing an error.

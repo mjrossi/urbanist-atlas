@@ -743,6 +743,16 @@ func (w *Worker) createPR(ctx context.Context, title, body, head, base string) (
 }
 
 func apiError(op string, resp *http.Response) error {
-	buf, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Errorf("%s: github returned %d: %s", op, resp.StatusCode, strings.TrimSpace(string(buf)))
+	// Best-effort body read, capped so a pathological response can't
+	// balloon the error string. The status code is the load-bearing
+	// signal; the body is diagnostic context. A read error here is
+	// non-fatal — whatever bytes arrived before it are still included —
+	// but we surface a marker (issue #27) so a truncated/failed read
+	// isn't silently indistinguishable from an empty body.
+	buf, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	body := strings.TrimSpace(string(buf))
+	if readErr != nil {
+		body += fmt.Sprintf(" [body read truncated: %v]", readErr)
+	}
+	return fmt.Errorf("%s: github returned %d: %s", op, resp.StatusCode, body)
 }
