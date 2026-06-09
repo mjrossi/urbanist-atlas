@@ -42,19 +42,56 @@ type ctxKey string
 const requestIDKey ctxKey = "rid"
 
 // requestIDMiddleware attaches a request ID to every request: the
-// incoming X-Request-ID header if present, otherwise a fresh random
-// hex string. The ID is echoed back in the response header and
-// stuffed into the request context for downstream use.
+// incoming X-Request-ID header if present AND well-formed, otherwise a
+// fresh random hex string. The ID is echoed back in the response header
+// and stuffed into the request context for downstream use.
+//
+// An inbound header is only trusted when validRequestID accepts it.
+// The value is reflected verbatim into the response header AND into
+// every structured log line ("rid"), so an unbounded/arbitrary inbound
+// value is a log-injection and header-reflection vector — a client
+// could smuggle CRLFs, ANSI escapes, or megabytes of text into the
+// access log. Constraining it to a short, conservative charset closes
+// that without breaking the legitimate cross-hop-correlation use case
+// (clients setting their own short request ids).
 func requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rid := r.Header.Get("X-Request-ID")
-		if rid == "" {
+		if !validRequestID(rid) {
 			rid = newRequestID()
 		}
 		w.Header().Set("X-Request-ID", rid)
 		ctx := context.WithValue(r.Context(), requestIDKey, rid)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// maxRequestIDLen caps an accepted inbound X-Request-ID. 64 chars
+// comfortably fits a UUID, a hex token, or our own 16-char hex ids
+// while bounding what can land in a log line or response header.
+const maxRequestIDLen = 64
+
+// validRequestID reports whether an inbound request-id is safe to echo
+// and log: non-empty, at most maxRequestIDLen characters, and drawn
+// only from the unreserved set [A-Za-z0-9._-]. The charset deliberately
+// excludes whitespace and control characters (CR/LF in particular) so
+// the value can't forge log lines or inject response headers.
+func validRequestID(s string) bool {
+	if s == "" || len(s) > maxRequestIDLen {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'A' && c <= 'Z',
+			c >= 'a' && c <= 'z',
+			c >= '0' && c <= '9',
+			c == '.', c == '_', c == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // requestIDFromContext returns the request ID stored in the context
