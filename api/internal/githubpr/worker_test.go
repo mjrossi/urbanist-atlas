@@ -33,6 +33,13 @@ type fakeGitHub struct {
 	createPRBody         map[string]string
 	createPRResponseURL  string
 	failOnCreatePRStatus int
+
+	// getRefTransientFailures: while > 0, the get-ref endpoint answers
+	// with getRefTransientStatus (default 503) and decrements, so a
+	// test can exercise the idempotent-GET retry path before the call
+	// finally succeeds.
+	getRefTransientFailures int
+	getRefTransientStatus   int
 }
 
 func newFakeGitHub(t *testing.T, fileContent string) *fakeGitHub {
@@ -51,6 +58,15 @@ func (f *fakeGitHub) handler() http.Handler {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.getRefCalled++
+		if f.getRefTransientFailures > 0 {
+			f.getRefTransientFailures--
+			status := f.getRefTransientStatus
+			if status == 0 {
+				status = http.StatusServiceUnavailable
+			}
+			http.Error(w, "transient", status)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"object": map[string]string{"sha": f.branchSHA, "type": "commit"},
 		})
