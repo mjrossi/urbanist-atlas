@@ -70,8 +70,28 @@ func Check(ctx context.Context, orgs []seedfiles.OrgEntry, opts Options) []Resul
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, o := range orgs {
+		// Acquire a slot, but bail out promptly if the caller cancels
+		// while every worker is busy (issue #31): without the ctx arm,
+		// a full semaphore would block the dispatch loop indefinitely
+		// past cancellation. On cancel, mark this and every remaining
+		// org with the cancellation cause so each input still has a
+		// non-misleading result row (input-order contract preserved),
+		// then stop dispatching.
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			for j := i; j < len(orgs); j++ {
+				results[j] = Result{
+					Slug: orgs[j].Slug,
+					Name: orgs[j].Name,
+					URL:  orgs[j].WebsiteURL,
+					Err:  ctx.Err().Error(),
+				}
+			}
+			wg.Wait()
+			return results
+		}
 		wg.Add(1)
-		sem <- struct{}{}
 		go func(i int, o seedfiles.OrgEntry) {
 			defer wg.Done()
 			defer func() { <-sem }()
