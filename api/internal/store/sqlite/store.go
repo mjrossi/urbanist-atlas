@@ -420,15 +420,20 @@ func dsnWithPragmas(path string) string {
 func escapePragmas(in []string) []string {
 	out := make([]string, len(in))
 	for i, p := range in {
-		// Pragmas are key=value where the value may contain '(' / ')'.
-		// modernc accepts the raw form, but going through url.QueryEscape
-		// for the value half keeps any future caller-supplied path safe.
+		// Pragmas are key=value (e.g. `_pragma=journal_mode(WAL)`) where
+		// the value may contain '(' / ')'. modernc accepts the raw form,
+		// but escape BOTH halves through url.QueryEscape (issue #29) so the
+		// whole pair is well-formed query-string regardless of input —
+		// previously only the value was escaped, leaving the key trusted.
+		// The keys today are a fixed in-package set (_pragma), so this is
+		// defensive completeness rather than a live fix, but it keeps the
+		// function correct for anything it's handed.
 		eq := strings.IndexByte(p, '=')
 		if eq < 0 {
-			out[i] = p
+			out[i] = url.QueryEscape(p)
 			continue
 		}
-		out[i] = p[:eq+1] + url.QueryEscape(p[eq+1:])
+		out[i] = url.QueryEscape(p[:eq]) + "=" + url.QueryEscape(p[eq+1:])
 	}
 	return out
 }
