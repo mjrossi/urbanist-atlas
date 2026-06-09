@@ -74,6 +74,17 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, title, detail, rid)
 			return
 		}
+		// DisallowUnknownFields rejects unknown keys inside the object but
+		// not trailing content after it; dec.More() catches a second JSON
+		// value (e.g. `{...}{...}` or `{...} garbage`) so the body must be
+		// exactly one object.
+		if dec.More() {
+			m.incSubmissions("rejected_validation")
+			writeProblem(w, r, http.StatusBadRequest, problemValidation,
+				"Invalid Request Body",
+				"The request body must contain exactly one NewSubmissionRequest JSON object.", rid)
+			return
+		}
 
 		// region_slugs is optional on the wire; the SPA's region field
 		// is free-form text and most submissions don't carry a
@@ -266,6 +277,13 @@ func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger, m 
 		if err := dec.Decode(&body); err != nil {
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Request Body",
 				"The request body is not valid JSON for RejectSubmissionRequest.", rid)
+			return
+		}
+		// Reject trailing content after the object (see the create handler
+		// for the rationale): the body must be exactly one object.
+		if dec.More() {
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Request Body",
+				"The request body must contain exactly one RejectSubmissionRequest JSON object.", rid)
 			return
 		}
 		reason := strings.TrimSpace(body.Reason)
