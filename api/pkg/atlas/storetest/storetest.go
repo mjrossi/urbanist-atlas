@@ -85,6 +85,9 @@ func RunContractSuite(t *testing.T, factory Factory) {
 	t.Run("SearchRegions_RanksAndFiltersNational", func(t *testing.T) {
 		testSearchRegionsRanksAndFiltersNational(t, factory)
 	})
+	t.Run("ReadPaths_CloneTagsNoAlias", func(t *testing.T) {
+		testReadPathsCloneTagsNoAlias(t, factory)
+	})
 }
 
 // testAncestorRegionsFiltersNational seeds a city under a metro under
@@ -666,6 +669,109 @@ func testSearchRegionsRanksAndFiltersNational(t *testing.T, factory Factory) {
 	if labels["springfield-ma"] != "Massachusetts" {
 		t.Errorf("springfield-ma context label: want %q, got %q", "Massachusetts", labels["springfield-ma"])
 	}
+}
+
+// testReadPathsCloneTagsNoAlias pins the anti-aliasing contract shared
+// by every Org-returning read path — OrgsForRegions, GetOrgBySlug, and
+// ListRecent: a caller that mutates the Tags slice of a returned Org
+// must NOT reach back into the store's backing array, and a nil Tags
+// must round-trip as nil (never an empty []Tag{}).
+//
+// This is the sole guard against shared-backing-array mutation. MemStore
+// stores an org's Tags header without copying it, so clone-on-read is
+// the only defense; a regression that drops the clone on any one path
+// would let a single consumer's in-place mutation silently corrupt every
+// later read of the same org. The contract lives here (not in a
+// MemStore-only test) so any future Store implementation inherits it.
+func testReadPathsCloneTagsNoAlias(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:city", Name: "Cityville", Slug: "cityville",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 15,
+	})
+	const firstTag = atlas.Tag("transit")
+	// One org WITH tags (to prove the clone), one WITHOUT (to prove nil
+	// survives the clone as nil). Distinct AddedAt so ListRecent ordering
+	// is deterministic; both are recent enough to land in the cap of 10.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 100, Slug: "tagged-org", Name: "Tagged Org", ShortDesc: "test",
+		WebsiteURL: "https://example.test",
+		AddedAt:    time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC),
+		Tags:       []atlas.Tag{firstTag, "safe-streets"},
+	}, []int64{1})
+	seed.SeedOrg(t, atlas.Org{
+		ID: 101, Slug: "untagged-org", Name: "Untagged Org", ShortDesc: "test",
+		WebsiteURL: "https://example.test",
+		AddedAt:    time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC),
+		Tags:       nil,
+	}, []int64{1})
+
+	// Each read path, re-runnable so we can mutate one result and then
+	// re-fetch to observe whether the store was touched.
+	fetchTagged := map[string]func() atlas.Org{
+		"OrgsForRegions": func() atlas.Org {
+			orgs, err := store.OrgsForRegions(context.Background(), []int64{1})
+			if err != nil {
+				t.Fatalf("OrgsForRegions: %v", err)
+			}
+			return findOrg(t, orgs, "tagged-org")
+		},
+		"GetOrgBySlug": func() atlas.Org {
+			o, err := store.GetOrgBySlug(context.Background(), "tagged-org")
+			if err != nil {
+				t.Fatalf("GetOrgBySlug: %v", err)
+			}
+			return *o
+		},
+		"ListRecent": func() atlas.Org {
+			orgs, err := store.ListRecent(context.Background())
+			if err != nil {
+				t.Fatalf("ListRecent: %v", err)
+			}
+			return findOrg(t, orgs, "tagged-org")
+		},
+	}
+
+	for name, fetch := range fetchTagged {
+		got := fetch()
+		if len(got.Tags) == 0 {
+			t.Fatalf("%s: tagged-org returned no Tags", name)
+		}
+		if got.Tags[0] != firstTag {
+			t.Fatalf("%s: Tags[0] = %q, want %q before mutation", name, got.Tags[0], firstTag)
+		}
+		// Mutate the returned slice in place; the store must not see it.
+		got.Tags[0] = "MUTATED-BY-CALLER"
+		after := fetch()
+		if after.Tags[0] != firstTag {
+			t.Errorf("%s: caller mutation leaked into the store (Tags[0] = %q, want %q) — clone-on-read missing?",
+				name, after.Tags[0], firstTag)
+		}
+	}
+
+	// nil Tags must survive the clone as nil, not []Tag{} — the clone
+	// uses append([]Tag(nil), nil...), which is nil; a switch to make([])
+	// would silently change the wire shape (`[]` vs `null`).
+	orgs, err := store.OrgsForRegions(context.Background(), []int64{1})
+	if err != nil {
+		t.Fatalf("OrgsForRegions (nil-tags check): %v", err)
+	}
+	if untagged := findOrg(t, orgs, "untagged-org"); untagged.Tags != nil {
+		t.Errorf("untagged org Tags = %#v, want nil (clone must preserve nil, not produce []Tag{})", untagged.Tags)
+	}
+}
+
+func findOrg(t *testing.T, orgs []atlas.Org, slug string) atlas.Org {
+	t.Helper()
+	for _, o := range orgs {
+		if o.Slug == slug {
+			return o
+		}
+	}
+	t.Fatalf("org %q not found in result (got %v)", slug, orgSlugs(orgs))
+	return atlas.Org{}
 }
 
 func hasOrg(orgs []atlas.Org, slug string) bool {

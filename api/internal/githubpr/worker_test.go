@@ -649,6 +649,46 @@ func TestWorker_NonRetryableGET(t *testing.T) {
 	}
 }
 
+// TestWorker_RetriesExhaustGET pins the retry-exhaustion boundary: a
+// retryable status (503) that never recovers stops after exactly
+// retryMaxAttempts calls and surfaces a terminal error (recorded via
+// PersistResult), rather than retrying unboundedly. TestWorker_RetriesTransientGET
+// covers recover-before-exhaustion; this covers the give-up edge.
+func TestWorker_RetriesExhaustGET(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.getRefTransientFailures = 99 // never recovers
+	gh.getRefTransientStatus = http.StatusServiceUnavailable
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	persist := &fakePersist{}
+	w := New(Config{
+		BaseURL:       server.URL,
+		Token:         "fake-token",
+		PersistResult: persist.record,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go w.Run(ctx)
+
+	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	calls := persist.wait(t, 1)
+	if calls[0].Err == "" {
+		t.Fatal("expected a terminal error after retries exhaust, got success")
+	}
+	gh.mu.Lock()
+	got := gh.getRefCalled
+	gh.mu.Unlock()
+	if got != retryMaxAttempts {
+		t.Fatalf("get-ref called %d times, want %d (1 initial + %d retries, then give up)",
+			got, retryMaxAttempts, retryMaxAttempts-1)
+	}
+}
+
 // TestWorker_CreateBranch_AlreadyExistsIsIdempotent pins issue #24's
 // whole-pipeline idempotency: when the deterministic submission branch
 // already exists (a prior attempt got that far then failed), the 422
