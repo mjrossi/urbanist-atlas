@@ -51,8 +51,25 @@ export function isSupportedCountry(raw: string): raw is Country {
 
 const DEFAULT_API_BASE = 'http://localhost:8080';
 
-/** Where the API lives. Set `VITE_API_BASE` to override at build time. */
-export const apiBase: string = import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE;
+/**
+ * Where the API lives. Set `VITE_API_BASE` to override at build time. A
+ * trailing slash (if any) is stripped so callers can join paths as
+ * `${apiBase}/api/v1/…` — both {@link openapiUrl} and the {@link apiFetch}
+ * path join do this — without risking a `//` in the URL.
+ */
+export const apiBase: string = (
+  import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE
+).replace(/\/+$/, '');
+
+/**
+ * Canonical URL of the served OpenAPI document, derived from
+ * {@link apiBase} so a QA-served build points at the QA API and a
+ * production build at production. The "For developers" copy on /about,
+ * the /colophon quick links, and the footer all render this — one
+ * source of truth instead of three call sites (one of which used to
+ * hardcode production and broke on QA builds).
+ */
+export const openapiUrl = `${apiBase}/api/v1/openapi.yaml`;
 
 /**
  * Shared secret bundled into the build during Phase 1 lockdown

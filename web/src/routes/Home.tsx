@@ -8,7 +8,7 @@ import { QueryState } from '../components/QueryState.tsx';
 import { SearchBox } from '../components/SearchBox.tsx';
 import type { Org, RegionSummary } from '../lib/api.ts';
 import { ApiError, listRecent, listRegions } from '../lib/api.ts';
-import { formatAddedAt } from '../lib/format.ts';
+import { formatAddedAt, pluralize } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
@@ -136,7 +136,7 @@ function TopPlaces({ query }: { query: UseQueryResult<RegionSummary[], ApiError>
                   </div>
                   <div className="count">
                     <span className="n">{p.org_count}</span>
-                    {p.org_count === 1 ? 'group' : 'groups'}
+                    {pluralize(p.org_count, 'group', 'groups')}
                   </div>
                 </Link>
               </li>

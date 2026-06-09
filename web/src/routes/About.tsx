@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
-import { apiBase } from '../lib/api.ts';
+import { openapiUrl } from '../lib/api.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 export function About() {
@@ -66,7 +66,6 @@ export function About() {
     };
   }, [hash]);
 
-  const openapiUrl = `${apiBase}/api/v1/openapi.yaml`;
   const atAGlance = (
     <div className="rail-block amber">
       <div className="rail-kicker">At a glance</div>

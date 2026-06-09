@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { domainOf, formatAddedAt, groupCountLabel, prettyTag } from './format.ts';
+import {
+  domainOf,
+  formatAddedAt,
+  groupCountLabel,
+  pluralize,
+  prettyTag,
+} from './format.ts';
 
 describe('groupCountLabel', () => {
   it('uses the singular form for exactly one', () => {
@@ -13,6 +19,17 @@ describe('groupCountLabel', () => {
 
   it('uses the plural form for many', () => {
     expect(groupCountLabel(42)).toBe('42 groups');
+  });
+});
+
+describe('pluralize', () => {
+  it('returns the singular form for exactly one', () => {
+    expect(pluralize(1, 'entry', 'entries')).toBe('entry');
+  });
+
+  it('returns the plural form for zero and many', () => {
+    expect(pluralize(0, 'entry', 'entries')).toBe('entries');
+    expect(pluralize(2, 'group', 'groups')).toBe('groups');
   });
 });
 

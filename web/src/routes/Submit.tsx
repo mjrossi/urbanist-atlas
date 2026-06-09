@@ -1,5 +1,4 @@
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
 import { Controller, type FieldPath, useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 
@@ -13,6 +12,7 @@ import {
   SUBMIT_FORM_DEFAULTS,
   type SubmitForm,
 } from '../lib/submitForm.ts';
+import { useCooldown, useCountdown } from '../lib/timers.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 // Brief lockout after a successful submit so a triple-click can't
@@ -146,6 +146,19 @@ function deriveSubmitError(
 }
 
 /**
+ * The inline `field-error` slot rendered under a form control when
+ * react-hook-form has an error for it. Renders nothing when the field
+ * is clean — one place for the role="alert" + class contract.
+ */
+function FieldErrorSlot({ error }: { error?: { message?: string } }) {
+  return error ? (
+    <span className="field-error" role="alert">
+      {error.message}
+    </span>
+  ) : null;
+}
+
+/**
  * `/submit` — accepts an org tip, POSTs it to `/api/v1/submissions`,
  * and shows a "received" confirmation card with the short submission
  * id moderators will reference in the auto-PR. On API failure we fall
@@ -186,36 +199,17 @@ export function Submit() {
   const isNewOrg = submissionType === 'new';
   const copy = SUBMISSION_COPY[submissionType];
 
-  const [cooldown, setCooldown] = useState(false);
-  // Seconds remaining on a 429 lockout. Initialized from
-  // ApiError.retryAfterSeconds when the mutation fails; ticks down
-  // in a useEffect; the submit button stays disabled until zero.
-  const [retryAfter, setRetryAfter] = useState<number>(0);
-
-  useEffect(() => {
-    if (!cooldown) return;
-    const id = setTimeout(() => {
-      setCooldown(false);
-    }, SUBMIT_COOLDOWN_MS);
-    return () => {
-      clearTimeout(id);
-    };
-  }, [cooldown]);
-
-  useEffect(() => {
-    if (retryAfter <= 0) return;
-    const id = setInterval(() => {
-      setRetryAfter((s) => (s <= 1 ? 0 : s - 1));
-    }, 1000);
-    return () => {
-      clearInterval(id);
-    };
-  }, [retryAfter]);
+  // Brief post-submit lockout (stops triple-click dupes) and the 429
+  // Retry-After countdown; both disable the submit button until they
+  // elapse. retryAfter is (re)armed from ApiError.retryAfterSeconds in
+  // the mutation's onError below.
+  const [cooldown, startCooldown] = useCooldown(SUBMIT_COOLDOWN_MS);
+  const [retryAfter, setRetryAfter] = useCountdown();
 
   const mutation = useMutation<Submission, ApiError, SubmitForm>({
     mutationFn: (form) => createSubmission(buildNewSubmissionRequest(form)),
     onSuccess: () => {
-      setCooldown(true);
+      startCooldown();
     },
     onError: (err) => {
       // Per-field validation errors (W1.4): hand each known field
@@ -385,11 +379,7 @@ export function Submit() {
                   placeholder="e.g. Transit Riders Union"
                   {...register('name', { required: 'Required' })}
                 />
-                {errors.name ? (
-                  <span className="field-error" role="alert">
-                    {errors.name.message}
-                  </span>
-                ) : null}
+                <FieldErrorSlot error={errors.name} />
               </div>
             </div>
 
@@ -411,11 +401,7 @@ export function Submit() {
                   placeholder="https://"
                   {...register('website', { required: 'Required' })}
                 />
-                {errors.website ? (
-                  <span className="field-error" role="alert">
-                    {errors.website.message}
-                  </span>
-                ) : null}
+                <FieldErrorSlot error={errors.website} />
               </div>
             </div>
 
@@ -459,11 +445,7 @@ export function Submit() {
                         />
                       )}
                     />
-                    {errors.regionSlugs ? (
-                      <span className="field-error" role="alert">
-                        {errors.regionSlugs.message}
-                      </span>
-                    ) : null}
+                    <FieldErrorSlot error={errors.regionSlugs} />
                   </div>
                 </div>
 
@@ -506,11 +488,7 @@ export function Submit() {
                     placeholder="Campaigns for better bus service."
                     {...register('oneLineDesc', { required: 'Required' })}
                   />
-                  {errors.oneLineDesc ? (
-                    <span className="field-error" role="alert">
-                      {errors.oneLineDesc.message}
-                    </span>
-                  ) : null}
+                  <FieldErrorSlot error={errors.oneLineDesc} />
                 </div>
               </>
             ) : null}
@@ -654,70 +632,84 @@ https://group.org/about"
             </div>
           </form>
 
-          <section className="process">
-            <div className="process-head">
-              <h2>What happens after you file.</h2>
-              <div className="aside">Editorial workflow</div>
-            </div>
-            <div className="process-grid">
-              <div className="process-step">
-                <div className="num">i.</div>
-                <h4>You file the tip.</h4>
-                <p>
-                  Your submission lands in the editorial queue with a reference ID you can
-                  hold onto.
-                </p>
-              </div>
-              <div className="process-step">
-                <div className="num">ii.</div>
-                <h4>An editor reads it.</h4>
-                <p>
-                  We check the website, scan recent coverage, and weigh against the
-                  inclusion criteria.
-                </p>
-              </div>
-              <div className="process-step">
-                <div className="num">iii.</div>
-                <h4>Verification.</h4>
-                <p>
-                  We confirm with public sources — news coverage, a council record, or a
-                  clear track of campaigns.
-                </p>
-              </div>
-              <div className="process-step">
-                <div className="num">iv.</div>
-                <h4>Published or declined.</h4>
-                <p>
-                  Accepted orgs land in a public pull request anyone can read. When the PR
-                  merges, the org appears in the Atlas.
-                </p>
-              </div>
-            </div>
-          </section>
+          <SubmissionProcess />
         </div>
 
-        <aside className="rail">
-          <div className="rail-block">
-            <div className="rail-kicker">Inclusion criteria</div>
-            <p>
-              The full list — what we include, what we skip — lives at{' '}
-              <Link to="/about#methodology">About / Methodology</Link>.
-            </p>
-          </div>
-          <div className="rail-block muted">
-            <div className="rail-kicker">Other ways to reach us</div>
-            <p>
-              Email <a href="mailto:hello@urbanistatlas.com">hello@urbanistatlas.com</a>{' '}
-              for anything sensitive, or{' '}
-              <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
-                open a GitHub issue
-              </a>{' '}
-              directly.
-            </p>
-          </div>
-        </aside>
+        <SubmitRail />
       </div>
     </>
+  );
+}
+
+/** The static "what happens after you file" editorial-workflow strip. */
+function SubmissionProcess() {
+  return (
+    <section className="process">
+      <div className="process-head">
+        <h2>What happens after you file.</h2>
+        <div className="aside">Editorial workflow</div>
+      </div>
+      <div className="process-grid">
+        <div className="process-step">
+          <div className="num">i.</div>
+          <h4>You file the tip.</h4>
+          <p>
+            Your submission lands in the editorial queue with a reference ID you can hold
+            onto.
+          </p>
+        </div>
+        <div className="process-step">
+          <div className="num">ii.</div>
+          <h4>An editor reads it.</h4>
+          <p>
+            We check the website, scan recent coverage, and weigh against the inclusion
+            criteria.
+          </p>
+        </div>
+        <div className="process-step">
+          <div className="num">iii.</div>
+          <h4>Verification.</h4>
+          <p>
+            We confirm with public sources — news coverage, a council record, or a clear
+            track of campaigns.
+          </p>
+        </div>
+        <div className="process-step">
+          <div className="num">iv.</div>
+          <h4>Published or declined.</h4>
+          <p>
+            Accepted orgs land in a public pull request anyone can read. When the PR
+            merges, the org appears in the Atlas.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The submission-page rail: inclusion-criteria pointer + contact routes. */
+function SubmitRail() {
+  return (
+    <aside className="rail">
+      <div className="rail-block">
+        <div className="rail-kicker">Inclusion criteria</div>
+        <p>
+          The full list — what we include, what we skip — lives at{' '}
+          <Link to="/about#methodology">About / Methodology</Link>.
+        </p>
+      </div>
+      <div className="rail-block muted">
+        <div className="rail-kicker">Other ways to reach us</div>
+        <p>
+          Email <a href="mailto:hello@urbanistatlas.com">hello@urbanistatlas.com</a> for
+          anything sensitive, or{' '}
+          <a href="https://github.com/mjrossi/urbanist-atlas/issues/new">
+            open a GitHub issue
+          </a>{' '}
+          directly.
+        </p>
+      </div>
+    </aside>
   );
 }
 

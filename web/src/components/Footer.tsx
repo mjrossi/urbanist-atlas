@@ -1,5 +1,7 @@
 import { Link } from 'react-router';
 
+import { openapiUrl } from '../lib/api.ts';
+
 export function Footer() {
   return (
     <>
@@ -53,7 +55,7 @@ export function Footer() {
               <Link to="/colophon">Colophon &amp; sources</Link>
             </li>
             <li>
-              <a href="https://api.urbanistatlas.com/api/v1/openapi.yaml">OpenAPI spec</a>
+              <a href={openapiUrl}>OpenAPI spec</a>
             </li>
           </ul>
         </div>
