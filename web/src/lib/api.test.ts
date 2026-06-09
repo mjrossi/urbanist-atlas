@@ -869,3 +869,54 @@ describe('isSupportedCountry', () => {
     expect(isSupportedCountry('ca')).toBe(false);
   });
 });
+
+describe('apiBase trailing-slash normalization (env-gated)', () => {
+  // apiBase is captured at module-load from import.meta.env.VITE_API_BASE,
+  // so each test resets the module registry, stubs the env, then
+  // dynamically re-imports `./api.ts` (same pattern as the X-Atlas-Client
+  // block above). A trailing slash on the base would otherwise produce a
+  // `//` in every derived URL — openapiUrl and the apiFetch path join.
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('strips a trailing slash so derived URLs do not double up', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://api.example.com/');
+    const { apiBase, openapiUrl } = await import('./api.ts');
+    expect(apiBase).toBe('https://api.example.com');
+    expect(openapiUrl).toBe('https://api.example.com/api/v1/openapi.yaml');
+  });
+
+  it('collapses multiple trailing slashes', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://api.example.com///');
+    const { apiBase } = await import('./api.ts');
+    expect(apiBase).toBe('https://api.example.com');
+  });
+
+  it('leaves a slash-free base unchanged', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://api.example.com');
+    const { apiBase, openapiUrl } = await import('./api.ts');
+    expect(apiBase).toBe('https://api.example.com');
+    expect(openapiUrl).toBe('https://api.example.com/api/v1/openapi.yaml');
+  });
+
+  it('apiFetch joins cleanly when the base carries a trailing slash', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://api.example.com/');
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { apiFetch } = await import('./api.ts');
+    await apiFetch('/api/v1/anything');
+    const [url] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe('https://api.example.com/api/v1/anything');
+  });
+});

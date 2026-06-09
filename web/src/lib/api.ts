@@ -51,8 +51,15 @@ export function isSupportedCountry(raw: string): raw is Country {
 
 const DEFAULT_API_BASE = 'http://localhost:8080';
 
-/** Where the API lives. Set `VITE_API_BASE` to override at build time. */
-export const apiBase: string = import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE;
+/**
+ * Where the API lives. Set `VITE_API_BASE` to override at build time. A
+ * trailing slash (if any) is stripped so callers can join paths as
+ * `${apiBase}/api/v1/…` — both {@link openapiUrl} and the {@link apiFetch}
+ * path join do this — without risking a `//` in the URL.
+ */
+export const apiBase: string = (
+  import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE
+).replace(/\/+$/, '');
 
 /**
  * Canonical URL of the served OpenAPI document, derived from
