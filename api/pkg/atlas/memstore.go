@@ -588,6 +588,12 @@ func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, 
 			continue
 		}
 		org.Regions = s.regionsForOrg(org.ID)
+		// Clone Tags so the returned copy's slice header does not alias
+		// the stored backing array — a caller mutating the result must
+		// not reach into the store (which is read under RLock here, with
+		// no write coordination). Mirrors the defensive copy AddOrg makes
+		// of the attachment ids. A nil Tags stays nil.
+		org.Tags = append([]Tag(nil), org.Tags...)
 		out = append(out, org)
 	}
 	return out, nil
