@@ -157,9 +157,9 @@ X-Data-Attribution: https://urbanistatlas.com
             tip jar.
           </p>
           <p>
-            Two caveats, both load-bearing. First: give to your local advocacy
+            Two caveats, both non-negotiable. First: give to your local advocacy
             organization before you give here — they&rsquo;re the entire point of this
-            directory, and a few dollars goes much further with them than with our server
+            directory, and a few dollars go much further with them than with our server
             bill. Second: donations buy nothing on this side. They don&rsquo;t influence
             which organizations are listed, how they&rsquo;re ordered, or anything else
             editorial. The directory grows one editorial decision at a time, and money is
