@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -113,35 +112,8 @@ func (e *submissionParseError) Error() string { return e.title + ": " + e.detail
 //   - otherwise → in is a valid, validated NewSubmissionInput.
 func parseSubmission(w http.ResponseWriter, r *http.Request, regions atlas.Store) (atlas.NewSubmissionInput, fieldErrors, *submissionParseError) {
 	var body oapi.NewSubmissionRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil {
-		title := "Invalid Request Body"
-		detail := "The request body is not valid JSON for NewSubmissionRequest."
-		if errors.Is(err, io.EOF) {
-			title = "Empty Request Body"
-			detail = "The request body is empty; expected a NewSubmissionRequest JSON object."
-		}
-		// http.MaxBytesReader surfaces an oversize body as a
-		// MaxBytesError; surface that with the 413-shape title even
-		// though we keep the 400 status (oversize submissions are a
-		// validation failure from the client's perspective).
-		var mbErr *http.MaxBytesError
-		if errors.As(err, &mbErr) {
-			title = "Request Body Too Large"
-			detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
-		}
-		return atlas.NewSubmissionInput{}, nil, &submissionParseError{title: title, detail: detail}
-	}
-	// DisallowUnknownFields rejects unknown keys inside the object but
-	// not trailing content after it; dec.More() catches a second JSON
-	// value (e.g. `{...}{...}` or `{...} garbage`) so the body must be
-	// exactly one object.
-	if dec.More() {
-		return atlas.NewSubmissionInput{}, nil, &submissionParseError{
-			title:  "Invalid Request Body",
-			detail: "The request body must contain exactly one NewSubmissionRequest JSON object.",
-		}
+	if perr := decodeOneJSONObject(w, r, &body, "NewSubmissionRequest"); perr != nil {
+		return atlas.NewSubmissionInput{}, nil, perr
 	}
 
 	// region_slugs is optional on the wire; the SPA's region field
@@ -210,6 +182,46 @@ func parseSubmission(w http.ResponseWriter, r *http.Request, regions atlas.Store
 	return in, fieldErrs, nil
 }
 
+// decodeOneJSONObject decodes the request body into v under the
+// submission body-size limit, rejecting unknown fields and requiring
+// the body to be exactly one JSON object. typeName names the expected
+// wire type in the returned problem title+detail. It writes nothing to
+// w (needed only for http.MaxBytesReader's oversize accounting) — the
+// caller maps a non-nil result onto a response.
+func decodeOneJSONObject(w http.ResponseWriter, r *http.Request, v any, typeName string) *submissionParseError {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		title := "Invalid Request Body"
+		detail := fmt.Sprintf("The request body is not valid JSON for %s.", typeName)
+		if errors.Is(err, io.EOF) {
+			title = "Empty Request Body"
+			detail = fmt.Sprintf("The request body is empty; expected a %s JSON object.", typeName)
+		}
+		// http.MaxBytesReader surfaces an oversize body as a
+		// MaxBytesError; surface that with the 413-shape title even
+		// though we keep the 400 status (oversize submissions are a
+		// validation failure from the client's perspective).
+		var mbErr *http.MaxBytesError
+		if errors.As(err, &mbErr) {
+			title = "Request Body Too Large"
+			detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
+		}
+		return &submissionParseError{title: title, detail: detail}
+	}
+	// DisallowUnknownFields rejects unknown keys inside the object but
+	// not trailing content after it; dec.More() catches a second JSON
+	// value (e.g. `{...}{...}` or `{...} garbage`) so the body must be
+	// exactly one object.
+	if dec.More() {
+		return &submissionParseError{
+			title:  "Invalid Request Body",
+			detail: fmt.Sprintf("The request body must contain exactly one %s JSON object.", typeName),
+		}
+	}
+	return nil
+}
+
 // listSubmissionsHandler answers GET /api/v1/admin/submissions.
 // Bearer-gated. Defaults to status=pending. Returns at most ?limit=
 // rows (default 50, max 200) ordered newest-first. When more rows
@@ -229,15 +241,11 @@ func listSubmissionsHandler(subs atlas.SubmissionStore, logger *slog.Logger) htt
 				return
 			}
 		}
-		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
-			n, err := strconv.Atoi(raw)
-			if err != nil || n < 1 || n > maxAdminListLimit {
-				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Limit",
-					fmt.Sprintf("The limit query parameter must be an integer between 1 and %d.", maxAdminListLimit), rid)
-				return
-			}
-			q.Limit = n
+		limit, ok := parseLimitParam(w, r, maxAdminListLimit, rid)
+		if !ok {
+			return
 		}
+		q.Limit = limit
 		if raw := strings.TrimSpace(r.URL.Query().Get("cursor")); raw != "" {
 			q.Cursor = raw
 		}
@@ -323,31 +331,8 @@ func rejectSubmissionHandler(subs atlas.SubmissionStore, logger *slog.Logger, m 
 			return
 		}
 		var body oapi.RejectSubmissionRequest
-		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&body); err != nil {
-			// Distinguish empty / oversize / malformed the same way the
-			// create handler does (see parseSubmission), so an admin gets a
-			// pointed message instead of a generic "not valid JSON".
-			title := "Invalid Request Body"
-			detail := "The request body is not valid JSON for RejectSubmissionRequest."
-			if errors.Is(err, io.EOF) {
-				title = "Empty Request Body"
-				detail = "The request body is empty; expected a RejectSubmissionRequest JSON object."
-			}
-			var mbErr *http.MaxBytesError
-			if errors.As(err, &mbErr) {
-				title = "Request Body Too Large"
-				detail = fmt.Sprintf("The request body exceeds the maximum size of %d bytes.", submissionBodyLimit)
-			}
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, title, detail, rid)
-			return
-		}
-		// Reject trailing content after the object (see the create handler
-		// for the rationale): the body must be exactly one object.
-		if dec.More() {
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Request Body",
-				"The request body must contain exactly one RejectSubmissionRequest JSON object.", rid)
+		if perr := decodeOneJSONObject(w, r, &body, "RejectSubmissionRequest"); perr != nil {
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, perr.title, perr.detail, rid)
 			return
 		}
 		reason := strings.TrimSpace(body.Reason)

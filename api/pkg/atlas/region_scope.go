@@ -101,9 +101,6 @@ func sortScopeBuckets(b []scopeBucketed) {
 }
 
 func extractScopeOrgs(b []scopeBucketed) []Org {
-	if len(b) == 0 {
-		return []Org{}
-	}
 	out := make([]Org, len(b))
 	for i, x := range b {
 		out[i] = x.org
