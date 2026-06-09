@@ -60,7 +60,7 @@ func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err erro
 
 	for {
 		row, readErr := reader.Read()
-		if readErr == io.EOF {
+		if errors.Is(readErr, io.EOF) {
 			break
 		}
 		if readErr != nil {

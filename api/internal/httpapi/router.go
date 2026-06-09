@@ -77,12 +77,15 @@ func New(cfg Config) http.Handler {
 
 	r := chi.NewRouter()
 
-	// Order matters: requestID first so every later layer (logger,
+	// Order matters: securityHeaders first so the hardening pair lands
+	// on every response — including problem+json errors and the
+	// /healthz probe; requestID next so every later layer (logger,
 	// recoverer, handlers) sees a consistent rid; timeoutMiddleware
 	// next so every handler runs with a per-request deadline ctx;
 	// recoverer next so panics in business logic don't escape;
 	// logger last so the access log records the final status
 	// (including 500s from recoverer).
+	r.Use(securityHeadersMiddleware)
 	r.Use(requestIDMiddleware)
 	r.Use(timeoutMiddleware(requestTimeout))
 	r.Use(recovererMiddleware(logger))
