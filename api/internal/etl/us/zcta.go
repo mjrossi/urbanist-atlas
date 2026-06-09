@@ -109,7 +109,14 @@ func parseZCTARelationship(r io.Reader, zctaCol, geoidCol, nameCol, areaCol int)
 			// entirely outside any place).
 			continue
 		}
-		area, _ := strconv.ParseInt(areaStr, 10, 64)
+		area, err := strconv.ParseInt(areaStr, 10, 64)
+		if err != nil {
+			// A malformed AREALAND_PART can't be silently coerced to 0:
+			// 0 would lose the max-area tiebreak and mis-anchor the ZCTA
+			// with no signal. Error with line context, mirroring the HUD
+			// reader's bad-ratio handling (hud.go).
+			return nil, fmt.Errorf("parse zcta relationship: line %d: AREALAND_PART %q: %w", lineNum, areaStr, err)
+		}
 		existing, ok := out[zcta]
 		if !ok || area > existing.AreaLandPart {
 			out[zcta] = zctaAttachment{GEOID: geoid, Name: name, AreaLandPart: area}

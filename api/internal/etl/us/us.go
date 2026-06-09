@@ -129,18 +129,46 @@ func init() {
 // Logs row counts and reason-bucket counts (city-leaf, nyc-borough,
 // county-leaf, msa, state) so the maintainer can spot coverage gaps.
 func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, logger *slog.Logger) error {
+	rt, err := regenerateRegions(srcDir, outDir, target, logger)
+	if err != nil {
+		return err
+	}
+
+	if !target.Postal() {
+		return nil
+	}
+
+	return regeneratePostal(srcDir, outDir, rt, logger)
+}
+
+// regionRouting carries the region-pass outputs the postal pass needs:
+// the county→MSA lookup and the two slug routing maps every crosswalk
+// call threads into newCountyResolver. The region TOML is written inside
+// regenerateRegions; only these lookups flow forward.
+type regionRouting struct {
+	countyToMSA  map[string]string
+	cbsaToSlug   map[string]string // CBSA code → umbrella slug
+	portionSlugs map[string]string // "CBSAcode:stateFIPS" → portion slug
+}
+
+// regenerateRegions runs the region pass: parse the CBSA delineation,
+// read editorial overrides, assign slugs/names/parents, expand to the
+// full emitted region set, and (when the target includes regions) write
+// regions_us_msas.toml. It always returns the routing lookups the postal
+// pass needs, even on a --target=postal run where no TOML is written.
+func regenerateRegions(srcDir, outDir string, target etl.Target, logger *slog.Logger) (regionRouting, error) {
 	cbsaPath := filepath.Join(srcDir, "list1_2023.csv")
 
 	msas, countyToMSA, err := loadCBSA(cbsaPath)
 	if err != nil {
-		return err
+		return regionRouting{}, err
 	}
 	logger.Info("etl us: parsed CBSA delineation", "msas", len(msas), "county_to_msa", len(countyToMSA))
 
 	overridesPath := filepath.Join(outDir, "regions_us_msa_overrides.toml")
 	overrides, err := etl.ReadOverrides[MSAOverride](overridesPath)
 	if err != nil {
-		return err
+		return regionRouting{}, err
 	}
 	logger.Info("etl us: read overrides", "count", len(overrides), "path", overridesPath)
 
@@ -156,15 +184,23 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	if target.Regions() {
 		msaTOMLPath := filepath.Join(outDir, "regions_us_msas.toml")
 		if err := writeMSAs(msaTOMLPath, rows); err != nil {
-			return err
+			return regionRouting{}, err
 		}
 		logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "regions", len(rows), "portions", len(portionSlugs))
 	}
 
-	if !target.Postal() {
-		return nil
-	}
+	return regionRouting{
+		countyToMSA:  countyToMSA,
+		cbsaToSlug:   cbsaToSlug,
+		portionSlugs: portionSlugs,
+	}, nil
+}
 
+// regeneratePostal runs the postal pass: parse the ZCTA crosswalks, run
+// the smallest-anchor crosswalk to produce ZCTA anchors, additively
+// backfill HUD anchors for the operational ZIPs Census omits, then write
+// postal_codes_us.csv (ZCTA winning any (country, postal_code) tie).
+func regeneratePostal(srcDir, outDir string, rt regionRouting, logger *slog.Logger) error {
 	// ZCTA crosswalks feed only the postal pass, so they're parsed here
 	// rather than above the region write — a --target=regions run needs
 	// just CBSA + overrides and skips ~20 MB of ZCTA download/parse.
@@ -180,50 +216,11 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounty))
 
-	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, cbsaToSlug, portionSlugs)
+	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
 
-	hudPath := findHUDFile(srcDir)
-	var hudAnchors []PostalAnchor
-	hudReasons := map[string]int{}
-	if hudPath == "" {
-		logger.Info("etl us: no HUD ZIP-County CSV found in src dir — skipping non-ZCTA backfill",
-			"src_dir", srcDir,
-			"hint", "place hud_zip_county_<vintage>.csv under etl/sources/us/ to enable",
-		)
-	} else {
-		huds, err := loadHUD(hudPath)
-		if err != nil {
-			return err
-		}
-		logger.Info("etl us: parsed HUD ZIP-County", "rows", len(huds), "path", hudPath)
-
-		// Repair the CT county-vintage gap before backfill: re-anchor CT
-		// ZCTA ZIPs stranded at the bare state (their 2020 legacy county
-		// isn't in the 2023 planning-region countyToMSA) using HUD's
-		// current-vintage county. Mutates `anchors` in place.
-		ctReasons := ReconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, cbsaToSlug, portionSlugs)
-		ctReconciled := 0
-		for k, n := range ctReasons {
-			if strings.HasPrefix(k, "ct-reconciled:") {
-				ctReconciled += n
-			}
-		}
-		logger.Info(fmt.Sprintf("etl us: ct legacy-county reconcile: %+v", ctReasons),
-			"reconciled_total", ctReconciled,
-			"reconciled_msa", ctReasons["ct-reconciled:msa"],
-			"skip_no_hud", ctReasons["ct-skip:no-hud"],
-			"skip_hud_unresolved", ctReasons["ct-skip:hud-unresolved"],
-		)
-
-		hudAnchors, hudReasons = CrosswalkHUDBackfill(huds, anchors, countyToMSA, cbsaToSlug, portionSlugs)
-		logger.Info(fmt.Sprintf("etl us: hud backfill: added %d anchors across %+v", len(hudAnchors), hudReasons),
-			"added", len(hudAnchors),
-			"borough_count", hudReasons["hud:nyc-borough"],
-			"county_leaf_count", hudReasons["hud:county-leaf"],
-			"msa_count", hudReasons["hud:msa"],
-			"state_count", hudReasons["hud:state"],
-			"unknown_count", hudReasons["hud:unknown"],
-		)
+	hudAnchors, hudReasons, err := backfillHUD(srcDir, anchors, zctaCounty, rt, logger)
+	if err != nil {
+		return err
 	}
 
 	csvPath := filepath.Join(outDir, "postal_codes_us.csv")
@@ -235,11 +232,66 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 		"zcta_count", len(anchors),
 		"hud_count", len(hudAnchors),
 		"total", len(anchors)+len(hudAnchors),
-		"by_reason", fmt.Sprintf("%+v", reasons),
-		"by_hud_reason", fmt.Sprintf("%+v", hudReasons),
+		"by_reason", reasons,
+		"by_hud_reason", hudReasons,
 	)
 
 	return nil
+}
+
+// backfillHUD runs the optional HUD ZIP-County backfill against the
+// post-ZCTA anchor set. When no HUD CSV is staged the flow degrades to
+// ZCTA-only (nil anchors, empty reasons). When one is present it first
+// reconciles the CT legacy-county gap (mutating zctaAnchors in place) and
+// then produces additional anchors for ZIPs Census ZCTA omits (P.O.
+// Box-only, single-building, APO/FPO).
+func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounty map[string]ZCTACounty, rt regionRouting, logger *slog.Logger) ([]PostalAnchor, map[string]int, error) {
+	hudPath := findHUDFile(srcDir)
+	if hudPath == "" {
+		logger.Info("etl us: no HUD ZIP-County CSV found in src dir — skipping non-ZCTA backfill",
+			"src_dir", srcDir,
+			"hint", "place hud_zip_county_<vintage>.csv under etl/sources/us/ to enable",
+		)
+		return nil, map[string]int{}, nil
+	}
+
+	huds, err := loadHUD(hudPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	logger.Info("etl us: parsed HUD ZIP-County", "rows", len(huds), "path", hudPath)
+
+	// Repair the CT county-vintage gap before backfill: re-anchor CT
+	// ZCTA ZIPs stranded at the bare state (their 2020 legacy county
+	// isn't in the 2023 planning-region countyToMSA) using HUD's
+	// current-vintage county. Mutates `zctaAnchors` in place.
+	ctReasons := ReconcileCTLegacyCounties(zctaAnchors, zctaCounty, huds, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
+	ctReconciled := 0
+	for k, n := range ctReasons {
+		if strings.HasPrefix(k, "ct-reconciled:") {
+			ctReconciled += n
+		}
+	}
+	logger.Info("etl us: ct legacy-county reconcile",
+		"reasons", ctReasons,
+		"reconciled_total", ctReconciled,
+		"reconciled_msa", ctReasons["ct-reconciled:msa"],
+		"skip_no_hud", ctReasons["ct-skip:no-hud"],
+		"skip_hud_unresolved", ctReasons["ct-skip:hud-unresolved"],
+	)
+
+	hudAnchors, hudReasons := CrosswalkHUDBackfill(huds, zctaAnchors, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
+	logger.Info("etl us: hud backfill",
+		"reasons", hudReasons,
+		"added", len(hudAnchors),
+		"borough_count", hudReasons["hud:nyc-borough"],
+		"county_leaf_count", hudReasons["hud:county-leaf"],
+		"msa_count", hudReasons["hud:msa"],
+		"state_count", hudReasons["hud:state"],
+		"unknown_count", hudReasons["hud:unknown"],
+	)
+
+	return hudAnchors, hudReasons, nil
 }
 
 // findHUDFile scans srcDir for any file matching the HUD ZIP-County
