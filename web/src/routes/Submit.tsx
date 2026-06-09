@@ -150,7 +150,7 @@ function deriveSubmitError(
  * react-hook-form has an error for it. Renders nothing when the field
  * is clean — one place for the role="alert" + class contract.
  */
-function FieldError({ error }: { error?: { message?: string } }) {
+function FieldErrorSlot({ error }: { error?: { message?: string } }) {
   return error ? (
     <span className="field-error" role="alert">
       {error.message}
@@ -379,7 +379,7 @@ export function Submit() {
                   placeholder="e.g. Transit Riders Union"
                   {...register('name', { required: 'Required' })}
                 />
-                <FieldError error={errors.name} />
+                <FieldErrorSlot error={errors.name} />
               </div>
             </div>
 
@@ -401,7 +401,7 @@ export function Submit() {
                   placeholder="https://"
                   {...register('website', { required: 'Required' })}
                 />
-                <FieldError error={errors.website} />
+                <FieldErrorSlot error={errors.website} />
               </div>
             </div>
 
@@ -445,7 +445,7 @@ export function Submit() {
                         />
                       )}
                     />
-                    <FieldError error={errors.regionSlugs} />
+                    <FieldErrorSlot error={errors.regionSlugs} />
                   </div>
                 </div>
 
@@ -488,7 +488,7 @@ export function Submit() {
                     placeholder="Campaigns for better bus service."
                     {...register('oneLineDesc', { required: 'Required' })}
                   />
-                  <FieldError error={errors.oneLineDesc} />
+                  <FieldErrorSlot error={errors.oneLineDesc} />
                 </div>
               </>
             ) : null}
