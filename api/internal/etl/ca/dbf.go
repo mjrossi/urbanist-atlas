@@ -57,6 +57,18 @@ func newDBFReader(src io.ReadSeeker) (*dbfReader, error) {
 	if _, err := src.Seek(int64(headerSize), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("dbf: seek to records: %w", err)
 	}
+	// Guard recordSize against the field layout before next() trusts it:
+	// each record is a 1-byte deletion flag followed by every field's
+	// fixed-width bytes, so a recordSize smaller than 1+Σ field.Length
+	// means a truncated/corrupt header that would otherwise make next()
+	// slice past the record buffer and panic. Fail with context instead.
+	minRecordSize := 1
+	for _, f := range fields {
+		minRecordSize += f.Length
+	}
+	if recordSize < minRecordSize {
+		return nil, fmt.Errorf("dbf: record size %d smaller than field layout requires (1 deletion flag + %d field bytes = %d)", recordSize, minRecordSize-1, minRecordSize)
+	}
 	return &dbfReader{
 		src:         src,
 		fields:      fields,
