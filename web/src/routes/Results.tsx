@@ -11,6 +11,7 @@ import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import { reverseAncestry } from '../lib/ancestry.ts';
 import type { Country, LookupResult } from '../lib/api.ts';
 import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
+import { totalEntries } from '../lib/orgBuckets.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -134,7 +135,7 @@ function ResultsContent({
 }) {
   const placeLabel = data.resolved_place_label;
   const { local, regional, statewide, resolved_ancestry } = data;
-  const empty = local.length === 0 && regional.length === 0 && statewide.length === 0;
+  const empty = totalEntries(data) === 0;
 
   // EntryList needs a slug -> display name map for its "Matched
   // via X" footer. Build it from the resolved-ancestry walk; this

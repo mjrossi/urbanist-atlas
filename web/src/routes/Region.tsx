@@ -11,6 +11,7 @@ import { reverseAncestry } from '../lib/ancestry.ts';
 import type { LookupOrg, RegionDetail } from '../lib/api.ts';
 import { ApiError, getRegion } from '../lib/api.ts';
 import { groupCountLabel, pluralize } from '../lib/format.ts';
+import { totalEntries } from '../lib/orgBuckets.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -41,9 +42,7 @@ export function Region() {
   // SPA owns its display ordering.
   const ancestorsRootFirst = query.data ? reverseAncestry(query.data.ancestry) : [];
   const currentLabel = query.data ? query.data.region.name : 'Region';
-  const totalOrgs = query.data
-    ? query.data.local.length + query.data.regional.length + query.data.statewide.length
-    : 0;
+  const totalOrgs = query.data ? totalEntries(query.data) : 0;
   const metaRight = query.data
     ? `${totalOrgs} ${pluralize(totalOrgs, 'org', 'orgs')} indexed`
     : 'Region report';
@@ -93,7 +92,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
 function RegionContent({ data }: { data: RegionDetail }) {
   const { region, local, regional, statewide, ancestry, descendant_region_names } = data;
   const kindLabel = regionKindLabel(region.kind);
-  const totalOrgs = local.length + regional.length + statewide.length;
+  const totalOrgs = totalEntries(data);
 
   // Build a slug → display-name map so Entry can render "Matched
   // via Brooklyn" instead of "Matched via brooklyn-ny". Seeded from
