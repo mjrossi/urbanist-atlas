@@ -261,6 +261,86 @@ func TestAttachPromotionResult_UnknownID(t *testing.T) {
 	}
 }
 
+// TestListPage_CursorContinuity pins issue #30: the keyset cursor
+// (created_at, public_id) must line up exactly with the queries'
+// ORDER BY created_at DESC, public_id DESC. Paging through with the
+// emitted NextCursor must visit every row exactly once, in strict
+// newest-first order, with no duplicates or gaps across page
+// boundaries — including rows that share a created_at (the composite
+// public_id tiebreak is what the cursor relies on).
+func TestListPage_CursorContinuity(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// 25 rows, but only 5 distinct created_at values (5 rows per second)
+	// so the public_id tiebreak in the cursor is genuinely exercised.
+	base := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	tick := -1
+	s.SetClock(func() time.Time {
+		tick++
+		return base.Add(time.Duration(tick/5) * time.Second)
+	})
+
+	const total = 25
+	for range total {
+		if _, err := s.Create(ctx, atlas.NewSubmissionInput{Payload: samplePayload()}); err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+	}
+
+	seen := make(map[string]bool, total)
+	var ordered []atlas.Submission
+	cursor := ""
+	for pages := 0; ; pages++ {
+		if pages > total {
+			t.Fatal("pagination did not terminate (cursor never emptied)")
+		}
+		page, err := s.ListPage(ctx, atlas.ListSubmissionsQuery{Limit: 7, Cursor: cursor})
+		if err != nil {
+			t.Fatalf("ListPage page %d: %v", pages, err)
+		}
+		for _, sub := range page.Items {
+			if seen[sub.PublicID] {
+				t.Fatalf("duplicate row across page boundary: %s", sub.PublicID)
+			}
+			seen[sub.PublicID] = true
+			ordered = append(ordered, sub)
+		}
+		if page.NextCursor == "" {
+			break
+		}
+		cursor = page.NextCursor
+	}
+
+	if len(ordered) != total {
+		t.Fatalf("paged %d rows, want %d (gap or early stop)", len(ordered), total)
+	}
+	// Strict newest-first across the whole concatenation: each row must
+	// be <= the previous by (created_at, public_id) DESC.
+	for i := 1; i < len(ordered); i++ {
+		prev, cur := ordered[i-1], ordered[i]
+		if cur.CreatedAt.After(prev.CreatedAt) {
+			t.Fatalf("row %d created_at %v is newer than predecessor %v — order broke across pages",
+				i, cur.CreatedAt, prev.CreatedAt)
+		}
+		if cur.CreatedAt.Equal(prev.CreatedAt) && cur.PublicID >= prev.PublicID {
+			t.Fatalf("row %d public_id %s !< predecessor %s within same created_at — tiebreak/cursor mismatch",
+				i, cur.PublicID, prev.PublicID)
+		}
+	}
+}
+
+// TestListPage_InvalidCursor pins that a cursor never emitted by
+// ListPage is rejected with ErrInvalidCursor (a 400, not a silent
+// full-table scan).
+func TestListPage_InvalidCursor(t *testing.T) {
+	s := newTestStore(t)
+	_, err := s.ListPage(context.Background(), atlas.ListSubmissionsQuery{Cursor: "not-valid-base64-$$$"})
+	if !errors.Is(err, sqlite.ErrInvalidCursor) {
+		t.Fatalf("err = %v, want ErrInvalidCursor", err)
+	}
+}
+
 func TestMigrate_Idempotent(t *testing.T) {
 	s := newTestStore(t)
 	// newTestStore already ran Migrate once. A second call must be a

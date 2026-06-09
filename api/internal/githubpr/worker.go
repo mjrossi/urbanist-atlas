@@ -169,11 +169,29 @@ func (w *Worker) Run(ctx context.Context) {
 	}
 }
 
+// shutdownDrainTimeout bounds a single job's process() during the
+// hard-cancel drain. The parent ctx is already canceled on this path,
+// so process() runs against a *detached* context (so the persist write
+// still lands) — but a detached context would otherwise re-derive
+// openPR's fresh 30s deadline, letting one wedged GitHub call pin
+// process exit for up to 30s. This tighter budget caps that: a slow
+// remote trips it, openPR returns ctx.Err(), and the row records the
+// failure for operator retry. Kept under openPRTimeout deliberately.
+//
+// A var, not a const, solely so the shutdown-drain test can shrink it;
+// production never reassigns it.
+var shutdownDrainTimeout = 5 * time.Second
+
 // drainAndExit consumes any remaining jobs in the buffer with the
 // caveat that the parent ctx is already canceled — GitHub I/O will
 // fail fast, but the persist side will still record the error on
 // each affected row. Called only from the ctx-canceled branch of
 // Run; Stop's normal path goes through the channel-close branch.
+//
+// Each job is processed under a fresh, detached context bounded by
+// shutdownDrainTimeout (issue #25) so a wedged GitHub call can't pin
+// process exit past that budget regardless of openPR's own 30s
+// deadline.
 func (w *Worker) drainAndExit() {
 	for {
 		select {
@@ -181,7 +199,9 @@ func (w *Worker) drainAndExit() {
 			if !ok {
 				return
 			}
-			w.process(context.Background(), job)
+			drainCtx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+			w.process(drainCtx, job)
+			cancel()
 		default:
 			w.cfg.Logger.Info("githubpr: worker shutting down")
 			return
@@ -297,6 +317,26 @@ const openPRTimeout = 30 * time.Second
 // from the caller's ctx (so an already-canceled parent still short-
 // circuits immediately). cancel is deferred so the derived ctx is
 // always released.
+//
+// Retry strategy (issue #24) — conservative, idempotency-first:
+//   - The two GETs (getBranchSHA, getFile) go through
+//     doIdempotentRequest, which retries retryable statuses (429, 502,
+//     503, secondary-rate-limit 403) with a bounded ctx-aware backoff.
+//     Retrying a GET has no side effects, so this is always safe.
+//   - createBranch is single-shot but tolerant of 422 "Reference
+//     already exists" — so a *whole-pipeline* re-run (operator
+//     retry-pr after a partial failure) doesn't trip over a branch a
+//     prior attempt left behind. The branch name is deterministic per
+//     submission, which is what makes that safe.
+//   - putFile and createPR stay single-shot with NO internal retry.
+//     NOTE: a blind retry of either could double-apply. A PUT contents
+//     with a now-stale base SHA returns 409 (handled as a hard error,
+//     not retried); a retried createPR after a transient 5xx that
+//     actually succeeded server-side would 422 on the second call
+//     ("a pull request already exists"). Until those are made
+//     idempotent (e.g. by GETing the existing PR on 422), they fail
+//     fast and surface as a promotion_error for operator retry — the
+//     same terminal semantics as before this change.
 func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, openPRTimeout)
 	defer cancel()
@@ -446,15 +486,142 @@ func (w *Worker) doRequest(ctx context.Context, method, path string, body any) (
 	return w.cfg.HTTPClient.Do(req)
 }
 
+// Retry tuning. GitHub's transient failures (502/503 from the edge,
+// 429/secondary-rate-limit 403 from abuse detection) usually clear in
+// well under a second, so a handful of attempts with a short, growing
+// backoff is plenty. The whole chain is still bounded by openPRTimeout
+// (the ctx deadline), so these numbers are an upper bound on attempts,
+// not on wall-clock — a slow remote just trips the deadline mid-sleep
+// and returns ctx.Err().
+const (
+	retryMaxAttempts = 4 // 1 initial try + up to 3 retries
+	retryBaseBackoff = 250 * time.Millisecond
+)
+
+// retryableStatus reports whether an HTTP status warrants a retry of an
+// idempotent request. 429 (rate limited), 502 (bad gateway) and 503
+// (service unavailable) are unambiguously transient. 403 is overloaded:
+// GitHub returns it for both hard authorization failures (never retry)
+// and *secondary rate limits* (retry) — the latter is signaled by a
+// Retry-After header or a body that mentions a rate limit, which
+// isSecondaryRateLimit inspects. Plain 4xx (404, 422, 409) are caller
+// state and never retried.
+func retryableStatus(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, // 429
+		http.StatusBadGateway,         // 502
+		http.StatusServiceUnavailable: // 503
+		return true
+	default:
+		return false
+	}
+}
+
+// isSecondaryRateLimit distinguishes a retryable GitHub secondary-rate-
+// limit 403 from a terminal authorization 403. GitHub flags the former
+// with a Retry-After header and/or a body containing "secondary rate
+// limit" / "rate limit" (see GitHub REST API "Rate limits" docs). body
+// is the already-read response body (retryBody buffers it so it can be
+// classified here and still restored for apiError on the no-retry path).
+func isSecondaryRateLimit(resp *http.Response, body []byte) bool {
+	if resp.StatusCode != http.StatusForbidden {
+		return false
+	}
+	if resp.Header.Get("Retry-After") != "" {
+		return true
+	}
+	// x-ratelimit-remaining: 0 is GitHub's primary-rate-limit signal on
+	// a 403; treat it as retryable too (the backoff gives the window
+	// time to roll over).
+	if resp.Header.Get("X-RateLimit-Remaining") == "0" {
+		return true
+	}
+	return strings.Contains(strings.ToLower(string(body)), "rate limit")
+}
+
+// backoffSleep waits for d or until ctx is canceled, whichever comes
+// first. Returns ctx.Err() if the context fired so the retry loop can
+// abort instead of sleeping out a doomed request. Uses a timer (not
+// time.Sleep) precisely so cancellation is honored mid-backoff — a
+// wedged GitHub call during graceful shutdown must not pin the worker.
+func backoffSleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// doIdempotentRequest issues an idempotent (GET) request via doRequest
+// and retries it on retryable statuses with a bounded, ctx-aware
+// backoff. It is ONLY safe for requests with no side effects: a retried
+// GET is harmless, a retried mutation is not (see openPR's notes on why
+// createBranch/putFile/createPR stay single-shot).
+//
+// On the terminal attempt — success, a non-retryable status, a
+// transport error, or exhausted attempts — it returns the live
+// *http.Response with its Body intact for the caller to decode or pass
+// to apiError. On a retryable status it drains+closes the body before
+// sleeping so the connection can be reused, then tries again.
+func (w *Worker) doIdempotentRequest(ctx context.Context, method, path string) (*http.Response, error) {
+	for attempt := 1; ; attempt++ {
+		resp, err := w.doRequest(ctx, method, path, nil)
+		if err != nil {
+			// Transport error: not classifiable as a status. Surface it
+			// immediately — http.Client already retried idempotent
+			// connection failures internally, and ctx cancellation
+			// arrives here too.
+			return nil, err
+		}
+		retryable := retryableStatus(resp.StatusCode)
+		if resp.StatusCode == http.StatusForbidden {
+			// Buffer the body so we can classify the 403 and still hand a
+			// readable body to apiError on the no-retry path.
+			buf, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			_ = resp.Body.Close()
+			resp.Body = io.NopCloser(bytes.NewReader(buf))
+			retryable = isSecondaryRateLimit(resp, buf)
+		}
+		if !retryable || attempt >= retryMaxAttempts {
+			return resp, nil
+		}
+		// Drain + close so the keep-alive connection is reusable, then
+		// back off before the next attempt.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		_ = resp.Body.Close()
+		backoff := retryBaseBackoff * time.Duration(1<<(attempt-1))
+		if serr := backoffSleep(ctx, backoff); serr != nil {
+			return nil, serr
+		}
+	}
+}
+
+// expectStatus closes nothing — the caller owns resp.Body via defer —
+// but it consolidates the "did GitHub return the status I wanted?"
+// check that every plumbing method repeated. On a status mismatch it
+// returns the shared apiError (op + status + truncated body); on a
+// match it returns nil so the caller can proceed to decode. want is
+// the single accepted status; methods that accept two (putFile) keep
+// their own inline check.
+func expectStatus(resp *http.Response, want int, op string) error {
+	if resp.StatusCode != want {
+		return apiError(op, resp)
+	}
+	return nil
+}
+
 func (w *Worker) getBranchSHA(ctx context.Context, branch string) (string, error) {
-	resp, err := w.doRequest(ctx, http.MethodGet,
-		fmt.Sprintf("/repos/%s/%s/git/ref/heads/%s", w.cfg.Owner, w.cfg.Repo, branch), nil)
+	resp, err := w.doIdempotentRequest(ctx, http.MethodGet,
+		fmt.Sprintf("/repos/%s/%s/git/ref/heads/%s", w.cfg.Owner, w.cfg.Repo, branch))
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", apiError("get ref", resp)
+	if err := expectStatus(resp, http.StatusOK, "get ref"); err != nil {
+		return "", err
 	}
 	var out struct {
 		Object struct {
@@ -471,14 +638,14 @@ func (w *Worker) getBranchSHA(ctx context.Context, branch string) (string, error
 }
 
 func (w *Worker) getFile(ctx context.Context, path, branch string) (fileContents, error) {
-	resp, err := w.doRequest(ctx, http.MethodGet,
-		fmt.Sprintf("/repos/%s/%s/contents/%s?ref=%s", w.cfg.Owner, w.cfg.Repo, path, branch), nil)
+	resp, err := w.doIdempotentRequest(ctx, http.MethodGet,
+		fmt.Sprintf("/repos/%s/%s/contents/%s?ref=%s", w.cfg.Owner, w.cfg.Repo, path, branch))
 	if err != nil {
 		return fileContents{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fileContents{}, apiError("get contents", resp)
+	if err := expectStatus(resp, http.StatusOK, "get contents"); err != nil {
+		return fileContents{}, err
 	}
 	var out struct {
 		Content  string `json:"content"`
@@ -510,10 +677,25 @@ func (w *Worker) createBranch(ctx context.Context, branch, sha string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		return apiError("create ref", resp)
+	if resp.StatusCode == http.StatusCreated {
+		return nil
 	}
-	return nil
+	// Idempotency: GitHub answers a duplicate branch with 422
+	// "Reference already exists". A previous openPR attempt that created
+	// the branch but failed at a later step (put/createPR) would leave
+	// the ref behind; on a manual retry-pr re-run the same submission
+	// derives the same deterministic branch name, so treat an existing
+	// ref as success and let the pipeline proceed (putFile/createPR are
+	// keyed on the branch, not on having just created it). buf is read
+	// once and reused for both the existence check and apiError so the
+	// body isn't consumed twice.
+	buf, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode == http.StatusUnprocessableEntity &&
+		strings.Contains(strings.ToLower(string(buf)), "reference already exists") {
+		return nil
+	}
+	return fmt.Errorf("create ref: github returned %d: %s",
+		resp.StatusCode, strings.TrimSpace(string(buf)))
 }
 
 func (w *Worker) putFile(ctx context.Context, path, branch, content, sha, message string) error {
@@ -548,8 +730,8 @@ func (w *Worker) createPR(ctx context.Context, title, body, head, base string) (
 		return "", err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		return "", apiError("create PR", resp)
+	if err := expectStatus(resp, http.StatusCreated, "create PR"); err != nil {
+		return "", err
 	}
 	var out struct {
 		HTMLURL string `json:"html_url"`
@@ -561,6 +743,16 @@ func (w *Worker) createPR(ctx context.Context, title, body, head, base string) (
 }
 
 func apiError(op string, resp *http.Response) error {
-	buf, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Errorf("%s: github returned %d: %s", op, resp.StatusCode, strings.TrimSpace(string(buf)))
+	// Best-effort body read, capped so a pathological response can't
+	// balloon the error string. The status code is the load-bearing
+	// signal; the body is diagnostic context. A read error here is
+	// non-fatal — whatever bytes arrived before it are still included —
+	// but we surface a marker (issue #27) so a truncated/failed read
+	// isn't silently indistinguishable from an empty body.
+	buf, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	body := strings.TrimSpace(string(buf))
+	if readErr != nil {
+		body += fmt.Sprintf(" [body read truncated: %v]", readErr)
+	}
+	return fmt.Errorf("%s: github returned %d: %s", op, resp.StatusCode, body)
 }
