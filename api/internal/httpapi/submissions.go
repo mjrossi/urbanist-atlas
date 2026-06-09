@@ -458,31 +458,26 @@ func toOAPISubmission(s atlas.Submission) oapi.Submission {
 		t := *s.ProcessedAt
 		out.ProcessedAt = &t
 	}
-	if s.SubmitterName != "" {
-		n := s.SubmitterName
-		out.SubmitterName = &n
-	}
+	out.SubmitterName = strPtrIfSet(s.SubmitterName)
 	if s.SubmitterEmail != "" {
 		e := openapi_types.Email(s.SubmitterEmail)
 		out.SubmitterEmail = &e
 	}
-	if s.SubmitterNote != "" {
-		n := s.SubmitterNote
-		out.SubmitterNote = &n
-	}
-	if s.PromotionPRURL != "" {
-		v := s.PromotionPRURL
-		out.PromotionPrUrl = &v
-	}
-	if s.PromotionError != "" {
-		v := s.PromotionError
-		out.PromotionError = &v
-	}
-	if s.RejectionReason != "" {
-		v := s.RejectionReason
-		out.RejectionReason = &v
-	}
+	out.SubmitterNote = strPtrIfSet(s.SubmitterNote)
+	out.PromotionPrUrl = strPtrIfSet(s.PromotionPRURL)
+	out.PromotionError = strPtrIfSet(s.PromotionError)
+	out.RejectionReason = strPtrIfSet(s.RejectionReason)
 	return out
+}
+
+// strPtrIfSet returns a pointer to s when s is non-empty, and nil
+// otherwise — the idiom for mapping a Go zero-value-elides-the-field
+// string onto an optional wire field that should be omitted when empty.
+func strPtrIfSet(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func toOAPISubmissionPayload(p atlas.SubmissionPayload) oapi.SubmissionPayload {
@@ -496,9 +491,6 @@ func toOAPISubmissionPayload(p atlas.SubmissionPayload) oapi.SubmissionPayload {
 		WebsiteUrl:  p.WebsiteURL,
 		RegionSlugs: &regions,
 	}
-	if p.ContactURL != "" {
-		c := p.ContactURL
-		out.ContactUrl = &c
-	}
+	out.ContactUrl = strPtrIfSet(p.ContactURL)
 	return out
 }
