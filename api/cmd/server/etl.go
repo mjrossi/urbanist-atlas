@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -342,10 +343,15 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 	return nil
 }
 
+// planCodes returns the registered country codes in sorted order so the
+// "known: %s" hint in the no-plan error reads identically run-to-run —
+// ranging etl.Plans directly would emit them in Go's randomized map
+// order.
 func planCodes() []string {
 	out := make([]string, 0, len(etl.Plans))
 	for k := range etl.Plans {
 		out = append(out, k)
 	}
+	slices.Sort(out)
 	return out
 }
