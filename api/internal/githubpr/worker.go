@@ -502,7 +502,7 @@ const (
 // idempotent request. 429 (rate limited), 502 (bad gateway) and 503
 // (service unavailable) are unambiguously transient. 403 is overloaded:
 // GitHub returns it for both hard authorization failures (never retry)
-// and *secondary rate limits* (retry) — the latter is signalled by a
+// and *secondary rate limits* (retry) — the latter is signaled by a
 // Retry-After header or a body that mentions a rate limit, which
 // isSecondaryRateLimit inspects. Plain 4xx (404, 422, 409) are caller
 // state and never retried.
