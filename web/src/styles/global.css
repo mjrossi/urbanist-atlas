@@ -570,6 +570,15 @@ a {
   align-items: start;
 }
 
+/* Grid items default to min-width: auto, which lets wide content (e.g. the
+   Colophon's <pre class="codeblock"> wire payloads, with long unbreakable
+   URLs) force a track wider than the viewport — producing horizontal page
+   scroll on mobile. min-width: 0 lets the columns shrink so the codeblock's
+   own overflow-x: auto handles the overflow internally. */
+.spread > * {
+  min-width: 0;
+}
+
 @media (min-width: 900px) {
   .spread {
     grid-template-columns: 1fr 320px;
