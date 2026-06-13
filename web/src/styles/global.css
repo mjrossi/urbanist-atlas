@@ -2076,6 +2076,15 @@ a.tag:hover::before {
 .cat-fill-amber-soft {
   fill: var(--amber-soft);
 }
+.cat-fill-amber {
+  fill: var(--amber);
+}
+.cat-fill-rule {
+  fill: var(--rule);
+}
+.cat-fill-rule-strong {
+  fill: var(--rule-strong);
+}
 .cat-fill-paper {
   fill: var(--paper);
 }
@@ -2087,6 +2096,9 @@ a.tag:hover::before {
 }
 .cat-stroke-ink {
   stroke: var(--ink);
+}
+.cat-stroke-ink-2 {
+  stroke: var(--ink-2);
 }
 .cat-stroke-rule {
   stroke: var(--rule-strong);

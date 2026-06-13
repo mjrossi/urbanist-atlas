@@ -115,11 +115,22 @@ export function PadThaiIllustration({ className }: { className?: string }) {
 
 /**
  * Mrs Peacock, a dilute tortoiseshell, at her post: seated squarely on
- * the keyboard, in front of whatever you were trying to read.
+ * the keyboard, in front of whatever you were trying to read. A dilute
+ * (blue-cream) tortie reads as three softly blended coats, not bold
+ * patches: a blue-grey base, muted fawn-brown brindled through it, and
+ * cream on the chest and paws. The color zones are clipped to her
+ * silhouette so the brindle never spills past the outline.
  */
 export function MrsPeacockIllustration({ className }: { className?: string }) {
+  const body =
+    'M64 106 C63 92 67 80 76 72 C77 68 78 66 80 64 C77 60 76 52 78 46 L72 30 L88 36 C94 32 106 32 112 36 L126 30 L122 46 C124 52 123 60 120 64 C122 66 123 68 124 72 C133 80 137 92 136 106 C120 111 80 111 64 106 Z';
   return (
     <svg viewBox="0 0 200 130" aria-hidden="true" focusable="false" className={className}>
+      <defs>
+        <clipPath id="mrs-peacock-body">
+          <path d={body} />
+        </clipPath>
+      </defs>
       {/* Monitor, screen copy, stand. */}
       <rect
         x="48"
@@ -148,7 +159,8 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
         className="cat-stroke-rule cat-fill-none"
         strokeWidth="1.5"
       />
-      {/* Tail wrapped along the keyboard: ink outline under a muted core. */}
+      {/* Tail wrapped along the keyboard: ink outline, muted core, a
+          lighter brindle band near the tip. */}
       <path
         d="M130 100 C150 101 162 107 159 115 C156 121 142 120 130 113"
         className="cat-stroke-ink cat-fill-none"
@@ -163,33 +175,57 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
       />
       <path
         d="M150 104 C155 106 158 109 157 113"
-        className="cat-stroke-amber-soft cat-fill-none"
+        className="cat-stroke-rule cat-fill-none"
         strokeWidth="7"
         strokeLinecap="round"
       />
-      {/* The supervisor herself: one bell-shaped seated silhouette. */}
+      {/* Base coat: soft blue-grey. */}
+      <path d={body} className="cat-fill-muted" />
+      {/* The three coats, clipped to her silhouette. */}
+      <g clipPath="url(#mrs-peacock-body)">
+        {/* Cream chest and belly — the white in her coat. */}
+        <path
+          d="M100 62 C113 70 117 88 110 102 C104 110 90 109 86 100 C82 86 88 70 100 62 Z"
+          className="cat-fill-rule"
+        />
+        <ellipse cx="100" cy="100" rx="15" ry="9" className="cat-fill-paper-2" />
+        {/* Cream paw fronts at the sitting base. */}
+        <ellipse cx="93" cy="106" rx="6" ry="5" className="cat-fill-paper-2" />
+        <ellipse cx="107" cy="106" rx="6" ry="5" className="cat-fill-paper-2" />
+        {/* Muted fawn-brown brindle — soft and translucent, blended into
+            the grey rather than stamped on. */}
+        <g className="cat-fill-amber" fillOpacity="0.5">
+          <ellipse cx="82" cy="55" rx="9" ry="12" transform="rotate(-18 82 55)" />
+          <ellipse cx="119" cy="62" rx="7" ry="10" transform="rotate(16 119 62)" />
+          <ellipse cx="95" cy="44" rx="6" ry="5" />
+          <ellipse cx="112" cy="90" rx="6" ry="9" transform="rotate(12 112 90)" />
+        </g>
+        {/* Warm wash over the muzzle. */}
+        <ellipse
+          cx="100"
+          cy="61"
+          rx="11"
+          ry="5"
+          className="cat-fill-amber"
+          fillOpacity="0.28"
+        />
+        {/* Darker grey ticking across the crown and back — the dilute
+            tabby brindle. */}
+        <path
+          d="M80 40 q3 5 1 10 M90 38 q3 5 1 10 M104 38 q3 5 1 10 M114 41 q3 5 1 10 M124 50 q3 5 1 9"
+          className="cat-stroke-ink-2 cat-fill-none"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          opacity="0.35"
+        />
+      </g>
+      {/* Crisp outline, on top of the coat zones. */}
       <path
-        d="M64 106
-           C63 92 67 80 76 72
-           C77 68 78 66 80 64
-           C77 60 76 52 78 46
-           L72 30 L88 36
-           C94 32 106 32 112 36
-           L126 30 L122 46
-           C124 52 123 60 120 64
-           C122 66 123 68 124 72
-           C133 80 137 92 136 106
-           C120 111 80 111 64 106 Z"
-        className="cat-fill-muted cat-stroke-ink"
+        d={body}
+        className="cat-stroke-ink cat-fill-none"
         strokeWidth="2.5"
         strokeLinejoin="round"
       />
-      {/* Tortie patches: brow, chest, haunch. */}
-      <g className="cat-fill-amber-soft">
-        <path d="M76 36 C82 33 90 36 92 42 C86 46 78 44 75 39 Z" />
-        <ellipse cx="92" cy="86" rx="8" ry="12" transform="rotate(-14 92 86)" />
-        <ellipse cx="125" cy="95" rx="7" ry="11" transform="rotate(12 125 95)" />
-      </g>
       {/* Face. */}
       <g className="cat-fill-ink">
         <ellipse cx="91" cy="55" rx="4" ry="3" transform="rotate(8 91 55)" />
@@ -197,7 +233,8 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
       </g>
       <circle cx="92.2" cy="54" r="1" className="cat-fill-paper" />
       <circle cx="110.2" cy="54" r="1" className="cat-fill-paper" />
-      <polygon points="97,63 103,63 100,67" className="cat-fill-amber-soft" />
+      {/* Pinkish nose. */}
+      <polygon points="97,63 103,63 100,67" className="cat-fill-rule-strong" />
       <path
         d="M86 63 q-11 -2 -17 -1 M86 66 q-11 2 -16 4 M114 63 q11 -2 17 -1 M114 66 q11 2 16 4"
         className="cat-stroke-ink cat-fill-none"
