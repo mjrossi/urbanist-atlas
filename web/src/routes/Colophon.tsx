@@ -1,5 +1,9 @@
 import { Link } from 'react-router';
 
+import {
+  MrsPeacockIllustration,
+  PadThaiIllustration,
+} from '../components/NewsroomCats.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { openapiUrl } from '../lib/api.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -165,6 +169,32 @@ X-Data-Attribution: https://urbanistatlas.com
             editorial. The directory grows one editorial decision at a time, and money is
             not one of the inputs.
           </p>
+
+          <div className="section-kicker">§ VII — The newsroom</div>
+          <h2>Staff who cannot be fired.</h2>
+          <div className="h2-rule" />
+          <p>
+            Every print shop of consequence kept a cat, and this one keeps two.{' '}
+            <strong>Pad Thai</strong>, an all-black tom, directs quality control — chiefly
+            by sprawling belly-up across whatever is being proofread until it has been
+            thoroughly reconsidered. <strong>Mrs Peacock</strong>, a dilute tortoiseshell,
+            heads keyboard supervision: no line of this site has shipped without her
+            walking across it first. Neither accepts corrections. Both are paid in salmon.
+          </p>
+          <div className="newsroom-cats">
+            <figure className="newsroom-cat">
+              <PadThaiIllustration className="cat-illustration" />
+              <figcaption>
+                <span className="cat-name">Pad Thai</span> · Quality control
+              </figcaption>
+            </figure>
+            <figure className="newsroom-cat">
+              <MrsPeacockIllustration className="cat-illustration" />
+              <figcaption>
+                <span className="cat-name">Mrs Peacock</span> · Keyboard supervision
+              </figcaption>
+            </figure>
+          </div>
         </main>
 
         <aside className="rail">
@@ -215,6 +245,14 @@ X-Data-Attribution: https://urbanistatlas.com
               <em>JetBrains Mono</em>. Cream <code>#FDF6EC</code>, amber{' '}
               <code>#8F5520</code>, ink <code>#1A1612</code>.
             </p>
+          </div>
+          <div className="rail-block muted">
+            <div className="rail-kicker">Masthead, cont&rsquo;d</div>
+            <ul>
+              <li>Pad Thai · Quality control</li>
+              <li>Mrs Peacock · Keyboard supervision</li>
+              <li>Errors that remain are theirs.</li>
+            </ul>
           </div>
         </aside>
       </div>
