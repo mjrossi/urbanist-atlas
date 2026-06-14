@@ -170,29 +170,30 @@ X-Data-Attribution: https://urbanistatlas.com
             not one of the inputs.
           </p>
 
-          <div className="section-kicker">§ VII — The newsroom</div>
-          <h2>Two names not on the masthead.</h2>
+          <div className="section-kicker">§ VII — Field staff</div>
+          <h2>Two surveyors who know the ground.</h2>
           <div className="h2-rule" />
           <p>
-            Every print shop of consequence kept a cat; this one keeps two, both salaried
-            in salmon and neither dismissible. <strong>Pad Thai</strong>, an all-black
-            Bombay, serves as Editor-at-Large — he reviews each proof by lying full-length
-            across it, belly to the ceiling, until its argument has been reconsidered.{' '}
-            <strong>Mrs Peacock</strong>, a dilute tortoiseshell, is Head Compositor: no
-            line of this site has been set without her first walking the length of the
-            keyboard. Corrections are not entertained.
+            No atlas is surveyed from a desk alone, and this one keeps two who know the
+            territory — both paid in salmon, neither inclined to file a report.{' '}
+            <strong>Pad Thai</strong>, an all-black Bombay, is our authority on sprawl: he
+            occupies the maximum possible desk area, belly to the ceiling, in open
+            defiance of every density guideline we publish. <strong>Mrs Peacock</strong>,
+            a dilute tortoiseshell, runs the walkability audit — she tests each surface on
+            foot, the keyboard especially, and reroutes the day around her chosen desire
+            line. Their findings are non-negotiable.
           </p>
           <div className="newsroom-cats">
             <figure className="newsroom-cat">
               <PadThaiIllustration className="cat-illustration" />
               <figcaption>
-                <span className="cat-name">Pad Thai</span> · Editor-at-Large
+                <span className="cat-name">Pad Thai</span> · Sprawl
               </figcaption>
             </figure>
             <figure className="newsroom-cat">
               <MrsPeacockIllustration className="cat-illustration" />
               <figcaption>
-                <span className="cat-name">Mrs Peacock</span> · Head Compositor
+                <span className="cat-name">Mrs Peacock</span> · Walkability
               </figcaption>
             </figure>
           </div>
@@ -248,11 +249,11 @@ X-Data-Attribution: https://urbanistatlas.com
             </p>
           </div>
           <div className="rail-block muted">
-            <div className="rail-kicker">Masthead, cont&rsquo;d</div>
+            <div className="rail-kicker">Field staff</div>
             <ul>
-              <li>Pad Thai · Editor-at-Large</li>
-              <li>Mrs Peacock · Head Compositor</li>
-              <li>Errors that remain are theirs.</li>
+              <li>Pad Thai · Sprawl</li>
+              <li>Mrs Peacock · Walkability</li>
+              <li>The territory disagrees at its peril.</li>
             </ul>
           </div>
         </aside>
