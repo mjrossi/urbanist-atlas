@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 
+import { PadThaiIllustration } from '../components/NewsroomCats.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { SheetLayout } from '../components/SheetLayout.tsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -35,6 +36,13 @@ export function NotFound() {
             redirect.
           </p>
           <p>Otherwise, the front page is the best place to start:</p>
+          <figure className="not-found-cat">
+            <PadThaiIllustration className="cat-illustration" />
+            <figcaption>
+              The newsroom cat was dispatched to find the missing page. He found a patch
+              of sun instead. The investigation is closed.
+            </figcaption>
+          </figure>
           <p>
             <Link to="/" className="btn-primary not-found-return">
               Return to the front page <span className="arrow">→</span>

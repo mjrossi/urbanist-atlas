@@ -41,6 +41,15 @@ describe('NotFound', () => {
     expect(link.classList.contains('not-found-return')).toBe(true);
   });
 
+  it('renders the newsroom-cat cameo with a decorative illustration', () => {
+    const { container } = renderNotFound();
+    expect(screen.getByText(/found a patch of sun/i)).toBeDefined();
+    const svg = container.querySelector('.not-found-cat svg');
+    expect(svg).not.toBeNull();
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(svg?.getAttribute('focusable')).toBe('false');
+  });
+
   it('sets the browser tab title', async () => {
     renderNotFound();
     await waitFor(() => {

@@ -1,5 +1,9 @@
 import { Link } from 'react-router';
 
+import {
+  MrsPeacockIllustration,
+  PadThaiIllustration,
+} from '../components/NewsroomCats.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { openapiUrl } from '../lib/api.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -165,6 +169,34 @@ X-Data-Attribution: https://urbanistatlas.com
             editorial. The directory grows one editorial decision at a time, and money is
             not one of the inputs.
           </p>
+
+          <div className="section-kicker">§ VII — Field staff</div>
+          <h2>Two surveyors who know the ground.</h2>
+          <div className="h2-rule" />
+          <p>
+            No atlas is surveyed from a desk alone, and this one keeps two who know the
+            territory — both paid in salmon, neither inclined to file a report.{' '}
+            <strong>Pad Thai</strong>, an all-black Bombay, is our authority on sprawl: he
+            occupies the maximum possible desk area, belly to the ceiling, in open
+            defiance of every density guideline we publish. <strong>Mrs Peacock</strong>,
+            a dilute tortoiseshell, runs the walkability audit — she tests each surface on
+            foot, the keyboard especially, and reroutes the day around her chosen desire
+            line. Their findings are non-negotiable.
+          </p>
+          <div className="newsroom-cats">
+            <figure className="newsroom-cat">
+              <PadThaiIllustration className="cat-illustration" />
+              <figcaption>
+                <span className="cat-name">Pad Thai</span> · Sprawl
+              </figcaption>
+            </figure>
+            <figure className="newsroom-cat">
+              <MrsPeacockIllustration className="cat-illustration" />
+              <figcaption>
+                <span className="cat-name">Mrs Peacock</span> · Walkability
+              </figcaption>
+            </figure>
+          </div>
         </main>
 
         <aside className="rail">
@@ -215,6 +247,14 @@ X-Data-Attribution: https://urbanistatlas.com
               <em>JetBrains Mono</em>. Cream <code>#FDF6EC</code>, amber{' '}
               <code>#8F5520</code>, ink <code>#1A1612</code>.
             </p>
+          </div>
+          <div className="rail-block muted">
+            <div className="rail-kicker">Field staff</div>
+            <ul>
+              <li>Pad Thai · Sprawl</li>
+              <li>Mrs Peacock · Walkability</li>
+              <li>The territory disagrees at its peril.</li>
+            </ul>
           </div>
         </aside>
       </div>

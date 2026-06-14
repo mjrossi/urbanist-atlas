@@ -2059,6 +2059,165 @@ a.tag:hover::before {
   color: var(--ink);
 }
 
+/* ── Newsroom cats ─────────────────────────────────── */
+/* Palette classes for the inline-SVG cat portraits
+   (NewsroomCats.tsx). SVG fill/stroke *attributes* can't carry
+   var(), so the components reach the tokens through these. Stroke
+   classes set only `stroke`; shapes that are stroke-only add
+   .cat-fill-none rather than baking fill: none into the stroke
+   class (some shapes carry both a fill and a stroke). */
+
+.cat-fill-ink {
+  fill: var(--ink);
+}
+.cat-fill-muted {
+  fill: var(--muted);
+}
+.cat-fill-amber-soft {
+  fill: var(--amber-soft);
+}
+.cat-fill-amber {
+  fill: var(--amber);
+}
+.cat-fill-rule {
+  fill: var(--rule);
+}
+.cat-fill-rule-strong {
+  fill: var(--rule-strong);
+}
+/* Mrs Peacock's coat greys. The broadsheet palette is entirely warm
+   (cream / amber / ink) and has no grey, so her dominant silver coat
+   and its darker shading are defined here — kept slightly warm so they
+   still sit in the broadsheet family rather than reading cold. */
+.cat-fill-coat {
+  fill: #c4beb4;
+}
+.cat-fill-coat-dark {
+  fill: #8b8479;
+}
+.cat-fill-paper {
+  fill: var(--paper);
+}
+.cat-fill-paper-2 {
+  fill: var(--paper-2);
+}
+.cat-fill-none {
+  fill: none;
+}
+.cat-stroke-ink {
+  stroke: var(--ink);
+}
+.cat-stroke-ink-2 {
+  stroke: var(--ink-2);
+}
+.cat-stroke-coat {
+  stroke: #c4beb4;
+}
+.cat-stroke-coat-dark {
+  stroke: #8b8479;
+}
+.cat-stroke-rule {
+  stroke: var(--rule-strong);
+}
+.cat-stroke-paper {
+  stroke: var(--paper);
+}
+.cat-stroke-amber-soft {
+  stroke: var(--amber-soft);
+}
+.cat-stroke-muted {
+  stroke: var(--muted);
+}
+
+.cat-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Colophon staff-portrait row. */
+.newsroom-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  margin: 28px 0 8px;
+}
+
+.newsroom-cats .newsroom-cat {
+  flex: 1 1 180px;
+  max-width: 200px;
+  margin: 0;
+}
+
+.newsroom-cats figcaption {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.newsroom-cats .cat-name {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* 404 cameo: Pad Thai asleep on the missing page. */
+.not-found-cat {
+  margin: 32px 0;
+  max-width: 240px;
+}
+
+.not-found-cat figcaption {
+  font-family: var(--serif-text);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+/* The slow tail sway is reserved for the dead-end page; the
+   site-wide prefers-reduced-motion clamp (top of file) collapses
+   it automatically. */
+@keyframes cat-tail-sway {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+
+.not-found-cat .cat-tail {
+  transform-box: fill-box;
+  transform-origin: 90% 40%;
+  animation: cat-tail-sway 4s ease-in-out infinite alternate;
+}
+
+/* Empty-state sign-off inside .editors-note. A div, not a p — the
+   .editors-note p rules force italic serif and this is a sans
+   caption line. */
+.editors-note-cat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.editors-note-cat .cat-glyph {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--amber);
+}
+
 /* ── Criteria table ────────────────────────────────── */
 
 .criteria {
@@ -4105,6 +4264,17 @@ fieldset.field {
     margin-top: 24px;
     padding: 12px 0;
     font-size: 9.5px;
+  }
+
+  /* ── Newsroom cats: snugger portraits ───────────────────────── */
+  .newsroom-cats {
+    gap: 20px;
+  }
+  .newsroom-cats .newsroom-cat {
+    flex-basis: 140px;
+  }
+  .not-found-cat {
+    max-width: 200px;
   }
 
   /* Visibility utilities are flipped inside the phone block. */
