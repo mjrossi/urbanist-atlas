@@ -30,7 +30,7 @@ describe('Colophon', () => {
     expect(text).toMatch(/broadsheet vocabulary/i);
     expect(text).toMatch(/what you can take/i);
     expect(text).toMatch(/how the directory stays current/i);
-    expect(text).toMatch(/staff who cannot be fired/i);
+    expect(text).toMatch(/two names not on the masthead/i);
     // And the kicker numerals carry their topic labels.
     const kickers = Array.from(container.querySelectorAll('.section-kicker'))
       .map((k) => k.textContent)

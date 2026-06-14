@@ -171,27 +171,28 @@ X-Data-Attribution: https://urbanistatlas.com
           </p>
 
           <div className="section-kicker">§ VII — The newsroom</div>
-          <h2>Staff who cannot be fired.</h2>
+          <h2>Two names not on the masthead.</h2>
           <div className="h2-rule" />
           <p>
-            Every print shop of consequence kept a cat, and this one keeps two.{' '}
-            <strong>Pad Thai</strong>, an all-black tom, directs quality control — chiefly
-            by sprawling belly-up across whatever is being proofread until it has been
-            thoroughly reconsidered. <strong>Mrs Peacock</strong>, a dilute tortoiseshell,
-            heads keyboard supervision: no line of this site has shipped without her
-            walking across it first. Neither accepts corrections. Both are paid in salmon.
+            Every print shop of consequence kept a cat; this one keeps two, both salaried
+            in salmon and neither dismissible. <strong>Pad Thai</strong>, an all-black
+            Bombay, serves as Editor-at-Large — he reviews each proof by lying full-length
+            across it, belly to the ceiling, until its argument has been reconsidered.{' '}
+            <strong>Mrs Peacock</strong>, a dilute tortoiseshell, is Head Compositor: no
+            line of this site has been set without her first walking the length of the
+            keyboard. Corrections are not entertained.
           </p>
           <div className="newsroom-cats">
             <figure className="newsroom-cat">
               <PadThaiIllustration className="cat-illustration" />
               <figcaption>
-                <span className="cat-name">Pad Thai</span> · Quality control
+                <span className="cat-name">Pad Thai</span> · Editor-at-Large
               </figcaption>
             </figure>
             <figure className="newsroom-cat">
               <MrsPeacockIllustration className="cat-illustration" />
               <figcaption>
-                <span className="cat-name">Mrs Peacock</span> · Keyboard supervision
+                <span className="cat-name">Mrs Peacock</span> · Head Compositor
               </figcaption>
             </figure>
           </div>
@@ -249,8 +250,8 @@ X-Data-Attribution: https://urbanistatlas.com
           <div className="rail-block muted">
             <div className="rail-kicker">Masthead, cont&rsquo;d</div>
             <ul>
-              <li>Pad Thai · Quality control</li>
-              <li>Mrs Peacock · Keyboard supervision</li>
+              <li>Pad Thai · Editor-at-Large</li>
+              <li>Mrs Peacock · Head Compositor</li>
               <li>Errors that remain are theirs.</li>
             </ul>
           </div>
