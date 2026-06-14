@@ -1,10 +1,8 @@
 package httpapi
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -54,15 +52,9 @@ func searchRegionsHandler(store atlas.Store, logger *slog.Logger, m *Metrics, re
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
-		limit := 0 // 0 lets the store apply its default; the cap is shared
-		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
-			n, err := strconv.Atoi(raw)
-			if err != nil || n < 1 || n > maxRegionSearchLimit {
-				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Limit",
-					fmt.Sprintf("The limit query parameter must be an integer between 1 and %d.", maxRegionSearchLimit), rid)
-				return
-			}
-			limit = n
+		limit, ok := parseLimitParam(w, r, maxRegionSearchLimit, rid)
+		if !ok {
+			return
 		}
 		results, err := store.SearchRegions(r.Context(), q, limit)
 		if err != nil {

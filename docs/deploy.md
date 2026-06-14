@@ -95,9 +95,12 @@ the default; rotate on schedule.
 Non-secret runtime config lives in `fly.toml`'s `[env]` block (where
 each var carries an explanatory comment), not in Fly secrets:
 `URBANIST_DB_PATH` (`/data/atlas.db`), `URBANIST_SUBMISSIONS_RATE_PER_HOUR`
-(per-IP submission cap), `URBANIST_METRICS_PORT` (private Prometheus
-port), `URBANIST_CORS_ORIGINS`, `URBANIST_PORT`, and `URBANIST_LOG_FORMAT`.
-Edit them there and redeploy.
+(per-IP submission cap), `URBANIST_COVERAGE_SAMPLE_RATE` (empty-result
+sampling), `URBANIST_CORS_ORIGINS`, `URBANIST_PORT`, and
+`URBANIST_LOG_FORMAT`. Edit them there and redeploy. The private
+Prometheus scrape port is set by `fly.toml`'s `[metrics]` block, not
+`[env]` (`URBANIST_METRICS_PORT` exists as an env override but is
+unset in production).
 
 ## Prerequisites
 

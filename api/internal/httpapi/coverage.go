@@ -1,11 +1,8 @@
 package httpapi
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
@@ -18,15 +15,9 @@ import (
 func listCoverageGapsHandler(reader atlas.CoverageGapReader, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
-		limit := 0 // 0 lets the store apply its default; the cap is shared
-		if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
-			n, err := strconv.Atoi(raw)
-			if err != nil || n < 1 || n > maxAdminListLimit {
-				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Limit",
-					fmt.Sprintf("The limit query parameter must be an integer between 1 and %d.", maxAdminListLimit), rid)
-				return
-			}
-			limit = n
+		limit, ok := parseLimitParam(w, r, maxAdminListLimit, rid)
+		if !ok {
+			return
 		}
 		gaps, err := reader.ListCoverageGaps(r.Context(), limit)
 		if err != nil {
