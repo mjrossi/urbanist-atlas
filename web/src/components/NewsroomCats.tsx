@@ -159,8 +159,8 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
         className="cat-stroke-rule cat-fill-none"
         strokeWidth="1.5"
       />
-      {/* Tail wrapped along the keyboard: ink outline, muted core, a
-          lighter brindle band near the tip. */}
+      {/* Tail wrapped along the keyboard: ink outline, silver core to
+          match her body, a darker brindle band near the tip. */}
       <path
         d="M130 100 C150 101 162 107 159 115 C156 121 142 120 130 113"
         className="cat-stroke-ink cat-fill-none"
@@ -169,54 +169,68 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
       />
       <path
         d="M130 100 C150 101 162 107 159 115 C156 121 142 120 130 113"
-        className="cat-stroke-muted cat-fill-none"
+        className="cat-stroke-coat cat-fill-none"
         strokeWidth="7"
         strokeLinecap="round"
       />
       <path
         d="M150 104 C155 106 158 109 157 113"
-        className="cat-stroke-rule cat-fill-none"
+        className="cat-stroke-coat-dark cat-fill-none"
         strokeWidth="7"
         strokeLinecap="round"
       />
-      {/* Base coat: soft blue-grey. */}
-      <path d={body} className="cat-fill-muted" />
-      {/* The three coats, clipped to her silhouette. */}
+      {/* Base coat: light silver — her dominant color. */}
+      <path d={body} className="cat-fill-coat" />
+      {/* Coat detail, clipped to her silhouette. */}
       <g clipPath="url(#mrs-peacock-body)">
-        {/* Cream chest and belly — the white in her coat. */}
+        {/* A shade deeper over the crown and ears — her head reads a
+            touch darker than her body. */}
+        <ellipse cx="100" cy="47" rx="27" ry="19" className="cat-fill-coat-dark" />
+        <polygon points="78,46 72,30 88,36" className="cat-fill-coat-dark" />
+        <polygon points="112,36 126,30 122,46" className="cat-fill-coat-dark" />
+        {/* Soft darker brindle down the flanks (the dilute-tabby bands);
+            the center band tucks behind the cream blaze below. */}
+        <g className="cat-fill-coat-dark" fillOpacity="0.4">
+          <ellipse cx="80" cy="88" rx="5" ry="16" transform="rotate(-8 80 88)" />
+          <ellipse cx="100" cy="92" rx="5" ry="17" />
+          <ellipse cx="120" cy="88" rx="5" ry="16" transform="rotate(8 120 88)" />
+        </g>
+        {/* Cream muzzle, chest, belly, and paw fronts — the silvery
+            white in her coat. */}
+        <ellipse cx="100" cy="65" rx="12" ry="6" className="cat-fill-paper-2" />
         <path
-          d="M100 62 C113 70 117 88 110 102 C104 110 90 109 86 100 C82 86 88 70 100 62 Z"
-          className="cat-fill-rule"
+          d="M100 66 C111 72 114 88 109 100 C104 108 92 108 88 100 C84 88 90 72 100 66 Z"
+          className="cat-fill-paper-2"
         />
-        <ellipse cx="100" cy="100" rx="15" ry="9" className="cat-fill-paper-2" />
-        {/* Cream paw fronts at the sitting base. */}
         <ellipse cx="93" cy="106" rx="6" ry="5" className="cat-fill-paper-2" />
         <ellipse cx="107" cy="106" rx="6" ry="5" className="cat-fill-paper-2" />
-        {/* Muted fawn-brown brindle — soft and translucent, blended into
-            the grey rather than stamped on. */}
-        <g className="cat-fill-amber" fillOpacity="0.5">
-          <ellipse cx="82" cy="55" rx="9" ry="12" transform="rotate(-18 82 55)" />
-          <ellipse cx="119" cy="62" rx="7" ry="10" transform="rotate(16 119 62)" />
-          <ellipse cx="95" cy="44" rx="6" ry="5" />
-          <ellipse cx="112" cy="90" rx="6" ry="9" transform="rotate(12 112 90)" />
-        </g>
-        {/* Warm wash over the muzzle. */}
+        {/* A whisper of warm fawn — the tortie in the dilute, kept very
+            faint so the grey stays dominant. */}
         <ellipse
-          cx="100"
-          cy="61"
-          rx="11"
-          ry="5"
+          cx="82"
+          cy="56"
+          rx="7"
+          ry="9"
+          transform="rotate(-18 82 56)"
           className="cat-fill-amber"
-          fillOpacity="0.28"
+          fillOpacity="0.22"
         />
-        {/* Darker grey ticking across the crown and back — the dilute
-            tabby brindle. */}
+        <ellipse
+          cx="116"
+          cy="80"
+          rx="6"
+          ry="9"
+          transform="rotate(14 116 80)"
+          className="cat-fill-amber"
+          fillOpacity="0.2"
+        />
+        {/* Fine ticking across the back. */}
         <path
-          d="M80 40 q3 5 1 10 M90 38 q3 5 1 10 M104 38 q3 5 1 10 M114 41 q3 5 1 10 M124 50 q3 5 1 9"
+          d="M84 40 q3 5 1 9 M96 38 q3 5 1 9 M108 39 q3 5 1 9 M118 44 q3 5 1 8"
           className="cat-stroke-ink-2 cat-fill-none"
-          strokeWidth="1.4"
+          strokeWidth="1.2"
           strokeLinecap="round"
-          opacity="0.35"
+          opacity="0.28"
         />
       </g>
       {/* Crisp outline, on top of the coat zones. */}

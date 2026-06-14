@@ -2085,6 +2085,16 @@ a.tag:hover::before {
 .cat-fill-rule-strong {
   fill: var(--rule-strong);
 }
+/* Mrs Peacock's coat greys. The broadsheet palette is entirely warm
+   (cream / amber / ink) and has no grey, so her dominant silver coat
+   and its darker shading are defined here — kept slightly warm so they
+   still sit in the broadsheet family rather than reading cold. */
+.cat-fill-coat {
+  fill: #c4beb4;
+}
+.cat-fill-coat-dark {
+  fill: #8b8479;
+}
 .cat-fill-paper {
   fill: var(--paper);
 }
@@ -2099,6 +2109,12 @@ a.tag:hover::before {
 }
 .cat-stroke-ink-2 {
   stroke: var(--ink-2);
+}
+.cat-stroke-coat {
+  stroke: #c4beb4;
+}
+.cat-stroke-coat-dark {
+  stroke: #8b8479;
 }
 .cat-stroke-rule {
   stroke: var(--rule-strong);
