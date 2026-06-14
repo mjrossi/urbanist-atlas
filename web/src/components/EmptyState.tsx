@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { NewsroomCatGlyph } from './NewsroomCats.tsx';
+
 /**
  * Broadsheet "editor's note" card used wherever a list page resolves
  * to no entries: a small framed block with a short label, a one-
@@ -12,7 +14,9 @@ import type { ReactNode } from 'react';
  *
  * Call sites — Results, Region, Browse, Home — pass copy that
  * names the place or kind of thing missing; this component owns
- * none of that domain logic.
+ * none of that domain logic. The one piece of copy it does own is
+ * the newsroom-cat sign-off below the card body — pure editorial
+ * chrome, naming no place or domain concept.
  */
 export function EmptyState({
   title,
@@ -41,6 +45,10 @@ export function EmptyState({
       <div className="label">{title}</div>
       <p>{body}</p>
       {cta ? <p>{cta}</p> : null}
+      <div className="editors-note-cat">
+        <NewsroomCatGlyph className="cat-glyph" />
+        <span>The newsroom cat has checked under every desk.</span>
+      </div>
     </div>
   );
 }
