@@ -12,8 +12,8 @@ require (
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/urfave/cli/v3 v3.9.0
-	modernc.org/sqlite v1.51.0
+	github.com/urfave/cli/v3 v3.10.0
+	modernc.org/sqlite v1.52.0
 )
 
 require (
