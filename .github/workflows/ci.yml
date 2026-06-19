@@ -43,7 +43,7 @@ jobs:
       web: ${{ steps.paths.outputs.web }}
       data: ${{ steps.paths.outputs.data }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # The `global` anchor is folded into every filter: a change to the
       # workflow itself, the justfile, a mise config, or the Dockerfile
       # flips all three true, so a build/tooling change can never silently
@@ -88,7 +88,7 @@ jobs:
     if: github.event_name != 'pull_request' || needs.detect.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Cache the Go module download cache (~/go/pkg/mod) and the
       # compiled-object build cache (~/.cache/go-build). Keyed on
       # api/go.sum so the cache invalidates the moment any dep moves;
@@ -140,7 +140,7 @@ jobs:
     if: github.event_name != 'pull_request' || needs.detect.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
       - name: Show mise version
         run: mise --version
@@ -161,7 +161,7 @@ jobs:
     if: github.event_name != 'pull_request' || needs.detect.outputs.data == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Cache Go modules + build cache
         uses: actions/cache@v5
         with:
@@ -189,7 +189,7 @@ jobs:
     if: github.event_name != 'pull_request' || needs.detect.outputs.api == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Cache Go modules + build cache
         uses: actions/cache@v5
         with:
@@ -240,7 +240,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy
