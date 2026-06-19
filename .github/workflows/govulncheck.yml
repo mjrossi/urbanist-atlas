@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # mise pins the Go toolchain (api/go.mod is the source of truth
       # for the required minor); reusing the same action as ci.yml
       # keeps the toolchain version unambiguous.
