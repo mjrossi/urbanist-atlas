@@ -182,9 +182,9 @@ X-Data-Attribution: https://urbanistatlas.com
             defiance of every density guideline we publish. <strong>Mrs Peacock</strong>,
             a dilute tortoiseshell, runs the walkability audit — she tests each surface on
             foot, the keyboard especially, and reroutes the day around her chosen desire
-            line. <strong>Cera</strong>, a calico, holds right of way — never once at
-            rest, she claims priority at every threshold she crosses and yields to no one,
-            the closing door included. Their findings are non-negotiable.
+            line. <strong>Cera</strong>, a calico, works the right-of-way desk — she steps
+            into every crossing unannounced, halts the oncoming traffic, and waves through
+            only the few she favors. Their findings are non-negotiable.
           </p>
           <div className="newsroom-cats">
             <figure className="newsroom-cat">

@@ -272,16 +272,17 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
  * outline showing through where the colored core stops).
  */
 export function CeraIllustration({ className }: { className?: string }) {
+  // The two ears are part of this one silhouette (the Mrs Peacock
+  // approach) rather than separate triangles — a continuous outline
+  // keeps them attached to the head instead of floating above it.
   const body =
-    'M42 72 C36 58 50 50 64 51 C92 47 118 47 140 51 C150 46 156 40 160 40 C170 40 178 46 180 55 C181 60 178 63 173 64 C168 66 162 66 158 68 C154 72 152 82 150 90 C148 96 140 98 130 97 C108 99 84 99 68 97 C54 95 46 88 44 80 C43 77 42 74 42 72 Z';
+    'M42 72 C36 58 50 50 64 51 C92 47 118 47 140 51 C146 47 148 46 150 45 L151 26 L162 41 L165 43 L168 41 L177 25 L181 43 C181 47 181 51 180 55 C181 60 178 63 173 64 C168 66 162 66 158 68 C154 72 152 82 150 90 C148 96 140 98 130 97 C108 99 84 99 68 97 C54 95 46 88 44 80 C43 77 42 74 42 72 Z';
   const tail = 'M50 66 C36 62 26 50 30 39 C32 33 38 30 44 33';
   return (
     <svg viewBox="0 0 200 120" aria-hidden="true" focusable="false" className={className}>
       <defs>
         <clipPath id="cera-body">
           <path d={body} />
-          <polygon points="148,42 150,25 163,38" />
-          <polygon points="164,38 173,24 181,40" />
         </clipPath>
       </defs>
       {/* Crosswalk she is busy claiming: pale zebra bars on the ground
@@ -337,18 +338,16 @@ export function CeraIllustration({ className }: { className?: string }) {
         <rect x="116" y="86" width="9" height="20" rx="4" />
         <rect x="132" y="84" width="9" height="14" rx="4" transform="rotate(20 136 91)" />
       </g>
-      {/* Cream base coat: body, then the two ears. */}
+      {/* Cream base coat (ears included, since they're part of the path). */}
       <path d={body} className="cat-fill-paper-2" />
-      <polygon points="148,42 150,25 163,38" className="cat-fill-paper-2" />
-      <polygon points="164,38 173,24 181,40" className="cat-fill-paper-2" />
       {/* Calico patches, clipped to her silhouette: ginger over the rump
           and far ear, black saddle and near-ear/crown (a split face),
           a deeper-amber touch and a small black hip dot for depth. */}
       <g clipPath="url(#cera-body)">
         <ellipse cx="66" cy="64" rx="22" ry="15" className="cat-fill-amber-soft" />
-        <ellipse cx="171" cy="43" rx="12" ry="12" className="cat-fill-amber-soft" />
+        <ellipse cx="174" cy="40" rx="12" ry="16" className="cat-fill-amber-soft" />
         <ellipse cx="108" cy="56" rx="24" ry="13" className="cat-fill-ink" />
-        <ellipse cx="152" cy="42" rx="12" ry="12" className="cat-fill-ink" />
+        <ellipse cx="152" cy="40" rx="12" ry="15" className="cat-fill-ink" />
         <ellipse
           cx="54"
           cy="70"
@@ -359,28 +358,16 @@ export function CeraIllustration({ className }: { className?: string }) {
         />
         <ellipse cx="50" cy="84" rx="8" ry="9" className="cat-fill-ink" />
       </g>
-      {/* Crisp outline, over the coat zones. */}
+      {/* Crisp outline, over the coat zones (ears flow from the path). */}
       <path
         d={body}
         className="cat-stroke-ink cat-fill-none"
         strokeWidth="2.5"
         strokeLinejoin="round"
       />
-      <polygon
-        points="148,42 150,25 163,38"
-        className="cat-stroke-ink cat-fill-none"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <polygon
-        points="164,38 173,24 181,40"
-        className="cat-stroke-ink cat-fill-none"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      {/* Inner ears. */}
-      <polygon points="152,39 153,30 160,37" className="cat-fill-rule-strong" />
-      <polygon points="168,38 172,30 177,39" className="cat-fill-rule-strong" />
+      {/* Inner ears, tucked inside each ear of the silhouette. */}
+      <polygon points="153,42 152,31 160,40" className="cat-fill-rule-strong" />
+      <polygon points="172,41 177,30 180,42" className="cat-fill-rule-strong" />
       {/* Face: a forward eye on the white cheek, pink nose, whiskers
           sweeping ahead of her, intent on the crossing. */}
       <ellipse cx="159" cy="54" rx="3" ry="2.6" className="cat-fill-ink" />
