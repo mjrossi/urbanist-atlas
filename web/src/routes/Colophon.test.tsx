@@ -30,7 +30,7 @@ describe('Colophon', () => {
     expect(text).toMatch(/broadsheet vocabulary/i);
     expect(text).toMatch(/what you can take/i);
     expect(text).toMatch(/how the directory stays current/i);
-    expect(text).toMatch(/two surveyors who know the ground/i);
+    expect(text).toMatch(/three surveyors who know the ground/i);
     // And the kicker numerals carry their topic labels.
     const kickers = Array.from(container.querySelectorAll('.section-kicker'))
       .map((k) => k.textContent)
@@ -46,8 +46,9 @@ describe('Colophon', () => {
     const { container } = renderColophon();
     expect(screen.getAllByText(/pad thai/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/mrs peacock/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/cera/i).length).toBeGreaterThan(0);
     const portraits = container.querySelectorAll('.newsroom-cats svg');
-    expect(portraits.length).toBe(2);
+    expect(portraits.length).toBe(3);
     for (const svg of portraits) {
       expect(svg.getAttribute('aria-hidden')).toBe('true');
       expect(svg.getAttribute('focusable')).toBe('false');
