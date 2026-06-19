@@ -176,16 +176,15 @@ X-Data-Attribution: https://urbanistatlas.com
           <div className="h2-rule" />
           <p>
             No atlas is surveyed from a desk alone, and this one keeps three who know the
-            territory — all paid in salmon, none inclined to file a report.
-            Their findings are non-negotiable.{' '}
-            <strong>Pad Thai</strong>, an all-black Bombay, is our authority on sprawl: he
-            occupies the maximum possible desk area, belly to the ceiling, in open
-            defiance of every density guideline we publish. <strong>Mrs Peacock</strong>,
-            a dilute tortoiseshell, runs the walkability audit — she tests each surface on
-            foot, the keyboard especially, and reroutes the day around her chosen desire
-            line. <strong>Cera</strong>, a calico, works the right-of-way desk — she steps
-            into every crossing unannounced, halts the oncoming traffic, and waves through
-            only the few she favors.
+            territory — all paid in salmon, none inclined to file a report. Their findings
+            are non-negotiable. <strong>Pad Thai</strong>, an all-black Bombay, is our
+            authority on sprawl: he occupies the maximum possible desk area, belly to the
+            ceiling, in open defiance of every density guideline we publish.{' '}
+            <strong>Mrs Peacock</strong>, a dilute tortoiseshell, runs the walkability
+            audit — she tests each surface on foot, the keyboard especially, and reroutes
+            the day around her chosen desire line. <strong>Cera</strong>, a calico, works
+            the right-of-way desk — she steps into every crossing unannounced, halts the
+            oncoming traffic, and waves through only the few she favors.
           </p>
           <div className="newsroom-cats">
             <figure className="newsroom-cat">
