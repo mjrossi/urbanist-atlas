@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 
 import {
+  CeraIllustration,
   MrsPeacockIllustration,
   PadThaiIllustration,
 } from '../components/NewsroomCats.tsx';
@@ -171,17 +172,19 @@ X-Data-Attribution: https://urbanistatlas.com
           </p>
 
           <div className="section-kicker">§ VII — Field staff</div>
-          <h2>Two surveyors who know the ground.</h2>
+          <h2>Three surveyors who know the ground.</h2>
           <div className="h2-rule" />
           <p>
-            No atlas is surveyed from a desk alone, and this one keeps two who know the
-            territory — both paid in salmon, neither inclined to file a report.{' '}
+            No atlas is surveyed from a desk alone, and this one keeps three who know the
+            territory — all paid in salmon, none inclined to file a report.{' '}
             <strong>Pad Thai</strong>, an all-black Bombay, is our authority on sprawl: he
             occupies the maximum possible desk area, belly to the ceiling, in open
             defiance of every density guideline we publish. <strong>Mrs Peacock</strong>,
             a dilute tortoiseshell, runs the walkability audit — she tests each surface on
             foot, the keyboard especially, and reroutes the day around her chosen desire
-            line. Their findings are non-negotiable.
+            line. <strong>Cera</strong>, a calico, holds right of way — never once at
+            rest, she claims priority at every threshold she crosses and yields to no one,
+            the closing door included. Their findings are non-negotiable.
           </p>
           <div className="newsroom-cats">
             <figure className="newsroom-cat">
@@ -194,6 +197,12 @@ X-Data-Attribution: https://urbanistatlas.com
               <MrsPeacockIllustration className="cat-illustration" />
               <figcaption>
                 <span className="cat-name">Mrs Peacock</span> · Walkability
+              </figcaption>
+            </figure>
+            <figure className="newsroom-cat">
+              <CeraIllustration className="cat-illustration" />
+              <figcaption>
+                <span className="cat-name">Cera</span> · Right of Way
               </figcaption>
             </figure>
           </div>
@@ -253,6 +262,7 @@ X-Data-Attribution: https://urbanistatlas.com
             <ul>
               <li>Pad Thai · Sprawl</li>
               <li>Mrs Peacock · Walkability</li>
+              <li>Cera · Right of Way</li>
               <li>The territory disagrees at its peril.</li>
             </ul>
           </div>

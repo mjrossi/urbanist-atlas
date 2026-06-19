@@ -1,12 +1,12 @@
 /**
  * The newsroom cats. Every print shop of consequence kept a cat; the
- * Atlas keeps two, and these are their woodcut portraits — flat fills,
+ * Atlas keeps three, and these are their woodcut portraits — flat fills,
  * heavy ink outlines, drawn entirely from the design-token palette via
  * the `.cat-fill-*` / `.cat-stroke-*` classes in global.css (SVG
  * `fill`/`stroke` *attributes* can't carry `var()`, but the CSS
  * properties can).
  *
- * All three are decorative: `aria-hidden`, unfocusable, sized by the
+ * All four are decorative: `aria-hidden`, unfocusable, sized by the
  * container through CSS (no width/height attributes). Pad Thai's tail
  * is grouped as `.cat-tail` so the 404 page can give it a slow sway.
  */
@@ -254,6 +254,150 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
         className="cat-stroke-ink cat-fill-none"
         strokeWidth="1"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Cera, a calico, mid-stride across a crosswalk — the one cat who is
+ * never once at rest, claiming right of way as she goes. A calico is
+ * the easiest of the three to draw from the broadsheet palette: she is
+ * simply white + ginger + black, which the tokens already carry, so
+ * unlike Mrs Peacock she needs no custom coat colors. Cream base
+ * (`paper-2`), ginger patches (`amber-soft`, deepened with `amber`),
+ * and black patches (`ink`) — including the classic split face — are
+ * clipped to her silhouette so no patch spills past the outline. Her
+ * tail reads bottom-up white → ginger → black tip (the bare ink
+ * outline showing through where the colored core stops).
+ */
+export function CeraIllustration({ className }: { className?: string }) {
+  const body =
+    'M42 72 C36 58 50 50 64 51 C92 47 118 47 140 51 C150 46 156 40 160 40 C170 40 178 46 180 55 C181 60 178 63 173 64 C168 66 162 66 158 68 C154 72 152 82 150 90 C148 96 140 98 130 97 C108 99 84 99 68 97 C54 95 46 88 44 80 C43 77 42 74 42 72 Z';
+  const tail = 'M50 66 C36 62 26 50 30 39 C32 33 38 30 44 33';
+  return (
+    <svg viewBox="0 0 200 120" aria-hidden="true" focusable="false" className={className}>
+      <defs>
+        <clipPath id="cera-body">
+          <path d={body} />
+          <polygon points="148,42 150,25 163,38" />
+          <polygon points="164,38 173,24 181,40" />
+        </clipPath>
+      </defs>
+      {/* Crosswalk she is busy claiming: pale zebra bars on the ground
+          rule — her stage prop, the way Pad Thai has his page and Mrs
+          Peacock her keyboard. */}
+      <g className="cat-fill-paper-2 cat-stroke-rule" strokeWidth="1">
+        <rect x="14" y="101" width="7" height="6" />
+        <rect x="32" y="101" width="7" height="6" />
+        <rect x="50" y="101" width="7" height="6" />
+        <rect x="68" y="101" width="7" height="6" />
+        <rect x="86" y="101" width="7" height="6" />
+        <rect x="104" y="101" width="7" height="6" />
+        <rect x="122" y="101" width="7" height="6" />
+        <rect x="140" y="101" width="7" height="6" />
+        <rect x="158" y="101" width="7" height="6" />
+        <rect x="176" y="101" width="7" height="6" />
+      </g>
+      <line
+        x1="10"
+        y1="107"
+        x2="190"
+        y2="107"
+        className="cat-stroke-rule cat-fill-none"
+        strokeWidth="1.5"
+      />
+      {/* Tail, carried high: ink outline, then a ginger core that stops
+          short of the tip so the bare outline reads as a black tip, then
+          a whisper of white at the base. */}
+      <path
+        d={tail}
+        className="cat-stroke-ink cat-fill-none"
+        strokeWidth="9"
+        strokeLinecap="round"
+      />
+      <path
+        d="M50 66 C37 62 28 51 31 41"
+        className="cat-stroke-amber-soft cat-fill-none"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M50 66 C46 65 42 63 39 60"
+        className="cat-stroke-paper cat-fill-none"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+      {/* Four legs mid-walk — back pair, front pair, the front-near one
+          lifted off the crosswalk into a step. Drawn first so the body
+          covers where they meet it. White, as a calico's legs tend to be. */}
+      <g className="cat-fill-paper-2 cat-stroke-ink" strokeWidth="2">
+        <rect x="58" y="86" width="9" height="20" rx="4" />
+        <rect x="78" y="86" width="9" height="17" rx="4" />
+        <rect x="116" y="86" width="9" height="20" rx="4" />
+        <rect x="132" y="84" width="9" height="14" rx="4" transform="rotate(20 136 91)" />
+      </g>
+      {/* Cream base coat: body, then the two ears. */}
+      <path d={body} className="cat-fill-paper-2" />
+      <polygon points="148,42 150,25 163,38" className="cat-fill-paper-2" />
+      <polygon points="164,38 173,24 181,40" className="cat-fill-paper-2" />
+      {/* Calico patches, clipped to her silhouette: ginger over the rump
+          and far ear, black saddle and near-ear/crown (a split face),
+          a deeper-amber touch and a small black hip dot for depth. */}
+      <g clipPath="url(#cera-body)">
+        <ellipse cx="66" cy="64" rx="22" ry="15" className="cat-fill-amber-soft" />
+        <ellipse cx="171" cy="43" rx="12" ry="12" className="cat-fill-amber-soft" />
+        <ellipse cx="108" cy="56" rx="24" ry="13" className="cat-fill-ink" />
+        <ellipse cx="152" cy="42" rx="12" ry="12" className="cat-fill-ink" />
+        <ellipse
+          cx="54"
+          cy="70"
+          rx="11"
+          ry="8"
+          className="cat-fill-amber"
+          fillOpacity="0.55"
+        />
+        <ellipse cx="50" cy="84" rx="8" ry="9" className="cat-fill-ink" />
+      </g>
+      {/* Crisp outline, over the coat zones. */}
+      <path
+        d={body}
+        className="cat-stroke-ink cat-fill-none"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="148,42 150,25 163,38"
+        className="cat-stroke-ink cat-fill-none"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="164,38 173,24 181,40"
+        className="cat-stroke-ink cat-fill-none"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      {/* Inner ears. */}
+      <polygon points="152,39 153,30 160,37" className="cat-fill-rule-strong" />
+      <polygon points="168,38 172,30 177,39" className="cat-fill-rule-strong" />
+      {/* Face: a forward eye on the white cheek, pink nose, whiskers
+          sweeping ahead of her, intent on the crossing. */}
+      <ellipse cx="159" cy="54" rx="3" ry="2.6" className="cat-fill-ink" />
+      <circle cx="160" cy="53" r="0.9" className="cat-fill-paper" />
+      <polygon points="176,55 182,55 179,59" className="cat-fill-rule-strong" />
+      <path
+        d="M179 60 q-3 3 -7 2"
+        className="cat-stroke-ink cat-fill-none"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M174 57 q9 -2 16 -1 M174 60 q9 0 15 3"
+        className="cat-stroke-ink cat-fill-none"
+        strokeWidth="1"
+        strokeLinecap="round"
+        opacity="0.8"
       />
     </svg>
   );
