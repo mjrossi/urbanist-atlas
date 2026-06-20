@@ -368,10 +368,10 @@ export function CeraIllustration({ className }: { className?: string }) {
       {/* Inner ears, tucked inside each ear of the silhouette. */}
       <polygon points="153,42 152,31 160,40" className="cat-fill-rule-strong" />
       <polygon points="172,41 177,30 180,42" className="cat-fill-rule-strong" />
-      {/* Face: a forward eye on the white cheek, pink nose, whiskers
+      {/* Face: a forward eye set in the ginger cheek, pink nose, whiskers
           sweeping ahead of her, intent on the crossing. */}
-      <ellipse cx="159" cy="54" rx="3" ry="2.6" className="cat-fill-ink" />
-      <circle cx="160" cy="53" r="0.9" className="cat-fill-paper" />
+      <ellipse cx="170" cy="50" rx="3" ry="2.6" className="cat-fill-ink" />
+      <circle cx="171" cy="49" r="0.9" className="cat-fill-paper" />
       <polygon points="176,55 182,55 179,59" className="cat-fill-rule-strong" />
       <path
         d="M179 60 q-3 3 -7 2"
