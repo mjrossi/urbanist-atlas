@@ -130,9 +130,7 @@ function ResultsBody({
           <EmptyState
             className="mt-48"
             title={e.problem?.title ?? 'No match for that postal code'}
-            body={
-              e.problem?.detail ?? `We couldn’t find a match for ${postalCode}.`
-            }
+            body={e.problem?.detail ?? `We couldn’t find a match for ${postalCode}.`}
             cta={
               <>
                 Try <Link to="/">another code</Link>, or{' '}

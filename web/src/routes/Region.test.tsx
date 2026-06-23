@@ -348,9 +348,7 @@ describe('Region', () => {
     // Server-supplied title + detail render verbatim; the frontend
     // doesn't author the message.
     await waitFor(() => {
-      expect(
-        screen.getByText(/don.t have this region in the atlas yet/i),
-      ).toBeDefined();
+      expect(screen.getByText(/don.t have this region in the atlas yet/i)).toBeDefined();
     });
     // Navigation links remain as frontend chrome.
     const browseLinks = screen
