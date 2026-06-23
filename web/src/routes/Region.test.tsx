@@ -328,20 +328,31 @@ describe('Region', () => {
     expect(ny.getAttribute('href')).toBe('/region/ny');
   });
 
-  it('renders the inline empty-state on 404 (not a crash)', async () => {
+  it('renders the backend not-found copy on 404 with Browse chrome (not a crash)', async () => {
     getRegionMock.mockRejectedValueOnce(
       new ApiError(
         404,
-        'Not Found',
-        { type: 'about:blank', title: 'Not Found', status: 404 },
+        'Region Not Found',
+        {
+          type: 'https://urbanistatlas.com/problems/not-found',
+          title: 'Region Not Found',
+          detail:
+            "We don't have this region in the atlas yet. It may not be indexed, or the link you followed may be out of date.",
+          status: 404,
+        },
         'req-region-1',
       ),
     );
     renderAt('/region/totally-fake');
 
+    // Server-supplied title + detail render verbatim; the frontend
+    // doesn't author the message.
     await waitFor(() => {
-      expect(screen.getByText(/isn.t in the atlas yet/i)).toBeDefined();
+      expect(
+        screen.getByText(/don.t have this region in the atlas yet/i),
+      ).toBeDefined();
     });
+    // Navigation links remain as frontend chrome.
     const browseLinks = screen
       .getAllByRole('link', { name: /browse/i })
       .filter((a) => a.getAttribute('href') === '/browse');
