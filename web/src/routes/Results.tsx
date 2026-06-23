@@ -138,6 +138,28 @@ function ResultsBody({
             }
             cta={<Link to="/">Back to the lookup</Link>}
           />
+        ) : e.status === 404 ? (
+          // Generic unresolved code. /lookup only 404s as military
+          // (handled above) or not-found, so status alone is enough —
+          // mirrors the 404 branches in Region.tsx / Org.tsx. Genuine
+          // errors (401/429/500) return undefined and fall through to
+          // QueryState's default red alert with the request id.
+          <EmptyState
+            className="mt-48"
+            title="No match for that postal code"
+            body={
+              <>
+                We couldn&rsquo;t find a region for {postalCode}. Double-check the digits —
+                or it may be a corner of the map the atlas hasn&rsquo;t reached yet.
+              </>
+            }
+            cta={
+              <>
+                Try <Link to="/">another code</Link>, or{' '}
+                <Link to="/submit">file a tip</Link> if you know advocates there.
+              </>
+            }
+          />
         ) : undefined
       }
       className="mt-48"

@@ -143,6 +143,30 @@ describe('Results', () => {
     expect(alert.textContent).toContain('req-abc-123');
   });
 
+  it('renders a friendly not-found card with a link back (not an alert) for an unresolved code', async () => {
+    lookupMock.mockRejectedValueOnce(
+      new ApiError(
+        404,
+        'Postal Code Not Found',
+        {
+          type: 'https://urbanistatlas.com/problems/not-found',
+          title: 'Postal Code Not Found',
+          status: 404,
+        },
+        'req-nf-1',
+      ),
+    );
+    renderAt('/r/00000?country=US');
+
+    await waitFor(() => {
+      expect(screen.getByText(/couldn.t find a region for/i)).toBeDefined();
+    });
+    // Friendly, not a red error: no alert role, and a link back to the
+    // lookup is offered.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('link', { name: /another code/i })).toBeDefined();
+  });
+
   it('renders a calm informational note (not an alert) for a military ZIP', async () => {
     lookupMock.mockRejectedValueOnce(
       new ApiError(
