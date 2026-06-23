@@ -143,6 +143,30 @@ describe('Results', () => {
     expect(alert.textContent).toContain('req-abc-123');
   });
 
+  it('renders a calm informational note (not an alert) for a military ZIP', async () => {
+    lookupMock.mockRejectedValueOnce(
+      new ApiError(
+        404,
+        'Military or Diplomatic ZIP Code',
+        {
+          type: 'https://urbanistatlas.com/problems/military-postal-code',
+          title: 'Military or Diplomatic ZIP Code',
+          status: 404,
+        },
+        'req-mil-1',
+      ),
+    );
+    renderAt('/r/09000?country=US');
+
+    await waitFor(() => {
+      expect(screen.getByText(/military.*\(APO\/FPO\).*diplomatic/i)).toBeDefined();
+    });
+    // Informational, not a red error: no alert role, and it nudges to a
+    // residential ZIP.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText(/residential\s+ZIP/i)).toBeDefined();
+  });
+
   it('defaults country to US when the search param is missing', async () => {
     lookupMock.mockResolvedValueOnce(makeResult({ local: [], regional: [] }));
     renderAt('/r/11217');

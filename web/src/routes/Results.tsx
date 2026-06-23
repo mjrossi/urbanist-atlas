@@ -21,6 +21,11 @@ function parseCountry(raw: string | null): Country | null {
   return isSupportedCountry(raw) ? raw : null;
 }
 
+// Problem `type` the API returns for US military (APO/FPO) / diplomatic
+// (DPO) ZIPs — valid codes with no residential region. Rendered as a
+// calm informational note rather than a red error (see ResultsBody).
+const MILITARY_ZIP_PROBLEM = 'https://urbanistatlas.com/problems/military-postal-code';
+
 export function Results() {
   const params = useParams<{ postalCode: string }>();
   const [search] = useSearchParams();
@@ -119,6 +124,22 @@ function ResultsBody({
     <QueryState
       query={query}
       loading={<>Finding organizations for {postalCode}…</>}
+      error={(e) =>
+        e.problem?.type === MILITARY_ZIP_PROBLEM ? (
+          <EmptyState
+            className="mt-48"
+            title="Military or diplomatic ZIP"
+            body={
+              <>
+                {postalCode} is a US military (APO/FPO) or diplomatic (DPO) ZIP
+                code — a mailing address with no local region. Enter a residential
+                ZIP code to find advocates near you.
+              </>
+            }
+            cta={<Link to="/">Back to the lookup</Link>}
+          />
+        ) : undefined
+      }
       className="mt-48"
     >
       {(data) => <ResultsContent data={data} postalCode={postalCode} />}

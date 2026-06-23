@@ -10,6 +10,7 @@ import (
 const (
 	problemValidation   = "https://urbanistatlas.com/problems/validation"
 	problemNotFound     = "https://urbanistatlas.com/problems/not-found"
+	problemMilitaryZIP  = "https://urbanistatlas.com/problems/military-postal-code"
 	problemInternal     = "https://urbanistatlas.com/problems/internal"
 	problemUnauthorized = "https://urbanistatlas.com/problems/unauthorized"
 	problemConflict     = "https://urbanistatlas.com/problems/conflict"

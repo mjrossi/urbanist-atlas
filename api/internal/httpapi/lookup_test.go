@@ -241,6 +241,39 @@ func TestLookup_PostalCodeNotFound_ReturnsProblemJSON(t *testing.T) {
 	}
 }
 
+func TestLookup_MilitaryZIP_ReturnsTailoredProblem(t *testing.T) {
+	srv := newTestServer(t)
+
+	// One ZIP per reserved range: AE (090–098), AA (340), AP (962–966).
+	for _, zip := range []string{"09000", "34001", "96201"} {
+		t.Run(zip, func(t *testing.T) {
+			resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=" + zip + "&country=US")
+			if err != nil {
+				t.Fatalf("GET: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusNotFound {
+				t.Fatalf("status: want 404, got %d", resp.StatusCode)
+			}
+			if ct := resp.Header.Get("Content-Type"); ct != "application/problem+json" {
+				t.Errorf("Content-Type: want application/problem+json, got %q", ct)
+			}
+
+			var prob oapi.ProblemDetails
+			if err := json.NewDecoder(resp.Body).Decode(&prob); err != nil {
+				t.Fatalf("decode problem: %v", err)
+			}
+			if prob.Type != problemMilitaryZIP {
+				t.Errorf("type: want %q, got %q", problemMilitaryZIP, prob.Type)
+			}
+			if prob.Title != "Military or Diplomatic ZIP Code" {
+				t.Errorf("title: want %q, got %q", "Military or Diplomatic ZIP Code", prob.Title)
+			}
+		})
+	}
+}
+
 func TestLookup_UnknownCountry_ReturnsNotFound(t *testing.T) {
 	// Per the slice #4.6 loader-engineering work, the handler no longer
 	// gates on a known-country whitelist (Country is opaque per

@@ -130,7 +130,9 @@ func NewMetrics() *Metrics {
 	}
 }
 
-// incLookup records a lookup outcome. result is "hit" or "miss".
+// incLookup records a lookup outcome. result is "hit", "miss", or
+// "military" (a US APO/FPO/DPO ZIP, which has no residential region and
+// so is tracked separately from genuine coverage misses).
 //
 // country is caller-supplied query input (the handler does not gate on a
 // known-country list), so it is bucketed to a bounded set here — only the

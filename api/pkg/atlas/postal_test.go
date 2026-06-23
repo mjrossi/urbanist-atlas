@@ -2,6 +2,42 @@ package atlas
 
 import "testing"
 
+func TestIsMilitaryPostalCode(t *testing.T) {
+	cases := []struct {
+		name    string
+		country Country
+		code    string
+		want    bool
+	}{
+		// AE range 090–098 and its boundaries.
+		{"ae low boundary 089 residential", "US", "08901", false},
+		{"ae 090", "US", "09000", true},
+		{"ae 098", "US", "09812", true},
+		{"ae high boundary 099", "US", "09900", false},
+		// AA range == 340 and its boundaries.
+		{"aa 339 residential", "US", "33912", false},
+		{"aa 340", "US", "34001", true},
+		{"aa 341 florida residential", "US", "34102", false},
+		// AP range 962–966 and its boundaries.
+		{"ap 961 california residential", "US", "96150", false},
+		{"ap 962", "US", "96201", true},
+		{"ap 966", "US", "96699", true},
+		{"ap 967 hawaii residential", "US", "96701", false},
+		// Plain residential / non-US / malformed.
+		{"residential nyc", "US", "11217", false},
+		{"non-us same digits", "CA", "09000", false},
+		{"too short", "US", "0900", false},
+		{"non-digit", "US", "090AB", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := IsMilitaryPostalCode(c.country, c.code); got != c.want {
+				t.Errorf("IsMilitaryPostalCode(%q, %q) = %v, want %v", c.country, c.code, got, c.want)
+			}
+		})
+	}
+}
+
 func TestNormalizePostalCode(t *testing.T) {
 	cases := []struct {
 		name    string
