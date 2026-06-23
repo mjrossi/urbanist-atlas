@@ -102,6 +102,46 @@ func ValidatePostalCode(country Country, code string) error {
 	return nil
 }
 
+// IsMilitaryPostalCode reports whether code is a US military (APO/FPO)
+// or diplomatic (DPO) ZIP. These occupy reserved ZIP prefixes that have
+// no residential region in the atlas graph, so a lookup for one always
+// misses; callers use this to swap the generic "not found" reply for a
+// tailored "enter a residential ZIP" message.
+//
+// Only meaningful for CountryUS; false for every other country. code is
+// expected already normalized (5 digits) — anything else returns false.
+// The reserved ranges, none of which overlap a residential ZIP:
+//
+//   - 090–098: AE (Armed Forces Europe/Middle East/Africa/Canada).
+//     Residential New England starts at 010; all of 09xxx is military.
+//   - 340:     AA (Armed Forces Americas). Florida residential is 341xx+.
+//   - 962–966: AP (Armed Forces Pacific). California ends at 961xx,
+//     Hawaii is 967/968.
+//
+// 099 is unassigned (neither residential nor military) and is
+// deliberately excluded — do not widen the AE range to 090–099.
+func IsMilitaryPostalCode(country Country, code string) bool {
+	if country != CountryUS || len(code) != 5 {
+		return false
+	}
+	for _, r := range code {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	prefix := code[:3]
+	switch {
+	case prefix >= "090" && prefix <= "098":
+		return true
+	case prefix == "340":
+		return true
+	case prefix >= "962" && prefix <= "966":
+		return true
+	default:
+		return false
+	}
+}
+
 // postalKey is the internal cache key used by MemStore. Lowercase
 // helper, not exported.
 func postalKey(country Country, code string) string {

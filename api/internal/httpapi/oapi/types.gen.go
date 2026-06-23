@@ -276,6 +276,10 @@ type Org struct {
 //     malformed or missing a required field (HTTP 400).
 //   - `https://urbanistatlas.com/problems/not-found` — the
 //     requested resource does not exist (HTTP 404).
+//   - `https://urbanistatlas.com/problems/military-postal-code` — the
+//     looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+//     ZIP, which has no residential region; enter a residential ZIP
+//     instead (HTTP 404).
 //   - `https://urbanistatlas.com/problems/unauthorized` — missing
 //     or invalid bearer token on a protected endpoint (HTTP 401).
 //   - `https://urbanistatlas.com/problems/conflict` — the requested
@@ -688,6 +692,10 @@ type SubmissionID = openapi_types.UUID
 //     malformed or missing a required field (HTTP 400).
 //   - `https://urbanistatlas.com/problems/not-found` — the
 //     requested resource does not exist (HTTP 404).
+//   - `https://urbanistatlas.com/problems/military-postal-code` — the
+//     looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+//     ZIP, which has no residential region; enter a residential ZIP
+//     instead (HTTP 404).
 //   - `https://urbanistatlas.com/problems/unauthorized` — missing
 //     or invalid bearer token on a protected endpoint (HTTP 401).
 //   - `https://urbanistatlas.com/problems/conflict` — the requested
@@ -720,6 +728,10 @@ type BadRequest = ProblemDetails
 //     malformed or missing a required field (HTTP 400).
 //   - `https://urbanistatlas.com/problems/not-found` — the
 //     requested resource does not exist (HTTP 404).
+//   - `https://urbanistatlas.com/problems/military-postal-code` — the
+//     looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+//     ZIP, which has no residential region; enter a residential ZIP
+//     instead (HTTP 404).
 //   - `https://urbanistatlas.com/problems/unauthorized` — missing
 //     or invalid bearer token on a protected endpoint (HTTP 401).
 //   - `https://urbanistatlas.com/problems/conflict` — the requested
@@ -752,6 +764,10 @@ type InternalError = ProblemDetails
 //     malformed or missing a required field (HTTP 400).
 //   - `https://urbanistatlas.com/problems/not-found` — the
 //     requested resource does not exist (HTTP 404).
+//   - `https://urbanistatlas.com/problems/military-postal-code` — the
+//     looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+//     ZIP, which has no residential region; enter a residential ZIP
+//     instead (HTTP 404).
 //   - `https://urbanistatlas.com/problems/unauthorized` — missing
 //     or invalid bearer token on a protected endpoint (HTTP 401).
 //   - `https://urbanistatlas.com/problems/conflict` — the requested
@@ -784,6 +800,10 @@ type NotFound = ProblemDetails
 //     malformed or missing a required field (HTTP 400).
 //   - `https://urbanistatlas.com/problems/not-found` — the
 //     requested resource does not exist (HTTP 404).
+//   - `https://urbanistatlas.com/problems/military-postal-code` — the
+//     looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+//     ZIP, which has no residential region; enter a residential ZIP
+//     instead (HTTP 404).
 //   - `https://urbanistatlas.com/problems/unauthorized` — missing
 //     or invalid bearer token on a protected endpoint (HTTP 401).
 //   - `https://urbanistatlas.com/problems/conflict` — the requested
@@ -816,6 +836,10 @@ type TooManyRequests = ProblemDetails
 //     malformed or missing a required field (HTTP 400).
 //   - `https://urbanistatlas.com/problems/not-found` — the
 //     requested resource does not exist (HTTP 404).
+//   - `https://urbanistatlas.com/problems/military-postal-code` — the
+//     looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+//     ZIP, which has no residential region; enter a residential ZIP
+//     instead (HTTP 404).
 //   - `https://urbanistatlas.com/problems/unauthorized` — missing
 //     or invalid bearer token on a protected endpoint (HTTP 401).
 //   - `https://urbanistatlas.com/problems/conflict` — the requested

@@ -38,8 +38,9 @@ func newMetricsTestServer(t *testing.T) (*httptest.Server, *Metrics) {
 func TestMetrics_LookupCounters(t *testing.T) {
 	srv, m := newMetricsTestServer(t)
 
-	// One known hit, one known miss.
-	for _, postal := range []string{"11217", "00000"} {
+	// One known hit, one known miss, one APO/FPO/DPO military ZIP (which
+	// is tracked under its own "military" result, not "miss").
+	for _, postal := range []string{"11217", "00000", "09000"} {
 		resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=" + postal + "&country=US")
 		if err != nil {
 			t.Fatalf("GET %s: %v", postal, err)
@@ -52,6 +53,10 @@ func TestMetrics_LookupCounters(t *testing.T) {
 	}
 	if got := testutil.ToFloat64(m.lookupTotal.WithLabelValues("US", "miss")); got != 1 {
 		t.Errorf("atlas_lookup_total{country=US,result=miss} = %v, want 1", got)
+	}
+	// The military ZIP must increment "military", not "miss".
+	if got := testutil.ToFloat64(m.lookupTotal.WithLabelValues("US", "military")); got != 1 {
+		t.Errorf("atlas_lookup_total{country=US,result=military} = %v, want 1", got)
 	}
 }
 

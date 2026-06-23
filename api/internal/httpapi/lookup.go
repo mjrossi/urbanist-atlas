@@ -68,6 +68,15 @@ func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *cove
 		})
 		if err != nil {
 			if errors.Is(err, atlas.ErrPostalCodeNotFound) {
+				// APO/FPO/DPO ZIPs are valid addresses with no residential
+				// region — never a coverage gap — so they get a tailored
+				// message and a distinct metrics label, not the generic miss.
+				if atlas.IsMilitaryPostalCode(country, postal) {
+					m.incLookup(string(country), "military")
+					writeProblem(w, r, http.StatusNotFound, problemMilitaryZIP, "Military or Diplomatic ZIP Code",
+						"APO, FPO, and DPO ZIP codes are military and diplomatic addresses that aren't tied to a local region. Enter a residential ZIP code to find organizations near you.", rid)
+					return
+				}
 				m.incLookup(string(country), "miss")
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Postal Code Not Found",
 					"No region is mapped to that postal code. Try a nearby code, or file a tip if you know an organization there.", rid)

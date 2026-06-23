@@ -100,6 +100,11 @@ export interface paths {
          *     (e.g. `M5V 3A8` → `M5V`) server-side; clients may pass either
          *     form.
          *
+         *     A code with no mapped region returns 404. US military (APO/FPO)
+         *     and diplomatic (DPO) ZIPs are a special case of that 404, carrying
+         *     `type` `https://urbanistatlas.com/problems/military-postal-code`
+         *     so clients can prompt for a residential ZIP instead.
+         *
          *     This is a single-object response — the body is a bare
          *     `LookupResult` with no `{meta, data}` envelope. ODbL
          *     attribution travels via the `X-Data-License` and
@@ -962,6 +967,10 @@ export interface components {
          *       malformed or missing a required field (HTTP 400).
          *     - `https://urbanistatlas.com/problems/not-found` — the
          *       requested resource does not exist (HTTP 404).
+         *     - `https://urbanistatlas.com/problems/military-postal-code` — the
+         *       looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+         *       ZIP, which has no residential region; enter a residential ZIP
+         *       instead (HTTP 404).
          *     - `https://urbanistatlas.com/problems/unauthorized` — missing
          *       or invalid bearer token on a protected endpoint (HTTP 401).
          *     - `https://urbanistatlas.com/problems/conflict` — the requested
