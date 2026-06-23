@@ -131,9 +131,9 @@ function ResultsBody({
             title="Military or diplomatic ZIP"
             body={
               <>
-                {postalCode} is a US military (APO/FPO) or diplomatic (DPO) ZIP
-                code — a mailing address with no local region. Enter a residential
-                ZIP code to find advocates near you.
+                {postalCode} is a US military (APO/FPO) or diplomatic (DPO) ZIP code — a
+                mailing address with no local region. Enter a residential ZIP code to find
+                advocates near you.
               </>
             }
             cta={<Link to="/">Back to the lookup</Link>}
