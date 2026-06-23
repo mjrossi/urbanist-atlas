@@ -21,11 +21,6 @@ function parseCountry(raw: string | null): Country | null {
   return isSupportedCountry(raw) ? raw : null;
 }
 
-// Problem `type` the API returns for US military (APO/FPO) / diplomatic
-// (DPO) ZIPs — valid codes with no residential region. Rendered as a
-// calm informational note rather than a red error (see ResultsBody).
-const MILITARY_ZIP_PROBLEM = 'https://urbanistatlas.com/problems/military-postal-code';
-
 export function Results() {
   const params = useParams<{ postalCode: string }>();
   const [search] = useSearchParams();
@@ -125,38 +120,23 @@ function ResultsBody({
       query={query}
       loading={<>Finding organizations for {postalCode}…</>}
       error={(e) =>
-        e.problem?.type === MILITARY_ZIP_PROBLEM ? (
+        // Any 404 on /lookup is an unresolved postal code — a not-found
+        // or a military/diplomatic ZIP. The API owns the consumer-facing
+        // sentence (problem.title/detail); we render it and add the
+        // navigation links as chrome rather than re-authoring the copy.
+        // Genuine errors (401/429/500) return undefined and fall through
+        // to QueryState's default red alert with the request id.
+        e.status === 404 ? (
           <EmptyState
             className="mt-48"
-            title="Military or diplomatic ZIP"
+            title={e.problem?.title ?? 'No match for that postal code'}
             body={
-              <>
-                {postalCode} is a US military (APO/FPO) or diplomatic (DPO) ZIP code — a
-                mailing address with no local region. Enter a residential ZIP code to find
-                advocates near you.
-              </>
-            }
-            cta={<Link to="/">Back to the lookup</Link>}
-          />
-        ) : e.status === 404 ? (
-          // Generic unresolved code. /lookup only 404s as military
-          // (handled above) or not-found, so status alone is enough —
-          // mirrors the 404 branches in Region.tsx / Org.tsx. Genuine
-          // errors (401/429/500) return undefined and fall through to
-          // QueryState's default red alert with the request id.
-          <EmptyState
-            className="mt-48"
-            title="No match for that postal code"
-            body={
-              <>
-                We couldn&rsquo;t find a region for {postalCode}. Double-check the digits —
-                or it may be a corner of the map the atlas hasn&rsquo;t reached yet.
-              </>
+              e.problem?.detail ?? `We couldn’t find a match for ${postalCode}.`
             }
             cta={
               <>
                 Try <Link to="/">another code</Link>, or{' '}
-                <Link to="/submit">file a tip</Link> if you know advocates there.
+                <Link to="/submit">file a tip</Link>.
               </>
             }
           />
