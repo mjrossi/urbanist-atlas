@@ -117,6 +117,9 @@ func ValidatePostalCode(country Country, code string) error {
 //   - 340:     AA (Armed Forces Americas). Florida residential is 341xx+.
 //   - 962–966: AP (Armed Forces Pacific). California ends at 961xx,
 //     Hawaii is 967/968.
+//
+// 099 is unassigned (neither residential nor military) and is
+// deliberately excluded — do not widen the AE range to 090–099.
 func IsMilitaryPostalCode(country Country, code string) bool {
 	if country != CountryUS || len(code) != 5 {
 		return false
