@@ -357,6 +357,24 @@ describe('Region', () => {
     expect(browseLinks.length).toBeGreaterThan(0);
   });
 
+  it('falls back to a generic deck on a 404 with no problem body', async () => {
+    getRegionMock.mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', undefined, 'req-region-3'),
+    );
+    renderAt('/region/totally-fake');
+
+    // No problem+json body (e.g. a proxy-injected error page): the deck
+    // falls back to a generic line that doesn't duplicate — and so can't
+    // drift from — the API's authoritative copy. Browse chrome remains.
+    await waitFor(() => {
+      expect(screen.getByText(/this page isn.t available/i)).toBeDefined();
+    });
+    const browseLinks = screen
+      .getAllByRole('link', { name: /browse/i })
+      .filter((a) => a.getAttribute('href') === '/browse');
+    expect(browseLinks.length).toBeGreaterThan(0);
+  });
+
   it('renders a friendly empty state when all three buckets are empty', async () => {
     getRegionMock.mockResolvedValueOnce(
       makeDetail({ local: [], regional: [], statewide: [] }),

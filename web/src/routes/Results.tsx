@@ -122,14 +122,18 @@ function ResultsBody({
       error={(e) =>
         // Any 404 on /lookup is an unresolved postal code — a not-found
         // or a military/diplomatic ZIP. The API owns the consumer-facing
-        // sentence (problem.title/detail); we render it and add the
-        // navigation links as chrome rather than re-authoring the copy.
-        // Genuine errors (401/429/500) return undefined and fall through
-        // to QueryState's default red alert with the request id.
+        // sentence (problem.detail); we render it as the card body and add
+        // the navigation links as chrome rather than re-authoring the copy.
+        // The card label is a fixed small-caps eyebrow (the EmptyState
+        // `.label` slot is uppercased and tracked — designed for a terse
+        // eyebrow, not a backend problem title), so the server's title is
+        // not routed there. Genuine errors (401/429/500) return undefined
+        // and fall through to QueryState's default red alert with the
+        // request id.
         e.status === 404 ? (
           <EmptyState
             className="mt-48"
-            title={e.problem?.title ?? 'No match for that postal code'}
+            title="No match for that postal code"
             body={e.problem?.detail ?? `We couldn’t find a match for ${postalCode}.`}
             cta={
               <>

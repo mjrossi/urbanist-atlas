@@ -160,12 +160,13 @@ describe('Results', () => {
     );
     renderAt('/r/00000?country=US');
 
-    // The card renders the server-supplied title + detail verbatim — the
-    // frontend doesn't re-author the sentence.
+    // The card renders the server-supplied detail verbatim as the body —
+    // the frontend doesn't re-author the sentence. The label is a fixed
+    // small-caps eyebrow (not the backend problem title).
     await waitFor(() => {
       expect(screen.getByText(/No region is mapped to that postal code/i)).toBeDefined();
     });
-    expect(screen.getByText('Postal Code Not Found')).toBeDefined();
+    expect(screen.getByText('No match for that postal code')).toBeDefined();
     // Friendly, not a red error: no alert role, and a link back to the
     // lookup is offered as navigation chrome.
     expect(screen.queryByRole('alert')).toBeNull();
@@ -195,6 +196,23 @@ describe('Results', () => {
     });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByText(/Enter a residential ZIP code/i)).toBeDefined();
+  });
+
+  it('falls back to a generic card body on a 404 with no problem body', async () => {
+    lookupMock.mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', undefined, 'req-nf-2'),
+    );
+    renderAt('/r/00000?country=US');
+
+    // No problem+json body (e.g. a proxy-injected error page): the card
+    // still renders friendly chrome — the fixed eyebrow, a generic body
+    // naming the code, and the nav link — without an alert role.
+    await waitFor(() => {
+      expect(screen.getByText('No match for that postal code')).toBeDefined();
+    });
+    expect(screen.getByText(/couldn.t find a match for 00000/i)).toBeDefined();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('link', { name: /another code/i })).toBeDefined();
   });
 
   it('defaults country to US when the search param is missing', async () => {

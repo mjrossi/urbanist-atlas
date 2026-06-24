@@ -255,6 +255,24 @@ describe('Org', () => {
     expect(browseLinks.length).toBeGreaterThan(0);
   });
 
+  it('falls back to a generic deck on a 404 with no problem body', async () => {
+    getOrgMock.mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', undefined, 'req-org-3'),
+    );
+    renderAt('/orgs/totally-fake');
+
+    // No problem+json body (e.g. a proxy-injected error page): the deck
+    // falls back to a generic line that doesn't duplicate — and so can't
+    // drift from — the API's authoritative copy. Browse chrome remains.
+    await waitFor(() => {
+      expect(screen.getByText(/this page isn.t available/i)).toBeDefined();
+    });
+    const browseLinks = screen
+      .getAllByRole('link', { name: /browse/i })
+      .filter((a) => a.getAttribute('href') === '/browse');
+    expect(browseLinks.length).toBeGreaterThan(0);
+  });
+
   it('sets the browser tab title to the org name on success', async () => {
     getOrgMock.mockResolvedValueOnce(makeOrg());
     renderAt('/orgs/transalt');

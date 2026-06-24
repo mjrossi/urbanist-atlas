@@ -82,7 +82,11 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               <span className="accent">.</span>
             </h1>
             <p className="deck">
-              {e.problem?.detail ?? 'We don’t have this region in the atlas yet.'}
+              {/* The fallback only renders for a 404 with no problem+json
+                  body (e.g. a proxy-injected error page). Keep it generic
+                  so it doesn't duplicate — and drift from — the API's
+                  authoritative copy. */}
+              {e.problem?.detail ?? 'This page isn’t available.'}
             </p>
             <p className="deck">
               Try <Link to="/browse">Browse</Link> for the regions we have indexed, or{' '}
