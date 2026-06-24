@@ -26,7 +26,7 @@ func getOrgHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.Hand
 				m.incOrgView(false)
 				logger.DebugContext(r.Context(), "org view", "slug", slug, "found", false, "rid", rid)
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Organization Not Found",
-					"No organization matches that slug.", rid)
+					"We don't have this organization in the atlas yet. It may not be indexed, or the link you followed may be out of date.", rid)
 				return
 			}
 			logger.ErrorContext(r.Context(), "get org failed", "err", err, "slug", slug, "rid", rid)

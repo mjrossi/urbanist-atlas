@@ -224,14 +224,16 @@ describe('Org', () => {
     });
   });
 
-  it('renders the inline empty-state on 404 (not a crash)', async () => {
+  it('renders the backend not-found copy on 404 with Browse chrome (not a crash)', async () => {
     getOrgMock.mockRejectedValueOnce(
       new ApiError(
         404,
-        'Not Found',
+        'Organization Not Found',
         {
           type: 'https://urbanistatlas.com/problems/not-found',
-          title: 'Not Found',
+          title: 'Organization Not Found',
+          detail:
+            "We don't have this organization in the atlas yet. It may not be indexed, or the link you followed may be out of date.",
           status: 404,
         },
         'req-org-1',
@@ -239,8 +241,31 @@ describe('Org', () => {
     );
     renderAt('/orgs/totally-fake');
 
+    // Server-supplied title + detail render verbatim; the frontend
+    // doesn't author the message.
     await waitFor(() => {
-      expect(screen.getByText(/isn.t in the atlas yet/i)).toBeDefined();
+      expect(
+        screen.getByText(/don.t have this organization in the atlas yet/i),
+      ).toBeDefined();
+    });
+    // Navigation links remain as frontend chrome.
+    const browseLinks = screen
+      .getAllByRole('link', { name: /browse/i })
+      .filter((a) => a.getAttribute('href') === '/browse');
+    expect(browseLinks.length).toBeGreaterThan(0);
+  });
+
+  it('falls back to a generic deck on a 404 with no problem body', async () => {
+    getOrgMock.mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', undefined, 'req-org-3'),
+    );
+    renderAt('/orgs/totally-fake');
+
+    // No problem+json body (e.g. a proxy-injected error page): the deck
+    // falls back to a generic line that doesn't duplicate — and so can't
+    // drift from — the API's authoritative copy. Browse chrome remains.
+    await waitFor(() => {
+      expect(screen.getByText(/this page isn.t available/i)).toBeDefined();
     });
     const browseLinks = screen
       .getAllByRole('link', { name: /browse/i })

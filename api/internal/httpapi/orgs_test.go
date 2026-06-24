@@ -84,6 +84,12 @@ func TestGetOrg_404_UnknownSlug(t *testing.T) {
 	if prob.Title != "Organization Not Found" {
 		t.Errorf("title: want %q, got %q", "Organization Not Found", prob.Title)
 	}
+	// Detail is the consumer-facing message the web UI renders verbatim
+	// (no frontend-side copy), so pin it.
+	wantDetail := "We don't have this organization in the atlas yet. It may not be indexed, or the link you followed may be out of date."
+	if prob.Detail == nil || *prob.Detail != wantDetail {
+		t.Errorf("detail: want %q, got %v", wantDetail, prob.Detail)
+	}
 	if prob.RequestId == nil || *prob.RequestId == "" {
 		t.Errorf("request_id: want non-empty, got %v", prob.RequestId)
 	}

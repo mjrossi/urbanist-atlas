@@ -21,11 +21,6 @@ function parseCountry(raw: string | null): Country | null {
   return isSupportedCountry(raw) ? raw : null;
 }
 
-// Problem `type` the API returns for US military (APO/FPO) / diplomatic
-// (DPO) ZIPs — valid codes with no residential region. Rendered as a
-// calm informational note rather than a red error (see ResultsBody).
-const MILITARY_ZIP_PROBLEM = 'https://urbanistatlas.com/problems/military-postal-code';
-
 export function Results() {
   const params = useParams<{ postalCode: string }>();
   const [search] = useSearchParams();
@@ -125,18 +120,27 @@ function ResultsBody({
       query={query}
       loading={<>Finding organizations for {postalCode}…</>}
       error={(e) =>
-        e.problem?.type === MILITARY_ZIP_PROBLEM ? (
+        // Any 404 on /lookup is an unresolved postal code — a not-found
+        // or a military/diplomatic ZIP. The API owns the consumer-facing
+        // sentence (problem.detail); we render it as the card body and add
+        // the navigation links as chrome rather than re-authoring the copy.
+        // The card label is a fixed small-caps eyebrow (the EmptyState
+        // `.label` slot is uppercased and tracked — designed for a terse
+        // eyebrow, not a backend problem title), so the server's title is
+        // not routed there. Genuine errors (401/429/500) return undefined
+        // and fall through to QueryState's default red alert with the
+        // request id.
+        e.status === 404 ? (
           <EmptyState
             className="mt-48"
-            title="Military or diplomatic ZIP"
-            body={
+            title="No match for that postal code"
+            body={e.problem?.detail ?? `We couldn’t find a match for ${postalCode}.`}
+            cta={
               <>
-                {postalCode} is a US military (APO/FPO) or diplomatic (DPO) ZIP code — a
-                mailing address with no local region. Enter a residential ZIP code to find
-                advocates near you.
+                Try <Link to="/">another code</Link>, or{' '}
+                <Link to="/submit">file a tip</Link>.
               </>
             }
-            cta={<Link to="/">Back to the lookup</Link>}
           />
         ) : undefined
       }

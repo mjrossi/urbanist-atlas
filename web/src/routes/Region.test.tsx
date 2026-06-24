@@ -328,19 +328,46 @@ describe('Region', () => {
     expect(ny.getAttribute('href')).toBe('/region/ny');
   });
 
-  it('renders the inline empty-state on 404 (not a crash)', async () => {
+  it('renders the backend not-found copy on 404 with Browse chrome (not a crash)', async () => {
     getRegionMock.mockRejectedValueOnce(
       new ApiError(
         404,
-        'Not Found',
-        { type: 'about:blank', title: 'Not Found', status: 404 },
+        'Region Not Found',
+        {
+          type: 'https://urbanistatlas.com/problems/not-found',
+          title: 'Region Not Found',
+          detail:
+            "We don't have this region in the atlas yet. It may not be indexed, or the link you followed may be out of date.",
+          status: 404,
+        },
         'req-region-1',
       ),
     );
     renderAt('/region/totally-fake');
 
+    // Server-supplied title + detail render verbatim; the frontend
+    // doesn't author the message.
     await waitFor(() => {
-      expect(screen.getByText(/isn.t in the atlas yet/i)).toBeDefined();
+      expect(screen.getByText(/don.t have this region in the atlas yet/i)).toBeDefined();
+    });
+    // Navigation links remain as frontend chrome.
+    const browseLinks = screen
+      .getAllByRole('link', { name: /browse/i })
+      .filter((a) => a.getAttribute('href') === '/browse');
+    expect(browseLinks.length).toBeGreaterThan(0);
+  });
+
+  it('falls back to a generic deck on a 404 with no problem body', async () => {
+    getRegionMock.mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', undefined, 'req-region-3'),
+    );
+    renderAt('/region/totally-fake');
+
+    // No problem+json body (e.g. a proxy-injected error page): the deck
+    // falls back to a generic line that doesn't duplicate — and so can't
+    // drift from — the API's authoritative copy. Browse chrome remains.
+    await waitFor(() => {
+      expect(screen.getByText(/this page isn.t available/i)).toBeDefined();
     });
     const browseLinks = screen
       .getAllByRole('link', { name: /browse/i })

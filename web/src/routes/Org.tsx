@@ -56,15 +56,25 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
       className="mt-48"
       error={(e) =>
         e.status === 404 ? (
+          // The API owns the not-found message (problem.title/detail);
+          // we render it and add the Browse/submit links as navigation
+          // chrome rather than re-authoring the copy here.
           <div className="lede mt-48">
             <div className="eyebrow">
               § Organization file
               <span className="eyebrow-rule" />
             </div>
             <h1>
-              This organization{' '}
-              <span className="accent">isn&rsquo;t in the atlas yet.</span>
+              {e.problem?.title ?? 'Organization Not Found'}
+              <span className="accent">.</span>
             </h1>
+            <p className="deck">
+              {/* The fallback only renders for a 404 with no problem+json
+                  body (e.g. a proxy-injected error page). Keep it generic
+                  so it doesn't duplicate — and drift from — the API's
+                  authoritative copy. */}
+              {e.problem?.detail ?? 'This page isn’t available.'}
+            </p>
             <p className="deck">
               Try <Link to="/browse">Browse</Link> for the metros we have indexed, or{' '}
               <Link to="/submit">file a tip</Link> if you know who&rsquo;s doing the work

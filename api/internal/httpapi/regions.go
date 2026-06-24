@@ -93,7 +93,7 @@ func getRegionHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.H
 			m.incRegionView(false)
 			logger.DebugContext(r.Context(), "region view", "slug", slug, "found", false, "rid", rid)
 			writeProblem(w, r, http.StatusNotFound, problemNotFound, "Region Not Found",
-				"No region matches that slug.", rid)
+				"We don't have this region in the atlas yet. It may not be indexed, or the link you followed may be out of date.", rid)
 			return
 		}
 		m.incRegionView(true)
