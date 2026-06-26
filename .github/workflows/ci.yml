@@ -97,7 +97,7 @@ jobs:
       # cold rebuild. On a cache hit this saves ~30-60s on every
       # PR push.
       - name: Cache Go modules + build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/go-build
@@ -163,7 +163,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Cache Go modules + build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/go-build
@@ -191,7 +191,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Cache Go modules + build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/go-build
