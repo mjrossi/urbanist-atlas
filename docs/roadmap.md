@@ -127,14 +127,14 @@ SQLite submission store are live (workflow at
   (2026-05-26):** Browse went `/metros` → `/places` → `/regions` so
   the endpoint name matches the underlying DAG. The list returns
   the editorial default browse set (metros + cities, per
-  `atlas.DefaultBrowseKinds`) — no query parameters; the right
+  `atlas.IsDefaultBrowseKind`) — no query parameters; the right
   filter axis (taxonomy via `kind`, DAG via `ancestor`, …) stays
   open until a concrete browse UI use case appears. The detail
   endpoint resolves any non-national region — `/regions/cook-county`
   (county), `/regions/chicagoland` (multi-state), `/regions/ny`
   (state), `/regions/brooklyn` (borough) all return the region
   plus its descendant orgs. National-tier slugs still 404. The
-  narrower `atlas.MetroKinds` predicate survives in
+  narrower `atlas.IsMetroKind` predicate survives in
   `metro_kinds.go` — `/lookup`'s `placeLabel` still uses it so a
   Brooklyn ZIP renders "Brooklyn, NYC — New York Metro" rather
   than picking the city as the broad ancestor. SPA route flipped
