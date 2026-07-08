@@ -1,7 +1,5 @@
 package atlas
 
-import "sort"
-
 // stateKinds names the region kinds that count as "state-equivalent" —
 // the top administrative tier a postal code rolls up into (state,
 // province). Used by BucketOrgsByScope to split the Regional bucket
@@ -68,27 +66,4 @@ func IsStateKind(k RegionKind) bool { return stateKinds[k] }
 // own orgs on the /dc detail page. The unknown empty string returns false.
 func IsRollupTargetKind(k RegionKind) bool {
 	return stateKinds[k] || k == "us:federal-district"
-}
-
-// StateKinds returns the state-equivalent kinds in deterministic
-// alphabetical order. Callers must not mutate the returned slice — it's
-// a fresh copy each call, but treat it as immutable.
-func StateKinds() []RegionKind {
-	out := make([]RegionKind, 0, len(stateKinds))
-	for k := range stateKinds {
-		out = append(out, k)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
-// StateKindStrings returns StateKinds as []string. Same ordering and
-// freshness guarantees as StateKinds.
-func StateKindStrings() []string {
-	kinds := StateKinds()
-	out := make([]string, len(kinds))
-	for i, k := range kinds {
-		out[i] = string(k)
-	}
-	return out
 }

@@ -70,23 +70,17 @@ func TestIsStateKind(t *testing.T) {
 	}
 }
 
-// TestStateKinds_Deterministic confirms the accessor returns the kinds
-// in a stable, alphabetical order across calls — defensive against an
-// accidental map-iteration order leak.
-func TestStateKinds_Deterministic(t *testing.T) {
-	want := []RegionKind{
-		"ca:province",
-		"ca:territory",
-		"us:state",
-		"us:territory",
+// TestStateKinds_ExactSet pins the full membership of the editorial
+// state-equivalent set, so an accidental addition (which the in/out
+// lists above can't catch) fails loudly too.
+func TestStateKinds_ExactSet(t *testing.T) {
+	want := map[RegionKind]bool{
+		"us:state":     true,
+		"us:territory": true,
+		"ca:province":  true,
+		"ca:territory": true,
 	}
-	got := StateKinds()
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("StateKinds() (-want +got):\n%s", diff)
-	}
-
-	got2 := StateKinds()
-	if diff := cmp.Diff(got, got2); diff != "" {
-		t.Errorf("StateKinds() not stable across calls (-first +second):\n%s", diff)
+	if diff := cmp.Diff(want, stateKinds); diff != "" {
+		t.Errorf("stateKinds (-want +got):\n%s", diff)
 	}
 }

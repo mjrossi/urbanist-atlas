@@ -51,27 +51,20 @@ func TestIsDefaultBrowseKind(t *testing.T) {
 	}
 }
 
-// TestDefaultBrowseKinds_Deterministic confirms the accessor returns
-// the kinds in a stable, alphabetical order. Deterministic ordering
-// keeps SQL EXPLAINs readable when the slice is passed as a
-// $1::text[] parameter.
-func TestDefaultBrowseKinds_Deterministic(t *testing.T) {
-	want := []RegionKind{
-		"ca:city",
-		"ca:cma",
-		"ca:regional-district",
-		"pt:area-metropolitana",
-		"us:city",
-		"us:metro",
+// TestDefaultBrowseKinds_ExactSet pins the full membership of the
+// editorial default-browse set, so an accidental addition (which the
+// in/out lists above can't catch) fails loudly too.
+func TestDefaultBrowseKinds_ExactSet(t *testing.T) {
+	want := map[RegionKind]bool{
+		"us:metro":              true,
+		"us:city":               true,
+		"ca:cma":                true,
+		"ca:regional-district":  true,
+		"ca:city":               true,
+		"pt:area-metropolitana": true,
 	}
-	got := DefaultBrowseKinds()
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("DefaultBrowseKinds() (-want +got):\n%s", diff)
-	}
-
-	got2 := DefaultBrowseKinds()
-	if diff := cmp.Diff(got, got2); diff != "" {
-		t.Errorf("DefaultBrowseKinds() not stable across calls (-first +second):\n%s", diff)
+	if diff := cmp.Diff(want, defaultBrowseKinds); diff != "" {
+		t.Errorf("defaultBrowseKinds (-want +got):\n%s", diff)
 	}
 }
 
@@ -81,9 +74,9 @@ func TestDefaultBrowseKinds_Deterministic(t *testing.T) {
 // true (cities are in the default but aren't metro-equivalent for
 // /lookup label purposes).
 func TestDefaultBrowseKinds_IsSupersetOfMetroKinds(t *testing.T) {
-	for _, k := range MetroKinds() {
+	for k := range metroKinds {
 		if !IsDefaultBrowseKind(k) {
-			t.Errorf("IsDefaultBrowseKind(%q) = false, but kind is in MetroKinds() — defaultBrowseKinds must be a superset", k)
+			t.Errorf("IsDefaultBrowseKind(%q) = false, but kind is in metroKinds — defaultBrowseKinds must be a superset", k)
 		}
 	}
 }

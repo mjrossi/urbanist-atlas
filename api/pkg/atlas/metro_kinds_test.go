@@ -48,26 +48,17 @@ func TestIsMetroKind(t *testing.T) {
 	}
 }
 
-// TestMetroKinds_Deterministic confirms the accessor returns the kinds
-// in a stable, alphabetical order. The SQL layer passes this slice as a
-// $1::text[] parameter, and deterministic ordering makes for
-// deterministic query plans (and easier-to-read EXPLAINs).
-func TestMetroKinds_Deterministic(t *testing.T) {
-	want := []RegionKind{
-		"ca:cma",
-		"ca:regional-district",
-		"pt:area-metropolitana",
-		"us:metro",
+// TestMetroKinds_ExactSet pins the full membership of the editorial
+// metro-equivalent set, so an accidental addition (which the in/out
+// lists above can't catch) fails loudly too.
+func TestMetroKinds_ExactSet(t *testing.T) {
+	want := map[RegionKind]bool{
+		"us:metro":              true,
+		"ca:cma":                true,
+		"ca:regional-district":  true,
+		"pt:area-metropolitana": true,
 	}
-	got := MetroKinds()
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("MetroKinds() (-want +got):\n%s", diff)
-	}
-
-	// Call again — same order. Defensive against an accidental
-	// map-iteration leak that would happen to pass on the first call.
-	got2 := MetroKinds()
-	if diff := cmp.Diff(got, got2); diff != "" {
-		t.Errorf("MetroKinds() not stable across calls (-first +second):\n%s", diff)
+	if diff := cmp.Diff(want, metroKinds); diff != "" {
+		t.Errorf("metroKinds (-want +got):\n%s", diff)
 	}
 }
