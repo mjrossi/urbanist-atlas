@@ -74,20 +74,17 @@ func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err erro
 				for i, name := range row {
 					col[strings.TrimSpace(name)] = i
 				}
-				if _, ok := col["CBSA Code"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing CBSA Code column")
+				required := []string{
+					"CBSA Code",
+					"CBSA Title",
+					"Metropolitan/Micropolitan Statistical Area",
+					"FIPS State Code",
+					"FIPS County Code",
 				}
-				if _, ok := col["CBSA Title"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing CBSA Title column")
-				}
-				if _, ok := col["Metropolitan/Micropolitan Statistical Area"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing Metropolitan/Micropolitan Statistical Area column")
-				}
-				if _, ok := col["FIPS State Code"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing FIPS State Code column")
-				}
-				if _, ok := col["FIPS County Code"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing FIPS County Code column")
+				for _, name := range required {
+					if _, ok := col[name]; !ok {
+						return nil, nil, fmt.Errorf("parse cbsa: missing %s column", name)
+					}
 				}
 				headerSeen = true
 			}
