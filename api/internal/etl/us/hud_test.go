@@ -20,11 +20,11 @@ func TestParseHUDZipCounty_GoldenFixture(t *testing.T) {
 "10001","36061","1.000000","1.000000","1.000000","1.000000"
 "99999","99999","0.000000","0.000000","0.000000","0.000000"
 `
-	got, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	got, err := parseHUDZipCounty(strings.NewReader(fixture))
 	if err != nil {
-		t.Fatalf("ParseHUDZipCounty: %v", err)
+		t.Fatalf("parseHUDZipCounty: %v", err)
 	}
-	want := []HUDZipCounty{
+	want := []hudZipCounty{
 		{ZIP: "20811", County: "24031", ResRatio: 0.0, BusRatio: 0.999, OthRatio: 0.001, TotRatio: 0.999},
 		{ZIP: "00601", County: "72001", ResRatio: 0.96436, BusRatio: 0.03059, OthRatio: 0.00505, TotRatio: 0.94969},
 		{ZIP: "00601", County: "72141", ResRatio: 0.03564, BusRatio: 0.06941, OthRatio: 0.99495, TotRatio: 0.05031},
@@ -32,7 +32,7 @@ func TestParseHUDZipCounty_GoldenFixture(t *testing.T) {
 		{ZIP: "99999", County: "99999", ResRatio: 0.0, BusRatio: 0.0, OthRatio: 0.0, TotRatio: 0.0},
 	}
 	if diff := cmp.Diff(want, got, cmpopts.EquateApprox(0, 1e-6)); diff != "" {
-		t.Errorf("ParseHUDZipCounty (-want +got):\n%s", diff)
+		t.Errorf("parseHUDZipCounty (-want +got):\n%s", diff)
 	}
 }
 
@@ -44,9 +44,9 @@ func TestParseHUDZipCounty_SkipsBlankLines(t *testing.T) {
 		"\n" +
 		"\"10001\",\"36061\",\"1.000\",\"1.000\",\"1.000\",\"1.000\"\n" +
 		"\n"
-	got, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	got, err := parseHUDZipCounty(strings.NewReader(fixture))
 	if err != nil {
-		t.Fatalf("ParseHUDZipCounty: %v", err)
+		t.Fatalf("parseHUDZipCounty: %v", err)
 	}
 	if len(got) != 2 {
 		t.Errorf("len = %d, want 2 (blank lines should be skipped); got %+v", len(got), got)
@@ -57,7 +57,7 @@ func TestParseHUDZipCounty_MalformedNumericRejected(t *testing.T) {
 	fixture := `"ZIP","COUNTY","RES_RATIO","BUS_RATIO","OTH_RATIO","TOT_RATIO"
 "20811","24031","not-a-number","0.999","0.001","0.999"
 `
-	_, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	_, err := parseHUDZipCounty(strings.NewReader(fixture))
 	if err == nil {
 		t.Fatal("expected error on malformed numeric, got nil")
 	}
@@ -77,9 +77,9 @@ func TestParseHUDZipCounty_LeftPadsLeadingZeros(t *testing.T) {
 "601","72001","0.95","0.03","0.02","0.95"
 "1001","25013","1.00","1.00","1.00","1.00"
 `
-	got, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	got, err := parseHUDZipCounty(strings.NewReader(fixture))
 	if err != nil {
-		t.Fatalf("ParseHUDZipCounty: %v", err)
+		t.Fatalf("parseHUDZipCounty: %v", err)
 	}
 	if len(got) != 2 {
 		t.Fatalf("len = %d, want 2", len(got))
@@ -102,16 +102,16 @@ func TestParseHUDZipCounty_RealWorldEightColumnLayout(t *testing.T) {
 00501,36103,HOLTSVILLE,NY,0.000000000,1.000000000,0.000000000,1.000000000
 20811,24031,BETHESDA,MD,0.000000000,0.999000000,0.001000000,0.999000000
 `
-	got, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	got, err := parseHUDZipCounty(strings.NewReader(fixture))
 	if err != nil {
-		t.Fatalf("ParseHUDZipCounty: %v", err)
+		t.Fatalf("parseHUDZipCounty: %v", err)
 	}
-	want := []HUDZipCounty{
+	want := []hudZipCounty{
 		{ZIP: "00501", County: "36103", ResRatio: 0.0, BusRatio: 1.0, OthRatio: 0.0, TotRatio: 1.0},
 		{ZIP: "20811", County: "24031", ResRatio: 0.0, BusRatio: 0.999, OthRatio: 0.001, TotRatio: 0.999},
 	}
 	if diff := cmp.Diff(want, got, cmpopts.EquateApprox(0, 1e-6)); diff != "" {
-		t.Errorf("ParseHUDZipCounty (-want +got):\n%s", diff)
+		t.Errorf("parseHUDZipCounty (-want +got):\n%s", diff)
 	}
 }
 
@@ -121,7 +121,7 @@ func TestParseHUDZipCounty_MissingRequiredHeader(t *testing.T) {
 	fixture := `ZIP,COUNTY,RES_RATIO,BUS_RATIO,OTH_RATIO
 "20811","24031","0.000","0.999","0.001"
 `
-	_, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	_, err := parseHUDZipCounty(strings.NewReader(fixture))
 	if err == nil {
 		t.Fatal("expected error on missing TOT_RATIO header, got nil")
 	}
@@ -133,9 +133,9 @@ func TestParseHUDZipCounty_MissingRequiredHeader(t *testing.T) {
 func TestParseHUDZipCounty_TrimsTrailingWhitespace(t *testing.T) {
 	fixture := "\"ZIP\",\"COUNTY\",\"RES_RATIO\",\"BUS_RATIO\",\"OTH_RATIO\",\"TOT_RATIO\"\n" +
 		"\"20811 \",\"24031 \",\"0.000\",\"0.999\",\"0.001\",\"0.999\"\n"
-	got, err := ParseHUDZipCounty(strings.NewReader(fixture))
+	got, err := parseHUDZipCounty(strings.NewReader(fixture))
 	if err != nil {
-		t.Fatalf("ParseHUDZipCounty: %v", err)
+		t.Fatalf("parseHUDZipCounty: %v", err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1; got %+v", len(got), got)

@@ -8,7 +8,7 @@ import (
 )
 
 // zctaRow builds one pipe-delimited relationship row in the 18-column
-// shape ParseZCTAPlace/ParseZCTACounty read, populating only the columns
+// shape parseZCTAPlace/parseZCTACounty read, populating only the columns
 // the shared scanner looks at: ZCTA (1), target GEOID (9), target name
 // (10), and AREALAND_PART (16).
 func zctaRow(zcta, geoid, name, area string) string {

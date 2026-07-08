@@ -72,7 +72,7 @@ func init() {
 func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, logger *slog.Logger) error {
 	cmaZipPath := filepath.Join(srcDir, "lcma000b21a_e.zip")
 
-	cmas, err := ParseCMAs(cmaZipPath)
+	cmas, err := parseCMAs(cmaZipPath)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	// The FSA boundary is the 155 MB source; parse it only for the postal
 	// pass so a --target=regions run needs just the CMA file.
 	fsaZipPath := filepath.Join(srcDir, "lfsa000b21a_e.zip")
-	fsas, err := ParseFSAs(fsaZipPath)
+	fsas, err := parseFSAs(fsaZipPath)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	// (reads the .shp geometry the DBF parse above ignores). Resolve the
 	// returned CMA UIDs to region slugs, keeping only CMAs we actually
 	// generated so an unmapped UID falls through to province.
-	cmaUIDByFSA, err := SpatialJoinFSAToCMA(fsaZipPath, cmaZipPath)
+	cmaUIDByFSA, err := spatialJoinFSAToCMA(fsaZipPath, cmaZipPath)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl ca: spatial join FSA→CMA", "assigned", len(cmaSlugByFSA), "of_fsas", len(fsas))
 
-	anchors, reasons := Crosswalk(fsas, cmaSlugByFSA, portionByCMA)
+	anchors, reasons := crosswalk(fsas, cmaSlugByFSA, portionByCMA)
 	csvPath := filepath.Join(outDir, "postal_codes_ca.csv")
 	writePostal := func(w io.Writer) error { return etl.WritePostalCSV(w, "CA", anchors) }
 	if err := etl.WriteFile(csvPath, "etl ca", writePostal); err != nil {

@@ -13,7 +13,7 @@ import (
 // "nyc-borough", "county-leaf", "msa", "state", "unknown").
 type PostalAnchor = etl.PostalAnchor
 
-// Crosswalk runs the smallest-anchor algorithm for every ZCTA in
+// crosswalk runs the smallest-anchor algorithm for every ZCTA in
 // zctaPlace ∪ zctaCounty:
 //
 //  1. If the ZCTA's primary place has a curated city-leaf entry in
@@ -27,11 +27,11 @@ type PostalAnchor = etl.PostalAnchor
 //     gaps don't silently leave coverage holes.
 //
 // msaSlugs is built by the caller from the post-override slug
-// assignments (see ApplyOverrides + AssignMSASlugs) so this layer
+// assignments (see ApplyOverrides + assignMSASlugs) so this layer
 // doesn't have to know about the override file format.
-func Crosswalk(
-	zctaPlace map[string]ZCTAPlace,
-	zctaCounty map[string]ZCTACounty,
+func crosswalk(
+	zctaPlace map[string]zctaPlace,
+	zctaCounty map[string]zctaCounty,
 	countyToMSA map[string]string,
 	msaSlugs map[string]string, // CBSA code → umbrella slug
 	portionSlugs map[string]string, // "CBSAcode:stateFIPS" → portion slug
@@ -81,7 +81,7 @@ func Crosswalk(
 	return out, reasonCounts
 }
 
-// CrosswalkHUDBackfill produces PostalAnchor rows for ZIPs that the
+// crosswalkHUDBackfill produces PostalAnchor rows for ZIPs that the
 // Census ZCTA crosswalk could not resolve. HUD's quarterly USPS
 // ZIP-to-County crosswalk covers P.O. Box-only ZIPs, single-building
 // ZIPs, APO/FPO ZIPs, and the long tail of ZIPs Census omits from
@@ -95,7 +95,7 @@ func Crosswalk(
 //     RES_RATIO pick would be undefined (RES_RATIO == 0 across all
 //     rows of a P.O. Box-only ZIP).
 //  2. Walk the primary county FIPS through countyResolver — the same
-//     4-tier chain Crosswalk uses after a failed city-place lookup
+//     4-tier chain crosswalk uses after a failed city-place lookup
 //     (NYC borough → county-leaf → MSA → state). HUD reasons are
 //     prefixed "hud:" so a merged histogram can distinguish ZCTA-
 //     sourced from HUD-sourced anchors.
@@ -112,11 +112,11 @@ func Crosswalk(
 // "hud:unknown", etc.) so it can be merged into the ZCTA-side
 // reason histogram without collision.
 //
-// CrosswalkHUDBackfill does NOT mutate or shadow the existing
-// Crosswalk output — it is purely additive. ZCTA-resolved ZIPs always
-// win any tie at the writer layer (see WritePostalCodesCSV).
-func CrosswalkHUDBackfill(
-	huds []HUDZipCounty,
+// crosswalkHUDBackfill does NOT mutate or shadow the existing
+// crosswalk output — it is purely additive. ZCTA-resolved ZIPs always
+// win any tie at the writer layer (see writePostalCodesCSV).
+func crosswalkHUDBackfill(
+	huds []hudZipCounty,
 	zctaAnchors []PostalAnchor,
 	countyToMSA map[string]string,
 	msaSlugs map[string]string, // CBSA code → umbrella slug
@@ -168,10 +168,10 @@ func CrosswalkHUDBackfill(
 // row encountered (strict `>`), so the choice is deterministic when two
 // rows match exactly.
 //
-// Shared by CrosswalkHUDBackfill (which then drops ZIPs already resolved
-// by ZCTA) and ReconcileCTLegacyCounties (which uses it to repair CT
+// Shared by crosswalkHUDBackfill (which then drops ZIPs already resolved
+// by ZCTA) and reconcileCTLegacyCounties (which uses it to repair CT
 // ZCTA anchors stranded by the county-vintage gap).
-func hudPrimaryCounty(huds []HUDZipCounty) map[string]string {
+func hudPrimaryCounty(huds []hudZipCounty) map[string]string {
 	type row struct {
 		county string
 		tot    float64
@@ -190,7 +190,7 @@ func hudPrimaryCounty(huds []HUDZipCounty) map[string]string {
 	return out
 }
 
-// ReconcileCTLegacyCounties repairs the Connecticut county-vintage gap
+// reconcileCTLegacyCounties repairs the Connecticut county-vintage gap
 // in place on the ZCTA anchor slice.
 //
 // The 2020 ZCTA→county relationship file keys Connecticut ZCTAs by the
@@ -217,10 +217,10 @@ func hudPrimaryCounty(huds []HUDZipCounty) map[string]string {
 //
 // No-op when huds is empty (no HUD source staged), matching the
 // orchestrator's graceful ZCTA-only degradation.
-func ReconcileCTLegacyCounties(
+func reconcileCTLegacyCounties(
 	zctaAnchors []PostalAnchor,
-	zctaCounty map[string]ZCTACounty,
-	huds []HUDZipCounty,
+	zctaCounty map[string]zctaCounty,
+	huds []hudZipCounty,
 	countyToMSA map[string]string,
 	msaSlugs map[string]string, // CBSA code → umbrella slug
 	portionSlugs map[string]string, // "CBSAcode:stateFIPS" → portion slug

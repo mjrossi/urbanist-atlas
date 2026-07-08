@@ -75,14 +75,14 @@ type cmaGeometry struct {
 // metro" rule, keeping the join's max-overlap semantics intact.
 const minOverlapFraction = 0.001
 
-// SpatialJoinFSAToCMA assigns each FSA to the CMA it overlaps most by
+// spatialJoinFSAToCMA assigns each FSA to the CMA it overlaps most by
 // area. It returns CFSAUID → CMAUID for every FSA whose largest CMA overlap
 // clears minOverlapFraction of the FSA's area; FSAs that overlap no CMA, or
 // only by a sub-threshold line-work sliver, are omitted so the crosswalk
 // falls them through to their province. The returned CMAUIDs are the raw
 // StatsCan codes (e.g. "535"); the caller resolves them to region slugs
 // via the CMA assignments.
-func SpatialJoinFSAToCMA(fsaZipPath, cmaZipPath string) (map[string]string, error) {
+func spatialJoinFSAToCMA(fsaZipPath, cmaZipPath string) (map[string]string, error) {
 	cmas, err := loadCMAGeometry(cmaZipPath)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func SpatialJoinFSAToCMA(fsaZipPath, cmaZipPath string) (map[string]string, erro
 }
 
 // loadCMAGeometry reads the CMA boundary shapefile, keeps only type-'B'
-// records (true CMAs, matching ParseCMAs), and dissolves them by CMAUID
+// records (true CMAs, matching parseCMAs), and dissolves them by CMAUID
 // into one cmaGeometry per metro. The result is sorted by UID so the
 // max-overlap tie-break (smallest UID wins) is deterministic.
 func loadCMAGeometry(zipPath string) ([]cmaGeometry, error) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// CMA is one Census Metropolitan Area row, derived from the StatsCan
+// cma is one Census Metropolitan Area row, derived from the StatsCan
 // CMA boundary file's DBF attribute table. We keep only the fields the
 // region-generation logic uses; the much-larger shapefile geometry is
 // ignored.
@@ -17,7 +17,7 @@ import (
 // Areas (CMATYPE='B', population ≥100,000) and Census Agglomerations
 // (CMATYPE='D', smaller). Only type 'B' is treated as a CMA for the
 // purpose of building regions_ca_cmas.toml.
-type CMA struct {
+type cma struct {
 	// UID is the 3-digit Census CMA code (e.g., "535" for Toronto).
 	// Multi-province CMAs (Ottawa-Gatineau, code 505) appear once per
 	// province in the source file but collapse to a single CMA here.
@@ -33,19 +33,19 @@ type CMA struct {
 	ProvinceUIDs []string
 }
 
-// ParseCMAs reads the StatsCan CMA boundary file zip (downloaded from
+// parseCMAs reads the StatsCan CMA boundary file zip (downloaded from
 // https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip)
 // and returns one CMA per unique UID. Only CMATYPE='B' rows (true
 // CMAs, pop ≥100k) are kept; every other CMATYPE (e.g. 'D', Census
 // Agglomerations) is filtered out.
-func ParseCMAs(zipPath string) ([]CMA, error) {
+func parseCMAs(zipPath string) ([]cma, error) {
 	dbf, closer, err := openDBFFromZip(zipPath, ".dbf")
 	if err != nil {
 		return nil, fmt.Errorf("parse cmas: %w", err)
 	}
 	defer closer()
 
-	agg := map[string]*CMA{}
+	agg := map[string]*cma{}
 	uidOrder := []string{}
 	for {
 		row, err := dbf.next()
@@ -68,14 +68,14 @@ func ParseCMAs(zipPath string) ([]CMA, error) {
 			existing.ProvinceUIDs = append(existing.ProvinceUIDs, pruid)
 			continue
 		}
-		agg[uid] = &CMA{
+		agg[uid] = &cma{
 			UID:          uid,
 			Name:         name,
 			ProvinceUIDs: []string{pruid},
 		}
 		uidOrder = append(uidOrder, uid)
 	}
-	out := make([]CMA, 0, len(uidOrder))
+	out := make([]cma, 0, len(uidOrder))
 	for _, uid := range uidOrder {
 		out = append(out, *agg[uid])
 	}

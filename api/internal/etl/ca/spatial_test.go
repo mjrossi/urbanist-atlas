@@ -222,9 +222,9 @@ func TestSpatialJoin_StraddleAssignsLargerOverlap(t *testing.T) {
 	fsaRings := [][]shp.Point{square(60, 0, 160, 100)}
 	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
 
-	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	got, err := spatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
 	if err != nil {
-		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+		t.Fatalf("spatialJoinFSAToCMA: %v", err)
 	}
 	if got["X1X"] != "200" {
 		t.Errorf("X1X assigned to %q, want 200 (larger overlap)", got["X1X"])
@@ -236,7 +236,7 @@ func TestSpatialJoin_StraddleAssignsLargerOverlap(t *testing.T) {
 // sweep-line loses precision unless the geometry is translated to a local
 // origin first (which assignFSAsToCMAs does). Without that translation the
 // intersection areas collapse toward zero and the max-overlap winner is
-// arbitrary — so this guards the precision fix through SpatialJoinFSAToCMA,
+// arbitrary — so this guards the precision fix through spatialJoinFSAToCMA,
 // not just the unit-level TestPolygonArea_AccurateAtLargeOffset. Same geometry
 // as the straddle test shifted by (9e6, 2e6): 40 wide in CMA 100, 60 wide in
 // CMA 200 → CMA 200 wins.
@@ -263,9 +263,9 @@ func TestSpatialJoin_LargeOffsetStraddle(t *testing.T) {
 	fsaRings := [][]shp.Point{off(square(60, 0, 160, 100))}
 	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
 
-	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	got, err := spatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
 	if err != nil {
-		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+		t.Fatalf("spatialJoinFSAToCMA: %v", err)
 	}
 	if got["X1X"] != "200" {
 		t.Errorf("X1X assigned to %q at 9e6 offset, want 200 (larger overlap; precision fix)", got["X1X"])
@@ -293,9 +293,9 @@ func TestSpatialJoin_EqualOverlapTieBreaksToSmallerUID(t *testing.T) {
 	fsaRings := [][]shp.Point{square(50, 0, 150, 100)}
 	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
 
-	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	got, err := spatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
 	if err != nil {
-		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+		t.Fatalf("spatialJoinFSAToCMA: %v", err)
 	}
 	if got["Y1Y"] != "100" {
 		t.Errorf("Y1Y assigned to %q, want 100 (smaller UID on tie)", got["Y1Y"])
@@ -353,9 +353,9 @@ func TestSpatialJoin_NoiseSliverFallsThrough(t *testing.T) {
 	fsaRings := [][]shp.Point{square(0, 0, 100, 100)}
 	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
 
-	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	got, err := spatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
 	if err != nil {
-		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+		t.Fatalf("spatialJoinFSAToCMA: %v", err)
 	}
 	if uid, ok := got["Z9Z"]; ok {
 		t.Errorf("Z9Z anchored to CMA %q on a 0.1%% sliver; want province fallback (absent)", uid)
@@ -377,9 +377,9 @@ func TestSpatialJoin_SubstantialOverlapAnchors(t *testing.T) {
 	fsaRings := [][]shp.Point{square(0, 0, 100, 100)}
 	writeShapefileZip(t, filepath.Join(dir, "fsa.zip"), "fsa", fsaFields, fsaRows, fsaRings)
 
-	got, err := SpatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
+	got, err := spatialJoinFSAToCMA(filepath.Join(dir, "fsa.zip"), filepath.Join(dir, "cma.zip"))
 	if err != nil {
-		t.Fatalf("SpatialJoinFSAToCMA: %v", err)
+		t.Fatalf("spatialJoinFSAToCMA: %v", err)
 	}
 	if got["A1A"] != "100" {
 		t.Errorf("A1A = %q, want 100 (fully contained)", got["A1A"])
