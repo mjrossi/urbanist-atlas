@@ -84,6 +84,15 @@ type Region struct {
 	RollupStates []string   `json:"-" toml:"rollup_states"` // server-side only; directional metro→state page rollup (see above)
 }
 
+// IsNational reports whether the region sits in the national scope
+// tier. National-tier regions are the editorial opt-out surface: they
+// are excluded from the default lookup ancestor walk, browse
+// (ListRegions), region resolution and detail (ResolveRegionBySlug,
+// DescendantRegions, RollupMetrosFor), region search, and ListRecent —
+// so country-wide umbrella orgs never surface in the local-first
+// defaults. Surfacing them is a future opt-in (see ScopeTier).
+func (r Region) IsNational() bool { return r.ScopeTier == ScopeNational }
+
 // Org is a single advocacy organization. Regions is denormalized onto
 // the org for ergonomic JSON output — Store implementations populate
 // it with every region the org serves (not just the ones that matched).

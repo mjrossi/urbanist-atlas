@@ -44,7 +44,7 @@ func (rs regionSearcher) collect(q string, limit int) []RegionSearchResult {
 	}
 	var hits []scored
 	for _, r := range rs.store.regionsByID {
-		if r.ScopeTier == ScopeNational {
+		if r.IsNational() {
 			continue
 		}
 		rank, ok := regionSearchRank(strings.ToLower(r.Name), strings.ToLower(r.Slug), q)
@@ -117,7 +117,7 @@ func (rs regionSearcher) firstParentName(rootID int64) string {
 	var best *Region
 	for _, pid := range rs.store.parents[rootID] {
 		r, ok := rs.store.regionsByID[pid]
-		if !ok || r.ScopeTier == ScopeNational {
+		if !ok || r.IsNational() {
 			continue
 		}
 		if best == nil || r.Slug < best.Slug {

@@ -189,7 +189,7 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	orgsByRegion := s.buildOrgsByRegion()
 	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
-		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
+		if !defaultBrowseKinds[r.Kind] || r.IsNational() {
 			continue
 		}
 		descendants := s.bfsCollectIDs(id, childrenOf)
@@ -254,7 +254,7 @@ func (s *MemStore) bfsUpwardFirstMatch(rootID int64, match func(Region) bool) (R
 			}
 			visited[id] = true
 			r, ok := s.regionsByID[id]
-			if !ok || r.ScopeTier == ScopeNational {
+			if !ok || r.IsNational() {
 				continue
 			}
 			if match(r) {
@@ -309,7 +309,7 @@ func (s *MemStore) ResolveRegionBySlug(_ context.Context, slug string) (Region, 
 	if !ok {
 		return Region{}, ErrRegionNotFound
 	}
-	if r.ScopeTier == ScopeNational {
+	if r.IsNational() {
 		return Region{}, ErrRegionNotFound
 	}
 	return r, nil
@@ -323,14 +323,14 @@ func (s *MemStore) DescendantRegions(_ context.Context, focusRegionID int64) ([]
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	focus, ok := s.regionsByID[focusRegionID]
-	if !ok || focus.ScopeTier == ScopeNational {
+	if !ok || focus.IsNational() {
 		return nil, nil
 	}
 	ids := s.descendantRegionIDs(focusRegionID)
 	out := make([]Region, 0, len(ids))
 	for _, id := range ids {
 		r, ok := s.regionsByID[id]
-		if !ok || r.ScopeTier == ScopeNational {
+		if !ok || r.IsNational() {
 			continue
 		}
 		out = append(out, r)
@@ -353,7 +353,7 @@ func (s *MemStore) RollupMetrosFor(_ context.Context, stateRegionID int64) ([]Re
 	out := make([]Region, 0, len(ids))
 	for _, id := range ids {
 		r, ok := s.regionsByID[id]
-		if !ok || r.ScopeTier == ScopeNational {
+		if !ok || r.IsNational() {
 			continue
 		}
 		out = append(out, r)
@@ -404,7 +404,7 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 			if !ok {
 				continue
 			}
-			if r.ScopeTier != ScopeNational {
+			if !r.IsNational() {
 				hasNonNational = true
 				break
 			}
@@ -499,7 +499,7 @@ func (s *MemStore) bfsCollectIDs(start int64, adj map[int64][]int64) []int64 {
 		if !ok {
 			continue
 		}
-		if r.ScopeTier == ScopeNational {
+		if r.IsNational() {
 			continue
 		}
 		out = append(out, id)
