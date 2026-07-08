@@ -14,7 +14,7 @@ import (
 type PostalAnchor = etl.PostalAnchor
 
 // crosswalk runs the smallest-anchor algorithm for every ZCTA in
-// zctaPlace ∪ zctaCounty:
+// zctaPlaces ∪ zctaCounties:
 //
 //  1. If the ZCTA's primary place has a curated city-leaf entry in
 //     placeToLeaf → anchor = leaf slug. (Reason: "city-leaf".)
@@ -30,8 +30,8 @@ type PostalAnchor = etl.PostalAnchor
 // assignments (see ApplyOverrides + assignMSASlugs) so this layer
 // doesn't have to know about the override file format.
 func crosswalk(
-	zctaPlace map[string]zctaPlace,
-	zctaCounty map[string]zctaCounty,
+	zctaPlaces map[string]zctaPlace,
+	zctaCounties map[string]zctaCounty,
 	countyToMSA map[string]string,
 	msaSlugs map[string]string, // CBSA code → umbrella slug
 	portionSlugs map[string]string, // "CBSAcode:stateFIPS" → portion slug
@@ -39,10 +39,10 @@ func crosswalk(
 	resolver := newCountyResolver(countyToMSA, msaSlugs, portionSlugs)
 
 	zctas := map[string]struct{}{}
-	for z := range zctaPlace {
+	for z := range zctaPlaces {
 		zctas[z] = struct{}{}
 	}
-	for z := range zctaCounty {
+	for z := range zctaCounties {
 		zctas[z] = struct{}{}
 	}
 	sorted := make([]string, 0, len(zctas))
@@ -57,8 +57,8 @@ func crosswalk(
 	for _, zcta := range sorted {
 		anchor := PostalAnchor{PostalCode: zcta, Reason: "unknown"}
 
-		place, hasPlace := zctaPlace[zcta]
-		county, hasCounty := zctaCounty[zcta]
+		place, hasPlace := zctaPlaces[zcta]
+		county, hasCounty := zctaCounties[zcta]
 
 		switch {
 		case hasPlace && placeToLeaf[place.PlaceGEOID] != "":
@@ -201,7 +201,7 @@ func hudPrimaryCounty(huds []hudZipCounty) map[string]string {
 // crosswalk already uses the current planning-region FIPS, which is why
 // HUD-sourced CT P.O.-box ZIPs resolve to their metro correctly.)
 //
-// For each ZCTA anchor whose source county GEOID (from zctaCounty) is a
+// For each ZCTA anchor whose source county GEOID (from zctaCounties) is a
 // retired CT legacy county AND which resolved only to the state, this
 // re-resolves the ZIP through HUD's current-vintage primary county and
 // the standard county fallback chain. A more specific HUD result (a
@@ -219,7 +219,7 @@ func hudPrimaryCounty(huds []hudZipCounty) map[string]string {
 // orchestrator's graceful ZCTA-only degradation.
 func reconcileCTLegacyCounties(
 	zctaAnchors []PostalAnchor,
-	zctaCounty map[string]zctaCounty,
+	zctaCounties map[string]zctaCounty,
 	huds []hudZipCounty,
 	countyToMSA map[string]string,
 	msaSlugs map[string]string, // CBSA code → umbrella slug
@@ -240,7 +240,7 @@ func reconcileCTLegacyCounties(
 		if a.Reason != "state" {
 			continue
 		}
-		county, ok := zctaCounty[a.PostalCode]
+		county, ok := zctaCounties[a.PostalCode]
 		if !ok {
 			continue
 		}

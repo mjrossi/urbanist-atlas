@@ -17,7 +17,7 @@ func TestReconcileCTLegacyCounties_RepairsStrandedStateAnchors(t *testing.T) {
 		// Control: a non-CT state anchor must not be touched.
 		{PostalCode: "82001", AnchorSlug: "wy", Reason: "state"},
 	}
-	zctaCounty := map[string]zctaCounty{
+	zctaCounties := map[string]zctaCounty{
 		"06902": {CountyGEOID: "09001"}, // legacy Fairfield County
 		"82001": {CountyGEOID: "56021"}, // Laramie County, WY
 	}
@@ -32,7 +32,7 @@ func TestReconcileCTLegacyCounties_RepairsStrandedStateAnchors(t *testing.T) {
 		"14860": "bridgeport-ct-metro",
 	}
 
-	counts := reconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, msaSlugs, nil)
+	counts := reconcileCTLegacyCounties(anchors, zctaCounties, huds, countyToMSA, msaSlugs, nil)
 
 	if got := anchors[0]; got.AnchorSlug != "bridgeport-ct-metro" || got.Reason != "ct-reconciled:msa" {
 		t.Errorf("06902 = %+v, want {bridgeport-ct-metro, ct-reconciled:msa}", got)
@@ -53,7 +53,7 @@ func TestReconcileCTLegacyCounties_LeavesFinerTiersAlone(t *testing.T) {
 	anchors := []PostalAnchor{
 		{PostalCode: "06604", AnchorSlug: "bridgeport", Reason: "city-leaf"},
 	}
-	zctaCounty := map[string]zctaCounty{
+	zctaCounties := map[string]zctaCounty{
 		"06604": {CountyGEOID: "09001"}, // legacy Fairfield County
 	}
 	huds := []hudZipCounty{
@@ -62,7 +62,7 @@ func TestReconcileCTLegacyCounties_LeavesFinerTiersAlone(t *testing.T) {
 	countyToMSA := map[string]string{"09120": "14860"}
 	msaSlugs := map[string]string{"14860": "bridgeport-ct-metro"}
 
-	reconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, msaSlugs, nil)
+	reconcileCTLegacyCounties(anchors, zctaCounties, huds, countyToMSA, msaSlugs, nil)
 
 	if got := anchors[0]; got.AnchorSlug != "bridgeport" || got.Reason != "city-leaf" {
 		t.Errorf("06604 = %+v, want unchanged {bridgeport, city-leaf}", got)
@@ -77,7 +77,7 @@ func TestReconcileCTLegacyCounties_RuralStaysAtState(t *testing.T) {
 	anchors := []PostalAnchor{
 		{PostalCode: "06750", AnchorSlug: "ct", Reason: "state"},
 	}
-	zctaCounty := map[string]zctaCounty{
+	zctaCounties := map[string]zctaCounty{
 		"06750": {CountyGEOID: "09005"}, // legacy Litchfield County
 	}
 	huds := []hudZipCounty{
@@ -87,7 +87,7 @@ func TestReconcileCTLegacyCounties_RuralStaysAtState(t *testing.T) {
 	countyToMSA := map[string]string{}
 	msaSlugs := map[string]string{}
 
-	counts := reconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, msaSlugs, nil)
+	counts := reconcileCTLegacyCounties(anchors, zctaCounties, huds, countyToMSA, msaSlugs, nil)
 
 	if got := anchors[0]; got.AnchorSlug != "ct" || got.Reason != "state" {
 		t.Errorf("06750 = %+v, want unchanged {ct, state}", got)
@@ -105,14 +105,14 @@ func TestReconcileCTLegacyCounties_HUDUnresolvedSkipped(t *testing.T) {
 	anchors := []PostalAnchor{
 		{PostalCode: "06902", AnchorSlug: "ct", Reason: "state"},
 	}
-	zctaCounty := map[string]zctaCounty{
+	zctaCounties := map[string]zctaCounty{
 		"06902": {CountyGEOID: "09001"}, // legacy Fairfield County
 	}
 	huds := []hudZipCounty{
 		{ZIP: "06902", County: "99999", TotRatio: 1.0}, // unresolvable FIPS
 	}
 
-	counts := reconcileCTLegacyCounties(anchors, zctaCounty, huds, map[string]string{}, map[string]string{}, nil)
+	counts := reconcileCTLegacyCounties(anchors, zctaCounties, huds, map[string]string{}, map[string]string{}, nil)
 
 	if got := anchors[0]; got.AnchorSlug != "ct" || got.Reason != "state" {
 		t.Errorf("06902 = %+v, want unchanged {ct, state}", got)
@@ -134,9 +134,9 @@ func TestReconcileCTLegacyCounties_NonLegacyAndNoHUDAndEmpty(t *testing.T) {
 	// county, so reconcile must not touch it even though it's at state.
 	t.Run("non-legacy county skipped", func(t *testing.T) {
 		anchors := []PostalAnchor{{PostalCode: "06000", AnchorSlug: "ct", Reason: "state"}}
-		zctaCounty := map[string]zctaCounty{"06000": {CountyGEOID: "09120"}}
+		zctaCounties := map[string]zctaCounty{"06000": {CountyGEOID: "09120"}}
 		huds := []hudZipCounty{{ZIP: "06000", County: "09120", TotRatio: 1.0}}
-		counts := reconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, msaSlugs, nil)
+		counts := reconcileCTLegacyCounties(anchors, zctaCounties, huds, countyToMSA, msaSlugs, nil)
 		if anchors[0].Reason != "state" {
 			t.Errorf("non-legacy county should be untouched, got %+v", anchors[0])
 		}
@@ -148,9 +148,9 @@ func TestReconcileCTLegacyCounties_NonLegacyAndNoHUDAndEmpty(t *testing.T) {
 	// (b) Legacy county but ZIP not present in HUD → counted as skip.
 	t.Run("legacy zip absent from HUD", func(t *testing.T) {
 		anchors := []PostalAnchor{{PostalCode: "06902", AnchorSlug: "ct", Reason: "state"}}
-		zctaCounty := map[string]zctaCounty{"06902": {CountyGEOID: "09001"}}
+		zctaCounties := map[string]zctaCounty{"06902": {CountyGEOID: "09001"}}
 		huds := []hudZipCounty{{ZIP: "07030", County: "34017", TotRatio: 1.0}} // unrelated ZIP
-		counts := reconcileCTLegacyCounties(anchors, zctaCounty, huds, countyToMSA, msaSlugs, nil)
+		counts := reconcileCTLegacyCounties(anchors, zctaCounties, huds, countyToMSA, msaSlugs, nil)
 		if anchors[0].Reason != "state" {
 			t.Errorf("ZIP absent from HUD should stay at state, got %+v", anchors[0])
 		}
@@ -162,8 +162,8 @@ func TestReconcileCTLegacyCounties_NonLegacyAndNoHUDAndEmpty(t *testing.T) {
 	// (c) Empty HUD slice → no-op, empty counts.
 	t.Run("empty HUD is a no-op", func(t *testing.T) {
 		anchors := []PostalAnchor{{PostalCode: "06902", AnchorSlug: "ct", Reason: "state"}}
-		zctaCounty := map[string]zctaCounty{"06902": {CountyGEOID: "09001"}}
-		counts := reconcileCTLegacyCounties(anchors, zctaCounty, nil, countyToMSA, msaSlugs, nil)
+		zctaCounties := map[string]zctaCounty{"06902": {CountyGEOID: "09001"}}
+		counts := reconcileCTLegacyCounties(anchors, zctaCounties, nil, countyToMSA, msaSlugs, nil)
 		if anchors[0].Reason != "state" || len(counts) != 0 {
 			t.Errorf("empty HUD must be a no-op; anchor=%+v counts=%+v", anchors[0], counts)
 		}

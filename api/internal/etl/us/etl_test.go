@@ -232,7 +232,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 	// city-leaf → nyc-borough → county-leaf → msa → state → unknown,
 	// in that order. We seed one ZCTA per bucket plus one that should
 	// short-circuit to "unknown".
-	zctaPlace := map[string]zctaPlace{
+	zctaPlaces := map[string]zctaPlace{
 		"10001": {PlaceGEOID: "3651000"}, // NYC city — not in placeToLeaf, falls through
 		"02115": {PlaceGEOID: "2507000"}, // Boston city → city-leaf
 		"60601": {PlaceGEOID: "1714000"}, // Chicago city → city-leaf (also Cook County)
@@ -240,7 +240,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"99999": {PlaceGEOID: "0000000"}, // unknown both → unknown bucket
 		"39580": {PlaceGEOID: "3754860"}, // Raleigh (not curated) → fall through to MSA
 	}
-	zctaCounty := map[string]zctaCounty{
+	zctaCounties := map[string]zctaCounty{
 		"10001": {CountyGEOID: "36061"}, // Manhattan → nyc-borough
 		"02115": {CountyGEOID: "25025"}, // Suffolk County, MA
 		"60601": {CountyGEOID: "17031"}, // Cook County — but place-leaf wins
@@ -270,7 +270,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"17140:21": "cincinnati-oh-metro-ky",
 	}
 
-	anchors, reasons := crosswalk(zctaPlace, zctaCounty, countyToMSA, msaSlugs, portionSlugs)
+	anchors, reasons := crosswalk(zctaPlaces, zctaCounties, countyToMSA, msaSlugs, portionSlugs)
 
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {

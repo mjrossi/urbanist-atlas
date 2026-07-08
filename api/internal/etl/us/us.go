@@ -206,21 +206,21 @@ func regeneratePostal(srcDir, outDir string, rt regionRouting, logger *slog.Logg
 	// ZCTA crosswalks feed only the postal pass, so they're parsed here
 	// rather than above the region write — a --target=regions run needs
 	// just CBSA + overrides and skips ~20 MB of ZCTA download/parse.
-	zctaPlace, err := loadZCTAPlace(filepath.Join(srcDir, "tab20_zcta520_place20_natl.txt"))
+	zctaPlaces, err := loadZCTAPlace(filepath.Join(srcDir, "tab20_zcta520_place20_natl.txt"))
 	if err != nil {
 		return err
 	}
-	logger.Info("etl us: parsed ZCTA-to-place", "rows", len(zctaPlace))
+	logger.Info("etl us: parsed ZCTA-to-place", "rows", len(zctaPlaces))
 
-	zctaCounty, err := loadZCTACounty(filepath.Join(srcDir, "tab20_zcta520_county20_natl.txt"))
+	zctaCounties, err := loadZCTACounty(filepath.Join(srcDir, "tab20_zcta520_county20_natl.txt"))
 	if err != nil {
 		return err
 	}
-	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounty))
+	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounties))
 
-	anchors, reasons := crosswalk(zctaPlace, zctaCounty, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
+	anchors, reasons := crosswalk(zctaPlaces, zctaCounties, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
 
-	hudAnchors, hudReasons, err := backfillHUD(srcDir, anchors, zctaCounty, rt, logger)
+	hudAnchors, hudReasons, err := backfillHUD(srcDir, anchors, zctaCounties, rt, logger)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func regeneratePostal(srcDir, outDir string, rt regionRouting, logger *slog.Logg
 // reconciles the CT legacy-county gap (mutating zctaAnchors in place) and
 // then produces additional anchors for ZIPs Census ZCTA omits (P.O.
 // Box-only, single-building, APO/FPO).
-func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounty map[string]zctaCounty, rt regionRouting, logger *slog.Logger) ([]PostalAnchor, map[string]int, error) {
+func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounties map[string]zctaCounty, rt regionRouting, logger *slog.Logger) ([]PostalAnchor, map[string]int, error) {
 	hudPath := findHUDFile(srcDir)
 	if hudPath == "" {
 		logger.Info("etl us: no HUD ZIP-County CSV found in src dir — skipping non-ZCTA backfill",
@@ -268,7 +268,7 @@ func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounty map[strin
 	// ZCTA ZIPs stranded at the bare state (their 2020 legacy county
 	// isn't in the 2023 planning-region countyToMSA) using HUD's
 	// current-vintage county. Mutates `zctaAnchors` in place.
-	ctReasons := reconcileCTLegacyCounties(zctaAnchors, zctaCounty, huds, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
+	ctReasons := reconcileCTLegacyCounties(zctaAnchors, zctaCounties, huds, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
 	ctReconciled := 0
 	for k, n := range ctReasons {
 		if strings.HasPrefix(k, "ct-reconciled:") {
