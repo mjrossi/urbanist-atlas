@@ -18,7 +18,7 @@ type FSARow struct {
 	CFSAUID string
 	// PRUID is the 2-digit Statistics Canada province/territory code
 	// (e.g., "35" for Ontario). Maps to a province slug via
-	// provinceCodeToSlug in mappings.go.
+	// provinceUIDToSlug in mappings.go.
 	PRUID string
 }
 

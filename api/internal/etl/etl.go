@@ -1,7 +1,8 @@
 // Package etl wraps the operator-side data pipeline that reshapes
 // upstream postal-code and metro reference data (Census ZCTA + CBSA,
 // Statistics Canada PCCF + CMA, etc.) into the seed file shapes that
-// loadregions and loadpostal already consume.
+// internal/seedfiles.BuildMemStore loads into the in-memory FileStore
+// at API boot.
 //
 // The pipeline is two-phase:
 //
@@ -13,9 +14,8 @@
 //
 // Output must be byte-identical given the same upstream inputs: rows
 // sorted by primary key (postal_code or slug), no embedded timestamps,
-// LF line endings, trailing newline. This preserves the upsert-based
-// loaders' idempotence at the file layer and keeps git diffs
-// signal-rich on intentional vintage upgrades.
+// LF line endings, trailing newline. This keeps git diffs signal-rich
+// on intentional vintage upgrades and lets CI gate on determinism.
 //
 // Layout:
 //

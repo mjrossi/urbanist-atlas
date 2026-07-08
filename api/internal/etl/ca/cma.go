@@ -35,9 +35,9 @@ type CMA struct {
 
 // ParseCMAs reads the StatsCan CMA boundary file zip (downloaded from
 // https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip)
-// and returns one CMA per unique UID. Type='D' (Census Agglomeration)
-// and type='K' rows are filtered out — only type='B' (true CMA, pop
-// ≥100k) survive.
+// and returns one CMA per unique UID. Only CMATYPE='B' rows (true
+// CMAs, pop ≥100k) are kept; every other CMATYPE (e.g. 'D', Census
+// Agglomerations) is filtered out.
 func ParseCMAs(zipPath string) ([]CMA, error) {
 	dbf, closer, err := openDBFFromZip(zipPath, ".dbf")
 	if err != nil {
