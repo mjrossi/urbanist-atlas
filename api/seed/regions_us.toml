@@ -3,12 +3,12 @@
 # first; entries here reference state slugs as parents via cross-file
 # resolution.
 #
-# Each [[region]] entry creates one row in `regions`; the `parents`
-# array creates rows in `region_parents`. A region may appear before
-# its parents in the file — loadregions resolves slugs after parsing.
-# Parents not defined in this file are resolved from the DB at write
-# time via the batched RegionIDsBySlugs lookup
-# (see internal/loadregions/write.go).
+# Each [[region]] entry defines one region; the `parents` array
+# defines its parent edges. A region may appear before its parents in
+# the file — slugs resolve after parsing, when internal/seedfiles
+# loads the bundle into the in-memory FileStore at API boot. Parents
+# not defined in this file resolve cross-file against the rest of the
+# seed bundle (see internal/seedfiles/regions.go).
 #
 # See docs/region-graph.md for modeling conventions, including:
 #   - State edges live on the leaf (city), not on the metro.

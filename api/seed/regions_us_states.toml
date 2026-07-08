@@ -5,11 +5,10 @@
 # docs/region-graph.md §9 (state/province band). No parents — states
 # sit at the top of the US subgraph.
 #
-# This file loads BEFORE regions_us.toml in just loaddata / loaddata
-# orchestration. Leaves in regions_us.toml may reference these slugs
-# as parents via cross-file resolution (internal/loadregions/write.go
-# resolves cross-file parents via the batched RegionIDsBySlugs query
-# after the in-file regions land).
+# Loaded at API boot by internal/seedfiles into the in-memory
+# FileStore, BEFORE regions_us.toml. Leaves in regions_us.toml may
+# reference these slugs as parents via cross-file resolution
+# (internal/seedfiles/regions.go).
 #
 # Slug convention: lowercase 2-letter postal code, except:
 #   - 'ca-state' for California (the bare 'ca' collides with the
