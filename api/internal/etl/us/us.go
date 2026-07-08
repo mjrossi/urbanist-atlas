@@ -32,6 +32,7 @@ package us
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -183,7 +184,8 @@ func regenerateRegions(srcDir, outDir string, target etl.Target, logger *slog.Lo
 
 	if target.Regions() {
 		msaTOMLPath := filepath.Join(outDir, "regions_us_msas.toml")
-		if err := writeMSAs(msaTOMLPath, rows); err != nil {
+		writeTOML := func(w io.Writer) error { return etl.WriteRegionsTOML(w, msaTOMLHeader, rows) }
+		if err := etl.WriteFile(msaTOMLPath, "etl us", writeTOML); err != nil {
 			return regionRouting{}, err
 		}
 		logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "regions", len(rows), "portions", len(portionSlugs))
@@ -224,7 +226,8 @@ func regeneratePostal(srcDir, outDir string, rt regionRouting, logger *slog.Logg
 	}
 
 	csvPath := filepath.Join(outDir, "postal_codes_us.csv")
-	if err := writeCSV(csvPath, anchors, hudAnchors); err != nil {
+	writePostal := func(w io.Writer) error { return WritePostalCodesCSV(w, anchors, hudAnchors) }
+	if err := etl.WriteFile(csvPath, "etl us", writePostal); err != nil {
 		return err
 	}
 	logger.Info("etl us: wrote postal codes",
@@ -345,20 +348,3 @@ func loadZCTACounty(path string) (map[string]ZCTACounty, error) {
 	return ParseZCTACounty(f)
 }
 
-func writeMSAs(path string, rows []RegionRow) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("etl us: create %s: %w", path, err)
-	}
-	defer f.Close()
-	return etl.WriteRegionsTOML(f, msaTOMLHeader, rows)
-}
-
-func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("etl us: create %s: %w", path, err)
-	}
-	defer f.Close()
-	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors)
-}
