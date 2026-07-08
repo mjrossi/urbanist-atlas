@@ -95,14 +95,14 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	// Expand multi-province CMAs (Ottawa-Gatineau) into per-province
 	// portions + the portion anchor lookup the FSA crosswalk routes through.
 	portions, portionByCMA := buildCMAPortions(cmas, assignments)
-	allRegions := make([]CMAAssignment, 0, len(assignments)+len(portions))
-	allRegions = append(allRegions, assignments...)
+	allRegions := make([]etl.RegionRow, 0, len(assignments)+len(portions))
+	allRegions = append(allRegions, cmaRowsToRegionRows(assignments)...)
 	allRegions = append(allRegions, portions...)
 
 	if target.Regions() {
 		tomlPath := filepath.Join(outDir, "regions_ca_cmas.toml")
 		writeTOML := func(w io.Writer) error {
-			return etl.WriteRegionsTOML(w, cmaTOMLHeader, cmaRowsToRegionRows(allRegions))
+			return etl.WriteRegionsTOML(w, cmaTOMLHeader, allRegions)
 		}
 		if err := etl.WriteFile(tomlPath, "etl ca", writeTOML); err != nil {
 			return err

@@ -214,15 +214,14 @@ func BuildRegionRows(msas []MSA, assignments map[string]MSAOverride) ([]RegionRo
 		if len(states) < 2 {
 			continue
 		}
-		for _, s := range states {
-			portionSlug := a.Slug + "-" + s.Abbrev
-			rows = append(rows, RegionRow{
-				Slug:    portionSlug,
-				Name:    a.Name + " (" + strings.ToUpper(s.Abbrev) + ")",
-				Kind:    "us:metro-portion",
-				Parents: []string{s.Slug, a.Slug},
-			})
-			portionSlugs[m.CBSACode+":"+s.FIPS] = portionSlug
+		spanned := make([]etl.PortionParent, len(states))
+		for i, s := range states {
+			spanned[i] = etl.PortionParent{Slug: s.Slug, Abbrev: s.Abbrev}
+		}
+		portions := etl.BuildPortionRows(a.Slug, a.Name, "us:metro-portion", spanned)
+		rows = append(rows, portions...)
+		for i, s := range states {
+			portionSlugs[m.CBSACode+":"+s.FIPS] = portions[i].Slug
 		}
 	}
 	return rows, portionSlugs
