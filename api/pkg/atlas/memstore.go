@@ -143,31 +143,17 @@ func (s *MemStore) ResolveLeafRegion(_ context.Context, country Country, postalC
 }
 
 // AncestorRegions implements Store. Returns the leaf followed by all
-// transitive ancestors via BFS, dedupes via a visited set. Excludes
-// scope_tier='national' rows from both the seed and the recursion
-// (the storetest harness pins this contract).
+// transitive ancestors via BFS (bfsCollectIDs over the parents map),
+// dedupes via a visited set. Excludes scope_tier='national' rows from
+// both the seed and the recursion (the storetest harness pins this
+// contract).
 func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	visited := map[int64]struct{}{}
-	out := []Region{}
-	queue := []int64{leafRegionID}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		if _, seen := visited[id]; seen {
-			continue
-		}
-		visited[id] = struct{}{}
-		r, ok := s.regionsByID[id]
-		if !ok {
-			continue
-		}
-		if r.ScopeTier == ScopeNational {
-			continue
-		}
-		out = append(out, r)
-		queue = append(queue, s.parents[id]...)
+	ids := s.bfsCollectIDs(leafRegionID, s.parents)
+	out := make([]Region, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, s.regionsByID[id])
 	}
 	return out, nil
 }
@@ -206,7 +192,7 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
 			continue
 		}
-		descendants := s.descendantRegionIDsWith(id, childrenOf)
+		descendants := s.bfsCollectIDs(id, childrenOf)
 		count := countDistinctOrgs(orgsByRegion, descendants)
 		if count == 0 {
 			continue
@@ -478,23 +464,30 @@ func (s *MemStore) buildChildrenOf() map[int64][]int64 {
 // Builds childrenOf inline — convenience wrapper for callers like
 // DescendantRegions that don't loop over multiple roots. Multi-root
 // callers (ListRegions) should hoist the buildChildrenOf call and
-// use descendantRegionIDsWith to avoid the O(P) rebuild per root.
+// pass it to bfsCollectIDs directly to avoid the O(P) rebuild per
+// root.
 //
 // Must be called with s.mu held (read or write).
 func (s *MemStore) descendantRegionIDs(rootID int64) []int64 {
-	return s.descendantRegionIDsWith(rootID, s.buildChildrenOf())
+	return s.bfsCollectIDs(rootID, s.buildChildrenOf())
 }
 
-// descendantRegionIDsWith is the BFS body of descendantRegionIDs,
-// parameterized on a precomputed parent → children map. Splits the
-// hot path so ListRegions can build childrenOf once for the whole
-// call instead of once per root.
+// bfsCollectIDs is the shared queue-BFS skeleton behind both DAG
+// directions: AncestorRegions walks the parents map upward, and the
+// descendant walks (descendantRegionIDs / ListRegions) walk a
+// precomputed parent → children map downward. It returns start
+// followed by every region reachable via adj, in breadth-first visit
+// order, deduped via a visited set. Rows missing from regionsByID and
+// scope_tier='national' rows are excluded from both the seed and the
+// recursion — a national row is neither collected nor expanded, so it
+// can't act as a transit hop (the storetest harness pins this contract
+// for both directions).
 //
 // Must be called with s.mu held (read or write).
-func (s *MemStore) descendantRegionIDsWith(rootID int64, childrenOf map[int64][]int64) []int64 {
+func (s *MemStore) bfsCollectIDs(start int64, adj map[int64][]int64) []int64 {
 	visited := map[int64]bool{}
 	out := []int64{}
-	queue := []int64{rootID}
+	queue := []int64{start}
 	for len(queue) > 0 {
 		id := queue[0]
 		queue = queue[1:]
@@ -510,7 +503,7 @@ func (s *MemStore) descendantRegionIDsWith(rootID int64, childrenOf map[int64][]
 			continue
 		}
 		out = append(out, id)
-		queue = append(queue, childrenOf[id]...)
+		queue = append(queue, adj[id]...)
 	}
 	return out
 }
