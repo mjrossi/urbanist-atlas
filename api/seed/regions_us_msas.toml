@@ -31,10 +31,11 @@
 #     still win as the smaller anchor, so only ZIPs lacking a curated leaf
 #     ride the portions.
 #
-# Loaded by just loaddata BETWEEN regions_us_states.toml (parents:
-# states) and regions_us.toml (children: curated city/borough leaves
-# that may reference these metros). Cross-file parent resolution lives
-# in internal/seedfiles/regions.go.
+# Loaded at API boot by internal/seedfiles into the in-memory
+# FileStore, BETWEEN regions_us_states.toml (parents: states) and
+# regions_us.toml (children: curated city/borough leaves that may
+# reference these metros). Cross-file parent resolution lives in
+# internal/seedfiles/regions.go.
 
 [[region]]
 slug = "abilene-tx-metro"

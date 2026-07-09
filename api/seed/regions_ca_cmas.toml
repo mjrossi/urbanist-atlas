@@ -26,9 +26,10 @@
 #     lookup reaches only its own province. Portion slug is
 #     "<umbrella>-<province>", which sorts right after the umbrella.
 #
-# Loaded by just loaddata BETWEEN regions_ca_provinces.toml (parents:
-# provinces) and regions_ca.toml (children: curated cities). Cross-file
-# parent resolution lives in internal/seedfiles/regions.go.
+# Loaded at API boot by internal/seedfiles into the in-memory
+# FileStore, BETWEEN regions_ca_provinces.toml (parents: provinces)
+# and regions_ca.toml (children: curated cities). Cross-file parent
+# resolution lives in internal/seedfiles/regions.go.
 
 [[region]]
 slug = "abbotsford-mission-cma"

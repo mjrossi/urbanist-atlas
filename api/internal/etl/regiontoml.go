@@ -23,6 +23,37 @@ type RegionRow struct {
 	Comment      string
 }
 
+// PortionParent is one state/province a multi-state/-province umbrella
+// spans, as the portion-row kernel needs it: the region slug of the
+// state or province (e.g. "il", "qc", "nl-province") and the bare
+// abbrev used in portion slugs and names (the slug minus its
+// "-state"/"-province" suffix).
+type PortionParent struct {
+	Slug   string
+	Abbrev string
+}
+
+// BuildPortionRows builds the per-state/-province portion rows for a
+// stateless multi-state/-province umbrella: one row per spanned parent
+// with slug "<umbrella>-<abbrev>", name "<Umbrella Name> (<ABBREV>)",
+// the country-specific kind (us:metro-portion / ca:cma-portion), and
+// parents [state-or-province slug, umbrella slug]. Rows are returned
+// in spanned order so callers can key their own portion-anchor maps
+// (US "CBSAcode:stateFIPS", CA "umbrellaSlug:PRUID" — deliberately
+// per-country) off the matching input entry.
+func BuildPortionRows(umbrellaSlug, umbrellaName, kind string, spanned []PortionParent) []RegionRow {
+	rows := make([]RegionRow, 0, len(spanned))
+	for _, p := range spanned {
+		rows = append(rows, RegionRow{
+			Slug:    umbrellaSlug + "-" + p.Abbrev,
+			Name:    umbrellaName + " (" + strings.ToUpper(p.Abbrev) + ")",
+			Kind:    kind,
+			Parents: []string{p.Slug, umbrellaSlug},
+		})
+	}
+	return rows
+}
+
 // WriteRegionsTOML emits a generated regions_*.toml file
 // deterministically: header, then one [[region]] block per row sorted
 // by slug ASC (so a "<umbrella>-<sub>" portion lands right after its

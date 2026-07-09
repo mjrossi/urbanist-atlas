@@ -11,7 +11,7 @@ func TestCrosswalkHUDBackfill_PicksMaxTotRatio(t *testing.T) {
 	// ZIP 20811 spans two synthetic counties; the row with the
 	// higher TOT_RATIO wins, even though its RES_RATIO is 0 (the
 	// P.O. Box case).
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "20811", County: "24033", ResRatio: 0.0, TotRatio: 0.10},
 		{ZIP: "20811", County: "24031", ResRatio: 0.0, TotRatio: 0.90},
 	}
@@ -23,7 +23,7 @@ func TestCrosswalkHUDBackfill_PicksMaxTotRatio(t *testing.T) {
 	msaSlugs := map[string]string{
 		"47900": "washington-dc-metro",
 	}
-	got, _ := CrosswalkHUDBackfill(huds, zctaAnchors, countyToMSA, msaSlugs, nil)
+	got, _ := crosswalkHUDBackfill(huds, zctaAnchors, countyToMSA, msaSlugs, nil)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1; got %+v", len(got), got)
 	}
@@ -33,7 +33,7 @@ func TestCrosswalkHUDBackfill_PicksMaxTotRatio(t *testing.T) {
 }
 
 func TestCrosswalkHUDBackfill_SkipsZIPsAlreadyResolvedByZCTA(t *testing.T) {
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "10001", County: "36061", TotRatio: 1.0},
 	}
 	zctaAnchors := []PostalAnchor{
@@ -42,7 +42,7 @@ func TestCrosswalkHUDBackfill_SkipsZIPsAlreadyResolvedByZCTA(t *testing.T) {
 	countyToMSA := map[string]string{"36061": "35620"}
 	msaSlugs := map[string]string{"35620": "nyc-metro"}
 
-	got, _ := CrosswalkHUDBackfill(huds, zctaAnchors, countyToMSA, msaSlugs, nil)
+	got, _ := crosswalkHUDBackfill(huds, zctaAnchors, countyToMSA, msaSlugs, nil)
 	if len(got) != 0 {
 		t.Errorf("HUD-backfill should skip ZIPs already in ZCTA output; got %+v", got)
 	}
@@ -53,13 +53,13 @@ func TestCrosswalkHUDBackfill_20811_AnchorsToDCMetro(t *testing.T) {
 	// 20811 anchors to Montgomery County, MD (24031), which is in
 	// CBSA 47900 (Washington-Arlington-Alexandria MSA → slug
 	// washington-dc-metro).
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "20811", County: "24031", ResRatio: 0.0, BusRatio: 1.0, OthRatio: 0.0, TotRatio: 1.0},
 	}
 	countyToMSA := map[string]string{"24031": "47900"}
 	msaSlugs := map[string]string{"47900": "washington-dc-metro"}
 
-	got, _ := CrosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
+	got, _ := crosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1; got %+v", len(got), got)
 	}
@@ -74,13 +74,13 @@ func TestCrosswalkHUDBackfill_20811_AnchorsToDCMetro(t *testing.T) {
 func TestCrosswalkHUDBackfill_NYCBoroughViaCountyFIPS(t *testing.T) {
 	// HUD row with a Brooklyn county FIPS must anchor at the
 	// brooklyn leaf via nycBoroughCounty, not at the MSA.
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "11999", County: "36047", TotRatio: 1.0}, // Kings/Brooklyn
 	}
 	countyToMSA := map[string]string{"36047": "35620"}
 	msaSlugs := map[string]string{"35620": "nyc-metro"}
 
-	got, _ := CrosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
+	got, _ := crosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1; got %+v", len(got), got)
 	}
@@ -92,13 +92,13 @@ func TestCrosswalkHUDBackfill_NYCBoroughViaCountyFIPS(t *testing.T) {
 func TestCrosswalkHUDBackfill_CountyLeafFallback(t *testing.T) {
 	// Cook County (17031) is in countyToLeaf; HUD-anchored ZIPs land
 	// at the curated cook-county leaf, not at the MSA.
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "60999", County: "17031", TotRatio: 1.0},
 	}
 	countyToMSA := map[string]string{"17031": "16980"}
 	msaSlugs := map[string]string{"16980": "chicago-metro"}
 
-	got, _ := CrosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
+	got, _ := crosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
 	if len(got) != 1 || got[0].AnchorSlug != "cook-county" || got[0].Reason != "hud:county-leaf" {
 		t.Errorf("got %+v, want {Anchor:cook-county, Reason:hud:county-leaf}", got)
 	}
@@ -107,10 +107,10 @@ func TestCrosswalkHUDBackfill_CountyLeafFallback(t *testing.T) {
 func TestCrosswalkHUDBackfill_StateFallback(t *testing.T) {
 	// County with no MSA + no curated leaf falls back to the state
 	// via the 2-digit state FIPS prefix.
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "82999", County: "56021", TotRatio: 1.0}, // WY, Laramie County
 	}
-	got, _ := CrosswalkHUDBackfill(huds, nil, map[string]string{}, map[string]string{}, nil)
+	got, _ := crosswalkHUDBackfill(huds, nil, map[string]string{}, map[string]string{}, nil)
 	if len(got) != 1 || got[0].AnchorSlug != "wy" || got[0].Reason != "hud:state" {
 		t.Errorf("got %+v, want {Anchor:wy, Reason:hud:state}", got)
 	}
@@ -122,10 +122,10 @@ func TestCrosswalkHUDBackfill_UnknownCountyDropped(t *testing.T) {
 	// ZIPs that can't be placed are dropped from the anchor output
 	// but counted in the returned reason map under "hud:unknown" so
 	// operators see the drop rate in the orchestrator log.
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "00000", County: "99999", TotRatio: 1.0},
 	}
-	got, reasons := CrosswalkHUDBackfill(huds, nil, map[string]string{}, map[string]string{}, nil)
+	got, reasons := crosswalkHUDBackfill(huds, nil, map[string]string{}, map[string]string{}, nil)
 	if len(got) != 0 {
 		t.Errorf("unknown county should drop the ZIP; got %+v", got)
 	}
@@ -135,7 +135,7 @@ func TestCrosswalkHUDBackfill_UnknownCountyDropped(t *testing.T) {
 }
 
 func TestCrosswalkHUDBackfill_OutputSortedByZIP(t *testing.T) {
-	huds := []HUDZipCounty{
+	huds := []hudZipCounty{
 		{ZIP: "99999", County: "56021", TotRatio: 1.0}, // WY
 		{ZIP: "20811", County: "24031", TotRatio: 1.0}, // MD → DC metro
 		{ZIP: "60999", County: "17031", TotRatio: 1.0}, // cook-county
@@ -143,7 +143,7 @@ func TestCrosswalkHUDBackfill_OutputSortedByZIP(t *testing.T) {
 	countyToMSA := map[string]string{"24031": "47900"}
 	msaSlugs := map[string]string{"47900": "washington-dc-metro"}
 
-	got, _ := CrosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
+	got, _ := crosswalkHUDBackfill(huds, nil, countyToMSA, msaSlugs, nil)
 	zips := make([]string, len(got))
 	for i, a := range got {
 		zips[i] = a.PostalCode

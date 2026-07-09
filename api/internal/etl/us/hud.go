@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-// HUDZipCounty is one row of HUD's quarterly USPS ZIP-County
+// hudZipCounty is one row of HUD's quarterly USPS ZIP-County
 // crosswalk. HUD publishes one row per (ZIP, COUNTY) combination —
 // multi-county ZIPs span multiple rows. The four ratio columns
 // (residential / business / other / total) share the implicit
@@ -30,7 +30,7 @@ import (
 // residential-share pick would mis-anchor them; TOT_RATIO weights
 // residential + business + other together and always sums to a
 // meaningful primary county.
-type HUDZipCounty struct {
+type hudZipCounty struct {
 	ZIP      string
 	County   string
 	ResRatio float64
@@ -39,7 +39,7 @@ type HUDZipCounty struct {
 	TotRatio float64
 }
 
-// ParseHUDZipCounty reads HUD's USPS ZIP-to-County crosswalk CSV
+// parseHUDZipCounty reads HUD's USPS ZIP-to-County crosswalk CSV
 // (downloaded from https://www.huduser.gov/portal/dataset/uspszip-api.html)
 // and returns one entry per ZIP-County pair. HUD ships the file with a
 // header row, quoted fields, and ratio columns as decimal strings. The
@@ -58,7 +58,7 @@ type HUDZipCounty struct {
 // silently mis-anchoring downstream. A malformed ratio column returns
 // an error wrapping the offending line number — silently dropping a
 // row would mean a silent coverage hole.
-func ParseHUDZipCounty(r io.Reader) ([]HUDZipCounty, error) {
+func parseHUDZipCounty(r io.Reader) ([]hudZipCounty, error) {
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = -1
 
@@ -97,7 +97,7 @@ func ParseHUDZipCounty(r io.Reader) ([]HUDZipCounty, error) {
 		return v, nil
 	}
 
-	out := make([]HUDZipCounty, 0, 50_000)
+	out := make([]hudZipCounty, 0, 50_000)
 	lineNum := 1
 	for {
 		fields, err := cr.Read()
@@ -137,7 +137,7 @@ func ParseHUDZipCounty(r io.Reader) ([]HUDZipCounty, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, HUDZipCounty{
+		out = append(out, hudZipCounty{
 			ZIP:      zip,
 			County:   county,
 			ResRatio: res,
@@ -151,7 +151,7 @@ func ParseHUDZipCounty(r io.Reader) ([]HUDZipCounty, error) {
 
 // padLeadingZeros left-pads s with '0' until it reaches width n. If s
 // is already >= n characters it is returned unchanged. See
-// ParseHUDZipCounty doc for why this matters for ZIP / county FIPS.
+// parseHUDZipCounty doc for why this matters for ZIP / county FIPS.
 func padLeadingZeros(s string, n int) string {
 	if len(s) >= n {
 		return s

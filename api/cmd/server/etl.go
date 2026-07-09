@@ -26,8 +26,9 @@ import (
 
 // etlCommand wraps the operator-side data pipeline that reshapes
 // upstream postal-code and metro reference data (Census ZCTA + CBSA,
-// Statistics Canada PCCF + CMA) into the seed file shapes loadregions
-// and loadpostal already consume.
+// Statistics Canada PCCF + CMA) into the seed file shapes that
+// internal/seedfiles.BuildMemStore loads into the in-memory FileStore
+// at API boot.
 //
 // Two sub-subcommands:
 //
@@ -86,7 +87,7 @@ func etlCommand() *cli.Command {
 
 	return &cli.Command{
 		Name:  "etl",
-		Usage: "Reshape upstream postal/metro source data into the seed file shapes loadregions/loadpostal consume",
+		Usage: "Reshape upstream postal/metro source data into the seed file shapes internal/seedfiles loads at API boot",
 		Commands: []*cli.Command{
 			{
 				Name:   "download",

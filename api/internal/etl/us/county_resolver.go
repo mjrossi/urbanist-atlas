@@ -4,10 +4,10 @@ package us
 // region anchor available for it. It encapsulates the 4-tier county
 // fallback chain shared by two callers:
 //
-//   - Crosswalk (ZCTA path) consults it AFTER the city-place tier
+//   - crosswalk (ZCTA path) consults it AFTER the city-place tier
 //     fails. Place GEOIDs aren't county-keyed, so the place lookup
 //     stays in the caller and the resolver picks up at NYC borough.
-//   - CrosswalkHUDBackfill (HUD path) calls it directly. HUD's
+//   - crosswalkHUDBackfill (HUD path) calls it directly. HUD's
 //     quarterly ZIP↔County crosswalk doesn't carry a place GEOID, so
 //     the place tier is skipped entirely — the resolver IS the whole
 //     fallback for the HUD path.

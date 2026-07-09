@@ -57,23 +57,23 @@ func TestParseStateAbbrevs(t *testing.T) {
 
 func TestAutoSlugAndName(t *testing.T) {
 	cases := []struct {
-		msa      MSA
+		msa      msa
 		wantSlug string
 		wantName string
 	}{
 		{
-			MSA{CBSACode: "47900", Title: "Washington-Arlington-Alexandria, DC-VA-MD-WV", StateAbbrevs: []string{"DC", "VA", "MD", "WV"}},
+			msa{CBSACode: "47900", Title: "Washington-Arlington-Alexandria, DC-VA-MD-WV", StateAbbrevs: []string{"DC", "VA", "MD", "WV"}},
 			"washington-dc-metro",
 			"Washington Metro",
 		},
 		{
-			MSA{CBSACode: "39580", Title: "Raleigh-Cary, NC", StateAbbrevs: []string{"NC"}},
+			msa{CBSACode: "39580", Title: "Raleigh-Cary, NC", StateAbbrevs: []string{"NC"}},
 			"raleigh-nc-metro",
 			"Raleigh Metro",
 		},
 		{
 			// Defensive: empty title → falls back to "msa-<code>".
-			MSA{CBSACode: "99999", Title: "", StateAbbrevs: nil},
+			msa{CBSACode: "99999", Title: "", StateAbbrevs: nil},
 			"msa-99999",
 			"",
 		},
@@ -90,30 +90,30 @@ func TestAutoSlugAndName(t *testing.T) {
 
 func TestAutoParents(t *testing.T) {
 	// Multi-state title produces all unique parents in title order.
-	got := autoParents(MSA{Title: "x", StateAbbrevs: []string{"NY", "NJ", "PA"}})
+	got := autoParents(msa{Title: "x", StateAbbrevs: []string{"NY", "NJ", "PA"}})
 	want := []string{"ny", "nj", "pa"}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("autoParents NY-NJ-PA (-want +got):\n%s", diff)
 	}
-	// Duplicate-state title (shouldn't occur, but Crosswalk dedupes).
-	got = autoParents(MSA{StateAbbrevs: []string{"NY", "NY"}})
+	// Duplicate-state title (shouldn't occur, but crosswalk dedupes).
+	got = autoParents(msa{StateAbbrevs: []string{"NY", "NY"}})
 	if diff := cmp.Diff([]string{"ny"}, got); diff != "" {
 		t.Errorf("autoParents dedupe (-want +got):\n%s", diff)
 	}
 	// Disambiguated state slug (CA → ca-state).
-	got = autoParents(MSA{StateAbbrevs: []string{"CA"}})
+	got = autoParents(msa{StateAbbrevs: []string{"CA"}})
 	if diff := cmp.Diff([]string{"ca-state"}, got); diff != "" {
 		t.Errorf("autoParents CA suffix (-want +got):\n%s", diff)
 	}
 	// Unknown abbreviation — dropped.
-	got = autoParents(MSA{StateAbbrevs: []string{"ZZ"}})
+	got = autoParents(msa{StateAbbrevs: []string{"ZZ"}})
 	if diff := cmp.Diff([]string{}, got); diff != "" {
 		t.Errorf("autoParents unknown (-want +got):\n%s", diff)
 	}
 }
 
 func TestAssignMSASlugs_OverrideWins(t *testing.T) {
-	msas := []MSA{
+	msas := []msa{
 		{
 			CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ-PA", StateAbbrevs: []string{"NY", "NJ", "PA"},
 			Counties: []string{"34017", "36061", "42103"},
@@ -126,11 +126,11 @@ func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 	overrides := []MSAOverride{
 		{CBSACode: "35620", Slug: "nyc-metro", Name: "New York Metro", Parents: []string{"nyc-tristate"}},
 	}
-	got := AssignMSASlugs(msas, overrides)
+	got := assignMSASlugs(msas, overrides)
 
-	// Override wins verbatim — AssignMSASlugs takes the override's
+	// Override wins verbatim — assignMSASlugs takes the override's
 	// slug/name/parents as-is and does not recompute statelessness. Portion
-	// generation for overridden multi-state CBSAs happens in BuildRegionRows
+	// generation for overridden multi-state CBSAs happens in buildRegionRows
 	// (see TestBuildRegionRows_OverriddenMultiStateGetsPortions), not here.
 	if got["35620"].Slug != "nyc-metro" {
 		t.Errorf("override slug = %q, want nyc-metro", got["35620"].Slug)
@@ -159,7 +159,7 @@ func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 // to the umbrella; the portions derive from the constituent county FIPS.
 // A regression that re-introduces a flagship skip would fail here.
 func TestBuildRegionRows_OverriddenMultiStateGetsPortions(t *testing.T) {
-	msas := []MSA{
+	msas := []msa{
 		{
 			CBSACode: "35620", Title: "New York-Newark-Jersey City, NY-NJ", StateAbbrevs: []string{"NY", "NJ"},
 			Counties: []string{"34017", "36061"},
@@ -171,7 +171,7 @@ func TestBuildRegionRows_OverriddenMultiStateGetsPortions(t *testing.T) {
 			Parents: []string{"nyc-tristate"}, RollupStates: []string{"nj", "ny"},
 		},
 	}
-	rows, portionSlugs := BuildRegionRows(msas, AssignMSASlugs(msas, overrides))
+	rows, portionSlugs := buildRegionRows(msas, assignMSASlugs(msas, overrides))
 
 	bySlug := make(map[string]RegionRow, len(rows))
 	for _, r := range rows {
@@ -232,7 +232,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 	// city-leaf → nyc-borough → county-leaf → msa → state → unknown,
 	// in that order. We seed one ZCTA per bucket plus one that should
 	// short-circuit to "unknown".
-	zctaPlace := map[string]ZCTAPlace{
+	zctaPlaces := map[string]zctaPlace{
 		"10001": {PlaceGEOID: "3651000"}, // NYC city — not in placeToLeaf, falls through
 		"02115": {PlaceGEOID: "2507000"}, // Boston city → city-leaf
 		"60601": {PlaceGEOID: "1714000"}, // Chicago city → city-leaf (also Cook County)
@@ -240,7 +240,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"99999": {PlaceGEOID: "0000000"}, // unknown both → unknown bucket
 		"39580": {PlaceGEOID: "3754860"}, // Raleigh (not curated) → fall through to MSA
 	}
-	zctaCounty := map[string]ZCTACounty{
+	zctaCounties := map[string]zctaCounty{
 		"10001": {CountyGEOID: "36061"}, // Manhattan → nyc-borough
 		"02115": {CountyGEOID: "25025"}, // Suffolk County, MA
 		"60601": {CountyGEOID: "17031"}, // Cook County — but place-leaf wins
@@ -270,7 +270,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"17140:21": "cincinnati-oh-metro-ky",
 	}
 
-	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, countyToMSA, msaSlugs, portionSlugs)
+	anchors, reasons := crosswalk(zctaPlaces, zctaCounties, countyToMSA, msaSlugs, portionSlugs)
 
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {
@@ -339,8 +339,8 @@ func TestWritePostalCodesCSV_MergesAndDedupsWithZCTAWinning(t *testing.T) {
 		{PostalCode: "10001", AnchorSlug: "nyc-metro", Reason: "hud:msa"},
 	}
 	var buf strings.Builder
-	if err := WritePostalCodesCSV(&buf, zcta, hud); err != nil {
-		t.Fatalf("WritePostalCodesCSV: %v", err)
+	if err := writePostalCodesCSV(&buf, zcta, hud); err != nil {
+		t.Fatalf("writePostalCodesCSV: %v", err)
 	}
 	got := buf.String()
 	want := "postal_code,country,leaf_region_slug\n" +
@@ -361,8 +361,8 @@ func TestWritePostalCodesCSV_NilHUDPreservesZCTAOnlyBehavior(t *testing.T) {
 		{PostalCode: "10001", AnchorSlug: "manhattan"},
 	}
 	var buf strings.Builder
-	if err := WritePostalCodesCSV(&buf, zcta, nil); err != nil {
-		t.Fatalf("WritePostalCodesCSV: %v", err)
+	if err := writePostalCodesCSV(&buf, zcta, nil); err != nil {
+		t.Fatalf("writePostalCodesCSV: %v", err)
 	}
 	got := buf.String()
 	want := "postal_code,country,leaf_region_slug\n" +

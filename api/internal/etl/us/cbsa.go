@@ -9,11 +9,11 @@ import (
 	"strings"
 )
 
-// MSA is a single auto-generated Metropolitan Statistical Area row,
+// msa is a single auto-generated Metropolitan Statistical Area row,
 // derived from one or more lines in the Census CBSA delineation file
 // (one per constituent county). All counties belonging to the same
-// CBSA code roll up into one MSA value.
-type MSA struct {
+// CBSA code roll up into one msa value.
+type msa struct {
 	// CBSACode is the 5-digit Census CBSA code (e.g., "35620" for
 	// New York-Newark-Jersey City).
 	CBSACode string
@@ -30,7 +30,7 @@ type MSA struct {
 	Counties []string
 }
 
-// ParseCBSA reads the Census CBSA delineation file (already converted
+// parseCBSA reads the Census CBSA delineation file (already converted
 // from xlsx to CSV — see etl/scripts/xlsx_to_csv.py and
 // etl/SOURCES.md) and returns:
 //
@@ -44,7 +44,7 @@ type MSA struct {
 // statistical areas (μSAs) and Metropolitan Division sub-rows are
 // filtered out. The first two banner rows of the Census CSV are
 // skipped automatically by detecting the column-header row.
-func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err error) {
+func parseCBSA(r io.Reader) (msas []msa, countyToMSA map[string]string, err error) {
 	reader := csv.NewReader(r)
 	reader.FieldsPerRecord = -1 // banner rows are short
 
@@ -74,20 +74,17 @@ func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err erro
 				for i, name := range row {
 					col[strings.TrimSpace(name)] = i
 				}
-				if _, ok := col["CBSA Code"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing CBSA Code column")
+				required := []string{
+					"CBSA Code",
+					"CBSA Title",
+					"Metropolitan/Micropolitan Statistical Area",
+					"FIPS State Code",
+					"FIPS County Code",
 				}
-				if _, ok := col["CBSA Title"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing CBSA Title column")
-				}
-				if _, ok := col["Metropolitan/Micropolitan Statistical Area"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing Metropolitan/Micropolitan Statistical Area column")
-				}
-				if _, ok := col["FIPS State Code"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing FIPS State Code column")
-				}
-				if _, ok := col["FIPS County Code"]; !ok {
-					return nil, nil, errors.New("parse cbsa: missing FIPS County Code column")
+				for _, name := range required {
+					if _, ok := col[name]; !ok {
+						return nil, nil, fmt.Errorf("parse cbsa: missing %s column", name)
+					}
 				}
 				headerSeen = true
 			}
@@ -132,14 +129,14 @@ func ParseCBSA(r io.Reader) (msas []MSA, countyToMSA map[string]string, err erro
 		}
 	}
 
-	msas = make([]MSA, 0, len(agg))
+	msas = make([]msa, 0, len(agg))
 	for code, v := range agg {
 		counties := make([]string, 0, len(v.Counties))
 		for c := range v.Counties {
 			counties = append(counties, c)
 		}
 		sort.Strings(counties)
-		msas = append(msas, MSA{
+		msas = append(msas, msa{
 			CBSACode:     code,
 			Title:        v.Title,
 			StateAbbrevs: parseStateAbbrevs(v.Title),

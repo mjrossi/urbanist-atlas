@@ -125,7 +125,7 @@ var statePostalToSlug = map[string]string{
 //
 // The 2020 ZCTA→county file is a frozen decennial product with no
 // drop-in planning-region successor (next ZCTA refresh is 2030), so the
-// fix can't be a source bump. Instead ReconcileCTLegacyCounties
+// fix can't be a source bump. Instead reconcileCTLegacyCounties
 // (crosswalk.go) re-resolves these ZIPs through the current-vintage HUD
 // crosswalk, which already uses the planning-region FIPS.
 //

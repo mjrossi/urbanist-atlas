@@ -32,9 +32,8 @@ package ca
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
@@ -73,7 +72,7 @@ func init() {
 func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, logger *slog.Logger) error {
 	cmaZipPath := filepath.Join(srcDir, "lcma000b21a_e.zip")
 
-	cmas, err := ParseCMAs(cmaZipPath)
+	cmas, err := parseCMAs(cmaZipPath)
 	if err != nil {
 		return err
 	}
@@ -96,13 +95,16 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	// Expand multi-province CMAs (Ottawa-Gatineau) into per-province
 	// portions + the portion anchor lookup the FSA crosswalk routes through.
 	portions, portionByCMA := buildCMAPortions(cmas, assignments)
-	allRegions := make([]CMAAssignment, 0, len(assignments)+len(portions))
-	allRegions = append(allRegions, assignments...)
+	allRegions := make([]etl.RegionRow, 0, len(assignments)+len(portions))
+	allRegions = append(allRegions, cmaRowsToRegionRows(assignments)...)
 	allRegions = append(allRegions, portions...)
 
 	if target.Regions() {
 		tomlPath := filepath.Join(outDir, "regions_ca_cmas.toml")
-		if err := writeCMAsToFile(tomlPath, allRegions); err != nil {
+		writeTOML := func(w io.Writer) error {
+			return etl.WriteRegionsTOML(w, cmaTOMLHeader, allRegions)
+		}
+		if err := etl.WriteFile(tomlPath, "etl ca", writeTOML); err != nil {
 			return err
 		}
 		logger.Info("etl ca: wrote CMAs", "path", tomlPath, "regions", len(allRegions), "portions", len(portions))
@@ -115,7 +117,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	// The FSA boundary is the 155 MB source; parse it only for the postal
 	// pass so a --target=regions run needs just the CMA file.
 	fsaZipPath := filepath.Join(srcDir, "lfsa000b21a_e.zip")
-	fsas, err := ParseFSAs(fsaZipPath)
+	fsas, err := parseFSAs(fsaZipPath)
 	if err != nil {
 		return err
 	}
@@ -125,7 +127,7 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	// (reads the .shp geometry the DBF parse above ignores). Resolve the
 	// returned CMA UIDs to region slugs, keeping only CMAs we actually
 	// generated so an unmapped UID falls through to province.
-	cmaUIDByFSA, err := SpatialJoinFSAToCMA(fsaZipPath, cmaZipPath)
+	cmaUIDByFSA, err := spatialJoinFSAToCMA(fsaZipPath, cmaZipPath)
 	if err != nil {
 		return err
 	}
@@ -137,9 +139,10 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl ca: spatial join FSA→CMA", "assigned", len(cmaSlugByFSA), "of_fsas", len(fsas))
 
-	anchors, reasons := Crosswalk(fsas, cmaSlugByFSA, portionByCMA)
+	anchors, reasons := crosswalk(fsas, cmaSlugByFSA, portionByCMA)
 	csvPath := filepath.Join(outDir, "postal_codes_ca.csv")
-	if err := writeCSVToFile(csvPath, anchors); err != nil {
+	writePostal := func(w io.Writer) error { return etl.WritePostalCSV(w, "CA", anchors) }
+	if err := etl.WriteFile(csvPath, "etl ca", writePostal); err != nil {
 		return err
 	}
 	logger.Info("etl ca: wrote postal codes",
@@ -148,22 +151,4 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 		"by_reason", reasons,
 	)
 	return nil
-}
-
-func writeCMAsToFile(path string, assignments []CMAAssignment) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("etl ca: create %s: %w", path, err)
-	}
-	defer f.Close()
-	return etl.WriteRegionsTOML(f, cmaTOMLHeader, cmaRowsToRegionRows(assignments))
-}
-
-func writeCSVToFile(path string, anchors []PostalAnchor) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("etl ca: create %s: %w", path, err)
-	}
-	defer f.Close()
-	return etl.WritePostalCSV(f, "CA", anchors)
 }

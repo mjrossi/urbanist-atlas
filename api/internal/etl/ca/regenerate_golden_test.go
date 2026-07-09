@@ -85,7 +85,7 @@ func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 		square(1000, 1000, 1010, 1010), // X0A → outside all CMAs → province
 		// Both K1A and J8X resolve to Ottawa-Gatineau (CMA UID 505) by the
 		// spatial join; the ON/QC portion split is then driven by each FSA's
-		// PRUID (35 vs 24) in Crosswalk, not by which box the polygon sits in.
+		// PRUID (35 vs 24) in crosswalk, not by which box the polygon sits in.
 		square(610, 10, 620, 20), // K1A (PRUID 35) → on-portion
 		square(710, 10, 720, 20), // J8X (PRUID 24) → qc-portion
 	}

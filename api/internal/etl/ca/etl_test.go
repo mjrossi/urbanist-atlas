@@ -36,7 +36,7 @@ func TestCleanCMAName(t *testing.T) {
 }
 
 func TestAssignCMAs_OverrideAndParents(t *testing.T) {
-	cmas := []CMA{
+	cmas := []cma{
 		// Toronto — single-province override
 		{UID: "535", Name: "Toronto", ProvinceUIDs: []string{"35"}},
 		// Metro Vancouver — kind override
@@ -60,7 +60,7 @@ func TestAssignCMAs_OverrideAndParents(t *testing.T) {
 	}
 	got := assignCMAs(cmas, overrides)
 
-	byUID := map[string]CMAAssignment{}
+	byUID := map[string]cmaAssignment{}
 	for _, a := range got {
 		byUID[a.UID] = a
 	}
@@ -106,7 +106,7 @@ func TestAssignCMAs_OverrideAndParents(t *testing.T) {
 }
 
 func TestCrosswalk_ReasonPriority(t *testing.T) {
-	fsas := []FSARow{
+	fsas := []fsaRow{
 		{CFSAUID: "M5V", PRUID: "35"}, // curated city leaf → toronto (outranks its CMA)
 		{CFSAUID: "M3K", PRUID: "35"}, // spatial join → toronto-cma
 		{CFSAUID: "H2X", PRUID: "24"}, // city-leaf → montreal
@@ -136,7 +136,7 @@ func TestCrosswalk_ReasonPriority(t *testing.T) {
 		"ottawa-gatineau-cma:24": "ottawa-gatineau-cma-qc",
 	}
 
-	anchors, reasons := Crosswalk(fsas, cmaSlugByFSA, portionByCMA)
+	anchors, reasons := crosswalk(fsas, cmaSlugByFSA, portionByCMA)
 	got := map[string]PostalAnchor{}
 	for _, a := range anchors {
 		got[a.PostalCode] = a

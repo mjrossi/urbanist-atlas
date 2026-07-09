@@ -8,33 +8,33 @@ import (
 	"io"
 )
 
-// FSARow is one entry from the StatsCan FSA boundary file's attribute
+// fsaRow is one entry from the StatsCan FSA boundary file's attribute
 // table. We keep only the fields we need for the smallest-anchor
 // crosswalk.
-type FSARow struct {
+type fsaRow struct {
 	// CFSAUID is the 3-character Forward Sortation Area code (e.g.,
 	// "M5V"). The first letter encodes the province; the digit and
 	// trailing letter further subdivide.
 	CFSAUID string
 	// PRUID is the 2-digit Statistics Canada province/territory code
 	// (e.g., "35" for Ontario). Maps to a province slug via
-	// provinceCodeToSlug in mappings.go.
+	// provinceUIDToSlug in mappings.go.
 	PRUID string
 }
 
-// ParseFSAs reads the StatsCan FSA boundary file zip (downloaded from
+// parseFSAs reads the StatsCan FSA boundary file zip (downloaded from
 // https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip)
-// and returns one FSARow per FSA. The function parses only the DBF
+// and returns one fsaRow per FSA. The function parses only the DBF
 // attribute table inside the zip; the much-larger shapefile geometry
 // is ignored.
-func ParseFSAs(zipPath string) ([]FSARow, error) {
+func parseFSAs(zipPath string) ([]fsaRow, error) {
 	dbf, closer, err := openDBFFromZip(zipPath, ".dbf")
 	if err != nil {
 		return nil, fmt.Errorf("parse fsas: %w", err)
 	}
 	defer closer()
 
-	rows := make([]FSARow, 0, 1700)
+	rows := make([]fsaRow, 0, 1700)
 	for {
 		row, err := dbf.next()
 		if errors.Is(err, io.EOF) {
@@ -48,7 +48,7 @@ func ParseFSAs(zipPath string) ([]FSARow, error) {
 		if fsa == "" || pruid == "" {
 			continue
 		}
-		rows = append(rows, FSARow{CFSAUID: fsa, PRUID: pruid})
+		rows = append(rows, fsaRow{CFSAUID: fsa, PRUID: pruid})
 	}
 	return rows, nil
 }

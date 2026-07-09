@@ -35,10 +35,10 @@ type CMAOverride struct {
 	Kind string `toml:"kind"`
 }
 
-// CMAAssignment captures the per-CMA slug + kind + parents that the
+// cmaAssignment captures the per-CMA slug + kind + parents that the
 // output writer emits to regions_ca_cmas.toml. Overrides take effect
 // during assignment (see assignCMAs).
-type CMAAssignment struct {
+type cmaAssignment struct {
 	UID     string
 	Slug    string
 	Kind    string
@@ -60,12 +60,12 @@ type CMAAssignment struct {
 // name). Parents are derived from ProvinceUIDs (single-province →
 // [province slug]; multi-province like Ottawa-Gatineau → [primary,
 // secondary]).
-func assignCMAs(cmas []CMA, overrides []CMAOverride) []CMAAssignment {
+func assignCMAs(cmas []cma, overrides []CMAOverride) []cmaAssignment {
 	overrideByUID := make(map[string]CMAOverride, len(overrides))
 	for _, o := range overrides {
 		overrideByUID[o.UID] = o
 	}
-	out := make([]CMAAssignment, 0, len(cmas))
+	out := make([]cmaAssignment, 0, len(cmas))
 	for _, c := range cmas {
 		override := overrideByUID[c.UID]
 		slug := override.Slug
@@ -97,7 +97,7 @@ func assignCMAs(cmas []CMA, overrides []CMAOverride) []CMAAssignment {
 				parents = append(parents, p.Slug)
 			}
 		}
-		out = append(out, CMAAssignment{
+		out = append(out, cmaAssignment{
 			UID:          c.UID,
 			Slug:         slug,
 			Kind:         kind,
@@ -122,7 +122,7 @@ type provinceEntry struct {
 // spannedProvinces returns the distinct provinces a CMA spans, derived
 // from its StatsCan ProvinceUIDs, sorted by slug for deterministic
 // output. Unknown PRUIDs are skipped.
-func spannedProvinces(c CMA) []provinceEntry {
+func spannedProvinces(c cma) []provinceEntry {
 	seen := map[string]bool{}
 	var out []provinceEntry
 	for _, pruid := range c.ProvinceUIDs {
@@ -140,13 +140,15 @@ func spannedProvinces(c CMA) []provinceEntry {
 // buildCMAPortions returns the per-province portion rows for multi-
 // province CMAs (only Ottawa-Gatineau in v1) plus the portion anchor
 // lookup ("umbrellaSlug:PRUID" → portion slug) the FSA crosswalk routes
-// through. Mirrors us.BuildRegionRows' portion logic.
-func buildCMAPortions(cmas []CMA, assignments []CMAAssignment) ([]CMAAssignment, map[string]string) {
-	byUID := make(map[string]CMAAssignment, len(assignments))
+// through. The rows come from the shared etl.BuildPortionRows kernel
+// (same one the US metro portions use); the anchor-map keying stays
+// CA-specific.
+func buildCMAPortions(cmas []cma, assignments []cmaAssignment) ([]etl.RegionRow, map[string]string) {
+	byUID := make(map[string]cmaAssignment, len(assignments))
 	for _, a := range assignments {
 		byUID[a.UID] = a
 	}
-	var portions []CMAAssignment
+	var portions []etl.RegionRow
 	portionByCMA := map[string]string{}
 	for _, c := range cmas {
 		provs := spannedProvinces(c)
@@ -154,25 +156,25 @@ func buildCMAPortions(cmas []CMA, assignments []CMAAssignment) ([]CMAAssignment,
 			continue
 		}
 		a := byUID[c.UID]
-		for _, p := range provs {
-			portionSlug := a.Slug + "-" + p.Abbrev
-			portions = append(portions, CMAAssignment{
-				Slug:    portionSlug,
-				Kind:    "ca:cma-portion",
-				Name:    a.Name + " (" + strings.ToUpper(p.Abbrev) + ")",
-				Parents: []string{p.Slug, a.Slug},
-			})
-			portionByCMA[a.Slug+":"+p.PRUID] = portionSlug
+		spanned := make([]etl.PortionParent, len(provs))
+		for i, p := range provs {
+			spanned[i] = etl.PortionParent{Slug: p.Slug, Abbrev: p.Abbrev}
+		}
+		rows := etl.BuildPortionRows(a.Slug, a.Name, "ca:cma-portion", spanned)
+		portions = append(portions, rows...)
+		for i, p := range provs {
+			portionByCMA[a.Slug+":"+p.PRUID] = rows[i].Slug
 		}
 	}
 	return portions, portionByCMA
 }
 
-// cmaRowsToRegionRows adapts the CA assignment shape to the shared
-// etl.RegionRow the common TOML writer consumes. The provenance comment
-// (# StatsCan CMA <UID> — <Name>) is attached only to umbrella rows
-// (UID set); portion rows carry no UID and so no comment.
-func cmaRowsToRegionRows(assignments []CMAAssignment) []etl.RegionRow {
+// cmaRowsToRegionRows adapts the CA umbrella-assignment shape to the
+// shared etl.RegionRow the common TOML writer consumes, attaching the
+// provenance comment (# StatsCan CMA <UID> — <Name>). Portion rows
+// never pass through here — buildCMAPortions builds them directly as
+// etl.RegionRow (comment-free).
+func cmaRowsToRegionRows(assignments []cmaAssignment) []etl.RegionRow {
 	rows := make([]etl.RegionRow, len(assignments))
 	for i, a := range assignments {
 		comment := ""
@@ -219,7 +221,8 @@ const cmaTOMLHeader = `# Canadian Census Metropolitan Areas (CMAs), generated fr
 #     lookup reaches only its own province. Portion slug is
 #     "<umbrella>-<province>", which sorts right after the umbrella.
 #
-# Loaded by just loaddata BETWEEN regions_ca_provinces.toml (parents:
-# provinces) and regions_ca.toml (children: curated cities). Cross-file
-# parent resolution lives in internal/seedfiles/regions.go.
+# Loaded at API boot by internal/seedfiles into the in-memory
+# FileStore, BETWEEN regions_ca_provinces.toml (parents: provinces)
+# and regions_ca.toml (children: curated cities). Cross-file parent
+# resolution lives in internal/seedfiles/regions.go.
 `

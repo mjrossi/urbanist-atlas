@@ -8,23 +8,23 @@ import (
 	"strings"
 )
 
-// ZCTAPlace is the primary place assignment for one ZCTA. A ZCTA may
+// zctaPlace is the primary place assignment for one ZCTA. A ZCTA may
 // straddle multiple Census places; we keep only the place with the
 // largest land area within the ZCTA (the AREALAND_PART column).
-type ZCTAPlace struct {
+type zctaPlace struct {
 	PlaceGEOID string
 	PlaceName  string
 }
 
-// ZCTACounty is the primary county assignment for one ZCTA. ZCTAs can
+// zctaCounty is the primary county assignment for one ZCTA. ZCTAs can
 // straddle counties too, but it's rare for the primary county to be
 // ambiguous — same largest-AREALAND_PART tiebreak applies.
-type ZCTACounty struct {
+type zctaCounty struct {
 	CountyGEOID string
 	CountyName  string
 }
 
-// ParseZCTAPlace reads the Census ZCTA-to-place relationship file
+// parseZCTAPlace reads the Census ZCTA-to-place relationship file
 // (tab20_zcta520_place20_natl.txt, pipe-delimited with a BOM) and
 // returns one entry per ZCTA: the primary place assignment.
 //
@@ -39,30 +39,30 @@ type ZCTACounty struct {
 // Rows where GEOID_ZCTA5_20 or GEOID_PLACE_20 is blank are skipped (no
 // ZCTA-place mapping to record). ZCTAs that straddle multiple places
 // keep only the row with the largest AREALAND_PART.
-func ParseZCTAPlace(r io.Reader) (map[string]ZCTAPlace, error) {
+func parseZCTAPlace(r io.Reader) (map[string]zctaPlace, error) {
 	raw, err := parseZCTARelationship(r, 1, 9, 10, 16)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]ZCTAPlace, len(raw))
+	out := make(map[string]zctaPlace, len(raw))
 	for zcta, v := range raw {
-		out[zcta] = ZCTAPlace{PlaceGEOID: v.GEOID, PlaceName: v.Name}
+		out[zcta] = zctaPlace{PlaceGEOID: v.GEOID, PlaceName: v.Name}
 	}
 	return out, nil
 }
 
-// ParseZCTACounty reads the Census ZCTA-to-county relationship file
+// parseZCTACounty reads the Census ZCTA-to-county relationship file
 // (tab20_zcta520_county20_natl.txt). Same pipe-delimited shape as the
 // place file, with COUNTY columns substituted for PLACE columns.
 // Returns one entry per ZCTA: the primary county assignment.
-func ParseZCTACounty(r io.Reader) (map[string]ZCTACounty, error) {
+func parseZCTACounty(r io.Reader) (map[string]zctaCounty, error) {
 	raw, err := parseZCTARelationship(r, 1, 9, 10, 16)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]ZCTACounty, len(raw))
+	out := make(map[string]zctaCounty, len(raw))
 	for zcta, v := range raw {
-		out[zcta] = ZCTACounty{CountyGEOID: v.GEOID, CountyName: v.Name}
+		out[zcta] = zctaCounty{CountyGEOID: v.GEOID, CountyName: v.Name}
 	}
 	return out, nil
 }

@@ -32,6 +32,7 @@ package us
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -117,7 +118,7 @@ func init() {
 //  4. Assign slugs/names/parents to every MSA (overrides win).
 //  5. Run the smallest-anchor crosswalk over every ZCTA → anchor slug.
 //  6. (Slice #7.5.5) If a HUD ZIP-County CSV is staged under srcDir,
-//     parse it and run CrosswalkHUDBackfill against the post-ZCTA
+//     parse it and run crosswalkHUDBackfill against the post-ZCTA
 //     anchor set to produce additional anchors for ZIPs Census ZCTA
 //     omits (P.O. Box-only, single-building, APO/FPO). The HUD CSV is
 //     account-gated so its absence is not an error — the flow
@@ -172,18 +173,19 @@ func regenerateRegions(srcDir, outDir string, target etl.Target, logger *slog.Lo
 	}
 	logger.Info("etl us: read overrides", "count", len(overrides), "path", overridesPath)
 
-	assignments := AssignMSASlugs(msas, overrides)
+	assignments := assignMSASlugs(msas, overrides)
 	cbsaToSlug := make(map[string]string, len(assignments))
 	for code, a := range assignments {
 		cbsaToSlug[code] = a.Slug
 	}
 	// Expand to the full emitted region set (umbrellas + per-state
 	// portions) and the portion anchor lookup the crosswalk routes through.
-	rows, portionSlugs := BuildRegionRows(msas, assignments)
+	rows, portionSlugs := buildRegionRows(msas, assignments)
 
 	if target.Regions() {
 		msaTOMLPath := filepath.Join(outDir, "regions_us_msas.toml")
-		if err := writeMSAs(msaTOMLPath, rows); err != nil {
+		writeTOML := func(w io.Writer) error { return etl.WriteRegionsTOML(w, msaTOMLHeader, rows) }
+		if err := etl.WriteFile(msaTOMLPath, "etl us", writeTOML); err != nil {
 			return regionRouting{}, err
 		}
 		logger.Info("etl us: wrote MSAs", "path", msaTOMLPath, "regions", len(rows), "portions", len(portionSlugs))
@@ -204,27 +206,28 @@ func regeneratePostal(srcDir, outDir string, rt regionRouting, logger *slog.Logg
 	// ZCTA crosswalks feed only the postal pass, so they're parsed here
 	// rather than above the region write — a --target=regions run needs
 	// just CBSA + overrides and skips ~20 MB of ZCTA download/parse.
-	zctaPlace, err := loadZCTAPlace(filepath.Join(srcDir, "tab20_zcta520_place20_natl.txt"))
+	zctaPlaces, err := loadZCTAPlace(filepath.Join(srcDir, "tab20_zcta520_place20_natl.txt"))
 	if err != nil {
 		return err
 	}
-	logger.Info("etl us: parsed ZCTA-to-place", "rows", len(zctaPlace))
+	logger.Info("etl us: parsed ZCTA-to-place", "rows", len(zctaPlaces))
 
-	zctaCounty, err := loadZCTACounty(filepath.Join(srcDir, "tab20_zcta520_county20_natl.txt"))
+	zctaCounties, err := loadZCTACounty(filepath.Join(srcDir, "tab20_zcta520_county20_natl.txt"))
 	if err != nil {
 		return err
 	}
-	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounty))
+	logger.Info("etl us: parsed ZCTA-to-county", "rows", len(zctaCounties))
 
-	anchors, reasons := Crosswalk(zctaPlace, zctaCounty, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
+	anchors, reasons := crosswalk(zctaPlaces, zctaCounties, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
 
-	hudAnchors, hudReasons, err := backfillHUD(srcDir, anchors, zctaCounty, rt, logger)
+	hudAnchors, hudReasons, err := backfillHUD(srcDir, anchors, zctaCounties, rt, logger)
 	if err != nil {
 		return err
 	}
 
 	csvPath := filepath.Join(outDir, "postal_codes_us.csv")
-	if err := writeCSV(csvPath, anchors, hudAnchors); err != nil {
+	writePostal := func(w io.Writer) error { return writePostalCodesCSV(w, anchors, hudAnchors) }
+	if err := etl.WriteFile(csvPath, "etl us", writePostal); err != nil {
 		return err
 	}
 	logger.Info("etl us: wrote postal codes",
@@ -245,7 +248,7 @@ func regeneratePostal(srcDir, outDir string, rt regionRouting, logger *slog.Logg
 // reconciles the CT legacy-county gap (mutating zctaAnchors in place) and
 // then produces additional anchors for ZIPs Census ZCTA omits (P.O.
 // Box-only, single-building, APO/FPO).
-func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounty map[string]ZCTACounty, rt regionRouting, logger *slog.Logger) ([]PostalAnchor, map[string]int, error) {
+func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounties map[string]zctaCounty, rt regionRouting, logger *slog.Logger) ([]PostalAnchor, map[string]int, error) {
 	hudPath := findHUDFile(srcDir)
 	if hudPath == "" {
 		logger.Info("etl us: no HUD ZIP-County CSV found in src dir — skipping non-ZCTA backfill",
@@ -265,7 +268,7 @@ func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounty map[strin
 	// ZCTA ZIPs stranded at the bare state (their 2020 legacy county
 	// isn't in the 2023 planning-region countyToMSA) using HUD's
 	// current-vintage county. Mutates `zctaAnchors` in place.
-	ctReasons := ReconcileCTLegacyCounties(zctaAnchors, zctaCounty, huds, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
+	ctReasons := reconcileCTLegacyCounties(zctaAnchors, zctaCounties, huds, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
 	ctReconciled := 0
 	for k, n := range ctReasons {
 		if strings.HasPrefix(k, "ct-reconciled:") {
@@ -280,7 +283,7 @@ func backfillHUD(srcDir string, zctaAnchors []PostalAnchor, zctaCounty map[strin
 		"skip_hud_unresolved", ctReasons["ct-skip:hud-unresolved"],
 	)
 
-	hudAnchors, hudReasons := CrosswalkHUDBackfill(huds, zctaAnchors, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
+	hudAnchors, hudReasons := crosswalkHUDBackfill(huds, zctaAnchors, rt.countyToMSA, rt.cbsaToSlug, rt.portionSlugs)
 	logger.Info("etl us: hud backfill",
 		"reasons", hudReasons,
 		"added", len(hudAnchors),
@@ -309,56 +312,38 @@ func findHUDFile(srcDir string) string {
 	return matches[len(matches)-1]
 }
 
-func loadHUD(path string) ([]HUDZipCounty, error) {
+func loadHUD(path string) ([]hudZipCounty, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("etl us: open hud %s: %w", path, err)
 	}
 	defer f.Close()
-	return ParseHUDZipCounty(f)
+	return parseHUDZipCounty(f)
 }
 
-func loadCBSA(path string) ([]MSA, map[string]string, error) {
+func loadCBSA(path string) ([]msa, map[string]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("etl us: open cbsa %s: %w", path, err)
 	}
 	defer f.Close()
-	return ParseCBSA(f)
+	return parseCBSA(f)
 }
 
-func loadZCTAPlace(path string) (map[string]ZCTAPlace, error) {
+func loadZCTAPlace(path string) (map[string]zctaPlace, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("etl us: open zcta-place %s: %w", path, err)
 	}
 	defer f.Close()
-	return ParseZCTAPlace(f)
+	return parseZCTAPlace(f)
 }
 
-func loadZCTACounty(path string) (map[string]ZCTACounty, error) {
+func loadZCTACounty(path string) (map[string]zctaCounty, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("etl us: open zcta-county %s: %w", path, err)
 	}
 	defer f.Close()
-	return ParseZCTACounty(f)
-}
-
-func writeMSAs(path string, rows []RegionRow) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("etl us: create %s: %w", path, err)
-	}
-	defer f.Close()
-	return etl.WriteRegionsTOML(f, msaTOMLHeader, rows)
-}
-
-func writeCSV(path string, zctaAnchors, hudAnchors []PostalAnchor) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("etl us: create %s: %w", path, err)
-	}
-	defer f.Close()
-	return WritePostalCodesCSV(f, zctaAnchors, hudAnchors)
+	return parseZCTACounty(f)
 }
