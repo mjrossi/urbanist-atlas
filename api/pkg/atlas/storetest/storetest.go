@@ -120,7 +120,7 @@ func testAncestorRegionsFiltersNational(t *testing.T, factory Factory) {
 		t.Fatalf("AncestorRegions: %v", err)
 	}
 	for _, r := range ancestors {
-		if r.ScopeTier == atlas.ScopeNational {
+		if r.IsNational() {
 			t.Errorf("national-tier row leaked into ancestors: %s (tier=%s)", r.Slug, r.ScopeTier)
 		}
 	}
@@ -162,7 +162,7 @@ func testDescendantRegionsFiltersNational(t *testing.T, factory Factory) {
 		t.Fatalf("DescendantRegions: %v", err)
 	}
 	for _, r := range descendants {
-		if r.ScopeTier == atlas.ScopeNational {
+		if r.IsNational() {
 			t.Errorf("national-tier row leaked into descendants: %s (tier=%s)", r.Slug, r.ScopeTier)
 		}
 	}
@@ -654,7 +654,7 @@ func testSearchRegionsRanksAndFiltersNational(t *testing.T, factory Factory) {
 	}
 	// National row never surfaces.
 	for _, r := range got {
-		if r.Region.ScopeTier == atlas.ScopeNational || r.Region.Slug == "springfield-national" {
+		if r.Region.IsNational() || r.Region.Slug == "springfield-national" {
 			t.Errorf("national-tier row leaked into search results: %s", r.Region.Slug)
 		}
 	}

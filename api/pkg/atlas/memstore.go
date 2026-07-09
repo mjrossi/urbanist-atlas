@@ -143,31 +143,17 @@ func (s *MemStore) ResolveLeafRegion(_ context.Context, country Country, postalC
 }
 
 // AncestorRegions implements Store. Returns the leaf followed by all
-// transitive ancestors via BFS, dedupes via a visited set. Excludes
-// scope_tier='national' rows from both the seed and the recursion
-// (the storetest harness pins this contract).
+// transitive ancestors via BFS (bfsCollectIDs over the parents map),
+// dedupes via a visited set. Excludes scope_tier='national' rows from
+// both the seed and the recursion (the storetest harness pins this
+// contract).
 func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	visited := map[int64]struct{}{}
-	out := []Region{}
-	queue := []int64{leafRegionID}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		if _, seen := visited[id]; seen {
-			continue
-		}
-		visited[id] = struct{}{}
-		r, ok := s.regionsByID[id]
-		if !ok {
-			continue
-		}
-		if r.ScopeTier == ScopeNational {
-			continue
-		}
-		out = append(out, r)
-		queue = append(queue, s.parents[id]...)
+	ids := s.bfsCollectIDs(leafRegionID, s.parents)
+	out := make([]Region, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, s.regionsByID[id])
 	}
 	return out, nil
 }
@@ -203,10 +189,10 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	orgsByRegion := s.buildOrgsByRegion()
 	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
-		if !defaultBrowseKinds[r.Kind] || r.ScopeTier == ScopeNational {
+		if !defaultBrowseKinds[r.Kind] || r.IsNational() {
 			continue
 		}
-		descendants := s.descendantRegionIDsWith(id, childrenOf)
+		descendants := s.bfsCollectIDs(id, childrenOf)
 		count := countDistinctOrgs(orgsByRegion, descendants)
 		if count == 0 {
 			continue
@@ -268,7 +254,7 @@ func (s *MemStore) bfsUpwardFirstMatch(rootID int64, match func(Region) bool) (R
 			}
 			visited[id] = true
 			r, ok := s.regionsByID[id]
-			if !ok || r.ScopeTier == ScopeNational {
+			if !ok || r.IsNational() {
 				continue
 			}
 			if match(r) {
@@ -323,7 +309,7 @@ func (s *MemStore) ResolveRegionBySlug(_ context.Context, slug string) (Region, 
 	if !ok {
 		return Region{}, ErrRegionNotFound
 	}
-	if r.ScopeTier == ScopeNational {
+	if r.IsNational() {
 		return Region{}, ErrRegionNotFound
 	}
 	return r, nil
@@ -337,14 +323,14 @@ func (s *MemStore) DescendantRegions(_ context.Context, focusRegionID int64) ([]
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	focus, ok := s.regionsByID[focusRegionID]
-	if !ok || focus.ScopeTier == ScopeNational {
+	if !ok || focus.IsNational() {
 		return nil, nil
 	}
 	ids := s.descendantRegionIDs(focusRegionID)
 	out := make([]Region, 0, len(ids))
 	for _, id := range ids {
 		r, ok := s.regionsByID[id]
-		if !ok || r.ScopeTier == ScopeNational {
+		if !ok || r.IsNational() {
 			continue
 		}
 		out = append(out, r)
@@ -367,7 +353,7 @@ func (s *MemStore) RollupMetrosFor(_ context.Context, stateRegionID int64) ([]Re
 	out := make([]Region, 0, len(ids))
 	for _, id := range ids {
 		r, ok := s.regionsByID[id]
-		if !ok || r.ScopeTier == ScopeNational {
+		if !ok || r.IsNational() {
 			continue
 		}
 		out = append(out, r)
@@ -418,7 +404,7 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 			if !ok {
 				continue
 			}
-			if r.ScopeTier != ScopeNational {
+			if !r.IsNational() {
 				hasNonNational = true
 				break
 			}
@@ -449,108 +435,6 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 		candidates = candidates[:10]
 	}
 	return candidates, nil
-}
-
-// buildChildrenOf returns a fresh reverse-adjacency map (parent → list
-// of children) derived from s.parents. O(P) in the parent-edge count.
-// Caller must hold s.mu (read or write). Allocate-and-return rather
-// than caching on the struct so the function is safe under RLock
-// without coordinating writes; the dominant caller (ListRegions)
-// builds it once per request and reuses across the loop.
-func (s *MemStore) buildChildrenOf() map[int64][]int64 {
-	out := map[int64][]int64{}
-	for childID, parents := range s.parents {
-		for _, p := range parents {
-			out[p] = append(out[p], childID)
-		}
-	}
-	return out
-}
-
-// descendantRegionIDs returns rootID followed by every non-national
-// region reachable by walking the parents map in reverse (child-of
-// relation). Excludes scope_tier='national' rows from both the seed
-// and the recursion so an editorial slip-up (a national region wired
-// under a metro) can't inflate a metro's org_count via ListRegions or
-// leak into GetRegion's in-scope set. Shares the DescendantRegions
-// exclusion contract.
-//
-// Builds childrenOf inline — convenience wrapper for callers like
-// DescendantRegions that don't loop over multiple roots. Multi-root
-// callers (ListRegions) should hoist the buildChildrenOf call and
-// use descendantRegionIDsWith to avoid the O(P) rebuild per root.
-//
-// Must be called with s.mu held (read or write).
-func (s *MemStore) descendantRegionIDs(rootID int64) []int64 {
-	return s.descendantRegionIDsWith(rootID, s.buildChildrenOf())
-}
-
-// descendantRegionIDsWith is the BFS body of descendantRegionIDs,
-// parameterized on a precomputed parent → children map. Splits the
-// hot path so ListRegions can build childrenOf once for the whole
-// call instead of once per root.
-//
-// Must be called with s.mu held (read or write).
-func (s *MemStore) descendantRegionIDsWith(rootID int64, childrenOf map[int64][]int64) []int64 {
-	visited := map[int64]bool{}
-	out := []int64{}
-	queue := []int64{rootID}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		if visited[id] {
-			continue
-		}
-		visited[id] = true
-		r, ok := s.regionsByID[id]
-		if !ok {
-			continue
-		}
-		if r.ScopeTier == ScopeNational {
-			continue
-		}
-		out = append(out, id)
-		queue = append(queue, childrenOf[id]...)
-	}
-	return out
-}
-
-// buildOrgsByRegion returns a fresh inverted index (region id → set of
-// the org ids attached to it). O(O · A) in the org count × attachments
-// per org — one pass over the org→regions adjacency. Caller must hold
-// s.mu. ListRegions builds it once per request so org counts become a
-// set-union over a region's descendant ids plus a map lookup for the
-// direct count, instead of re-scanning every org per browseable region.
-func (s *MemStore) buildOrgsByRegion() map[int64]map[int64]struct{} {
-	out := map[int64]map[int64]struct{}{}
-	for _, org := range s.orgs {
-		for _, rid := range s.orgRegions[org.ID] {
-			set := out[rid]
-			if set == nil {
-				set = map[int64]struct{}{}
-				out[rid] = set
-			}
-			set[org.ID] = struct{}{}
-		}
-	}
-	return out
-}
-
-// countDistinctOrgs returns the number of distinct orgs attached to any
-// region in regionIDs, reading the precomputed orgsByRegion inverted
-// index. Equivalent to the old per-region full org scan, but O(sum of
-// per-region set sizes) instead of O(O · A) per region.
-func countDistinctOrgs(orgsByRegion map[int64]map[int64]struct{}, regionIDs []int64) int {
-	if len(regionIDs) == 0 {
-		return 0
-	}
-	seen := map[int64]struct{}{}
-	for _, rid := range regionIDs {
-		for orgID := range orgsByRegion[rid] {
-			seen[orgID] = struct{}{}
-		}
-	}
-	return len(seen)
 }
 
 // regionsForOrg gathers the Region rows for an org's attachments,

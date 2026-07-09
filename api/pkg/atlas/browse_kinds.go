@@ -1,7 +1,5 @@
 package atlas
 
-import "sort"
-
 // defaultBrowseKinds names the region kinds the `/api/v1/regions`
 // list endpoint returns by default — and today, in the only mode it
 // ships. The editorial default for the homepage Browse panel: metros
@@ -37,8 +35,8 @@ import "sort"
 // when an org gets tagged to them.
 //
 // Adding a new country's default-browse kind is a one-line append
-// here; the predicate and the accessor stay unchanged. The
-// per-country editorial conventions live in docs/region-graph.md.
+// here; the predicate stays unchanged. The per-country editorial
+// conventions live in docs/region-graph.md.
 var defaultBrowseKinds = map[RegionKind]bool{
 	"us:metro":              true,
 	"us:city":               true,
@@ -51,30 +49,3 @@ var defaultBrowseKinds = map[RegionKind]bool{
 // IsDefaultBrowseKind reports whether k is one of the kinds returned
 // by `/api/v1/regions`. The unknown empty string returns false.
 func IsDefaultBrowseKind(k RegionKind) bool { return defaultBrowseKinds[k] }
-
-// DefaultBrowseKinds returns the default-browse kinds in
-// deterministic alphabetical order. The SQL layer passes this as a
-// $1::text[] parameter, so a stable order keeps query plans (and
-// EXPLAINs) readable. Callers must not mutate the returned slice —
-// it's a fresh copy each call, but treat it as immutable to keep the
-// API obvious.
-func DefaultBrowseKinds() []RegionKind {
-	out := make([]RegionKind, 0, len(defaultBrowseKinds))
-	for k := range defaultBrowseKinds {
-		out = append(out, k)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
-// DefaultBrowseKindStrings returns DefaultBrowseKinds as []string for
-// the sqlc-generated queries that take text[] parameters. Same
-// ordering and freshness guarantees as DefaultBrowseKinds.
-func DefaultBrowseKindStrings() []string {
-	kinds := DefaultBrowseKinds()
-	out := make([]string, len(kinds))
-	for i, k := range kinds {
-		out[i] = string(k)
-	}
-	return out
-}

@@ -99,7 +99,7 @@ func TestMemStore_ListRegions_ExcludesOutsideKindsAndNational(t *testing.T) {
 		if p.OrgCount == 0 {
 			t.Errorf("zero-org region leaked into result: %s", p.Region.Slug)
 		}
-		if p.Region.ScopeTier == ScopeNational {
+		if p.Region.IsNational() {
 			t.Errorf("national-tier region leaked into result: %s", p.Region.Slug)
 		}
 	}
@@ -275,7 +275,7 @@ func TestMemStore_GetRegion_Ancestry_LeafToRoot(t *testing.T) {
 		if r.Slug == "brooklyn-ny" {
 			t.Errorf("ancestry includes the region itself; want excluded")
 		}
-		if r.ScopeTier == ScopeNational {
+		if r.IsNational() {
 			t.Errorf("national-tier region leaked into ancestry: %s", r.Slug)
 		}
 	}
@@ -540,7 +540,7 @@ func TestMemStore_SearchRegions_RanksExactSlugFirstAndExcludesNational(t *testin
 		t.Errorf("exact-slug match should rank first; got %q", got[0].Region.Slug)
 	}
 	for _, r := range got {
-		if r.Region.ScopeTier == ScopeNational {
+		if r.Region.IsNational() {
 			t.Errorf("national-tier region %q must be excluded", r.Region.Slug)
 		}
 		if r.Region.Slug == "queens-national" {

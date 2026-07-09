@@ -13,7 +13,7 @@ import (
 
 // listRegionsHandler answers GET /api/v1/regions — the homepage
 // Browse panel. Returns the editorial default browse set (metros +
-// cities, per atlas.DefaultBrowseKinds) with ≥1 approved org
+// cities, per atlas.IsDefaultBrowseKind) with ≥1 approved org
 // attached directly or via a region-DAG descendant. Ordered by org
 // count DESC then name ASC.
 //
