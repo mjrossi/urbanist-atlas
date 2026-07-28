@@ -128,14 +128,16 @@ describe('Browse', () => {
 
     const us = await screen.findByRole('heading', { name: /united states/i });
     const usHeader = us.closest('.country-head');
-    expect(usHeader?.textContent).toMatch(/196\s*orgs/);
+    // "countrywide" is load-bearing: the org total spans regions that
+    // never render as rows, so the label must not read as a row tally.
+    expect(usHeader?.textContent).toMatch(/196\s*orgs countrywide/);
     expect(usHeader?.textContent).not.toMatch(/\b19\s*orgs/);
     // Region count still reflects the rows actually rendered.
     expect(usHeader?.textContent).toMatch(/2\s*regions/);
 
     const ca = screen.getByRole('heading', { name: /canada/i });
     const caHeader = ca.closest('.country-head');
-    expect(caHeader?.textContent).toMatch(/40\s*orgs/);
+    expect(caHeader?.textContent).toMatch(/40\s*orgs countrywide/);
     expect(caHeader?.textContent).toMatch(/1\s*regions/);
   });
 

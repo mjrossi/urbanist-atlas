@@ -494,6 +494,10 @@ func (s *MemStore) Stats(_ context.Context) (Stats, error) {
 	browse := s.listRegionsLocked()
 	regionsByCountry := map[Country]int{}
 	for _, summary := range browse {
+		// Mirrors the org-side rule above: a blank Country (possible only
+		// in hand-built fixtures) still counts toward BrowseRegionCount
+		// but has no country row to be attributed to, so the by_country
+		// region_count columns may sum to less than BrowseRegionCount.
 		if summary.Region.Country != "" {
 			regionsByCountry[summary.Region.Country]++
 		}

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
-import type { Stats } from '../lib/api.ts';
+import type { ApiError, Stats } from '../lib/api.ts';
 import { getStats } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
@@ -57,7 +57,7 @@ export function BroadsheetNav() {
   // Dropping the regions query also means routes that never render a
   // region list (/about, /colophon, /submit) no longer pull the whole
   // browse set just to print two numbers.
-  const stats = useQuery<Stats>({
+  const stats = useQuery<Stats, ApiError>({
     queryKey: queryKeys.stats(),
     queryFn: ({ signal }) => getStats({ signal }),
   });

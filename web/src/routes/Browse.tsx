@@ -258,7 +258,8 @@ function CountrySection({
   // the header can never disagree with the rows. The org count is the
   // country-wide total from `/api/v1/stats` and is deliberately larger
   // than what these rows sum to — statewide and provincial groups have
-  // no browseable region of their own to appear under.
+  // no browseable region of their own to appear under — so the label
+  // says "countrywide" to make the mixed provenance explicit.
   const total = country.total.length;
   const name = COUNTRY_TITLES[country.country] ?? country.country;
   return (
@@ -271,7 +272,7 @@ function CountrySection({
           {orgCount !== null ? (
             <>
               {' · '}
-              <span className="em">{orgCount}</span> orgs
+              <span className="em">{orgCount}</span> orgs countrywide
             </>
           ) : null}
         </div>

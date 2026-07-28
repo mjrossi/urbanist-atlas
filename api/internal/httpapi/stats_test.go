@@ -95,9 +95,52 @@ func TestStats_TotalExceedsBrowseSubsetSum(t *testing.T) {
 	for _, rs := range env.Data {
 		directSum += rs.DirectOrgCount
 	}
-	if directSum > stats.TotalOrgCount {
-		t.Errorf("sum(direct_org_count) = %d exceeds total_org_count = %d — the browse sum double-counts multi-region orgs and can never legitimately exceed the distinct total",
-			directSum, stats.TotalOrgCount)
+	// Strict inequality is the whole guard: the dev fixtures attach
+	// tri-state-transportation-campaign solely to the ny state region,
+	// which is invisible to the browse subset, so a source count must
+	// exceed the sum. Equality means the handler has been rewired onto
+	// the browse subset and the bug is back.
+	if stats.TotalOrgCount <= directSum {
+		t.Errorf("total_org_count = %d must strictly exceed sum(direct_org_count) = %d — the fixtures contain an org attached only to a non-browseable region",
+			stats.TotalOrgCount, directSum)
+	}
+}
+
+// TestStats_EmptyStore_ByCountryIsEmptyArray pins the adapter's
+// []-not-null guarantee where it can actually fail. The fixture-backed
+// happy-path test always produces country rows, so its nil check is
+// trivially satisfied; only an empty store exercises the make() in
+// toOAPIStats. Asserting on the raw body is deliberate — decoding into
+// oapi.Stats maps both null and [] to a nil slice.
+func TestStats_EmptyStore_ByCountryIsEmptyArray(t *testing.T) {
+	store := atlas.NewMemStore()
+	handler := New(Config{
+		Store:      store,
+		Logger:     slog.New(slog.DiscardHandler),
+		APIVersion: "v1",
+	})
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/v1/stats")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", resp.StatusCode)
+	}
+	var body map[string]json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	raw, ok := body["by_country"]
+	if !ok {
+		t.Fatal("by_country: key missing from response body")
+	}
+	if got := string(raw); got != "[]" {
+		t.Errorf("by_country on the wire: want [], got %s", got)
 	}
 }
 
