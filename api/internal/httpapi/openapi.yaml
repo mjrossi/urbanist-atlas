@@ -460,6 +460,44 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/stats:
+    get:
+      tags: [meta]
+      summary: Atlas-wide size summary.
+      description: |
+        Dataset-level counts: how many organizations the atlas holds,
+        how many regions, and the same split per country.
+
+        Use this for any "how big is the atlas" number. In particular,
+        do NOT compute a total organization count by summing
+        `direct_org_count` over `GET /api/v1/regions` — that endpoint
+        returns only the browseable subset (metros and cities), so the
+        sum silently omits every organization attached solely to a
+        state, province, borough, or multi-state region. `Stats`
+        counts distinct organizations at the source and is not subject
+        to that omission.
+
+        Single-resource response: no `{ meta, data }` envelope. The
+        ODbL attribution travels in the `X-Data-License` and
+        `X-Data-Attribution` headers, as on every `/api/v1` response.
+      operationId: getStats
+      responses:
+        '200':
+          description: The atlas-wide counts.
+          headers:
+            X-Data-License:
+              $ref: '#/components/headers/XDataLicense'
+            X-Data-Attribution:
+              $ref: '#/components/headers/XDataAttribution'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/v1/submissions:
     post:
       tags: [submissions]
@@ -892,6 +930,76 @@ components:
             token to pass back as `?cursor=` for the next page. Treat as
             opaque; the format may change without notice. Its absence
             always means there are no further rows.
+
+    Stats:
+      type: object
+      description: |
+        Atlas-wide size summary, returned by `GET /api/v1/stats`.
+
+        Organizations whose ONLY region attachments are
+        `scope_tier: national` are excluded from every count here,
+        matching the default `/lookup`, `/recent`, and `/regions`
+        filters.
+      required: [total_org_count, total_region_count, browse_region_count, by_country]
+      properties:
+        total_org_count:
+          type: integer
+          format: int32
+          description: |
+            Distinct organizations in the atlas, counted once each no
+            matter how many regions they attach to. This is the
+            authoritative catalog size — it is NOT the sum of
+            `direct_org_count` over `/api/v1/regions`, which omits
+            orgs attached only to non-browseable regions.
+          example: 236
+        total_region_count:
+          type: integer
+          format: int32
+          description: |
+            Every non-national region in the graph — states, counties,
+            metros, MSA portions, cities, boroughs. Much larger than
+            `browse_region_count`.
+          example: 628
+        browse_region_count:
+          type: integer
+          format: int32
+          description: |
+            Regions returned by `GET /api/v1/regions`: browseable-kind
+            regions carrying at least one organization in their
+            subtree. Guaranteed equal to that endpoint's array length.
+          example: 92
+        by_country:
+          type: array
+          description: |
+            Per-country breakdown, sorted by country code ascending.
+          items:
+            $ref: '#/components/schemas/CountryStats'
+
+    CountryStats:
+      type: object
+      description: |
+        One country's slice of `Stats`.
+
+        An organization is credited to every country it has a
+        non-national attachment in, so an org spanning the border
+        appears in two rows and `org_count` can sum to more than
+        `total_org_count`. No such organization exists in the v1
+        dataset, but consumers must not treat this array as a
+        partition of the total.
+      required: [country, org_count, region_count]
+      properties:
+        country:
+          $ref: '#/components/schemas/Country'
+        org_count:
+          type: integer
+          format: int32
+          description: Distinct organizations with at least one attachment in this country.
+          example: 196
+        region_count:
+          type: integer
+          format: int32
+          description: This country's share of `browse_region_count`.
+          example: 71
 
     ScopeTier:
       type: string

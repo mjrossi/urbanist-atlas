@@ -78,6 +78,27 @@ func (e SubmissionStatus) Valid() bool {
 // changes as data is loaded.
 type Country = string
 
+// CountryStats One country's slice of `Stats`.
+//
+// An organization is credited to every country it has a
+// non-national attachment in, so an org spanning the border
+// appears in two rows and `org_count` can sum to more than
+// `total_org_count`. No such organization exists in the v1
+// dataset, but consumers must not treat this array as a
+// partition of the total.
+type CountryStats struct {
+	// Country ISO-style country code. v1 ships with `US` and `CA`; additional
+	// countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
+	// changes as data is loaded.
+	Country Country `json:"country"`
+
+	// OrgCount Distinct organizations with at least one attachment in this country.
+	OrgCount int32 `json:"org_count"`
+
+	// RegionCount This country's share of `browse_region_count`.
+	RegionCount int32 `json:"region_count"`
+}
+
 // CoverageGap One sampled empty-result lookup or search — an editorial signal
 // of where the directory has no coverage yet. Admin-only; capture
 // is sampled, so the set is a recent partial sample.
@@ -605,6 +626,34 @@ type RejectSubmissionRequest struct {
 // (do not exhaustively switch and error on the default case).
 // The enumerated set may grow without a breaking-change bump.
 type ScopeTier string
+
+// Stats Atlas-wide size summary, returned by `GET /api/v1/stats`.
+//
+// Organizations whose ONLY region attachments are
+// `scope_tier: national` are excluded from every count here,
+// matching the default `/lookup`, `/recent`, and `/regions`
+// filters.
+type Stats struct {
+	// BrowseRegionCount Regions returned by `GET /api/v1/regions`: browseable-kind
+	// regions carrying at least one organization in their
+	// subtree. Guaranteed equal to that endpoint's array length.
+	BrowseRegionCount int32 `json:"browse_region_count"`
+
+	// ByCountry Per-country breakdown, sorted by country code ascending.
+	ByCountry []CountryStats `json:"by_country"`
+
+	// TotalOrgCount Distinct organizations in the atlas, counted once each no
+	// matter how many regions they attach to. This is the
+	// authoritative catalog size — it is NOT the sum of
+	// `direct_org_count` over `/api/v1/regions`, which omits
+	// orgs attached only to non-browseable regions.
+	TotalOrgCount int32 `json:"total_org_count"`
+
+	// TotalRegionCount Every non-national region in the graph — states, counties,
+	// metros, MSA portions, cities, boroughs. Much larger than
+	// `browse_region_count`.
+	TotalRegionCount int32 `json:"total_region_count"`
+}
 
 // Submission A queued or processed public submission.
 type Submission struct {

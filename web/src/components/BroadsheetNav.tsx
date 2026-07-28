@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
-import type { RegionSummary } from '../lib/api.ts';
-import { listRegions } from '../lib/api.ts';
+import type { ApiError, Stats } from '../lib/api.ts';
+import { getStats } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 
 interface NavEntry {
@@ -48,16 +48,21 @@ export function BroadsheetNav() {
     setMenuOpen(false);
   };
 
-  const regions = useQuery<RegionSummary[]>({
-    queryKey: queryKeys.regions(),
-    queryFn: ({ signal }) => listRegions({ signal }),
+  // The masthead tally reads `/api/v1/stats` rather than summing over
+  // `/api/v1/regions`. That list is the browseable subset (metros and
+  // cities), so the old reduce here silently omitted every org attached
+  // solely to a state, province, borough, or multi-state region — the
+  // masthead under-reported the catalog by 30% on every page.
+  //
+  // Dropping the regions query also means routes that never render a
+  // region list (/about, /colophon, /submit) no longer pull the whole
+  // browse set just to print two numbers.
+  const stats = useQuery<Stats, ApiError>({
+    queryKey: queryKeys.stats(),
+    queryFn: ({ signal }) => getStats({ signal }),
   });
-  const regionCount = regions.data?.length ?? null;
-  // direct_org_count keeps the masthead tally from double-counting
-  // orgs that surface under both a metro and its child cities.
-  const orgCount = regions.data
-    ? regions.data.reduce((sum, p) => sum + p.direct_org_count, 0)
-    : null;
+  const orgCount = stats.data?.total_org_count ?? null;
+  const placeCount = stats.data?.browse_region_count ?? null;
 
   return (
     <nav className={`nav${menuOpen ? ' nav-open' : ''}`} aria-label="Primary">
@@ -102,9 +107,9 @@ export function BroadsheetNav() {
         <span className="live">
           <strong>Live directory</strong>
         </span>
-        {regionCount !== null && orgCount !== null ? (
+        {placeCount !== null && orgCount !== null ? (
           <span>
-            {orgCount} orgs · {regionCount} regions
+            {orgCount} orgs · {placeCount} places
           </span>
         ) : null}
       </div>

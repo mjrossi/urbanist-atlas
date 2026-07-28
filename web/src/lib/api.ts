@@ -29,6 +29,8 @@ export type RegionDetail = components['schemas']['RegionDetail'];
 export type Meta = components['schemas']['Meta'];
 export type RegionSummariesEnvelope = components['schemas']['RegionSummariesEnvelope'];
 export type RecentEnvelope = components['schemas']['RecentEnvelope'];
+export type Stats = components['schemas']['Stats'];
+export type CountryStats = components['schemas']['CountryStats'];
 export type Submission = components['schemas']['Submission'];
 export type SubmissionPayload = components['schemas']['SubmissionPayload'];
 export type NewSubmissionRequest = components['schemas']['NewSubmissionRequest'];
@@ -321,6 +323,24 @@ export function getOrg(slug: string, init?: RequestInit): Promise<Org> {
  */
 export function listRecent(init?: RequestInit): Promise<Org[]> {
   return apiFetch<RecentEnvelope>('/api/v1/recent', init).then((env) => env.data);
+}
+
+/**
+ * `GET /api/v1/stats` — atlas-wide counts: distinct organizations,
+ * regions, and the same split per country.
+ *
+ * Use this for every "how big is the atlas" number. Do NOT compute a
+ * total by summing `direct_org_count` over {@link listRegions} —
+ * `/api/v1/regions` returns only the browseable subset (metros and
+ * cities), so that sum silently drops every org attached solely to a
+ * state, province, borough, or multi-state region. Three components
+ * did exactly that and under-reported the catalog by 30%.
+ *
+ * Single-object response — no `{meta, data}` envelope. ODbL travels via
+ * the `X-Data-License` + `X-Data-Attribution` response headers.
+ */
+export function getStats(init?: RequestInit): Promise<Stats> {
+  return apiFetch<Stats>('/api/v1/stats', init);
 }
 
 /**

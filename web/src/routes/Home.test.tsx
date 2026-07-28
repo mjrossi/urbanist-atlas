@@ -1,13 +1,14 @@
 import { screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Org, RegionSummary } from '../lib/api.ts';
+import type { Org, RegionSummary, Stats } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
-const { listRegionsMock, listRecentMock } = vi.hoisted(() => ({
+const { listRegionsMock, listRecentMock, getStatsMock } = vi.hoisted(() => ({
   listRegionsMock: vi.fn(),
   listRecentMock: vi.fn(),
+  getStatsMock: vi.fn(),
 }));
 
 vi.mock('../lib/api.ts', async () => {
@@ -16,8 +17,26 @@ vi.mock('../lib/api.ts', async () => {
     ...actual,
     listRegions: listRegionsMock,
     listRecent: listRecentMock,
+    getStats: getStatsMock,
   };
 });
+
+// Mirrors the real seed bundle. The gap between total_org_count (236)
+// and what the region rows sum to is the point: 70 orgs attach only to
+// states, provinces, boroughs, or multi-state coalitions and appear in
+// no browseable region.
+function makeStats(overrides: Partial<Stats> = {}): Stats {
+  return {
+    total_org_count: 236,
+    total_region_count: 628,
+    browse_region_count: 92,
+    by_country: [
+      { country: 'CA', org_count: 40, region_count: 21 },
+      { country: 'US', org_count: 196, region_count: 71 },
+    ],
+    ...overrides,
+  };
+}
 
 const { Home } = await import('./Home.tsx');
 
@@ -63,11 +82,14 @@ describe('Home', () => {
   beforeEach(() => {
     listRegionsMock.mockReset();
     listRecentMock.mockReset();
+    getStatsMock.mockReset();
+    getStatsMock.mockResolvedValue(makeStats());
   });
 
   afterEach(() => {
     listRegionsMock.mockReset();
     listRecentMock.mockReset();
+    getStatsMock.mockReset();
   });
 
   it('renders the lede column unchanged with the search box', async () => {
@@ -216,6 +238,78 @@ describe('Home', () => {
     renderHome();
     await waitFor(() => {
       expect(document.title).toMatch(/urbanist atlas/i);
+    });
+  });
+
+  describe('by-the-numbers panel', () => {
+    function statTile(label: RegExp) {
+      const el = screen.getByText(label);
+      return el.closest('.stat');
+    }
+
+    it('reports the server org total, not the sum of the region rows', async () => {
+      // Three regions summing to 20 direct orgs. The old code printed
+      // that sum as "Organizations on file"; the catalog actually holds
+      // 236. This is the exact shape of the production bug: 166 shown
+      // against a 236-org bundle.
+      listRegionsMock.mockResolvedValueOnce([
+        makeRegion('nyc-metro', 'New York Metro', 12),
+        makeRegion('sf-bay', 'SF Bay Area', 5),
+        makeRegion('chicago', 'Chicago Metro', 3),
+      ]);
+      listRecentMock.mockResolvedValueOnce([]);
+      renderHome();
+
+      await waitFor(() => {
+        expect(statTile(/organizations on file/i)?.textContent).toMatch(/236/);
+      });
+      expect(statTile(/organizations on file/i)?.textContent).not.toMatch(/\b20\b/);
+    });
+
+    it('reports covered places from the server and splits them by country', async () => {
+      listRegionsMock.mockResolvedValueOnce([
+        makeRegion('nyc-metro', 'New York Metro', 12),
+      ]);
+      listRecentMock.mockResolvedValueOnce([]);
+      renderHome();
+
+      await waitFor(() => {
+        expect(statTile(/places with coverage/i)?.textContent).toMatch(/92/);
+      });
+      // Not 1 — the one rendered row is a top-7 preview, not the count.
+      expect(statTile(/places with coverage/i)?.textContent).toMatch(/71 US/);
+      expect(statTile(/places with coverage/i)?.textContent).toMatch(/21 Canada/);
+    });
+
+    it('takes deepest coverage from the head of the org_count-sorted list', async () => {
+      listRegionsMock.mockResolvedValueOnce([
+        makeRegion('nyc-metro', 'New York Metro', 11),
+        makeRegion('sf-bay', 'SF Bay Area', 4),
+      ]);
+      listRecentMock.mockResolvedValueOnce([]);
+      renderHome();
+
+      await waitFor(() => {
+        expect(statTile(/deepest coverage/i)?.textContent).toMatch(/11/);
+      });
+      expect(statTile(/deepest coverage/i)?.textContent).toMatch(/New York Metro/);
+    });
+
+    it('shows a placeholder instead of a wrong total when stats fail', async () => {
+      listRegionsMock.mockResolvedValueOnce([
+        makeRegion('nyc-metro', 'New York Metro', 12),
+      ]);
+      listRecentMock.mockResolvedValueOnce([]);
+      getStatsMock.mockRejectedValue(new ApiError(500, 'boom', undefined, 'rid-stats'));
+      renderHome();
+
+      // The region list resolves, so the panel renders; the org tile
+      // must stay a dash rather than fall back to summing the rows.
+      await waitFor(() => {
+        expect(statTile(/deepest coverage/i)?.textContent).toMatch(/New York Metro/);
+      });
+      expect(statTile(/organizations on file/i)?.textContent).toMatch(/—/);
+      expect(statTile(/organizations on file/i)?.textContent).not.toMatch(/12/);
     });
   });
 });

@@ -5,8 +5,8 @@ import { Link } from 'react-router';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
-import type { RegionSummary } from '../lib/api.ts';
-import { ApiError, listRegions } from '../lib/api.ts';
+import type { RegionSummary, Stats } from '../lib/api.ts';
+import { ApiError, getStats, listRegions } from '../lib/api.ts';
 import { pluralize } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { regionKindLabel } from '../lib/regionKind.ts';
@@ -112,6 +112,17 @@ export function Browse() {
     queryKey: queryKeys.regions(),
     queryFn: ({ signal }) => listRegions({ signal }),
   });
+  // Per-country org totals come from `/api/v1/stats`. Summing
+  // direct_org_count over `query.data` would only count orgs attached
+  // to the browseable regions listed on this page, omitting every
+  // statewide, provincial, borough, and multi-state org — 63 US and 7
+  // Canadian ones at time of writing.
+  const stats = useQuery<Stats, ApiError>({
+    queryKey: queryKeys.stats(),
+    queryFn: ({ signal }) => getStats({ signal }),
+  });
+  const orgCountFor = (code: string) =>
+    stats.data?.by_country.find((c) => c.country === code)?.org_count ?? null;
 
   const grouped = useMemo(() => groupForBrowse(query.data ?? []), [query.data]);
   const availableLetters = useMemo(() => {
@@ -161,7 +172,12 @@ export function Browse() {
         </div>
       </div>
 
-      <BrowseBody query={query} grouped={grouped} availableLetters={availableLetters} />
+      <BrowseBody
+        query={query}
+        grouped={grouped}
+        availableLetters={availableLetters}
+        orgCountFor={orgCountFor}
+      />
 
       <section className="editors-note mt-56">
         <div className="label">Don&rsquo;t see your region?</div>
@@ -179,10 +195,12 @@ function BrowseBody({
   query,
   grouped,
   availableLetters,
+  orgCountFor,
 }: {
   query: ReturnType<typeof useQuery<RegionSummary[], ApiError>>;
   grouped: ByCountry[];
   availableLetters: Set<string>;
+  orgCountFor: (country: string) => number | null;
 }) {
   return (
     <QueryState
@@ -217,7 +235,11 @@ function BrowseBody({
             )}
           </div>
           {grouped.map((country) => (
-            <CountrySection key={country.country} country={country} />
+            <CountrySection
+              key={country.country}
+              country={country}
+              orgCount={orgCountFor(country.country)}
+            />
           ))}
         </>
       )}
@@ -225,11 +247,20 @@ function BrowseBody({
   );
 }
 
-function CountrySection({ country }: { country: ByCountry }) {
+function CountrySection({
+  country,
+  orgCount,
+}: {
+  country: ByCountry;
+  orgCount: number | null;
+}) {
+  // Region count is the length of the list actually rendered below, so
+  // the header can never disagree with the rows. The org count is the
+  // country-wide total from `/api/v1/stats` and is deliberately larger
+  // than what these rows sum to — statewide and provincial groups have
+  // no browseable region of their own to appear under — so the label
+  // says "countrywide" to make the mixed provenance explicit.
   const total = country.total.length;
-  // Same as the page total: direct_org_count avoids double-counting
-  // orgs that surface under both a metro and its child cities.
-  const orgs = country.total.reduce((sum, p) => sum + p.direct_org_count, 0);
   const name = COUNTRY_TITLES[country.country] ?? country.country;
   return (
     <section className="country-section">
@@ -237,8 +268,13 @@ function CountrySection({ country }: { country: ByCountry }) {
         <h2 className="cname">{name}</h2>
         <div className="crule" />
         <div className="cnum">
-          <span className="em">{total}</span> regions · <span className="em">{orgs}</span>{' '}
-          orgs
+          <span className="em">{total}</span> regions
+          {orgCount !== null ? (
+            <>
+              {' · '}
+              <span className="em">{orgCount}</span> orgs countrywide
+            </>
+          ) : null}
         </div>
       </header>
       {country.letters.map((group) => (

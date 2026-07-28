@@ -321,6 +321,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Atlas-wide size summary.
+         * @description Dataset-level counts: how many organizations the atlas holds,
+         *     how many regions, and the same split per country.
+         *
+         *     Use this for any "how big is the atlas" number. In particular,
+         *     do NOT compute a total organization count by summing
+         *     `direct_org_count` over `GET /api/v1/regions` — that endpoint
+         *     returns only the browseable subset (metros and cities), so the
+         *     sum silently omits every organization attached solely to a
+         *     state, province, borough, or multi-state region. `Stats`
+         *     counts distinct organizations at the source and is not subject
+         *     to that omission.
+         *
+         *     Single-resource response: no `{ meta, data }` envelope. The
+         *     ODbL attribution travels in the `X-Data-License` and
+         *     `X-Data-Attribution` headers, as on every `/api/v1` response.
+         */
+        get: operations["getStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/submissions": {
         parameters: {
             query?: never;
@@ -520,6 +554,69 @@ export interface components {
              *     always means there are no further rows.
              */
             next_cursor?: string;
+        };
+        /**
+         * @description Atlas-wide size summary, returned by `GET /api/v1/stats`.
+         *
+         *     Organizations whose ONLY region attachments are
+         *     `scope_tier: national` are excluded from every count here,
+         *     matching the default `/lookup`, `/recent`, and `/regions`
+         *     filters.
+         */
+        Stats: {
+            /**
+             * Format: int32
+             * @description Distinct organizations in the atlas, counted once each no
+             *     matter how many regions they attach to. This is the
+             *     authoritative catalog size — it is NOT the sum of
+             *     `direct_org_count` over `/api/v1/regions`, which omits
+             *     orgs attached only to non-browseable regions.
+             * @example 236
+             */
+            total_org_count: number;
+            /**
+             * Format: int32
+             * @description Every non-national region in the graph — states, counties,
+             *     metros, MSA portions, cities, boroughs. Much larger than
+             *     `browse_region_count`.
+             * @example 628
+             */
+            total_region_count: number;
+            /**
+             * Format: int32
+             * @description Regions returned by `GET /api/v1/regions`: browseable-kind
+             *     regions carrying at least one organization in their
+             *     subtree. Guaranteed equal to that endpoint's array length.
+             * @example 92
+             */
+            browse_region_count: number;
+            /** @description Per-country breakdown, sorted by country code ascending. */
+            by_country: components["schemas"]["CountryStats"][];
+        };
+        /**
+         * @description One country's slice of `Stats`.
+         *
+         *     An organization is credited to every country it has a
+         *     non-national attachment in, so an org spanning the border
+         *     appears in two rows and `org_count` can sum to more than
+         *     `total_org_count`. No such organization exists in the v1
+         *     dataset, but consumers must not treat this array as a
+         *     partition of the total.
+         */
+        CountryStats: {
+            country: components["schemas"]["Country"];
+            /**
+             * Format: int32
+             * @description Distinct organizations with at least one attachment in this country.
+             * @example 196
+             */
+            org_count: number;
+            /**
+             * Format: int32
+             * @description This country's share of `browse_region_count`.
+             * @example 71
+             */
+            region_count: number;
         };
         /**
          * @description Drives result grouping in `/lookup`. `local` for city/county
@@ -1443,6 +1540,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecentEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The atlas-wide counts. */
+            200: {
+                headers: {
+                    "X-Data-License": components["headers"]["XDataLicense"];
+                    "X-Data-Attribution": components["headers"]["XDataAttribution"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Stats"];
                 };
             };
             401: components["responses"]["Unauthorized"];

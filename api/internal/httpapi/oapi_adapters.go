@@ -148,6 +148,26 @@ func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 	return out
 }
 
+// toOAPIStats converts the domain-level atlas summary to the wire
+// shape. ByCountry is forced non-nil so the JSON body carries `[]`
+// rather than `null` on an empty store.
+func toOAPIStats(in atlas.Stats) oapi.Stats {
+	byCountry := make([]oapi.CountryStats, 0, len(in.ByCountry))
+	for _, c := range in.ByCountry {
+		byCountry = append(byCountry, oapi.CountryStats{
+			Country:     oapi.Country(c.Country),
+			OrgCount:    int32(c.OrgCount),
+			RegionCount: int32(c.RegionCount),
+		})
+	}
+	return oapi.Stats{
+		TotalOrgCount:     int32(in.TotalOrgCount),
+		TotalRegionCount:  int32(in.TotalRegionCount),
+		BrowseRegionCount: int32(in.BrowseRegionCount),
+		ByCountry:         byCountry,
+	}
+}
+
 // toOAPIRegionSearchResults converts the domain-level search results to
 // the wire-level slice. Returns a non-nil zero-length slice when the
 // input is empty so the JSON body is `[]`, not `null`. ContextLabel

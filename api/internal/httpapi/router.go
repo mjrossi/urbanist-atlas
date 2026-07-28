@@ -154,6 +154,7 @@ func New(cfg Config) http.Handler {
 			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger, cfg.Metrics))
 			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger, cfg.Metrics))
 			getHead(r, "/recent", recentHandler(cfg.Store, logger))
+			getHead(r, "/stats", statsHandler(cfg.Store, logger))
 
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
