@@ -136,4 +136,16 @@ type Store interface {
 	// #4.6). The 10-row cap is hardcoded; opening it would require an
 	// OpenAPI spec edit.
 	ListRecent(ctx context.Context) ([]Org, error)
+
+	// Stats returns the atlas-wide size summary: distinct org count,
+	// region counts, and a per-country breakdown. Organizations whose
+	// ONLY region attachments are scope_tier='national' are excluded,
+	// consistent with ListRecent and the default /lookup filter.
+	//
+	// Callers must not derive a total org count by summing
+	// RegionSummary.DirectOrgCount over ListRegions — that list is the
+	// browseable subset (metros and cities), so the sum omits every
+	// org attached solely to a state, province, borough, or
+	// multi-state region. Use this method instead; see atlas.Stats.
+	Stats(ctx context.Context) (Stats, error)
 }

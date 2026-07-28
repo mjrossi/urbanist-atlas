@@ -1,19 +1,40 @@
 import { screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RegionSummary } from '../lib/api.ts';
+import type { RegionSummary, Stats } from '../lib/api.ts';
 import { ApiError } from '../lib/api.ts';
 import { renderWithProviders } from '../test/renderWithProviders.tsx';
 
-const { listRegionsMock } = vi.hoisted(() => ({ listRegionsMock: vi.fn() }));
+const { listRegionsMock, getStatsMock } = vi.hoisted(() => ({
+  listRegionsMock: vi.fn(),
+  getStatsMock: vi.fn(),
+}));
 
 vi.mock('../lib/api.ts', async () => {
   const actual = await vi.importActual<typeof import('../lib/api.ts')>('../lib/api.ts');
   return {
     ...actual,
     listRegions: listRegionsMock,
+    getStats: getStatsMock,
   };
 });
+
+// Per-country org totals are deliberately LARGER than what the rendered
+// rows sum to: statewide and provincial orgs have no browseable region
+// to appear under, so they exist only in this payload. That gap is the
+// whole point of /api/v1/stats — see makeStats' use below.
+function makeStats(overrides: Partial<Stats> = {}): Stats {
+  return {
+    total_org_count: 236,
+    total_region_count: 628,
+    browse_region_count: 92,
+    by_country: [
+      { country: 'CA', org_count: 40, region_count: 21 },
+      { country: 'US', org_count: 196, region_count: 71 },
+    ],
+    ...overrides,
+  };
+}
 
 const { Browse } = await import('./Browse.tsx');
 
@@ -55,10 +76,13 @@ function makeRegion(
 describe('Browse', () => {
   beforeEach(() => {
     listRegionsMock.mockReset();
+    getStatsMock.mockReset();
+    getStatsMock.mockResolvedValue(makeStats());
   });
 
   afterEach(() => {
     listRegionsMock.mockReset();
+    getStatsMock.mockReset();
   });
 
   it('renders the loading state while the query is pending', () => {
@@ -87,6 +111,45 @@ describe('Browse', () => {
     expect(screen.getByRole('link', { name: /toronto gta/i }).getAttribute('href')).toBe(
       '/region/toronto-gta',
     );
+  });
+
+  it('shows each country the server-side org total, not the sum of its rendered rows', async () => {
+    // Two US rows summing to 19 direct orgs, one CA row with 3. The old
+    // code derived the header totals from exactly this sum and so
+    // printed "19 orgs" / "3 orgs". The correct totals (196 / 40)
+    // include statewide and provincial groups that have no browseable
+    // region to render under, and can only come from /api/v1/stats.
+    listRegionsMock.mockResolvedValueOnce([
+      makeRegion({ id: 1, slug: 'nyc-metro', name: 'New York Metro' }, 12),
+      makeRegion({ id: 2, slug: 'sf-bay-area', name: 'San Francisco Bay Area' }, 7),
+      makeRegion({ id: 3, slug: 'toronto-gta', name: 'Toronto GTA', country: 'CA' }, 3),
+    ]);
+    renderBrowse();
+
+    const us = await screen.findByRole('heading', { name: /united states/i });
+    const usHeader = us.closest('.country-head');
+    expect(usHeader?.textContent).toMatch(/196\s*orgs/);
+    expect(usHeader?.textContent).not.toMatch(/\b19\s*orgs/);
+    // Region count still reflects the rows actually rendered.
+    expect(usHeader?.textContent).toMatch(/2\s*regions/);
+
+    const ca = screen.getByRole('heading', { name: /canada/i });
+    const caHeader = ca.closest('.country-head');
+    expect(caHeader?.textContent).toMatch(/40\s*orgs/);
+    expect(caHeader?.textContent).toMatch(/1\s*regions/);
+  });
+
+  it('omits the org total when the stats query fails, rather than showing a wrong one', async () => {
+    listRegionsMock.mockResolvedValueOnce([
+      makeRegion({ id: 1, slug: 'nyc-metro', name: 'New York Metro' }, 12),
+    ]);
+    getStatsMock.mockRejectedValue(new ApiError(500, 'boom', undefined, 'rid-stats'));
+    renderBrowse();
+
+    const us = await screen.findByRole('heading', { name: /united states/i });
+    const usHeader = us.closest('.country-head');
+    expect(usHeader?.textContent).toMatch(/1\s*regions/);
+    expect(usHeader?.textContent).not.toMatch(/orgs/);
   });
 
   it('each region row links to /region/:slug', async () => {

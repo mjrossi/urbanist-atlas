@@ -6,8 +6,8 @@ import { Link } from 'react-router';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import { SearchBox } from '../components/SearchBox.tsx';
-import type { Org, RegionSummary } from '../lib/api.ts';
-import { ApiError, listRecent, listRegions } from '../lib/api.ts';
+import type { Org, RegionSummary, Stats } from '../lib/api.ts';
+import { ApiError, getStats, listRecent, listRegions } from '../lib/api.ts';
 import { formatAddedAt, pluralize } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -37,6 +37,10 @@ export function Home() {
   const recent = useQuery<Org[], ApiError>({
     queryKey: queryKeys.recent(),
     queryFn: ({ signal }) => listRecent({ signal }),
+  });
+  const stats = useQuery<Stats, ApiError>({
+    queryKey: queryKeys.stats(),
+    queryFn: ({ signal }) => getStats({ signal }),
   });
 
   return (
@@ -99,7 +103,7 @@ export function Home() {
       </div>
 
       <RecentlyFiled query={recent} />
-      <ByTheNumbers places={places} recent={recent} />
+      <ByTheNumbers places={places} recent={recent} stats={stats} />
       <TopicIndex tags={TOPIC_TAGS} />
     </>
   );
@@ -209,48 +213,32 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
 function ByTheNumbers({
   places,
   recent,
+  stats,
 }: {
   places: UseQueryResult<RegionSummary[], ApiError>;
   recent: UseQueryResult<Org[], ApiError>;
+  stats: UseQueryResult<Stats, ApiError>;
 }) {
-  // Stat aggregates over the (potentially large) regions list.
-  // The cost is negligible today, but useMemo declares the intent
-  // and stops the work from re-running when an unrelated parent
-  // state change re-renders this section.
-  const { placeCount, usCount, caCount, totalOrgCount, topRegion } = useMemo(() => {
-    const data = places.data;
-    if (!data) {
-      return {
-        placeCount: null,
-        usCount: null,
-        caCount: null,
-        totalOrgCount: null,
-        topRegion: null,
-      };
-    }
-    let us = 0;
-    let ca = 0;
-    let total = 0;
-    let top: RegionSummary | null = null;
-    for (const p of data) {
-      if (p.region.country === 'US') us += 1;
-      else if (p.region.country === 'CA') ca += 1;
-      // direct_org_count avoids double-counting orgs that surface
-      // under both a metro and its child cities.
-      total += p.direct_org_count;
-      // "Deepest coverage" intentionally tracks org_count (descendant
-      // walk) — single-row max showing how much advocacy depth one
-      // region's scope contains.
-      if (!top || p.org_count > top.org_count) top = p;
-    }
-    return {
-      placeCount: data.length,
-      usCount: us,
-      caCount: ca,
-      totalOrgCount: total,
-      topRegion: top,
-    };
-  }, [places.data]);
+  // Counts come from `/api/v1/stats`, never from summing over
+  // `places`. `/api/v1/regions` returns only the browseable subset
+  // (metros and cities), so a sum of its direct_org_count drops every
+  // org attached solely to a state, province, borough, or multi-state
+  // region — 70 of them, which is how this panel came to advertise 166
+  // organizations against a 236-org catalog.
+  const totalOrgCount = stats.data?.total_org_count ?? null;
+  const coveredPlaceCount = stats.data?.browse_region_count ?? null;
+  const { usCount, caCount } = useMemo(() => {
+    const rows = stats.data?.by_country;
+    if (!rows) return { usCount: null, caCount: null };
+    const find = (code: string) =>
+      rows.find((r) => r.country === code)?.region_count ?? 0;
+    return { usCount: find('US'), caCount: find('CA') };
+  }, [stats.data]);
+  // "Deepest coverage" is the single region whose scope contains the
+  // most orgs (org_count is the descendant walk). ListRegions already
+  // sorts by org_count DESC, so the head of the list is the answer —
+  // no scan needed.
+  const topRegion = places.data?.[0] ?? null;
   const recentCount = recent.data?.length ?? null;
 
   return (
@@ -269,8 +257,14 @@ function ByTheNumbers({
           <div className="sub">Across the US and Canada</div>
         </div>
         <div className="stat">
-          <div className="n">{formatNumber(placeCount)}</div>
-          <div className="label">Regions indexed</div>
+          <div className="n">{formatNumber(coveredPlaceCount)}</div>
+          {/*
+            "Places with coverage", not "Regions indexed": this counts
+            the browseable metros and cities carrying at least one org,
+            not the ~628 regions in the graph. The old label claimed the
+            whole index and showed a seventh of it.
+          */}
+          <div className="label">Places with coverage</div>
           <div className="sub">
             {usCount !== null ? `${usCount} US · ${caCount} Canada` : 'Two countries, v1'}
           </div>

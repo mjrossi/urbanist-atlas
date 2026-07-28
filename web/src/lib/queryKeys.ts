@@ -17,4 +17,5 @@ export const queryKeys = {
   region: (slug: string) => ['region', slug] as const,
   org: (slug: string) => ['org', slug] as const,
   recent: () => ['recent'] as const,
+  stats: () => ['stats'] as const,
 } as const;

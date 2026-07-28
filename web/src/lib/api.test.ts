@@ -10,6 +10,7 @@ import {
   apiFetch,
   getOrg,
   getRegion,
+  getStats,
   isSupportedCountry,
   listRecent,
   listRegions,
@@ -66,6 +67,41 @@ describe('listRegions / getRegion / listRecent', () => {
     // Tighter than `toContain('/api/v1/regions')` so it can't
     // accidentally match a detail route like `/api/v1/regions/some-slug`.
     expect(String(url)).toMatch(/\/api\/v1\/regions($|\?)/);
+  });
+
+  it('getStats calls GET /api/v1/stats and parses the bare object', async () => {
+    // No {meta, data} envelope on this one — it's a single resource,
+    // so the helper must NOT try to unwrap `.data`.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        total_org_count: 236,
+        total_region_count: 628,
+        browse_region_count: 92,
+        by_country: [
+          { country: 'CA', org_count: 40, region_count: 21 },
+          { country: 'US', org_count: 196, region_count: 71 },
+        ],
+      }),
+    );
+    const result = await getStats();
+    expect(result.total_org_count).toBe(236);
+    expect(result.browse_region_count).toBe(92);
+    expect(result.by_country).toHaveLength(2);
+    expect(result.by_country[1]!.country).toBe('US');
+    expect(result.by_country[1]!.org_count).toBe(196);
+    const [url] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toMatch(/\/api\/v1\/stats($|\?)/);
+  });
+
+  it('getStats throws ApiError on a non-2xx response', async () => {
+    fetchMock.mockResolvedValueOnce(
+      problemResponse(500, {
+        type: 'https://urbanistatlas.com/problems/internal-error',
+        title: 'Internal Server Error',
+        status: 500,
+      }),
+    );
+    await expect(getStats()).rejects.toBeInstanceOf(ApiError);
   });
 
   it('listRegions returns the unwrapped data array on a non-empty body', async () => {

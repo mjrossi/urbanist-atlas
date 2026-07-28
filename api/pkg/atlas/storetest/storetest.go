@@ -73,6 +73,9 @@ func RunContractSuite(t *testing.T, factory Factory) {
 	t.Run("ListRegions_DirectOrgCountExcludesDescendantOrgs", func(t *testing.T) {
 		testListRegionsDirectOrgCountExcludesDescendantOrgs(t, factory)
 	})
+	t.Run("Stats_CountsOrgsInvisibleToListRegions", func(t *testing.T) {
+		testStatsCountsOrgsInvisibleToListRegions(t, factory)
+	})
 	t.Run("GetRegion_DescendantRegionNames_ExcludesFocusAndAncestors", func(t *testing.T) {
 		testGetRegionDescendantRegionNamesExcludesFocusAndAncestors(t, factory)
 	})
@@ -344,6 +347,142 @@ func testListRegionsFiltersNationalInDescendantWalk(t *testing.T, factory Factor
 // would silently double-count any org surfacing under both a metro and
 // one of its child cities — exactly what the SPA's Browse totals avoid
 // by summing DirectOrgCount instead of OrgCount.
+// testStatsCountsOrgsInvisibleToListRegions pins the regression this
+// method exists for. Summing RegionSummary.DirectOrgCount over
+// ListRegions omits every org attached solely to a non-browse-kind
+// region (states, provinces, boroughs, multi-state coalitions) — that
+// is how the production frontend came to report 166 orgs against a
+// 236-org catalog. Stats must count all of them.
+//
+// The fixture also covers the opposite failure mode: an org attached
+// to two browseable regions must count ONCE, not twice.
+func testStatsCountsOrgsInvisibleToListRegions(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	// Browseable: a metro and its child city. Not browseable: a state
+	// (us:state is deliberately outside defaultBrowseKinds) and a
+	// national-tier region.
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:metro", Name: "Test Metro", Slug: "test-metro",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 40,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 2, Kind: "us:city", Name: "Test City", Slug: "test-city",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 15,
+		ParentSlugs: []string{"test-metro"},
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 3, Kind: "us:state", Name: "Test State", Slug: "test-state",
+		Country: "US", ScopeTier: atlas.ScopeRegional, SortPriority: 60,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 4, Kind: "ca:cma", Name: "Test CMA", Slug: "test-cma",
+		Country: "CA", ScopeTier: atlas.ScopeRegional, SortPriority: 40,
+	})
+	seed.SeedRegion(t, atlas.Region{
+		ID: 5, Kind: "pt:nacional", Name: "Test Nation", Slug: "test-nation",
+		Country: "PT", ScopeTier: atlas.ScopeNational, SortPriority: 90,
+	})
+
+	// Attached to a browseable city — visible to the old sum.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 100, Slug: "city-org", Name: "City Org",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{2})
+	// Attached ONLY to a state — invisible to the old sum. The bug.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 101, Slug: "statewide-org", Name: "Statewide Org",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{3})
+	// Attached to TWO browseable regions — the old sum double-counted
+	// this shape, which is why the frontend used DirectOrgCount.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 102, Slug: "two-region-org", Name: "Two Region Org",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{1, 2})
+	// Canadian org, for the per-country breakdown.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 103, Slug: "canada-org", Name: "Canada Org",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{4})
+	// National-only — excluded, matching ListRecent and /lookup.
+	seed.SeedOrg(t, atlas.Org{
+		ID: 104, Slug: "national-org", Name: "National Org",
+		ShortDesc: "test", WebsiteURL: "https://example.test",
+	}, []int64{5})
+
+	stats, err := store.Stats(context.Background())
+	if err != nil {
+		t.Fatalf("Stats: %v", err)
+	}
+
+	// city-org + statewide-org + two-region-org + canada-org. national-org
+	// is excluded; two-region-org counts once.
+	if stats.TotalOrgCount != 4 {
+		t.Errorf("TotalOrgCount = %d, want 4 (statewide org counted, national excluded, two-region org counted once)", stats.TotalOrgCount)
+	}
+
+	// Guard the actual regression by org identity, not by arithmetic:
+	// prove statewide-org is unreachable through ListRegions, so a
+	// future refactor can't quietly revert to deriving the total from
+	// that list.
+	//
+	// Deliberately not asserting sum(DirectOrgCount) < TotalOrgCount —
+	// in this fixture two-region-org's double-count cancels
+	// statewide-org's omission exactly, and the sum lands on 4 by
+	// coincidence. That cancellation is precisely why a count derived
+	// from per-region sums can look plausible while being wrong.
+	regions, err := store.ListRegions(context.Background())
+	if err != nil {
+		t.Fatalf("ListRegions: %v", err)
+	}
+	browseIDs := make([]int64, 0, len(regions))
+	for _, r := range regions {
+		browseIDs = append(browseIDs, r.Region.ID)
+	}
+	visible, err := store.OrgsForRegions(context.Background(), browseIDs)
+	if err != nil {
+		t.Fatalf("OrgsForRegions: %v", err)
+	}
+	for _, o := range visible {
+		if o.Slug == "statewide-org" {
+			t.Fatalf("statewide-org reachable via ListRegions regions — fixture no longer reproduces the undercount it exists to guard")
+		}
+	}
+	if len(visible) >= stats.TotalOrgCount {
+		t.Errorf("orgs reachable via ListRegions = %d, want < TotalOrgCount %d", len(visible), stats.TotalOrgCount)
+	}
+
+	if stats.BrowseRegionCount != len(regions) {
+		t.Errorf("BrowseRegionCount = %d, want %d (must equal len(ListRegions))", stats.BrowseRegionCount, len(regions))
+	}
+	// Every non-national region: metro, city, state, CMA.
+	if stats.TotalRegionCount != 4 {
+		t.Errorf("TotalRegionCount = %d, want 4 (all non-national regions)", stats.TotalRegionCount)
+	}
+
+	byCountry := map[atlas.Country]atlas.CountryStats{}
+	for _, c := range stats.ByCountry {
+		byCountry[c.Country] = c
+	}
+	if got := byCountry["US"].OrgCount; got != 3 {
+		t.Errorf("US OrgCount = %d, want 3 (city, statewide, two-region)", got)
+	}
+	if got := byCountry["CA"].OrgCount; got != 1 {
+		t.Errorf("CA OrgCount = %d, want 1", got)
+	}
+	if _, ok := byCountry["PT"]; ok {
+		t.Errorf("PT present in ByCountry, want absent (its only region is national-tier)")
+	}
+	for i := 1; i < len(stats.ByCountry); i++ {
+		if stats.ByCountry[i-1].Country >= stats.ByCountry[i].Country {
+			t.Errorf("ByCountry not sorted by country ASC: %v", stats.ByCountry)
+			break
+		}
+	}
+}
+
 func testListRegionsDirectOrgCountExcludesDescendantOrgs(t *testing.T, factory Factory) {
 	store, seed, teardown := factory(t)
 	defer teardown()

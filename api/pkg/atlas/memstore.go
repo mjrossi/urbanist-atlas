@@ -174,6 +174,18 @@ func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Reg
 func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.listRegionsLocked(), nil
+}
+
+// listRegionsLocked is the body of ListRegions, split out so Stats can
+// reuse the identical result rather than re-deriving the "browseable
+// kind AND non-national AND >=1 org in subtree" predicate. A second
+// copy of that predicate would be free to drift from this one, and a
+// drifting duplicate of exactly this logic is what made the frontend
+// under-report the org total in the first place.
+//
+// Must be called with s.mu held (read or write).
+func (s *MemStore) listRegionsLocked() []RegionSummary {
 	// Build the reverse-adjacency map once for the whole call instead
 	// of inside each descendantRegionIDs invocation. Without this hoist
 	// the cost was O(R · P) per ListRegions (R browseable regions, P
@@ -210,7 +222,7 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 		}
 		return out[i].Region.Name < out[j].Region.Name
 	})
-	return out, nil
+	return out
 }
 
 // nearestBrowseableAncestorSlug walks upward from rootID via the
@@ -435,6 +447,93 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 		candidates = candidates[:10]
 	}
 	return candidates, nil
+}
+
+// Stats implements Store. Counts distinct orgs over s.orgs directly —
+// never by summing per-region counts, which is what makes the total
+// immune to both the browse-subset undercount and the multi-region
+// double-count. See atlas.Stats for why that matters.
+func (s *MemStore) Stats(_ context.Context) (Stats, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	orgsByCountry := map[Country]int{}
+	totalOrgs := 0
+	for _, org := range s.orgs {
+		// Same "at least one non-national attachment" filter ListRecent
+		// applies, so the two surfaces agree on what counts as a live org.
+		// An org is credited to every country it touches; see CountryStats
+		// on why that column need not sum to totalOrgs.
+		hasNonNational := false
+		countries := map[Country]struct{}{}
+		for _, rid := range s.orgRegions[org.ID] {
+			r, ok := s.regionsByID[rid]
+			if !ok || r.ScopeTier == ScopeNational {
+				continue
+			}
+			hasNonNational = true
+			// Country is stamped by the seedfiles loader; hand-built
+			// fixtures may leave it blank. Such an org still counts toward
+			// the total, it just can't be attributed to a country row.
+			if r.Country != "" {
+				countries[r.Country] = struct{}{}
+			}
+		}
+		if !hasNonNational {
+			continue
+		}
+		totalOrgs++
+		for c := range countries {
+			orgsByCountry[c]++
+		}
+	}
+
+	// Derive the browse counts from ListRegions' own output rather than
+	// re-implementing its predicate, so BrowseRegionCount cannot drift
+	// from the list the SPA actually renders.
+	browse := s.listRegionsLocked()
+	regionsByCountry := map[Country]int{}
+	for _, summary := range browse {
+		if summary.Region.Country != "" {
+			regionsByCountry[summary.Region.Country]++
+		}
+	}
+
+	totalRegions := 0
+	for _, r := range s.regionsByID {
+		if r.ScopeTier != ScopeNational {
+			totalRegions++
+		}
+	}
+
+	codes := make([]Country, 0, len(orgsByCountry))
+	seen := map[Country]struct{}{}
+	for _, m := range []map[Country]int{orgsByCountry, regionsByCountry} {
+		for c := range m {
+			if _, dup := seen[c]; dup {
+				continue
+			}
+			seen[c] = struct{}{}
+			codes = append(codes, c)
+		}
+	}
+	sort.Slice(codes, func(i, j int) bool { return codes[i] < codes[j] })
+
+	byCountry := make([]CountryStats, 0, len(codes))
+	for _, c := range codes {
+		byCountry = append(byCountry, CountryStats{
+			Country:     c,
+			OrgCount:    orgsByCountry[c],
+			RegionCount: regionsByCountry[c],
+		})
+	}
+
+	return Stats{
+		TotalOrgCount:     totalOrgs,
+		TotalRegionCount:  totalRegions,
+		BrowseRegionCount: len(browse),
+		ByCountry:         byCountry,
+	}, nil
 }
 
 // regionsForOrg gathers the Region rows for an org's attachments,
