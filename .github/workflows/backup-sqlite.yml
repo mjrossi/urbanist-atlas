@@ -65,6 +65,27 @@ jobs:
           # Integrity: gunzip -t verifies the gzip stream end-to-end so
           # a corrupted upload is caught here, not at restore time.
           gunzip -t "${out}"
+          # Content: neither check above can tell an empty QUEUE from an empty
+          # DUMP. `.dump` on a database whose tables vanished still emits the
+          # PRAGMA/BEGIN/COMMIT skeleton, which clears the 100-byte floor and
+          # gunzips cleanly — so the exact failure this job exists to catch
+          # would upload successfully and look identical to a healthy backup.
+          # Assert the schema is present instead.
+          #
+          # Deliberately schema-shaped, not row-count-shaped: zero submissions
+          # is the correct state today and must not fail the job. Decompressed
+          # to a file rather than piped into grep, because `gunzip -c | grep -q`
+          # exits grep early, hands gunzip a SIGPIPE, and `pipefail` then fails
+          # the step on a backup that was actually fine — the same class of
+          # pipe-discipline trap documented for the capture step above.
+          gunzip -c "${out}" > backup-check.sql
+          for table in submissions coverage_gaps; do
+            if ! grep -q "CREATE TABLE ${table}" backup-check.sql; then
+              echo "backup is missing 'CREATE TABLE ${table}' — not a valid snapshot" >&2
+              exit 1
+            fi
+          done
+          rm -f backup-check.sql
           echo "BACKUP_FILE=${out}" >> "${GITHUB_ENV}"
 
       - name: Set up rclone
