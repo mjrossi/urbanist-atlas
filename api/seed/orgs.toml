@@ -770,15 +770,6 @@ website_url = "https://www.ourstreetsmn.org"
 tags = ["cycling", "walking", "safe-streets", "advocacy"]
 region_slugs = ["minneapolis-mn-metro"]
 
-[[org]]
-slug = "streets-mn"
-added_at = 2026-05-21
-name = "Streets.mn"
-short_desc = "Twin Cities publication and advocacy nonprofit fostering conversation about transportation, land use, and urban planning across Minnesota. Publishes daily articles by community contributors on transit, bike corrals, and zoning."
-website_url = "https://streets.mn"
-tags = ["transit", "urbanism", "media", "advocacy", "land-use"]
-region_slugs = ["minneapolis-mn-metro"]
-
 # --- San Diego ---
 
 [[org]]
@@ -2150,6 +2141,15 @@ name = "Bicycle Alliance of Minnesota"
 short_desc = "Minnesota's statewide cycling nonprofit (BikeMN). Works to make walking and biking a frequent means of everyday mobility within communities throughout the state."
 website_url = "https://www.bikemn.org"
 tags = ["cycling", "walking", "advocacy", "safe-streets"]
+region_slugs = ["mn"]
+
+[[org]]
+slug = "streets-mn"
+added_at = 2026-05-21
+name = "Streets.mn"
+short_desc = "Statewide Minnesota nonprofit publication and community forum on transportation, land use, and urban planning — volunteer-driven, member-supported, and explicit that contributor articles carry their authors' own views rather than an organizational position. Its Greater Minnesota section covers Duluth, Rochester, and Mankato alongside Twin Cities reporting."
+website_url = "https://streets.mn"
+tags = ["transit", "urbanism", "media", "advocacy", "land-use"]
 region_slugs = ["mn"]
 
 # --- Missouri ---
