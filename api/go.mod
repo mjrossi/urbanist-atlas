@@ -4,16 +4,16 @@ go 1.26.4
 
 require (
 	github.com/ctessum/polyclip-go v1.1.0
-	github.com/go-chi/chi/v5 v5.3.1
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jonas-p/go-shp v0.1.1
-	github.com/oapi-codegen/runtime v1.6.0
+	github.com/oapi-codegen/runtime v1.7.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/prometheus/client_golang v1.24.1
-	github.com/urfave/cli/v3 v3.10.1
-	modernc.org/sqlite v1.56.0
+	github.com/urfave/cli/v3 v3.11.0
+	modernc.org/sqlite v1.57.0
 )
 
 require (
