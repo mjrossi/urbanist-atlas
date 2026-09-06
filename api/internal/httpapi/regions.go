@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/coverage"
+	"github.com/mjrossi/urbanist-atlas/api/internal/usage"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
@@ -79,7 +80,7 @@ func searchRegionsHandler(store atlas.Store, logger *slog.Logger, m *Metrics, re
 // multi-state coalitions. Returns 404 with a problem+json document
 // for unknown slugs and for national-tier slugs (atlas.GetRegion
 // signals both with (nil, nil)).
-func getRegionHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.HandlerFunc {
+func getRegionHandler(store atlas.Store, logger *slog.Logger, m *Metrics, u *usage.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		slug := strings.TrimSpace(chi.URLParam(r, "slug"))
@@ -91,12 +92,23 @@ func getRegionHandler(store atlas.Store, logger *slog.Logger, m *Metrics) http.H
 		}
 		if detail == nil {
 			m.incRegionView(false)
+			// Deliberately NOT bucketed into usage_daily. slug here is
+			// the raw path param, so recording it would let any caller
+			// mint unbounded rows in a 400-day table that shares the
+			// submission volume — and an unresolved slug is not content
+			// popularity in the first place. The hit/miss split lives in
+			// Prometheus (incRegionView); raw misses land in
+			// coverage_gaps, which is sampled and row-capped precisely
+			// because it holds user input.
 			logger.DebugContext(r.Context(), "region view", "slug", slug, "found", false, "rid", rid)
 			writeProblem(w, r, http.StatusNotFound, problemNotFound, "Region Not Found",
 				"We don't have this region in the atlas yet. It may not be indexed, or the link you followed may be out of date.", rid)
 			return
 		}
 		m.incRegionView(true)
+		// The canonical slug, not the raw path param, so casing
+		// variants collapse into one bucket.
+		u.Increment(usage.KindRegionView, detail.Region.Slug)
 		logger.DebugContext(r.Context(), "region view", "slug", slug, "found", true, "rid", rid)
 		writeJSON(w, http.StatusOK, toOAPIRegionDetail(*detail))
 	}

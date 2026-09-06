@@ -30,3 +30,10 @@ type Submission struct {
 	PromotionPrUrl  string
 	PromotionError  string
 }
+
+type UsageDaily struct {
+	Day       string
+	Kind      string
+	BucketKey string
+	Count     int64
+}

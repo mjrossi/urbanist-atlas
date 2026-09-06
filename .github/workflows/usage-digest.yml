@@ -1,0 +1,470 @@
+name: Monthly usage digest
+
+# Pushes a monthly summary of how the Atlas is actually being used, as a
+# GitHub issue. This is the consumption layer for the usage rollups
+# (api/internal/usage) — see
+# docs/superpowers/specs/2026-09-06-usage-digest-design.md.
+#
+# Unlike uptime.yml and backup-sqlite.yml (which reuse one open issue so
+# a sustained outage doesn't spam), this opens a NEW issue each month:
+# each digest is a durable record, and the issue list is the archive.
+# The failure alarm at the end DOES reuse one open issue, matching them.
+#
+# Each of the four sources degrades independently to an "unavailable"
+# line, at both the fetch and the render layer. A Cloudflare token
+# hiccup must not cost the content and coverage numbers. The job fails
+# only if every source fails — and a failure opens an alarm issue,
+# because at a monthly cadence nobody notices a red run in the Actions
+# tab until three months of digests are missing.
+#
+# Caveat (same as uptime.yml): GitHub disables scheduled workflows on a
+# repo with no commit activity for 60 days. A monthly workflow can miss
+# several cycles before that's noticed — if digests go quiet, check the
+# workflow is still enabled.
+#
+# The admin endpoints are gated by the bearer token ALONE (the /admin
+# subtree sits outside the X-Atlas-Client group in router.go), so no
+# client secret is needed here.
+#
+# Repo secrets required:
+#   - URBANIST_ADMIN_TOKEN         (NEW) matches the Fly secret of the same name
+#   - CF_ANALYTICS_TOKEN           (NEW) Cloudflare API token, Account Analytics:Read
+#   - CF_WEB_ANALYTICS_SITE_TAG    (NEW) the Web Analytics site tag
+#   - FLY_ORG_SLUG                 (NEW) Fly org slug for the Prometheus API path
+#   - FLY_API_TOKEN_PROMETHEUS     (NEW) org-scoped read token; the deploy
+#                                        token is app+deploy-scoped and cannot
+#                                        read the org Prometheus endpoint
+#   - CF_ACCOUNT_ID                (existing, used by backup-sqlite.yml)
+
+on:
+  schedule:
+    # 13:00 UTC on the 2nd of each month — a day of margin so the
+    # previous month is fully flushed and backed up.
+    - cron: '0 13 2 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Render to the run summary instead of opening an issue'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute reporting months
+        id: months
+        run: |
+          set -euo pipefail
+          # Previous month and the one before it, for deltas. Anchored to
+          # the 15th before stepping back a month, so a run on the 29th-31st
+          # can't skip a short month (GNU date arithmetic is day-preserving).
+          anchor="$(date -u +%Y-%m-15)"
+          cur_start="$(date -u -d "$anchor -1 month" +%Y-%m-01)"
+          prev_start="$(date -u -d "$anchor -2 months" +%Y-%m-01)"
+          this_start="$(date -u +%Y-%m-01)"
+          {
+            echo "cur_start=${cur_start}"
+            echo "cur_end=$(date -u -d "${this_start} -1 day" +%F)"
+            echo "cur_label=$(date -u -d "${cur_start}" +%Y-%m)"
+            echo "prev_start=${prev_start}"
+            echo "prev_end=$(date -u -d "${cur_start} -1 day" +%F)"
+            echo "prev_label=$(date -u -d "${prev_start}" +%Y-%m)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Fetch usage rollups
+        id: usage
+        continue-on-error: true
+        env:
+          ADMIN_TOKEN: ${{ secrets.URBANIST_ADMIN_TOKEN }}
+          CUR_START: ${{ steps.months.outputs.cur_start }}
+          CUR_END: ${{ steps.months.outputs.cur_end }}
+          PREV_START: ${{ steps.months.outputs.prev_start }}
+          PREV_END: ${{ steps.months.outputs.prev_end }}
+        run: |
+          set -euo pipefail
+          # One request per kind, not one for the whole month. The
+          # endpoint caps rows and does not paginate, so a shared budget
+          # lets a busy region_view month crowd out the lookup_result
+          # totals — silently, since a truncated response looks exactly
+          # like a complete one. Per-kind, each gets its own budget and
+          # the render step flags any kind that came back at the cap.
+          #
+          # group_by=key (the default) sums each bucket across the range
+          # server-side. Without it the response is one row PER DAY,
+          # which both multiplies the row count by ~31 and ranks by
+          # single-day count — burying a slug with steady daily traffic
+          # under one that spiked once.
+          LIMIT=1000
+          for period in cur prev; do
+            case "${period}" in
+              cur)  from="${CUR_START}";  to="${CUR_END}"  ;;
+              prev) from="${PREV_START}"; to="${PREV_END}" ;;
+            esac
+            for kind in region_view org_view lookup lookup_tier lookup_result lookup_country; do
+              curl -fsS --max-time 30 \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                "https://api.urbanistatlas.com/api/v1/admin/usage?from=${from}&to=${to}&kind=${kind}&limit=${LIMIT}" \
+                > "usage_${period}_${kind}.json"
+            done
+          done
+          echo "limit=${LIMIT}" >> "$GITHUB_OUTPUT"
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch coverage gaps
+        id: coverage
+        continue-on-error: true
+        env:
+          ADMIN_TOKEN: ${{ secrets.URBANIST_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 30 \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            'https://api.urbanistatlas.com/api/v1/admin/coverage-gaps?limit=200' > coverage.json
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch Cloudflare Web Analytics
+        id: cloudflare
+        continue-on-error: true
+        env:
+          CF_TOKEN: ${{ secrets.CF_ANALYTICS_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_SITE_TAG: ${{ secrets.CF_WEB_ANALYTICS_SITE_TAG }}
+          CUR_START: ${{ steps.months.outputs.cur_start }}
+          CUR_END: ${{ steps.months.outputs.cur_end }}
+          PREV_START: ${{ steps.months.outputs.prev_start }}
+          PREV_END: ${{ steps.months.outputs.prev_end }}
+        run: |
+          set -euo pipefail
+          # jq builds the JSON body so the tokens and tags are never
+          # substituted into a quoted shell string.
+          query_month() {
+            local body
+            body="$(jq -n \
+              --arg acct "${CF_ACCOUNT_ID}" \
+              --arg site "${CF_SITE_TAG}" \
+              --arg from "$1T00:00:00Z" \
+              --arg to "$2T23:59:59Z" \
+              '{query: "query($acct: String!, $site: String!, $from: Time!, $to: Time!) { viewer { accounts(filter: {accountTag: $acct}) { rumPageloadEventsAdaptiveGroups(limit: 1, filter: {siteTag: $site, datetime_geq: $from, datetime_leq: $to}) { count sum { visits } } } } }",
+                variables: {acct: $acct, site: $site, from: $from, to: $to}}')"
+            curl -fsS --max-time 30 https://api.cloudflare.com/client/v4/graphql \
+              -H "Authorization: Bearer ${CF_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              --data "${body}"
+          }
+          query_month "${CUR_START}" "${CUR_END}" > cf_cur.json
+          query_month "${PREV_START}" "${PREV_END}" > cf_prev.json
+          # A GraphQL error comes back as HTTP 200 with an errors array,
+          # so curl -f cannot catch it; check explicitly. Only the
+          # current month is fatal — an errors body on the previous month
+          # costs a delta, not the section, so it is logged and the
+          # render step falls back to "-".
+          if jq -e '.errors != null and (.errors | length > 0)' cf_cur.json > /dev/null; then
+            echo "Cloudflare GraphQL returned errors for the current month:" >&2
+            jq -r '.errors[].message' cf_cur.json >&2
+            exit 1
+          fi
+          if jq -e '.errors != null and (.errors | length > 0)' cf_prev.json > /dev/null; then
+            echo "note: Cloudflare GraphQL returned errors for the previous month (deltas will show '-'):" >&2
+            jq -r '.errors[].message' cf_prev.json >&2
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch Fly Prometheus health
+        id: health
+        continue-on-error: true
+        env:
+          # NOT the deploy token: that one is app+deploy scoped, and this
+          # endpoint is org-scoped. See docs/deploy.md §GitHub Actions
+          # secrets for how to mint the read token.
+          FLY_TOKEN: ${{ secrets.FLY_API_TOKEN_PROMETHEUS }}
+          FLY_ORG: ${{ secrets.FLY_ORG_SLUG }}
+        run: |
+          set -euo pipefail
+          # Fly's managed Prometheus is not reachable over 6PN from here,
+          # but it exposes a token-authenticated HTTP query API.
+          # Prometheus retention is ~30 days, so a full previous-month
+          # range is not available: this is a trailing-30d snapshot, and
+          # the digest labels it as such.
+          #
+          # A generous timeout: these are 30d range queries over a
+          # histogram on a shared managed Prometheus, and a timeout
+          # silently zeroes the whole Health section.
+          q() {
+            curl -fsS --max-time 120 -G \
+              -H "Authorization: Bearer ${FLY_TOKEN}" \
+              --data-urlencode "query=$1" \
+              "https://api.fly.io/prometheus/${FLY_ORG}/api/v1/query"
+          }
+          # Exclude the health probes. fly.toml checks /healthz every 30s
+          # and /readyz every 15s — ~259k requests per 30 days against
+          # ~10k monthly pageviews of real traffic — so an unfiltered
+          # total is ~90% synthetic, the 5xx RATE divides by that inflated
+          # denominator, and p95 is dragged toward zero by sub-millisecond
+          # probes. The `route` label is the chi route pattern
+          # (see metricsMiddleware in internal/httpapi/metrics.go).
+          EXCL='route!~"/healthz|/readyz"'
+          q "sum(increase(atlas_http_requests_total{${EXCL}}[30d]))" > health_requests.json
+          q "sum(increase(atlas_http_requests_total{${EXCL},status=~\"5..\"}[30d]))" > health_5xx.json
+          q "histogram_quantile(0.95, sum by (le) (rate(atlas_http_request_duration_seconds_bucket{${EXCL}}[30d])))" > health_p95.json
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if every source failed
+        if: >
+          steps.usage.outputs.ok != 'true' &&
+          steps.coverage.outputs.ok != 'true' &&
+          steps.cloudflare.outputs.ok != 'true' &&
+          steps.health.outputs.ok != 'true'
+        run: |
+          echo "every digest source failed - not opening an empty issue" >&2
+          exit 1
+
+      - name: Render and open the digest issue
+        uses: actions/github-script@v9
+        env:
+          CUR_LABEL: ${{ steps.months.outputs.cur_label }}
+          PREV_LABEL: ${{ steps.months.outputs.prev_label }}
+          USAGE_OK: ${{ steps.usage.outputs.ok }}
+          USAGE_LIMIT: ${{ steps.usage.outputs.limit }}
+          COVERAGE_OK: ${{ steps.coverage.outputs.ok }}
+          CLOUDFLARE_OK: ${{ steps.cloudflare.outputs.ok }}
+          HEALTH_OK: ${{ steps.health.outputs.ok }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        with:
+          script: |
+            const fs = require('fs');
+            const readJSON = (p) => {
+              try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+            };
+            // Well-formed JSON of the wrong SHAPE is the case `|| []`
+            // misses, and it is the one that used to take the whole
+            // issue down with it.
+            const readRows = (p) => {
+              const v = readJSON(p);
+              return Array.isArray(v) ? v : null;
+            };
+            const UNAVAILABLE = '_Source unavailable this run - see the workflow log._';
+            const FAILED = '_Section failed to render - see the workflow log._';
+            const { CUR_LABEL, PREV_LABEL } = process.env;
+
+            // D6 at the render layer: one section throwing must not cost
+            // the other three. Fetch-level degradation alone was not
+            // enough — all four sections are computed in this one script.
+            const section = (ok, build) => {
+              if (ok !== 'true') return UNAVAILABLE;
+              try {
+                return build();
+              } catch (err) {
+                core.warning(`digest section failed to render: ${err.message}`);
+                return FAILED;
+              }
+            };
+
+            const pct = (now, before) =>
+              typeof before === 'number' && before > 0
+                ? `${now - before >= 0 ? '+' : ''}${Math.round(((now - before) / before) * 100)}%`
+                : '-';
+
+            // ---- Content popularity -------------------------------
+            const KINDS = ['region_view', 'org_view', 'lookup', 'lookup_tier', 'lookup_result', 'lookup_country'];
+            const USAGE_LIMIT = Number(process.env.USAGE_LIMIT || 1000);
+            const truncated = new Set();
+
+            const loadPeriod = (period) => {
+              const byKind = new Map();
+              for (const kind of KINDS) {
+                const rows = readRows(`usage_${period}_${kind}.json`);
+                if (rows === null) throw new Error(`usage_${period}_${kind}.json missing or not an array`);
+                // A response at exactly the cap may have been truncated;
+                // there is no pagination and no truncation flag.
+                if (rows.length >= USAGE_LIMIT) truncated.add(kind);
+                const inner = new Map();
+                for (const r of rows) inner.set(r.key, (inner.get(r.key) || 0) + r.count);
+                byKind.set(kind, inner);
+              }
+              return byKind;
+            };
+
+            const sumKind = (period, kind) =>
+              [...period.get(kind).values()].reduce((a, v) => a + v, 0);
+            const keyTotal = (period, kind, key) => period.get(kind).get(key) || 0;
+
+            const content = section(process.env.USAGE_OK, () => {
+              const cur = loadPeriod('cur');
+              const prev = loadPeriod('prev');
+
+              const topTable = (kind, heading, n = 15) => {
+                const c = cur.get(kind);
+                const p = prev.get(kind);
+                const rows = [...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+                if (!rows.length) return `#### ${heading}\n\n_No data recorded._\n`;
+                const lines = rows.map(([k, v]) => {
+                  // A key absent from a TRUNCATED previous month is
+                  // unknown, not zero. Rendering 0 here would report a
+                  // steady region as "new this month, prev 0".
+                  const before = p.get(k);
+                  const cell = before !== undefined ? before : (truncated.has(kind) ? '?' : 0);
+                  return `| \`${k}\` | ${v} | ${cell} | ${pct(v, before)} |`;
+                });
+                return `#### ${heading}\n\n| Key | ${CUR_LABEL} | ${PREV_LABEL} | Change |\n|---|--:|--:|--:|\n${lines.join('\n')}\n`;
+              };
+
+              const hits = keyTotal(cur, 'lookup_result', 'hit');
+              const misses = keyTotal(cur, 'lookup_result', 'miss');
+              const mil = keyTotal(cur, 'lookup_result', 'military');
+              const total = hits + misses + mil;
+              const rate = total ? Math.round((hits / total) * 100) : 0;
+              const empties = keyTotal(cur, 'lookup_tier', 'empty');
+              const prevTotal = ['hit', 'miss', 'military']
+                .reduce((a, k) => a + keyTotal(prev, 'lookup_result', k), 0);
+
+              const parts = [
+                `**Lookups:** ${total} total (${PREV_LABEL}: ${prevTotal}, ${pct(total, prevTotal)}) - ${hits} resolved (${rate}%), ${misses} missed, ${mil} military.`,
+                `**Resolved but empty:** ${empties} - a resolved region with no orgs, the coverage-gap signal.`,
+                `**Region detail views:** ${sumKind(cur, 'region_view')} | **Org detail views:** ${sumKind(cur, 'org_view')}`,
+              ];
+              if (truncated.size) {
+                parts.push(
+                  '',
+                  `> ⚠️ Hit the ${USAGE_LIMIT}-bucket cap for: ${[...truncated].map((k) => `\`${k}\``).join(', ')}. ` +
+                    'Those totals are a floor and their previous-month cells may show `?`.',
+                );
+              }
+              parts.push(
+                '',
+                topTable('lookup', 'Top regions by postal lookup'),
+                topTable('region_view', 'Top regions by detail view'),
+                topTable('org_view', 'Top organizations'),
+              );
+              return parts.join('\n');
+            });
+
+            // ---- Coverage gaps ------------------------------------
+            const coverage = section(process.env.COVERAGE_OK, () => {
+              const gaps = readRows('coverage.json');
+              if (gaps === null) throw new Error('coverage.json missing or not an array');
+              const counts = new Map();
+              for (const g of gaps) {
+                const k = `${g.kind}: ${g.input}`;
+                counts.set(k, (counts.get(k) || 0) + 1);
+              }
+              const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
+              if (!rows.length) return '_No coverage gaps sampled._';
+              return `| Input | Times seen |\n|---|--:|\n${rows.map(([k, v]) => `| \`${k}\` | ${v} |`).join('\n')}\n\n` +
+                '_The most recent 200 samples, **not** scoped to this month, and sampled at ' +
+                '`URBANIST_COVERAGE_SAMPLE_RATE` — a recent partial sample, not a full log._';
+            });
+
+            // ---- Audience -----------------------------------------
+            const audience = section(process.env.CLOUDFLARE_OK, () => {
+              const pick = (p) => {
+                const g = readJSON(p)?.data?.viewer?.accounts?.[0]?.rumPageloadEventsAdaptiveGroups?.[0];
+                return g ? { views: g.count ?? 0, visits: g.sum?.visits ?? 0 } : null;
+              };
+              const c = pick('cf_cur.json');
+              const p = pick('cf_prev.json');
+              // The fetch succeeded, so an empty result set means no
+              // pageviews (or a wrong site tag) — say that rather than
+              // reporting the source as unavailable, which would send
+              // someone to a workflow log with nothing wrong in it.
+              if (!c) {
+                return '_No pageview data returned for this month. If that is unexpected, check ' +
+                  '`CF_WEB_ANALYTICS_SITE_TAG` matches the site in the Cloudflare dashboard._';
+              }
+              return `| Metric | ${CUR_LABEL} | ${PREV_LABEL} | Change |\n|---|--:|--:|--:|\n` +
+                `| Page views | ${c.views} | ${p ? p.views : '-'} | ${p ? pct(c.views, p.views) : '-'} |\n` +
+                `| Visits | ${c.visits} | ${p ? p.visits : '-'} | ${p ? pct(c.visits, p.visits) : '-'} |`;
+            });
+
+            // ---- Health -------------------------------------------
+            const health = section(process.env.HEALTH_OK, () => {
+              const scalar = (p) => {
+                const v = readJSON(p)?.data?.result?.[0]?.value?.[1];
+                if (v === undefined) return null;
+                // histogram_quantile returns the STRING "NaN" when there
+                // are too few observations; Number("NaN") is NaN, which
+                // is not === null, and would render "NaN ms".
+                const n = Number(v);
+                return Number.isFinite(n) ? n : null;
+              };
+              const reqs = scalar('health_requests.json');
+              const errs = scalar('health_5xx.json');
+              const p95 = scalar('health_p95.json');
+              return [
+                `**Requests (trailing 30d):** ${reqs === null ? '-' : Math.round(reqs)}`,
+                `**5xx:** ${errs === null ? '-' : Math.round(errs)}` +
+                  (reqs && errs !== null ? ` (${((errs / reqs) * 100).toFixed(2)}%)` : ''),
+                `**p95 latency:** ${p95 === null ? '-' : `${(p95 * 1000).toFixed(0)} ms`}`,
+                '',
+                '_Prometheus retains ~30 days, so this is a trailing-30d snapshot rather than a calendar month._',
+                '_Excludes the `/healthz` and `/readyz` probes, which would otherwise be ~90% of all requests._',
+              ].join('\n');
+            });
+
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `# Usage digest - ${CUR_LABEL}`,
+              '',
+              '## Audience', '', audience, '',
+              '## What people looked at', '', content, '',
+              '## Where coverage fell short', '', coverage, '',
+              '## Health', '', health, '',
+              '---', '',
+              `Generated by [\`usage-digest.yml\`](${runUrl}). Design: \`docs/superpowers/specs/2026-09-06-usage-digest-design.md\`.`,
+            ].join('\n');
+
+            // A dispatch run used to open a real, duplicate digest issue
+            // with no dedupe — including when validating the workflow,
+            // which the design explicitly asks for before the first cron.
+            if (process.env.DRY_RUN === 'true') {
+              core.summary.addRaw(body).write();
+              core.info('dry run: rendered to the job summary, no issue opened');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Usage digest - ${CUR_LABEL}`,
+              body,
+            });
+
+      - name: Open an issue on failure
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = 'Usage digest failed';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              'The monthly usage digest run failed, so no digest issue was opened.',
+              '',
+              'This fires when EVERY source failed (a single failing source degrades',
+              'to one "unavailable" line instead), or when the render step itself threw.',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'Triage (docs/deploy.md §Monitoring & incident response):',
+              '- Is the API up? `flyctl status -a urbanist-atlas`',
+              '- Do the repo secrets still exist and match Fly? `URBANIST_ADMIN_TOKEN`,',
+              '  `CF_ANALYTICS_TOKEN`, `CF_WEB_ANALYTICS_SITE_TAG`, `FLY_ORG_SLUG`,',
+              '  `FLY_API_TOKEN_PROMETHEUS`, `CF_ACCOUNT_ID`.',
+              '- Re-run with **Run workflow → dry run** to render without opening an issue.',
+            ].join('\n');
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', per_page: 100,
+            });
+            const hit = open.data.find(i => !i.pull_request && i.title.startsWith(marker));
+            if (hit) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: hit.number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: `${marker} (${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC)`, body,
+              });
+            }
