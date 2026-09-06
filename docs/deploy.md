@@ -400,6 +400,30 @@ for the why.
     https://api.urbanistatlas.com/api/v1/admin/coverage-gaps | jq
   ```
 
+- **Usage rollups (product).** Daily aggregate counts of content
+  popularity and lookup outcomes, kept ~400 days on the SQLite volume —
+  so they outlive the ~30-day Prometheus window and ride the nightly R2
+  backup. Read them directly:
+
+  ```sh
+  curl -fsS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+    'https://api.urbanistatlas.com/api/v1/admin/usage?from=2026-08-01&to=2026-08-31&kind=region_view&limit=25' | jq
+  ```
+
+  `from` and `to` are required (an unbounded range would scan the whole
+  table). Tuned by `URBANIST_USAGE_FLUSH_INTERVAL` (default `1m`) and
+  `URBANIST_USAGE_KEEP_DAYS` (default `400` — a year plus a month of
+  margin, so year-over-year is always available). Counts buffer in RAM
+  between flushes, so an ungraceful machine kill loses at most one
+  interval.
+
+  Per-slug popularity is recorded **here**, not in the logs. The
+  `region view` / `org view` DEBUG slog lines are a debugging aid only —
+  do **not** set `URBANIST_LOG_LEVEL=debug` in production to answer
+  popularity questions. (Before this table existed, those lines were the
+  only popularity signal, and because prod runs at `info` they were never
+  actually emitted.)
+
 ### What pages you (GitHub Issues, no SaaS)
 
 - **API down** — [`uptime.yml`](../.github/workflows/uptime.yml) probes
@@ -410,6 +434,24 @@ for the why.
   opens an issue if the nightly SQLite→R2 snapshot fails.
 
 Both reuse one open issue (comment, not spam) until you close it.
+
+### What reports to you (monthly)
+
+- **Usage digest** — [`usage-digest.yml`](../.github/workflows/usage-digest.yml)
+  opens an issue on the 2nd of each month summarising audience
+  (Cloudflare pageviews), content popularity, coverage gaps, and health,
+  each with a month-over-month delta. Unlike the alarms above, **each
+  month gets its own issue**: the digest is a durable record and the
+  issue list is the archive.
+
+  Sources degrade independently — a failed Cloudflare token shows one
+  "unavailable" line rather than costing the whole digest. The job fails
+  only if every source fails. Run it early with **Actions → Monthly usage
+  digest → Run workflow**.
+
+  Needs repo secrets `URBANIST_ADMIN_TOKEN`, `CF_ANALYTICS_TOKEN`,
+  `CF_WEB_ANALYTICS_SITE_TAG`, and `FLY_ORG_SLUG` alongside the existing
+  `CF_ACCOUNT_ID` and `FLY_API_TOKEN_DEPLOY`.
 
 ### Triage
 

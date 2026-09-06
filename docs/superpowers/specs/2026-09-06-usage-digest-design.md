@@ -1,6 +1,6 @@
 # Usage rollups & the monthly digest
 
-**Status:** Approved, not yet implemented (2026-09-06).
+**Status:** Shipped (2026-09-06).
 
 **Related:**
 - [`2026-06-08-observability-design.md`](./2026-06-08-observability-design.md) —
