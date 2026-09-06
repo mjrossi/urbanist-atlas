@@ -153,6 +153,31 @@ func New(cfg Config) http.Handler {
 		// wire contract before any auth. Registered BEFORE the
 		// gated group so the client-secret middleware doesn't reach it.
 		getHead(r, "/openapi.yaml", openapiHandler())
+		// Admin sits OUTSIDE the client-secret group, gated by the
+		// bearer token alone. X-Atlas-Client is a scraper deterrent for
+		// the browser — it ships inside the public SPA bundle via
+		// VITE_API_CLIENT_SECRET and is explicitly not a security
+		// boundary (see clientsecret.go). The admin bearer token is the
+		// strictly stronger credential, so requiring both buys no
+		// security while forcing every server-to-server caller (the
+		// usage-digest workflow, an operator's curl) to carry a secret
+		// that exists only for the frontend. Phase 2 removes the client
+		// gate entirely; admin auth is unaffected by that.
+		if cfg.Submissions != nil {
+			r.Route("/admin", func(r chi.Router) {
+				r.Use(bearerAuthMiddleware(cfg.AdminToken))
+				r.Get("/submissions", listSubmissionsHandler(cfg.Submissions, logger))
+				r.Post("/submissions/{id}/approve", approveSubmissionHandler(cfg.Submissions, cfg.PromotionEnqueuer, logger, cfg.Metrics))
+				r.Post("/submissions/{id}/reject", rejectSubmissionHandler(cfg.Submissions, logger, cfg.Metrics))
+				if cfg.CoverageGaps != nil {
+					r.Get("/coverage-gaps", listCoverageGapsHandler(cfg.CoverageGaps, logger))
+				}
+				if cfg.UsageCounts != nil {
+					r.Get("/usage", listUsageHandler(cfg.UsageCounts, logger))
+				}
+			})
+		}
+
 		r.Group(func(r chi.Router) {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
 			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage, cfg.Usage))
@@ -167,21 +192,11 @@ func New(cfg Config) http.Handler {
 			getHead(r, "/recent", recentHandler(cfg.Store, logger))
 			getHead(r, "/stats", statsHandler(cfg.Store, logger))
 
+			// The public submission POST stays inside the client-secret
+			// group: it is browser-facing, so the deterrent applies.
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
 				r.Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger, cfg.Metrics))
-				r.Route("/admin", func(r chi.Router) {
-					r.Use(bearerAuthMiddleware(cfg.AdminToken))
-					r.Get("/submissions", listSubmissionsHandler(cfg.Submissions, logger))
-					r.Post("/submissions/{id}/approve", approveSubmissionHandler(cfg.Submissions, cfg.PromotionEnqueuer, logger, cfg.Metrics))
-					r.Post("/submissions/{id}/reject", rejectSubmissionHandler(cfg.Submissions, logger, cfg.Metrics))
-					if cfg.CoverageGaps != nil {
-						r.Get("/coverage-gaps", listCoverageGapsHandler(cfg.CoverageGaps, logger))
-					}
-					if cfg.UsageCounts != nil {
-						r.Get("/usage", listUsageHandler(cfg.UsageCounts, logger))
-					}
-				})
 			}
 		})
 	})

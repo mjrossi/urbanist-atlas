@@ -59,6 +59,9 @@ never emitted at all:
 | D5 | **Do NOT set `URBANIST_LOG_LEVEL=debug` in production.** | The rollup replaces that signal properly. Flipping it would flood short-retention logs to answer a question the table now answers durably. The DEBUG lines stay as a debugging aid. |
 | D6 | **Each digest source degrades independently.** | A Cloudflare token hiccup must not cost the content and coverage numbers. Only a total failure of all four sources fails the run. |
 | D7 | **No new runtime dependency, no SaaS, no Worker.** | Matches the project's minimal-deps, no-SaaS posture. Cloudflare Analytics Engine (client funnels) stays deferred as a future slice. |
+| D8 | **Only canonical slugs are bucketed; a 404 records nothing.** (added in code review) | The original design's kind table said "keyed by slug" without saying what a *miss* does, and the first implementation bucketed the raw path param. That let any caller mint unbounded rows in a 400-day table sharing the 1 GiB volume with the submission queue — a disk-exhaustion path into the write side, and a contradiction of the privacy note in the migration and the OpenAPI schema. The hit/miss split already lives in Prometheus; raw misses already land in `coverage_gaps`, which is sampled and row-capped precisely because it holds user input. `internal/usage` additionally caps key length and distinct buffered keys as defense in depth. |
+| D9 | **The admin read defaults to totals over the range, not per-day rows.** (added in code review) | `/admin/usage` originally returned one row per `(day, kind, key)` under a hard `LIMIT` with no pagination, so a month silently truncated *and* ranked by single-day count — a slug viewed steadily every day sorted below one that spiked once. `group_by=key` (the default) sums server-side; `group_by=day` still returns the daily series. |
+| D10 | **`/api/v1/admin/*` sits outside the Phase 1 `X-Atlas-Client` gate.** (added in code review) | The admin subtree was originally nested inside it, so the digest — sending only a bearer token — would have 401'd, been swallowed by `continue-on-error`, and produced a green run with its two most valuable sections blank, every month. The client secret ships inside the public SPA bundle and is documented as not a security boundary; the admin bearer is strictly stronger, so requiring both bought nothing and broke every server-to-server caller. |
 
 ## Architecture
 
@@ -104,7 +107,10 @@ CREATE TABLE usage_daily (
 | `lookup_result` | `hit`\|`miss`\|`military` | `GET /lookup` |
 | `lookup_country` | `US`\|`CA`\|`other` | `GET /lookup` |
 
-A `lookup` row is written **only for a resolved lookup** — an
+`region_view` and `org_view` are written **only for a slug that
+resolved** (D8): a 404 records nothing at all, because the path param is
+raw user input and a slug that does not exist is not popularity.
+Likewise a `lookup` row is written **only for a resolved lookup** — an
 unresolved one has no region slug to key on. Every lookup, resolved or
 not, writes `lookup_result` and `lookup_country`, so the durable
 hit/miss rate survives the Prometheus retention cliff. `lookup_tier`
@@ -119,9 +125,14 @@ the existing `go generate ./...` path.
 
 ### 3. `GET /api/v1/admin/usage`
 
-Bearer-gated, registered beside `coverage-gaps` in `router.go:168`.
-Query params `from`, `to`, `kind`, `limit`. Returns aggregated rows over
-the range. This is an `openapi.yaml` change, so Go and TS types
+Bearer-gated, registered beside `coverage-gaps` — outside the
+`X-Atlas-Client` group (D10). Query params `from`, `to`, `kind`,
+`group_by`, `limit`, all validated against the spec's enums so a typo is
+a 400 rather than an empty `200` that reads as "no traffic". Returns
+buckets summed over the range by default (D9); `group_by=day` returns
+the stored daily rows. There is no pagination, so a response at exactly
+`limit` may be truncated — the digest fetches per `kind` to give each
+its own budget and flags any kind that comes back at the cap. This is an `openapi.yaml` change, so Go and TS types
 regenerate via `just api-gen`; `just api-check` gates the drift.
 
 ### 4. `.github/workflows/usage-digest.yml`
@@ -143,16 +154,30 @@ Unlike `uptime.yml`, the digest opens a **new** issue each month rather
 than reusing one open issue: each month is a durable record, and the
 issue list becomes the archive.
 
-**Secrets.** Reuses `FLY_API_TOKEN_DEPLOY` and `CF_ACCOUNT_ID`. Adds two:
-`URBANIST_ADMIN_TOKEN` (to call the admin endpoints) and a
-Cloudflare Analytics-scoped API token.
+**Secrets.** Reuses `CF_ACCOUNT_ID`. Adds `URBANIST_ADMIN_TOKEN` (to
+call the admin endpoints — the same value as the Fly secret, so it must
+be generated once and set in both places), a Cloudflare
+Analytics-scoped API token, `CF_WEB_ANALYTICS_SITE_TAG`, `FLY_ORG_SLUG`,
+and `FLY_API_TOKEN_PROMETHEUS`. The last one is **not**
+`FLY_API_TOKEN_DEPLOY` as originally planned: that token is app- and
+deploy-scoped, while the Prometheus query endpoint is org-scoped.
 
 ## Error handling
 
 Each source is fetched independently; a failure degrades that section to
-a "⚠️ unavailable" line rather than failing the run (D6). The workflow
-fails — and opens an alarm issue — only when every source fails, which
-indicates something real rather than a token hiccup.
+a "⚠️ unavailable" line rather than failing the run (D6). Degradation
+applies at the **render** layer too — all four sections are computed in
+one `github-script` block, so each is wrapped individually; without that
+a single malformed response takes the whole issue down, which is the
+failure D6 exists to prevent. The workflow fails — and opens an alarm
+issue, reusing one open issue like `uptime.yml` — only when every source
+fails, which indicates something real rather than a token hiccup.
+
+The Health queries exclude the `/healthz` and `/readyz` probes. Fly
+polls them every 15-30s (~259k requests per 30 days against ~10k monthly
+pageviews of real traffic), so an unfiltered total is ~90% synthetic,
+the 5xx *rate* divides by that inflated denominator, and p95 is dragged
+toward zero by sub-millisecond probes.
 
 Recorder writes are best-effort and off the request path: a flush error
 is logged and the buffer is dropped, never retried into unbounded growth
@@ -170,8 +195,10 @@ and never surfaced to a user request. This matches
 - `internal/httpapi`: the admin endpoint end-to-end including the
   503-without-token path, following `coverage_test.go`.
 - Gates: `just api-test` (race), `just api-lint`, `just api-check`
-  (codegen drift). Workflow YAML validated by `workflow_dispatch` on a
-  branch before the first cron fires.
+  (codegen drift). The workflow has a `dry_run` dispatch input that
+  renders to the run summary instead of opening an issue, so
+  `workflow_dispatch` validation before the first cron no longer leaves
+  a duplicate production-looking issue behind.
 
 ## Non-goals
 

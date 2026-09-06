@@ -493,7 +493,18 @@ export interface paths {
          *
          *     Buckets hold only public content identifiers (slugs) and bounded
          *     enum values; raw postal codes and search queries are never
-         *     recorded here. Results are highest-count first.
+         *     recorded here. A region or org slug that resolved to nothing is
+         *     not recorded at all, so every key in this table is a slug that
+         *     exists.
+         *
+         *     By default (`group_by=key`) each bucket is summed across the
+         *     whole `from`..`to` range and `day` is omitted from the row.
+         *     Pass `group_by=day` for the stored per-day rows.
+         *
+         *     Results are highest-count first and capped at `limit`; there is
+         *     no pagination. A response holding exactly `limit` rows may have
+         *     been truncated, so totals derived from it are a floor — narrow
+         *     the range or filter by `kind` rather than raising the cap.
          */
         get: operations["listUsage"];
         put?: never;
@@ -553,10 +564,12 @@ export interface components {
         UsageCount: {
             /**
              * Format: date
-             * @description UTC calendar day for this bucket.
+             * @description UTC calendar day for this bucket. Present only when the
+             *     request passed `group_by=day`; omitted for the default
+             *     range-aggregated read, where the row spans `from`..`to`.
              * @example 2026-08-14
              */
-            day: string;
+            day?: string;
             /**
              * @description `region_view` / `org_view` — detail fetches, keyed by slug.
              *     `lookup` — the region a postal code resolved to, keyed by
@@ -568,7 +581,7 @@ export interface components {
             kind: "region_view" | "org_view" | "lookup" | "lookup_tier" | "lookup_result" | "lookup_country";
             /**
              * @description Region or org slug, or the enum value for outcome kinds.
-             * @example chicago-il
+             * @example chicago
              */
             key: string;
             /**
@@ -1290,6 +1303,21 @@ export interface components {
                 "application/problem+json": components["schemas"]["ProblemDetails"];
             };
         };
+        /**
+         * @description Admin endpoints are disabled because `URBANIST_ADMIN_TOKEN` is
+         *     not configured on the server. Returned in preference to 401 so
+         *     a misconfigured deployment is distinguishable from a bad token.
+         *     Response body is an RFC 9457 problem document with
+         *     `type` `https://urbanistatlas.com/problems/internal`.
+         */
+        AdminUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["ProblemDetails"];
+            };
+        };
     };
     parameters: {
         /**
@@ -1694,6 +1722,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["AdminUnavailable"];
         };
     };
     approveSubmission: {
@@ -1740,6 +1769,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["AdminUnavailable"];
         };
     };
     rejectSubmission: {
@@ -1787,6 +1817,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["AdminUnavailable"];
         };
     };
     listCoverageGaps: {
@@ -1813,6 +1844,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["AdminUnavailable"];
         };
     };
     listUsage: {
@@ -1830,6 +1862,11 @@ export interface operations {
                 to: string;
                 /** @description Restrict to one bucket kind. Omit for all kinds. */
                 kind?: "region_view" | "org_view" | "lookup" | "lookup_tier" | "lookup_result" | "lookup_country";
+                /**
+                 * @description `key` (default) sums each bucket over the whole range and
+                 *     omits `day`. `day` returns the stored per-day rows.
+                 */
+                group_by?: "key" | "day";
                 /** @description Maximum number of buckets to return. Capped at 1000. */
                 limit?: number;
             };
@@ -1851,6 +1888,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["AdminUnavailable"];
         };
     };
 }

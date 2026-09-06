@@ -7,7 +7,15 @@
 -- Aggregating by day is what makes per-slug popularity affordable here
 -- when it was rejected as a Prometheus label (unbounded cardinality;
 -- see the 2026-06-08 observability spec's D3). One row per
--- (day, kind, bucket_key) caps growth at roughly the slug count per day.
+-- (day, kind, bucket_key) caps growth at the number of DISTINCT SLUGS
+-- SERVED per day.
+--
+-- That bound only holds because callers write canonical slugs and never
+-- raw request input: a 404 slug is deliberately not recorded (see the
+-- notes in httpapi/regions.go and orgs.go), and internal/usage caps key
+-- length and distinct buffered keys as defense in depth. Without those,
+-- any caller could mint unbounded rows here — on the same 1 GiB volume
+-- the submission queue writes to.
 --
 -- PRIVACY: bucket_key holds only public content identifiers (region and
 -- org slugs) or bounded enum values — never raw postal codes or search
@@ -23,13 +31,16 @@ CREATE TABLE usage_daily (
     PRIMARY KEY (day, kind, bucket_key)
 ) WITHOUT ROWID;
 
--- Serves the digest's range scan (day BETWEEN ? AND ?, optional kind).
-CREATE INDEX usage_daily_day_kind ON usage_daily(day, kind);
+-- No secondary index: on a WITHOUT ROWID table the PRIMARY KEY
+-- (day, kind, bucket_key) IS the b-tree, and (day, kind) is a strict
+-- prefix of it, so the range scans below already plan as
+-- "SEARCH usage_daily USING PRIMARY KEY (day>? AND day<?)". A separate
+-- index could never be chosen (it does not cover bucket_key or count)
+-- and would cost a second b-tree write on every flushed row.
 
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-DROP INDEX IF EXISTS usage_daily_day_kind;
 DROP TABLE IF EXISTS usage_daily;
 -- +goose StatementEnd

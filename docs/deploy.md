@@ -67,10 +67,24 @@ Day-to-day, deploys are automated.
 | Secret | Scope | Used by | How to issue |
 |---|---|---|---|
 | `FLY_API_TOKEN_DEPLOY` | deploy-only on `urbanist-atlas` | `ci.yml` → `deploy-api` | `flyctl tokens create deploy -a urbanist-atlas --expiry 8760h` |
+| `FLY_API_TOKEN_PROMETHEUS` | **org**-scoped, read-only | `usage-digest.yml` → Health | `flyctl tokens create readonly -o <org> --expiry 8760h` |
+| `URBANIST_ADMIN_TOKEN` | must equal the Fly secret of the same name | `usage-digest.yml` → Content + Coverage | see §Application secrets below — issue once, set in both places |
+| `CF_ANALYTICS_TOKEN` | Cloudflare API token, Account Analytics → Read | `usage-digest.yml` → Audience | dashboard → My Profile → API Tokens → Create Token → Custom |
+| `CF_WEB_ANALYTICS_SITE_TAG` | not secret, stored as one for convenience | `usage-digest.yml` → Audience | dashboard → Analytics & Logs → Web Analytics → site → the `token`/site tag in the JS snippet |
+| `CF_ACCOUNT_ID` | Cloudflare account identifier | `backup-sqlite.yml`, `usage-digest.yml` | dashboard → any zone → right-hand sidebar |
+| `FLY_ORG_SLUG` | Fly org slug, for the Prometheus API path | `usage-digest.yml` → Health | `flyctl orgs list` |
 
-Rotate by re-issuing the token and `gh secret set FLY_API_TOKEN_DEPLOY`
-with the new value; flyctl picks up the new token on the next workflow
-run.
+Rotate by re-issuing the token and `gh secret set <NAME>` with the new
+value; flyctl and the workflows pick it up on the next run.
+
+**The Prometheus token is deliberately not `FLY_API_TOKEN_DEPLOY`.** The
+deploy token is scoped to the `urbanist-atlas` app and to deploys; the
+Prometheus query endpoint is `https://api.fly.io/prometheus/<org>/...`
+and is org-scoped, so the deploy token cannot read it. Because the
+digest degrades each source independently, getting this wrong is not a
+loud failure — it is a Health section that reads
+"Source unavailable this run" every month forever. Verify with a dry run
+(below) before trusting it.
 
 ## Application secrets (Fly)
 
@@ -80,10 +94,26 @@ run.
 | `URBANIST_CLIENT_SECRET` | Phase 1 shared-secret `X-Atlas-Client` gate; mirrored to the SPA build as `VITE_API_CLIENT_SECRET` | `flyctl secrets set URBANIST_CLIENT_SECRET=<value> -a urbanist-atlas` |
 | `URBANIST_GITHUB_TOKEN` | Fine-grained PAT scoped to this repo only (Contents R/W + Pull requests R/W). Drives the promotion-PR worker on submission approval. Empty → approval still flips status but `promotion_error="worker disabled (no token configured)"`. | `flyctl secrets set URBANIST_GITHUB_TOKEN=<pat> -a urbanist-atlas` |
 
-Generate the two random secrets with `openssl rand -hex 32` (pipe
-directly into `flyctl secrets set`, don't capture into a variable
-first — fewer places the value sits in shell history). The client
-secret must match the value built into the SPA bundle.
+Generate the client secret with `openssl rand -hex 32`, piped directly
+into `flyctl secrets set` so the value doesn't sit in shell history. It
+must match the value built into the SPA bundle.
+
+`URBANIST_ADMIN_TOKEN` is different: it has to reach **two** places —
+Fly (so the server accepts it) and GitHub Actions (so `usage-digest.yml`
+can call the admin endpoints). Fly stores secrets write-only, so a value
+piped straight in cannot be read back afterwards. Generate it once into
+a shell variable, set both, then drop it:
+
+```sh
+admin_token="$(openssl rand -hex 32)"
+flyctl secrets set "URBANIST_ADMIN_TOKEN=${admin_token}" -a urbanist-atlas
+gh secret set URBANIST_ADMIN_TOKEN --body "${admin_token}"
+unset admin_token
+```
+
+Both must be rotated together: changing one alone leaves the digest
+authenticating with a stale token, which surfaces only as two
+permanently "unavailable" sections in next month's issue.
 
 The GitHub PAT is issued at
 [`github.com/settings/personal-access-tokens/new`](https://github.com/settings/personal-access-tokens/new):
@@ -406,12 +436,32 @@ for the why.
   backup. Read them directly:
 
   ```sh
+  # Top regions for August, summed across the month.
   curl -fsS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
     'https://api.urbanistatlas.com/api/v1/admin/usage?from=2026-08-01&to=2026-08-31&kind=region_view&limit=25' | jq
+
+  # The same slice as a daily series (rows carry `day`).
+  curl -fsS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
+    'https://api.urbanistatlas.com/api/v1/admin/usage?from=2026-08-01&to=2026-08-31&kind=region_view&group_by=day' | jq
   ```
 
   `from` and `to` are required (an unbounded range would scan the whole
-  table). Tuned by `URBANIST_USAGE_FLUSH_INTERVAL` (default `1m`) and
+  table) and an inverted range is a 400, not an empty result. `kind` and
+  `group_by` are validated against their enums, so a typo is a 400
+  rather than an empty `200` that reads as "no traffic".
+
+  `group_by` defaults to `key`: each bucket is summed over the whole
+  range and rows carry no `day`. That is almost always what you want —
+  `group_by=day` returns one row per day, so a month is ~31x the rows
+  and the `limit` ranks by single-day count, which buries a slug with
+  steady traffic under one that spiked once. There is no pagination:
+  a response holding exactly `limit` rows may be truncated.
+
+  Admin endpoints need **only** the bearer token — the `/admin` subtree
+  sits outside the Phase 1 `X-Atlas-Client` gate, since that header is a
+  browser-facing scraper deterrent that ships in the public SPA bundle.
+
+  Tuned by `URBANIST_USAGE_FLUSH_INTERVAL` (default `1m`) and
   `URBANIST_USAGE_KEEP_DAYS` (default `400` — a year plus a month of
   margin, so year-over-year is always available). Counts buffer in RAM
   between flushes, so an ungraceful machine kill loses at most one
@@ -445,13 +495,28 @@ Both reuse one open issue (comment, not spam) until you close it.
   issue list is the archive.
 
   Sources degrade independently — a failed Cloudflare token shows one
-  "unavailable" line rather than costing the whole digest. The job fails
-  only if every source fails. Run it early with **Actions → Monthly usage
-  digest → Run workflow**.
+  "unavailable" line rather than costing the whole digest, and a section
+  that throws while rendering degrades the same way instead of taking
+  the issue down with it. The job fails only if every source fails, and
+  **a failure opens its own alarm issue** (reusing one open issue, like
+  `uptime.yml`) — at a monthly cadence a red run in the Actions tab is
+  exactly what nobody notices.
+
+  Validate it before the first cron with **Actions → Monthly usage
+  digest → Run workflow → dry run**, which renders the digest to the run
+  summary instead of opening a real issue. Leave dry run off and it
+  opens the issue for real.
 
   Needs repo secrets `URBANIST_ADMIN_TOKEN`, `CF_ANALYTICS_TOKEN`,
-  `CF_WEB_ANALYTICS_SITE_TAG`, and `FLY_ORG_SLUG` alongside the existing
-  `CF_ACCOUNT_ID` and `FLY_API_TOKEN_DEPLOY`.
+  `CF_WEB_ANALYTICS_SITE_TAG`, `FLY_ORG_SLUG`, and
+  `FLY_API_TOKEN_PROMETHEUS` alongside the existing `CF_ACCOUNT_ID` —
+  all issued in §GitHub Actions secrets above. Note the Health section
+  needs the **org-scoped read** token, not `FLY_API_TOKEN_DEPLOY`.
+
+  The Health numbers exclude the `/healthz` and `/readyz` probes: Fly
+  polls them every 15-30s (~259k requests per 30 days), which would
+  otherwise be ~90% of the reported traffic, deflate the 5xx rate by the
+  same factor, and drag p95 toward zero.
 
 ### Triage
 

@@ -593,6 +593,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/AdminUnavailable'
 
   /api/v1/admin/submissions/{id}/approve:
     post:
@@ -635,6 +637,8 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/AdminUnavailable'
 
   /api/v1/admin/submissions/{id}/reject:
     post:
@@ -675,6 +679,8 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/AdminUnavailable'
 
   /api/v1/admin/coverage-gaps:
     get:
@@ -717,6 +723,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/AdminUnavailable'
 
   /api/v1/admin/usage:
     get:
@@ -731,7 +739,18 @@ paths:
 
         Buckets hold only public content identifiers (slugs) and bounded
         enum values; raw postal codes and search queries are never
-        recorded here. Results are highest-count first.
+        recorded here. A region or org slug that resolved to nothing is
+        not recorded at all, so every key in this table is a slug that
+        exists.
+
+        By default (`group_by=key`) each bucket is summed across the
+        whole `from`..`to` range and `day` is omitted from the row.
+        Pass `group_by=day` for the stored per-day rows.
+
+        Results are highest-count first and capped at `limit`; there is
+        no pagination. A response holding exactly `limit` rows may have
+        been truncated, so totals derived from it are a floor — narrow
+        the range or filter by `kind` rather than raising the cap.
       operationId: listUsage
       security:
         - BearerAuth: []
@@ -760,6 +779,16 @@ paths:
             enum: [region_view, org_view, lookup, lookup_tier, lookup_result, lookup_country]
           description: Restrict to one bucket kind. Omit for all kinds.
         - in: query
+          name: group_by
+          required: false
+          schema:
+            type: string
+            enum: [key, day]
+            default: key
+          description: |
+            `key` (default) sums each bucket over the whole range and
+            omits `day`. `day` returns the stored per-day rows.
+        - in: query
           name: limit
           required: false
           schema:
@@ -783,6 +812,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/AdminUnavailable'
 
 components:
 
@@ -915,6 +946,17 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    AdminUnavailable:
+      description: |
+        Admin endpoints are disabled because `URBANIST_ADMIN_TOKEN` is
+        not configured on the server. Returned in preference to 401 so
+        a misconfigured deployment is distinguishable from a bad token.
+        Response body is an RFC 9457 problem document with
+        `type` `https://urbanistatlas.com/problems/internal`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
 
   schemas:
 
@@ -963,12 +1005,15 @@ components:
         One daily aggregate usage bucket. Admin-only. Holds public
         content identifiers and bounded enum values only — never raw
         user input.
-      required: [day, kind, key, count]
+      required: [kind, key, count]
       properties:
         day:
           type: string
           format: date
-          description: UTC calendar day for this bucket.
+          description: |
+            UTC calendar day for this bucket. Present only when the
+            request passed `group_by=day`; omitted for the default
+            range-aggregated read, where the row spans `from`..`to`.
           example: '2026-08-14'
         kind:
           type: string
@@ -982,7 +1027,7 @@ components:
         key:
           type: string
           description: Region or org slug, or the enum value for outcome kinds.
-          example: chicago-il
+          example: chicago
         count:
           type: integer
           description: Number of events in this bucket on this day.

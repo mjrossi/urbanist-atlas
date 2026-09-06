@@ -45,6 +45,20 @@ const dayFormat = "2006-01-02"
 // stall process exit.
 const flushTimeout = 5 * time.Second
 
+// maxKeyLen and maxBufferedKeys are defense in depth, not the primary
+// guard. Every caller is supposed to pass a canonical slug or a bounded
+// enum value (see the Kind* docs), so neither bound should ever be
+// reached in normal operation. They exist so that a future caller that
+// forgets and passes raw request input cannot turn the buffer into an
+// unbounded allocation or write oversized rows into a WITHOUT ROWID
+// table on the shared 1 GiB volume. Over-long keys and overflow past the
+// cap are dropped, not truncated: a truncated key would silently merge
+// distinct buckets, which is worse than losing a count.
+const (
+	maxKeyLen       = 128
+	maxBufferedKeys = 10000
+)
+
 // CountStore is the persistence seam the Recorder writes through —
 // satisfied by *sqlite.Store. Mirrors coverage.GapStore.
 type CountStore interface {
@@ -71,9 +85,14 @@ type Recorder struct {
 	keepDays int
 	logger   *slog.Logger
 
-	mu  sync.Mutex
-	buf map[bucketKey]int
-	now func() time.Time
+	// wg tracks the Run goroutine so Wait can join it, matching
+	// coverage.Recorder.Wait's contract — see Wait.
+	wg sync.WaitGroup
+
+	mu      sync.Mutex
+	buf     map[bucketKey]int
+	dropped int
+	now     func() time.Time
 }
 
 // New builds a Recorder. interval is the flush cadence (non-positive
@@ -111,23 +130,56 @@ func (r *Recorder) SetClock(fn func() time.Time) {
 // Increment buckets one event. It returns immediately — nothing touches
 // the database until the next flush. Blank kind or key is dropped: a
 // blank slug would create a meaningless bucket that pollutes the
-// digest's top-N sections.
+// digest's top-N sections. An over-long key is dropped too (see
+// maxKeyLen).
 func (r *Recorder) Increment(kind, key string) {
-	if r == nil || r.store == nil || kind == "" || key == "" {
+	if r == nil || r.store == nil || kind == "" || key == "" || len(key) > maxKeyLen {
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.buf[bucketKey{day: r.now().Format(dayFormat), kind: kind, key: key}]++
+	bk := bucketKey{day: r.now().Format(dayFormat), kind: kind, key: key}
+	// Bumping a bucket that already exists costs no new memory, so the
+	// cap applies only to new keys.
+	if _, ok := r.buf[bk]; !ok && len(r.buf) >= maxBufferedKeys {
+		r.dropped++
+		return
+	}
+	r.buf[bk]++
+}
+
+// Start launches Run in its own goroutine, registering it with the
+// WaitGroup *before* returning so a Wait that follows immediately is
+// guaranteed to see it. Production callers should use this rather than
+// `go rec.Run(ctx)`, which registers from inside the new goroutine and
+// so races a Wait on a very short-lived process. Nil-safe.
+func (r *Recorder) Start(ctx context.Context) {
+	if r == nil || r.store == nil {
+		return
+	}
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		r.run(ctx)
+	}()
 }
 
 // Run drives the flush ticker until ctx is canceled, then performs one
 // final flush so the last interval's counts survive shutdown. Intended
-// to be called in its own goroutine.
+// to be called in its own goroutine; prefer Start, which closes the
+// registration race.
 func (r *Recorder) Run(ctx context.Context) {
 	if r == nil || r.store == nil {
 		return
 	}
+	r.wg.Add(1)
+	defer r.wg.Done()
+	r.run(ctx)
+}
+
+// run is the ticker loop shared by Start and Run. It assumes the caller
+// has already registered with r.wg.
+func (r *Recorder) run(ctx context.Context) {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 	for {
@@ -171,11 +223,20 @@ func (r *Recorder) Flush(ctx context.Context) error {
 		counts = append(counts, atlas.UsageCount{Day: k.day, Kind: k.kind, Key: k.key, Count: n})
 	}
 	r.buf = make(map[bucketKey]int)
+	dropped := r.dropped
+	r.dropped = 0
 	cutoff := ""
 	if r.keepDays > 0 {
 		cutoff = r.now().AddDate(0, 0, -r.keepDays).Format(dayFormat)
 	}
 	r.mu.Unlock()
+
+	// Reaching maxBufferedKeys means a caller is passing unbounded keys;
+	// that is a bug worth seeing, not a routine condition.
+	if dropped > 0 {
+		r.logger.Warn("usage: buffer cap reached, counts dropped",
+			"dropped", dropped, "cap", maxBufferedKeys)
+	}
 
 	if err := r.store.UpsertUsageCounts(ctx, counts); err != nil {
 		return err
@@ -189,11 +250,37 @@ func (r *Recorder) Flush(ctx context.Context) error {
 	return nil
 }
 
-// Wait performs a final flush, bounded by ctx. Called during graceful
-// shutdown alongside coverage.Recorder.Wait. Nil-safe.
+// Wait performs a final flush and then blocks until the Run goroutine
+// has exited, or until ctx is done — whichever comes first. Called
+// during graceful shutdown alongside coverage.Recorder.Wait, and it
+// means the same thing there: when Wait returns nil, no further write
+// will be issued, so the caller may safely close the store.
+//
+// Joining matters because Run performs its own final flush on ctx
+// cancellation using a *detached* context. Without the join, Wait could
+// return while that flush is still in flight and the deferred store
+// Close would race it. If Run was never started the WaitGroup is empty
+// and the join returns immediately. Nil-safe.
 func (r *Recorder) Wait(ctx context.Context) error {
 	if r == nil {
 		return nil
 	}
-	return r.Flush(ctx)
+	flushErr := r.Flush(ctx)
+
+	done := make(chan struct{})
+	go func() {
+		r.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return flushErr
+	case <-ctx.Done():
+		// Report the flush error in preference to the deadline: it says
+		// more about what actually went wrong.
+		if flushErr != nil {
+			return flushErr
+		}
+		return ctx.Err()
+	}
 }

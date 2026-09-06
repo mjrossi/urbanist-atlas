@@ -348,8 +348,12 @@ implementation slices.
   is restricted to `urbanistatlas.com` + `*.<account>.workers.dev`. A shared
   `X-Atlas-Client` secret header (bundled into the frontend build via
   `VITE_API_CLIENT_SECRET`, checked by the backend against
-  `URBANIST_CLIENT_SECRET`) keeps casual scrapers out. Only `/healthz`
-  and `/api/v1/openapi.yaml` are exempt. Goal: shake out schema +
+  `URBANIST_CLIENT_SECRET`) keeps casual scrapers out. Exempt:
+  `/healthz`, `/api/v1/openapi.yaml`, and the whole `/api/v1/admin`
+  subtree — admin is gated by the `URBANIST_ADMIN_TOKEN` bearer, which
+  is the strictly stronger credential, and requiring a browser-bundled
+  secret in addition would only break server-to-server callers such as
+  the usage-digest workflow. Goal: shake out schema +
   query bugs in a low-stakes window.
 - **Phase 2 — public free-key (target state).** Self-serve free API
   keys (`api_keys` table, email-verified registration), tiered

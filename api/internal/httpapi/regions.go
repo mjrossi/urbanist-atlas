@@ -92,7 +92,14 @@ func getRegionHandler(store atlas.Store, logger *slog.Logger, m *Metrics, u *usa
 		}
 		if detail == nil {
 			m.incRegionView(false)
-			u.Increment(usage.KindRegionView, slug)
+			// Deliberately NOT bucketed into usage_daily. slug here is
+			// the raw path param, so recording it would let any caller
+			// mint unbounded rows in a 400-day table that shares the
+			// submission volume — and an unresolved slug is not content
+			// popularity in the first place. The hit/miss split lives in
+			// Prometheus (incRegionView); raw misses land in
+			// coverage_gaps, which is sampled and row-capped precisely
+			// because it holds user input.
 			logger.DebugContext(r.Context(), "region view", "slug", slug, "found", false, "rid", rid)
 			writeProblem(w, r, http.StatusNotFound, problemNotFound, "Region Not Found",
 				"We don't have this region in the atlas yet. It may not be indexed, or the link you followed may be out of date.", rid)

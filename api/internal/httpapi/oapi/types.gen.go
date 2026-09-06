@@ -133,6 +133,24 @@ func (e ListUsageParamsKind) Valid() bool {
 	}
 }
 
+// Defines values for ListUsageParamsGroupBy.
+const (
+	ListUsageParamsGroupByDay ListUsageParamsGroupBy = "day"
+	ListUsageParamsGroupByKey ListUsageParamsGroupBy = "key"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageParamsGroupBy enum.
+func (e ListUsageParamsGroupBy) Valid() bool {
+	switch e {
+	case ListUsageParamsGroupByDay:
+		return true
+	case ListUsageParamsGroupByKey:
+		return true
+	default:
+		return false
+	}
+}
+
 // Country ISO-style country code. v1 ships with `US` and `CA`; additional
 // countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
 // changes as data is loaded.
@@ -783,8 +801,10 @@ type UsageCount struct {
 	// Count Number of events in this bucket on this day.
 	Count int `json:"count"`
 
-	// Day UTC calendar day for this bucket.
-	Day openapi_types.Date `json:"day"`
+	// Day UTC calendar day for this bucket. Present only when the
+	// request passed `group_by=day`; omitted for the default
+	// range-aggregated read, where the row spans `from`..`to`.
+	Day *openapi_types.Date `json:"day,omitempty"`
 
 	// Key Region or org slug, or the enum value for outcome kinds.
 	Key string `json:"key"`
@@ -817,6 +837,42 @@ type RegionSlug = string
 
 // SubmissionID defines model for SubmissionID.
 type SubmissionID = openapi_types.UUID
+
+// AdminUnavailable Standard [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
+// Problem Details object. Returned on every non-2xx response with
+// content-type `application/problem+json`.
+//
+// The `type` field is a stable URI identifying the problem class.
+// The current v1 type values are:
+//
+//   - `https://urbanistatlas.com/problems/validation` — request was
+//     malformed or missing a required field (HTTP 400).
+//   - `https://urbanistatlas.com/problems/not-found` — the
+//     requested resource does not exist (HTTP 404).
+//   - `https://urbanistatlas.com/problems/military-postal-code` — the
+//     looked-up code is a US military (APO/FPO) or diplomatic (DPO)
+//     ZIP, which has no residential region; enter a residential ZIP
+//     instead (HTTP 404).
+//   - `https://urbanistatlas.com/problems/unauthorized` — missing
+//     or invalid bearer token on a protected endpoint (HTTP 401).
+//   - `https://urbanistatlas.com/problems/conflict` — the requested
+//     state transition is not valid given current state (e.g.
+//     approving a non-pending submission) (HTTP 409).
+//   - `https://urbanistatlas.com/problems/rate-limited` — too many
+//     requests from this source (HTTP 429). A `Retry-After` header
+//     is also returned.
+//   - `https://urbanistatlas.com/problems/internal` — an
+//     unexpected server error (HTTP 500).
+//
+// These URIs are stable identifiers; they do not necessarily
+// dereference to a human-readable page yet.
+//
+// Additional fields beyond the RFC's standard five are permitted
+// and consumers should ignore unknown fields. The `request_id`
+// extension is included on every error response and matches the
+// `X-Request-ID` response header so clients can quote it when
+// reporting bugs.
+type AdminUnavailable = ProblemDetails
 
 // BadRequest Standard [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 // Problem Details object. Returned on every non-2xx response with
@@ -1032,12 +1088,19 @@ type ListUsageParams struct {
 	// Kind Restrict to one bucket kind. Omit for all kinds.
 	Kind *ListUsageParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
 
+	// GroupBy `key` (default) sums each bucket over the whole range and
+	// omits `day`. `day` returns the stored per-day rows.
+	GroupBy *ListUsageParamsGroupBy `form:"group_by,omitempty" json:"group_by,omitempty"`
+
 	// Limit Maximum number of buckets to return. Capped at 1000.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListUsageParamsKind defines parameters for ListUsage.
 type ListUsageParamsKind string
+
+// ListUsageParamsGroupBy defines parameters for ListUsage.
+type ListUsageParamsGroupBy string
 
 // LookupParams defines parameters for Lookup.
 type LookupParams struct {

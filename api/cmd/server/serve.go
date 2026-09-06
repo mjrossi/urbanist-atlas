@@ -229,7 +229,10 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	var usageRec *usage.Recorder
 	if subs != nil {
 		usageRec = usage.New(subs, cfg.usageFlushInterval, cfg.usageKeepDays, logger)
-		go usageRec.Run(ctx)
+		// Start, not `go Run`: it registers with the recorder's
+		// WaitGroup synchronously, so the shutdown Wait below is
+		// guaranteed to join this goroutine.
+		usageRec.Start(ctx)
 	}
 
 	origins := splitCSV(cfg.corsOrigins)
@@ -384,10 +387,12 @@ func awaitShutdown(ctx context.Context, logger *slog.Logger, d shutdownDeps) err
 		if err := d.recorder.Wait(shutdownCtx); err != nil {
 			logger.Warn("coverage: drain incomplete on shutdown", "err", err)
 		}
-		// Flush buffered usage counts before the deferred store Close
-		// runs, so the last interval isn't lost. Run(ctx) also flushes on
-		// its own context cancellation; this is the belt-and-braces call
-		// for the case where the signal races the ticker goroutine.
+		// Flush buffered usage counts and join the recorder's ticker
+		// goroutine before the deferred store Close runs, so the last
+		// interval isn't lost and no flush is still in flight when the
+		// database closes. The goroutine does its own final flush on ctx
+		// cancellation using a detached context, so the join — not just
+		// the flush — is what makes closing the store safe here.
 		// Nil-safe.
 		if err := d.usageRec.Wait(shutdownCtx); err != nil {
 			logger.Warn("usage: final flush incomplete on shutdown", "err", err)
@@ -498,10 +503,10 @@ func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
 	return s
 }
 
-// coverageReaderOrNil converts the concrete *sqlite.Store into the
-// atlas.CoverageGapReader interface, preserving nil-ness (same typed-nil
-// guard as submissionsOrNil) so the router skips registering the admin
-// coverage-gaps route when there is no store.
+// usageReaderOrNil converts the concrete *sqlite.Store into the
+// atlas.UsageReader interface, preserving nil-ness (same typed-nil guard
+// as submissionsOrNil) so the router skips registering the admin usage
+// route when there is no store.
 func usageReaderOrNil(s *sqlite.Store) atlas.UsageReader {
 	if s == nil {
 		return nil

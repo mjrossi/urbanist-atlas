@@ -25,7 +25,9 @@ func getOrgHandler(store atlas.Store, logger *slog.Logger, m *Metrics, u *usage.
 		if err != nil {
 			if errors.Is(err, atlas.ErrOrgNotFound) {
 				m.incOrgView(false)
-				u.Increment(usage.KindOrgView, slug)
+				// Not bucketed into usage_daily — see the matching note
+				// in regions.go: slug is raw path input here, and a miss
+				// is not popularity. Prometheus carries the miss.
 				logger.DebugContext(r.Context(), "org view", "slug", slug, "found", false, "rid", rid)
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Organization Not Found",
 					"We don't have this organization in the atlas yet. It may not be indexed, or the link you followed may be out of date.", rid)
