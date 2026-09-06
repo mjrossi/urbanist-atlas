@@ -16,11 +16,6 @@ import (
 // of usage_daily.day.
 const dayParamFormat = "2006-01-02"
 
-// maxUsageLimit caps GET /api/v1/admin/usage. Higher than the
-// submission/coverage list cap because the digest legitimately pulls a
-// few hundred buckets per month in one call.
-const maxUsageLimit = 1000
-
 // usageKinds is the accepted set of the kind query param, in spec order.
 // Kept for the 400 message; membership itself is decided by the
 // generated enum's Valid so the spec stays the single source of truth.
@@ -67,7 +62,7 @@ func listUsageHandler(reader atlas.UsageReader, logger *slog.Logger) http.Handle
 		if !ok {
 			return
 		}
-		limit, ok := parseLimitParam(w, r, maxUsageLimit, rid)
+		limit, ok := parseLimitParam(w, r, atlas.MaxUsageLimit, rid)
 		if !ok {
 			return
 		}

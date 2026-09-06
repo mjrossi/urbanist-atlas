@@ -8,14 +8,6 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// maxUsageListLimit caps a single admin usage read. Generous because
-// the digest legitimately wants a few hundred buckets per month, but
-// bounded so a malformed query can't stream the whole table.
-const maxUsageListLimit = 1000
-
-// defaultUsageListLimit is applied when the caller passes limit <= 0.
-const defaultUsageListLimit = 100
-
 // UpsertUsageCounts accumulates a batch of daily usage deltas in one
 // transaction. Counts SUM into any existing (day, kind, key) row, so
 // repeated flushes within a day compose correctly.
@@ -68,10 +60,10 @@ func (s *Store) UpsertUsageCounts(ctx context.Context, counts []atlas.UsageCount
 func (s *Store) ListUsage(ctx context.Context, q atlas.UsageQuery) ([]atlas.UsageCount, error) {
 	limit := q.Limit
 	if limit <= 0 {
-		limit = defaultUsageListLimit
+		limit = atlas.DefaultUsageLimit
 	}
-	if limit > maxUsageListLimit {
-		limit = maxUsageListLimit
+	if limit > atlas.MaxUsageLimit {
+		limit = atlas.MaxUsageLimit
 	}
 
 	if q.GroupBy == atlas.UsageGroupByDay {

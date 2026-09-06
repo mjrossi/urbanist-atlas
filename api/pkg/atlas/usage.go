@@ -27,6 +27,18 @@ type UsageCount struct {
 	Count int `json:"count"`
 }
 
+// MaxUsageLimit and DefaultUsageLimit bound a usage read. They live
+// here, rather than in each caller, because the handler rejects an
+// out-of-range limit with a 400 while the store clamps defensively, and
+// three independent copies of one number is how those two silently stop
+// agreeing. The third copy is unavoidable: openapi.yaml declares
+// `maximum: 1000` / `default: 100` on the limit param, and the spec is
+// the published contract. Change these together with the spec.
+const (
+	MaxUsageLimit     = 1000
+	DefaultUsageLimit = 100
+)
+
 // UsageGroupBy selects the granularity of a usage read.
 type UsageGroupBy string
 
