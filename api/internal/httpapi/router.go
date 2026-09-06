@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/coverage"
+	"github.com/mjrossi/urbanist-atlas/api/internal/usage"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
@@ -57,6 +58,16 @@ type Config struct {
 	// searches for coverage-gap analysis (see internal/coverage). Nil
 	// disables capture; handlers call it unconditionally (it is nil-safe).
 	Coverage *coverage.Recorder
+
+	// Usage, when non-nil, accumulates daily aggregate usage counts
+	// (content popularity + lookup outcomes) for the monthly digest.
+	// Nil disables recording; handlers call it unconditionally (it is
+	// nil-safe). See internal/usage.
+	Usage *usage.Recorder
+
+	// UsageCounts, when non-nil, backs the admin GET /api/v1/admin/usage
+	// read endpoint. Satisfied by the same SQLite store as Submissions.
+	UsageCounts atlas.UsageReader
 
 	// CoverageGaps, when non-nil, backs the admin GET
 	// /api/v1/admin/coverage-gaps read endpoint. Satisfied by the same
@@ -144,15 +155,15 @@ func New(cfg Config) http.Handler {
 		getHead(r, "/openapi.yaml", openapiHandler())
 		r.Group(func(r chi.Router) {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
-			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage))
+			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage, cfg.Usage))
 			getHead(r, "/regions", listRegionsHandler(cfg.Store, logger))
 			// Static "/regions/search" before the "/regions/{slug}"
 			// param route. chi prefers static segments over params, so
 			// order here is for readers, not the matcher — but a router
 			// test pins that "search" never resolves as a slug.
 			getHead(r, "/regions/search", searchRegionsHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage))
-			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger, cfg.Metrics))
-			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger, cfg.Metrics))
+			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger, cfg.Metrics, cfg.Usage))
+			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger, cfg.Metrics, cfg.Usage))
 			getHead(r, "/recent", recentHandler(cfg.Store, logger))
 			getHead(r, "/stats", statsHandler(cfg.Store, logger))
 
