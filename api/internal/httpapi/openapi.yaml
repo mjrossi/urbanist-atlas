@@ -718,6 +718,72 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/admin/usage:
+    get:
+      tags: [admin]
+      summary: List daily aggregate usage counts.
+      description: |
+        Returns accumulated daily usage buckets — content popularity
+        (region and org views), the region a postal code resolved to,
+        and lookup outcome/tier/country totals. This is the durable
+        record behind the monthly usage digest, and it outlives the
+        ~30-day Prometheus retention window.
+
+        Buckets hold only public content identifiers (slugs) and bounded
+        enum values; raw postal codes and search queries are never
+        recorded here. Results are highest-count first.
+      operationId: listUsage
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Inclusive start day (YYYY-MM-DD, UTC).
+          example: '2026-08-01'
+        - in: query
+          name: to
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Inclusive end day (YYYY-MM-DD, UTC).
+          example: '2026-08-31'
+        - in: query
+          name: kind
+          required: false
+          schema:
+            type: string
+            enum: [region_view, org_view, lookup, lookup_tier, lookup_result, lookup_country]
+          description: Restrict to one bucket kind. Omit for all kinds.
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of buckets to return. Capped at 1000.
+      responses:
+        '200':
+          description: Usage buckets, highest count first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsageCount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
 
   securitySchemes:
@@ -890,6 +956,37 @@ components:
           type: string
           format: date-time
           description: RFC 3339 timestamp when the gap was recorded.
+
+    UsageCount:
+      type: object
+      description: |
+        One daily aggregate usage bucket. Admin-only. Holds public
+        content identifiers and bounded enum values only — never raw
+        user input.
+      required: [day, kind, key, count]
+      properties:
+        day:
+          type: string
+          format: date
+          description: UTC calendar day for this bucket.
+          example: '2026-08-14'
+        kind:
+          type: string
+          enum: [region_view, org_view, lookup, lookup_tier, lookup_result, lookup_country]
+          description: |
+            `region_view` / `org_view` — detail fetches, keyed by slug.
+            `lookup` — the region a postal code resolved to, keyed by
+            region slug. `lookup_tier` / `lookup_result` /
+            `lookup_country` — lookup outcome totals, keyed by the
+            corresponding enum value.
+        key:
+          type: string
+          description: Region or org slug, or the enum value for outcome kinds.
+          example: chicago-il
+        count:
+          type: integer
+          description: Number of events in this bucket on this day.
+          example: 42
 
     Meta:
       type: object

@@ -476,6 +476,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List daily aggregate usage counts.
+         * @description Returns accumulated daily usage buckets — content popularity
+         *     (region and org views), the region a postal code resolved to,
+         *     and lookup outcome/tier/country totals. This is the durable
+         *     record behind the monthly usage digest, and it outlives the
+         *     ~30-day Prometheus retention window.
+         *
+         *     Buckets hold only public content identifiers (slugs) and bounded
+         *     enum values; raw postal codes and search queries are never
+         *     recorded here. Results are highest-count first.
+         */
+        get: operations["listUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -516,6 +544,38 @@ export interface components {
              * @description RFC 3339 timestamp when the gap was recorded.
              */
             created_at: string;
+        };
+        /**
+         * @description One daily aggregate usage bucket. Admin-only. Holds public
+         *     content identifiers and bounded enum values only — never raw
+         *     user input.
+         */
+        UsageCount: {
+            /**
+             * Format: date
+             * @description UTC calendar day for this bucket.
+             * @example 2026-08-14
+             */
+            day: string;
+            /**
+             * @description `region_view` / `org_view` — detail fetches, keyed by slug.
+             *     `lookup` — the region a postal code resolved to, keyed by
+             *     region slug. `lookup_tier` / `lookup_result` /
+             *     `lookup_country` — lookup outcome totals, keyed by the
+             *     corresponding enum value.
+             * @enum {string}
+             */
+            kind: "region_view" | "org_view" | "lookup" | "lookup_tier" | "lookup_result" | "lookup_country";
+            /**
+             * @description Region or org slug, or the enum value for outcome kinds.
+             * @example chicago-il
+             */
+            key: string;
+            /**
+             * @description Number of events in this bucket on this day.
+             * @example 42
+             */
+            count: number;
         };
         /**
          * @description Attribution block included on every collection response.
@@ -1748,6 +1808,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoverageGap"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listUsage: {
+        parameters: {
+            query: {
+                /**
+                 * @description Inclusive start day (YYYY-MM-DD, UTC).
+                 * @example 2026-08-01
+                 */
+                from: string;
+                /**
+                 * @description Inclusive end day (YYYY-MM-DD, UTC).
+                 * @example 2026-08-31
+                 */
+                to: string;
+                /** @description Restrict to one bucket kind. Omit for all kinds. */
+                kind?: "region_view" | "org_view" | "lookup" | "lookup_tier" | "lookup_result" | "lookup_country";
+                /** @description Maximum number of buckets to return. Capped at 1000. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage buckets, highest count first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageCount"][];
                 };
             };
             400: components["responses"]["BadRequest"];

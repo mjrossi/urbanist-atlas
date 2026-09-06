@@ -121,7 +121,7 @@ func (r *Recorder) Increment(kind, key string) {
 	r.buf[bucketKey{day: r.now().Format(dayFormat), kind: kind, key: key}]++
 }
 
-// Run drives the flush ticker until ctx is cancelled, then performs one
+// Run drives the flush ticker until ctx is canceled, then performs one
 // final flush so the last interval's counts survive shutdown. Intended
 // to be called in its own goroutine.
 func (r *Recorder) Run(ctx context.Context) {
@@ -137,7 +137,7 @@ func (r *Recorder) Run(ctx context.Context) {
 				r.logger.Warn("usage: periodic flush failed", "err", err)
 			}
 		case <-ctx.Done():
-			// Detached context: the caller's ctx is already cancelled,
+			// Detached context: the caller's ctx is already canceled,
 			// so reusing it would abort the very write we need.
 			flushCtx, cancel := context.WithTimeout(context.Background(), flushTimeout)
 			if err := r.Flush(flushCtx); err != nil {

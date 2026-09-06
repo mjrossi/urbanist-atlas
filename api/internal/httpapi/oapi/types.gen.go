@@ -73,6 +73,66 @@ func (e SubmissionStatus) Valid() bool {
 	}
 }
 
+// Defines values for UsageCountKind.
+const (
+	UsageCountKindLookup        UsageCountKind = "lookup"
+	UsageCountKindLookupCountry UsageCountKind = "lookup_country"
+	UsageCountKindLookupResult  UsageCountKind = "lookup_result"
+	UsageCountKindLookupTier    UsageCountKind = "lookup_tier"
+	UsageCountKindOrgView       UsageCountKind = "org_view"
+	UsageCountKindRegionView    UsageCountKind = "region_view"
+)
+
+// Valid indicates whether the value is a known member of the UsageCountKind enum.
+func (e UsageCountKind) Valid() bool {
+	switch e {
+	case UsageCountKindLookup:
+		return true
+	case UsageCountKindLookupCountry:
+		return true
+	case UsageCountKindLookupResult:
+		return true
+	case UsageCountKindLookupTier:
+		return true
+	case UsageCountKindOrgView:
+		return true
+	case UsageCountKindRegionView:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageParamsKind.
+const (
+	ListUsageParamsKindLookup        ListUsageParamsKind = "lookup"
+	ListUsageParamsKindLookupCountry ListUsageParamsKind = "lookup_country"
+	ListUsageParamsKindLookupResult  ListUsageParamsKind = "lookup_result"
+	ListUsageParamsKindLookupTier    ListUsageParamsKind = "lookup_tier"
+	ListUsageParamsKindOrgView       ListUsageParamsKind = "org_view"
+	ListUsageParamsKindRegionView    ListUsageParamsKind = "region_view"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageParamsKind enum.
+func (e ListUsageParamsKind) Valid() bool {
+	switch e {
+	case ListUsageParamsKindLookup:
+		return true
+	case ListUsageParamsKindLookupCountry:
+		return true
+	case ListUsageParamsKindLookupResult:
+		return true
+	case ListUsageParamsKindLookupTier:
+		return true
+	case ListUsageParamsKindOrgView:
+		return true
+	case ListUsageParamsKindRegionView:
+		return true
+	default:
+		return false
+	}
+}
+
 // Country ISO-style country code. v1 ships with `US` and `CA`; additional
 // countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
 // changes as data is loaded.
@@ -716,6 +776,34 @@ type SubmissionPayload struct {
 // SubmissionStatus Lifecycle state of a public submission.
 type SubmissionStatus string
 
+// UsageCount One daily aggregate usage bucket. Admin-only. Holds public
+// content identifiers and bounded enum values only — never raw
+// user input.
+type UsageCount struct {
+	// Count Number of events in this bucket on this day.
+	Count int `json:"count"`
+
+	// Day UTC calendar day for this bucket.
+	Day openapi_types.Date `json:"day"`
+
+	// Key Region or org slug, or the enum value for outcome kinds.
+	Key string `json:"key"`
+
+	// Kind `region_view` / `org_view` — detail fetches, keyed by slug.
+	// `lookup` — the region a postal code resolved to, keyed by
+	// region slug. `lookup_tier` / `lookup_result` /
+	// `lookup_country` — lookup outcome totals, keyed by the
+	// corresponding enum value.
+	Kind UsageCountKind `json:"kind"`
+}
+
+// UsageCountKind `region_view` / `org_view` — detail fetches, keyed by slug.
+// `lookup` — the region a postal code resolved to, keyed by
+// region slug. `lookup_tier` / `lookup_result` /
+// `lookup_country` — lookup outcome totals, keyed by the
+// corresponding enum value.
+type UsageCountKind string
+
 // CountryQuery ISO-style country code. v1 ships with `US` and `CA`; additional
 // countries (`DE`, `FR`, `UK`, `AU`, …) are added without spec
 // changes as data is loaded.
@@ -932,6 +1020,24 @@ type ListSubmissionsParams struct {
 	// Omit to start at the newest submission.
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
+
+// ListUsageParams defines parameters for ListUsage.
+type ListUsageParams struct {
+	// From Inclusive start day (YYYY-MM-DD, UTC).
+	From openapi_types.Date `form:"from" json:"from"`
+
+	// To Inclusive end day (YYYY-MM-DD, UTC).
+	To openapi_types.Date `form:"to" json:"to"`
+
+	// Kind Restrict to one bucket kind. Omit for all kinds.
+	Kind *ListUsageParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Limit Maximum number of buckets to return. Capped at 1000.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListUsageParamsKind defines parameters for ListUsage.
+type ListUsageParamsKind string
 
 // LookupParams defines parameters for Lookup.
 type LookupParams struct {

@@ -178,6 +178,9 @@ func New(cfg Config) http.Handler {
 					if cfg.CoverageGaps != nil {
 						r.Get("/coverage-gaps", listCoverageGapsHandler(cfg.CoverageGaps, logger))
 					}
+					if cfg.UsageCounts != nil {
+						r.Get("/usage", listUsageHandler(cfg.UsageCounts, logger))
+					}
 				})
 			}
 		})

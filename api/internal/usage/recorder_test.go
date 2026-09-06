@@ -229,7 +229,7 @@ func TestRecorder_ConcurrentIncrements(t *testing.T) {
 
 func TestRecorder_RunFlushesOnContextCancel(t *testing.T) {
 	// Shutdown path: Run must drain what's buffered when its context
-	// is cancelled, so the last interval's counts aren't lost.
+	// is canceled, so the last interval's counts aren't lost.
 	store := &fakeStore{}
 	r := usage.New(store, time.Hour, 400, nil)
 	r.SetClock(fixedClock("2026-09-01"))
