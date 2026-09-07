@@ -55,6 +55,10 @@ permissions:
 jobs:
   digest:
     runs-on: ubuntu-latest
+    # The four fetch steps are individually --max-time capped, but the
+    # caps are generous (health alone can spend 6 minutes) and a hung
+    # curl would otherwise hold a runner for the 6-hour default.
+    timeout-minutes: 20
     steps:
       - name: Compute reporting months
         id: months
@@ -94,8 +98,11 @@ jobs:
           # like a complete one. Per-kind, each gets its own budget and
           # the render step flags any kind that came back at the cap.
           #
-          # group_by=key (the default) sums each bucket across the range
-          # server-side. Without it the response is one row PER DAY,
+          # group_by=key sums each bucket across the range server-side. It
+          # is also the server-side default, but it is sent explicitly:
+          # relying on the default would make this step's correctness
+          # hinge on a value defined in another repo half, and the
+          # failure is silent. Without it the response is one row PER DAY,
           # which both multiplies the row count by ~31 and ranks by
           # single-day count — burying a slug with steady daily traffic
           # under one that spiked once.
@@ -108,7 +115,7 @@ jobs:
             for kind in region_view org_view lookup lookup_tier lookup_result lookup_country; do
               curl -fsS --max-time 30 \
                 -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-                "https://api.urbanistatlas.com/api/v1/admin/usage?from=${from}&to=${to}&kind=${kind}&limit=${LIMIT}" \
+                "https://api.urbanistatlas.com/api/v1/admin/usage?from=${from}&to=${to}&kind=${kind}&group_by=key&limit=${LIMIT}" \
                 > "usage_${period}_${kind}.json"
             done
           done

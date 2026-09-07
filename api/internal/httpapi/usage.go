@@ -84,12 +84,15 @@ func listUsageHandler(reader atlas.UsageReader, logger *slog.Logger) http.Handle
 			converted, convErr := toOAPIUsageCount(c)
 			if convErr != nil {
 				// A stored day that won't parse means the table was
-				// written by something other than the recorder. Loud,
-				// because it breaks the digest silently otherwise.
-				logger.ErrorContext(r.Context(), "usage row has unparseable day",
+				// written by something other than the recorder. Log at
+				// ERROR — but skip the row rather than failing the whole
+				// read: one bad row (a hand-edited sqlite3 session, a
+				// restored backup) would otherwise 500 the endpoint
+				// permanently, taking out both digest sections behind
+				// continue-on-error and the operator's own curl with it.
+				logger.ErrorContext(r.Context(), "usage row has unparseable day, skipping",
 					"err", convErr, "day", c.Day, "kind", c.Kind, "rid", rid)
-				writeInternalProblem(w, r, rid)
-				return
+				continue
 			}
 			out = append(out, converted)
 		}

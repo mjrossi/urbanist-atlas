@@ -292,3 +292,44 @@ func TestUsage_UnconfiguredAdminTokenReturns503(t *testing.T) {
 
 	assertUsageStatus(t, srv, "from=2026-08-01&to=2026-08-31", http.StatusServiceUnavailable)
 }
+
+// stubUsageReader returns a fixed row set, so the handler's conversion
+// path can be driven with rows the recorder could never write.
+type stubUsageReader struct{ rows []atlas.UsageCount }
+
+func (s stubUsageReader) ListUsage(context.Context, atlas.UsageQuery) ([]atlas.UsageCount, error) {
+	return s.rows, nil
+}
+
+func TestUsage_UnparseableDayIsSkippedNotFatal(t *testing.T) {
+	// A row whose day won't parse means the table was written by
+	// something other than the recorder — a hand-edited sqlite3 session
+	// or a restored backup. Failing the whole read would 500 the
+	// endpoint until the row is removed, which the digest swallows
+	// behind continue-on-error: two blank sections and a green run. The
+	// good rows must still come back.
+	srv, _ := newUsageTestServer(t, func(c *Config) {
+		c.UsageCounts = stubUsageReader{rows: []atlas.UsageCount{
+			{Day: "2026-08-01", Kind: usage.KindRegionView, Key: "boston", Count: 9},
+			{Day: "not-a-day", Kind: usage.KindRegionView, Key: "corrupt", Count: 7},
+			{Day: "2026-08-02", Kind: usage.KindRegionView, Key: "chicago", Count: 4},
+		}}
+	})
+
+	got := getUsage(t, srv, "from=2026-08-01&to=2026-08-31&group_by=day")
+
+	keys := make([]string, 0, len(got))
+	for _, c := range got {
+		keys = append(keys, c.Key)
+	}
+	want := []string{"boston", "chicago"}
+	if len(keys) != len(want) {
+		t.Fatalf("keys = %v, want %v", keys, want)
+	}
+	for i := range want {
+		if keys[i] != want[i] {
+			t.Errorf("keys = %v, want %v", keys, want)
+			break
+		}
+	}
+}
