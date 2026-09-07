@@ -116,6 +116,27 @@ loud failure — it is a Health section that reads
 "Source unavailable this run" every month forever. Verify with a dry run
 (below) before trusting it.
 
+**Store the Fly token with its `FlyV1 ` prefix, and note the header is
+not `Bearer`.** `flyctl tokens create` emits the string
+`FlyV1 fm2_...`, where `FlyV1` is itself the Authorization scheme —
+`usage-digest.yml` sends the value verbatim as
+`Authorization: ${FLY_TOKEN}`. Wrapping it in `Bearer` nests one scheme
+inside another and Fly answers **401 even with a perfectly scoped
+token**, which reads exactly like a permissions problem and sends you
+off re-minting tokens that were never the issue. Verify a token by hand
+before storing it:
+
+```sh
+curl -sS -o /dev/null -w '%{http_code}\n' -G \
+  -H "Authorization: ${fly_token}" \
+  --data-urlencode 'query=up' \
+  "https://api.fly.io/prometheus/<org-slug>/api/v1/query"
+```
+
+200 is good; 401 means the token or the scheme is wrong. Note the org
+**slug** (`flyctl orgs list`, Slug column — `personal` for a personal
+org), not the org name.
+
 ## Application secrets (Fly)
 
 | Secret | Purpose | How to set |

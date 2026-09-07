@@ -201,9 +201,16 @@ jobs:
           # A generous timeout: these are 30d range queries over a
           # histogram on a shared managed Prometheus, and a timeout
           # silently zeroes the whole Health section.
+          # NOT "Bearer ${FLY_TOKEN}". A Fly token is the string
+          # "FlyV1 fm2_...", where FlyV1 is itself the Authorization
+          # scheme, so prefixing Bearer nests one scheme inside another
+          # and Fly answers 401 — with a correctly scoped token, which
+          # is what makes it look like a permissions problem. Send the
+          # token verbatim. The secret must therefore hold the FULL
+          # value including the "FlyV1 " prefix.
           q() {
             curl -fsS --max-time 120 -G \
-              -H "Authorization: Bearer ${FLY_TOKEN}" \
+              -H "Authorization: ${FLY_TOKEN}" \
               --data-urlencode "query=$1" \
               "https://api.fly.io/prometheus/${FLY_ORG}/api/v1/query"
           }
