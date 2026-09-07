@@ -10,7 +10,7 @@
 
 [tools]
 # Language runtimes — patch-pinned so reproducibility > convenience.
-go = "1.26.4"
+go = "1.27.1"
 node = "22.22.3"
 # Python is used by the etl pipeline (slice #7.5.3+) to convert the
 # Census CBSA delineation xlsx into CSV before the Go regenerate step
@@ -27,7 +27,7 @@ python = "3.14"
 # golangci-lint v2 is the api/ lint + format gate (govet + staticcheck +
 # gofumpt + goimports are all bundled). Config lives in api/.golangci.yml;
 # run via `just api-lint` / `just api-fmt`.
-"aqua:golangci/golangci-lint" = "2.12.2"
+"aqua:golangci/golangci-lint" = "2.13.2"
 "go:github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" = "2.7.0"
 # Python `openpyxl` is a library (no CLI entry point) so it can't be
 # managed via mise's pipx backend — contributors install it on demand

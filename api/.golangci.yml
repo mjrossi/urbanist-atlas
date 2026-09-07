@@ -108,7 +108,9 @@ formatters:
   settings:
     gofumpt:
       module-path: github.com/mjrossi/urbanist-atlas/api
-      extra-rules: true
+      # Renamed from `extra-rules` in golangci-lint 2.13; same behaviour.
+      extra:
+        group-params: true
     goimports:
       local-prefixes:
         - github.com/mjrossi/urbanist-atlas/api

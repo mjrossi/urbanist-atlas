@@ -15,9 +15,9 @@
 
 # ── build ─────────────────────────────────────────────
 # Patch-pinned to match mise.toml. If the patch tag is unavailable on
-# Docker Hub at build time, fall back to `golang:1.26-alpine` and note
+# Docker Hub at build time, fall back to `golang:1.27-alpine` and note
 # the skew in the build log.
-FROM golang:1.26.4-alpine AS builder
+FROM golang:1.27.1-alpine AS builder
 
 WORKDIR /src
 
