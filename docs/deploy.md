@@ -70,12 +70,39 @@ Day-to-day, deploys are automated.
 | `FLY_API_TOKEN_PROMETHEUS` | **org**-scoped, read-only | `usage-digest.yml` → Health | `flyctl tokens create readonly -o <org> --expiry 8760h` |
 | `URBANIST_ADMIN_TOKEN` | must equal the Fly secret of the same name | `usage-digest.yml` → Content + Coverage | see §Application secrets below — issue once, set in both places |
 | `CF_ANALYTICS_TOKEN` | Cloudflare API token, Account Analytics → Read | `usage-digest.yml` → Audience | dashboard → My Profile → API Tokens → Create Token → Custom |
-| `CF_WEB_ANALYTICS_SITE_TAG` | not secret, stored as one for convenience | `usage-digest.yml` → Audience | dashboard → Analytics & Logs → Web Analytics → site → the `token`/site tag in the JS snippet |
+| `CF_WEB_ANALYTICS_SITE_TAG` | not secret, stored as one for convenience | `usage-digest.yml` → Audience | see §Finding the Web Analytics site tag below — the dashboard does **not** show it under automatic injection |
 | `CF_ACCOUNT_ID` | Cloudflare account identifier | `backup-sqlite.yml`, `usage-digest.yml` | dashboard → any zone → right-hand sidebar |
 | `FLY_ORG_SLUG` | Fly org slug, for the Prometheus API path | `usage-digest.yml` → Health | `flyctl orgs list` |
 
 Rotate by re-issuing the token and `gh secret set <NAME>` with the new
 value; flyctl and the workflows pick it up on the next run.
+
+#### Finding the Web Analytics site tag
+
+This site runs Web Analytics in **automatic injection** mode (Web
+Analytics → site → Manage site → RUM → "Enable"), so Cloudflare injects
+the beacon at the edge and the dashboard never renders a JS snippet to
+copy the tag out of. The tag still exists — it is just not anywhere in
+the dashboard UI, and it is not in this repo either (see the comment in
+`web/index.html`).
+
+Read it off the live page instead. Injection is skipped for non-browser
+user agents, so a bare `curl` returns nothing and the browser UA is
+load-bearing:
+
+```sh
+curl -s -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36' \
+  https://urbanistatlas.com | grep -o '"token":"[a-f0-9]*"'
+```
+
+The tag is public — it ships in the HTML of every page view — so
+treat a leak as a non-event. It is stored as a repo secret only so the
+workflow reads all its inputs from one place.
+
+Alternatives if the page ever stops carrying it: switch RUM to "Enable
+with JS Snippet installation" long enough to read the snippet and switch
+back (the tag survives the round trip), or, once `CF_ANALYTICS_TOKEN`
+exists, `GET /accounts/<CF_ACCOUNT_ID>/rum/site_info/list`.
 
 **The Prometheus token is deliberately not `FLY_API_TOKEN_DEPLOY`.** The
 deploy token is scoped to the `urbanist-atlas` app and to deploys; the
