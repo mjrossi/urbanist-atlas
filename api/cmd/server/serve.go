@@ -20,6 +20,7 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi"
 	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
 	"github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite"
+	"github.com/mjrossi/urbanist-atlas/api/internal/usage"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 	seedfs "github.com/mjrossi/urbanist-atlas/api/seed"
 )
@@ -49,6 +50,8 @@ type serveConfig struct {
 	submissionsRatePerHour int
 	coverageSampleRate     float64
 	coverageMaxRows        int
+	usageFlushInterval     time.Duration
+	usageKeepDays          int
 }
 
 // parseServeConfig reads every serve flag exactly once. Flag names,
@@ -70,6 +73,8 @@ func parseServeConfig(c *cli.Command) serveConfig {
 		submissionsRatePerHour: c.Int("submissions-rate-per-hour"),
 		coverageSampleRate:     c.Float("coverage-sample-rate"),
 		coverageMaxRows:        c.Int("coverage-max-rows"),
+		usageFlushInterval:     c.Duration("usage-flush-interval"),
+		usageKeepDays:          c.Int("usage-keep-days"),
 	}
 }
 
@@ -158,6 +163,20 @@ func serveCommand() *cli.Command {
 				Value:   5000,
 				Sources: cli.EnvVars("URBANIST_COVERAGE_MAX_ROWS"),
 			},
+			&cli.DurationFlag{
+				Name:    "usage-flush-interval",
+				Usage:   "how often buffered usage counts are written to SQLite",
+				Value:   time.Minute,
+				Sources: cli.EnvVars("URBANIST_USAGE_FLUSH_INTERVAL"),
+			},
+			&cli.IntFlag{
+				Name: "usage-keep-days",
+				// 400 days keeps a full year plus a month of margin, so
+				// a year-over-year comparison is always available.
+				Usage:   "days of daily usage rollups to retain; 0 disables pruning",
+				Value:   400,
+				Sources: cli.EnvVars("URBANIST_USAGE_KEEP_DAYS"),
+			},
 		},
 		Action: runServe,
 	}
@@ -203,6 +222,19 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		recorder = coverage.New(subs, cfg.coverageSampleRate, cfg.coverageMaxRows, logger)
 	}
 
+	// Usage rollups share the SQLite store with submissions, so like the
+	// coverage recorder they exist only when that store does. Unlike
+	// coverage, this is on by default: the buckets hold public content
+	// identifiers only, and recording them is the point of the slice.
+	var usageRec *usage.Recorder
+	if subs != nil {
+		usageRec = usage.New(subs, cfg.usageFlushInterval, cfg.usageKeepDays, logger)
+		// Start, not `go Run`: it registers with the recorder's
+		// WaitGroup synchronously, so the shutdown Wait below is
+		// guaranteed to join this goroutine.
+		usageRec.Start(ctx)
+	}
+
 	origins := splitCSV(cfg.corsOrigins)
 	logServeConfig(logger, cfg, origins, subs != nil)
 
@@ -219,6 +251,8 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		Metrics:                metrics,
 		Coverage:               recorder,
 		CoverageGaps:           coverageReaderOrNil(subs),
+		Usage:                  usageRec,
+		UsageCounts:            usageReaderOrNil(subs),
 	})
 
 	addr := net.JoinHostPort("", cfg.port)
@@ -266,6 +300,7 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		metricsDone: metricsDone,
 		worker:      worker,
 		recorder:    recorder,
+		usageRec:    usageRec,
 	})
 }
 
@@ -286,6 +321,8 @@ func logServeConfig(logger *slog.Logger, cfg serveConfig, origins []string, subm
 		"submissions_rate_per_hour", cfg.submissionsRatePerHour,
 		"coverage_sample_rate", cfg.coverageSampleRate,
 		"coverage_max_rows", cfg.coverageMaxRows,
+		"usage_flush_interval", cfg.usageFlushInterval,
+		"usage_keep_days", cfg.usageKeepDays,
 		"client_secret_set", cfg.clientSecret != "",
 		"admin_token_set", cfg.adminToken != "",
 		"github_token_set", cfg.githubToken != "",
@@ -302,6 +339,7 @@ type shutdownDeps struct {
 	metricsDone <-chan struct{}
 	worker      *githubpr.Worker
 	recorder    *coverage.Recorder
+	usageRec    *usage.Recorder
 }
 
 // awaitShutdown blocks until either the OS signal (ctx cancellation) or
@@ -348,6 +386,16 @@ func awaitShutdown(ctx context.Context, logger *slog.Logger, d shutdownDeps) err
 		// Nil-safe.
 		if err := d.recorder.Wait(shutdownCtx); err != nil {
 			logger.Warn("coverage: drain incomplete on shutdown", "err", err)
+		}
+		// Flush buffered usage counts and join the recorder's ticker
+		// goroutine before the deferred store Close runs, so the last
+		// interval isn't lost and no flush is still in flight when the
+		// database closes. The goroutine does its own final flush on ctx
+		// cancellation using a detached context, so the join — not just
+		// the flush — is what makes closing the store safe here.
+		// Nil-safe.
+		if err := d.usageRec.Wait(shutdownCtx); err != nil {
+			logger.Warn("usage: final flush incomplete on shutdown", "err", err)
 		}
 		// Wait for ListenAndServe to return (it will, with ErrServerClosed).
 		<-d.serverErr
@@ -455,10 +503,18 @@ func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
 	return s
 }
 
-// coverageReaderOrNil converts the concrete *sqlite.Store into the
-// atlas.CoverageGapReader interface, preserving nil-ness (same typed-nil
-// guard as submissionsOrNil) so the router skips registering the admin
-// coverage-gaps route when there is no store.
+// usageReaderOrNil converts the concrete *sqlite.Store into the
+// atlas.UsageReader interface, preserving nil-ness (same typed-nil guard
+// as submissionsOrNil) so the router skips registering the admin usage
+// route when there is no store.
+func usageReaderOrNil(s *sqlite.Store) atlas.UsageReader {
+	if s == nil {
+		return nil
+	}
+	return s
+}
+
+// coverageReaderOrNil mirrors usageReaderOrNil for the coverage-gap seam.
 func coverageReaderOrNil(s *sqlite.Store) atlas.CoverageGapReader {
 	if s == nil {
 		return nil

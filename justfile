@@ -91,9 +91,9 @@ linkcheck:
 
 # fail if any generated file would change after a fresh regen. One
 # `go generate ./...` covers both artifacts via the //go:generate
-# directives in oapi/doc.go and httpapi/openapi_handler.go. Used
-# inside api-check so `just ci` rejects commits that forgot to
-# regenerate.
+# directives in oapi/doc.go, httpapi/openapi_handler.go, and
+# store/sqlite/generate.go. Used inside api-check so `just ci` rejects
+# commits that forgot to regenerate.
 [group('api')]
 [doc('fail if any generated file would drift after a regen')]
 api-gen-check:
@@ -101,6 +101,7 @@ api-gen-check:
     @cd api && git diff --exit-code -- \
         internal/httpapi/oapi/types.gen.go \
         internal/httpapi/openapi.yaml \
+        internal/store/sqlite/gen \
         || (echo "generated files drifted; run \`just api-gen\` and commit." && exit 1)
 
 # ── data: operational subcommands ─────────────────────

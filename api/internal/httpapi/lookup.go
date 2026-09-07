@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/coverage"
+	"github.com/mjrossi/urbanist-atlas/api/internal/usage"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
@@ -19,7 +20,7 @@ import (
 // OpenAPI shape.
 //
 // Error responses are RFC 9457 problem documents (see problem.go).
-func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *coverage.Recorder) http.HandlerFunc {
+func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *coverage.Recorder, u *usage.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		rawPostalIn := r.URL.Query().Get("postal_code")
@@ -73,11 +74,15 @@ func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *cove
 				// message and a distinct metrics label, not the generic miss.
 				if atlas.IsMilitaryPostalCode(country, postal) {
 					m.incLookup(string(country), "military")
+					u.Increment(usage.KindLookupResult, "military")
+					u.Increment(usage.KindLookupCountry, metricCountry(string(country)))
 					writeProblem(w, r, http.StatusNotFound, problemMilitaryZIP, "Military or Diplomatic ZIP Code",
 						"APO, FPO, and DPO ZIP codes are military and diplomatic addresses that aren't tied to a local region. Enter a residential ZIP code to find organizations near you.", rid)
 					return
 				}
 				m.incLookup(string(country), "miss")
+				u.Increment(usage.KindLookupResult, "miss")
+				u.Increment(usage.KindLookupCountry, metricCountry(string(country)))
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Postal Code Not Found",
 					"No region is mapped to that postal code. Try a nearby code, or file a tip if you know an organization there.", rid)
 				return
@@ -95,6 +100,18 @@ func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *cove
 		tier := lookupTier(len(result.Local), len(result.Regional), len(result.Statewide))
 		m.incLookup(string(country), "hit")
 		m.incLookupTier(string(country), tier)
+		u.Increment(usage.KindLookupResult, "hit")
+		u.Increment(usage.KindLookupTier, tier)
+		u.Increment(usage.KindLookupCountry, metricCountry(string(country)))
+		// ResolvedAncestry is BFS-ordered from the matched leaf outward
+		// (see MemStore.bfsCollectIDs), so element 0 is the smallest
+		// curated anchor — the region this postal code resolved to.
+		// Recording the slug rather than the postal code is the privacy
+		// bar: a slug is a public content identifier, a full ZIP is
+		// semi-identifying at low volume. See the usage-digest spec D3.
+		if len(result.ResolvedAncestry) > 0 {
+			u.Increment(usage.KindLookup, result.ResolvedAncestry[0].Slug)
+		}
 		// A resolved region with zero orgs in every tier is the coverage
 		// gap worth capturing (sampled). The raw normalized postal is the
 		// privacy bar's sanctioned "sampled empties" input.
