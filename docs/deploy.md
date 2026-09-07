@@ -74,8 +74,11 @@ Day-to-day, deploys are automated.
 | `CF_ACCOUNT_ID` | Cloudflare account identifier | `backup-sqlite.yml`, `usage-digest.yml` | dashboard → any zone → right-hand sidebar |
 | `FLY_ORG_SLUG` | Fly org slug, for the Prometheus API path | `usage-digest.yml` → Health | `flyctl orgs list` |
 
-Rotate by re-issuing the token and `gh secret set <NAME>` with the new
-value; flyctl and the workflows pick it up on the next run.
+Rotate by re-issuing the token and piping the new value into
+`gh secret set <NAME>` on stdin; flyctl and the workflows pick it up on
+the next run. Pipe rather than `--body`: an argument is visible in
+`ps` output for the life of the call, and on a shared or CI host that is
+the whole secret.
 
 #### Finding the Web Analytics site tag
 
@@ -117,13 +120,17 @@ loud failure — it is a Health section that reads
 
 | Secret | Purpose | How to set |
 |---|---|---|
-| `URBANIST_ADMIN_TOKEN` | bearer token for `/api/v1/admin/*` endpoints (submission moderation). Empty → admin endpoints return 503. | `flyctl secrets set URBANIST_ADMIN_TOKEN=<value> -a urbanist-atlas` |
-| `URBANIST_CLIENT_SECRET` | Phase 1 shared-secret `X-Atlas-Client` gate; mirrored to the SPA build as `VITE_API_CLIENT_SECRET` | `flyctl secrets set URBANIST_CLIENT_SECRET=<value> -a urbanist-atlas` |
-| `URBANIST_GITHUB_TOKEN` | Fine-grained PAT scoped to this repo only (Contents R/W + Pull requests R/W). Drives the promotion-PR worker on submission approval. Empty → approval still flips status but `promotion_error="worker disabled (no token configured)"`. | `flyctl secrets set URBANIST_GITHUB_TOKEN=<pat> -a urbanist-atlas` |
+| `URBANIST_ADMIN_TOKEN` | bearer token for `/api/v1/admin/*` endpoints (submission moderation). Empty → admin endpoints return 503. | `printf 'URBANIST_ADMIN_TOKEN=%s\n' '<value>' \| flyctl secrets import -a urbanist-atlas` |
+| `URBANIST_CLIENT_SECRET` | Phase 1 shared-secret `X-Atlas-Client` gate; mirrored to the SPA build as `VITE_API_CLIENT_SECRET` | `printf 'URBANIST_CLIENT_SECRET=%s\n' '<value>' \| flyctl secrets import -a urbanist-atlas` |
+| `URBANIST_GITHUB_TOKEN` | Fine-grained PAT scoped to this repo only (Contents R/W + Pull requests R/W). Drives the promotion-PR worker on submission approval. Empty → approval still flips status but `promotion_error="worker disabled (no token configured)"`. | `printf 'URBANIST_GITHUB_TOKEN=%s\n' '<pat>' \| flyctl secrets import -a urbanist-atlas` |
 
 Generate the client secret with `openssl rand -hex 32`, piped directly
-into `flyctl secrets set` so the value doesn't sit in shell history. It
-must match the value built into the SPA bundle.
+into `flyctl secrets import` so the value never sits in shell history or
+in `ps` output — `flyctl secrets set NAME=value` and `gh secret set
+--body value` both put the secret in `argv`, where any local process can
+read it while the command runs. Every command below therefore feeds
+secrets on stdin. The client secret must match the value built into the
+SPA bundle.
 
 `URBANIST_ADMIN_TOKEN` is different: it has to reach **two** places —
 Fly (so the server accepts it) and GitHub Actions (so `usage-digest.yml`
@@ -133,8 +140,8 @@ a shell variable, set both, then drop it:
 
 ```sh
 admin_token="$(openssl rand -hex 32)"
-flyctl secrets set "URBANIST_ADMIN_TOKEN=${admin_token}" -a urbanist-atlas
-gh secret set URBANIST_ADMIN_TOKEN --body "${admin_token}"
+printf 'URBANIST_ADMIN_TOKEN=%s\n' "${admin_token}" | flyctl secrets import -a urbanist-atlas
+printf '%s' "${admin_token}" | gh secret set URBANIST_ADMIN_TOKEN
 unset admin_token
 ```
 
@@ -178,11 +185,19 @@ git history of this file if it ever needs to be replayed.
 ```sh
 flyctl apps create urbanist-atlas --org <your-org>
 flyctl volumes create atlas_data --size 1 --region iad -a urbanist-atlas
-flyctl secrets set \
-  URBANIST_ADMIN_TOKEN="$(openssl rand -hex 32)" \
-  URBANIST_CLIENT_SECRET="$(openssl rand -hex 32)" \
-  URBANIST_GITHUB_TOKEN="<paste fine-grained PAT here>" \
-  -a urbanist-atlas
+
+# Pre-generate the admin token: Fly stores secrets write-only, so a
+# value generated inline here could never be copied to GitHub Actions
+# afterwards, and usage-digest.yml needs the same value.
+admin_token="$(openssl rand -hex 32)"
+{
+  printf 'URBANIST_ADMIN_TOKEN=%s\n'   "${admin_token}"
+  printf 'URBANIST_CLIENT_SECRET=%s\n' "$(openssl rand -hex 32)"
+  printf 'URBANIST_GITHUB_TOKEN=%s\n'  '<paste fine-grained PAT here>'
+} | flyctl secrets import -a urbanist-atlas
+printf '%s' "${admin_token}" | gh secret set URBANIST_ADMIN_TOKEN
+unset admin_token
+
 flyctl deploy --remote-only -a urbanist-atlas
 ```
 
