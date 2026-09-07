@@ -449,9 +449,9 @@ jobs:
                 ? `Usage digest - ${label}`
                 : `Usage digest - ${label} [partial: ${degraded.join(', ')}]`;
 
-            if (degraded.length > 0) {
-              core.warning(`digest degraded, sources unavailable: ${degraded.join(', ')}`);
-            }
+if (degraded.length > 0) {
+  core.warning(`digest degraded, sections not rendered cleanly: ${degraded.join(', ')}`);
+}
 
             // A dispatch run used to open a real, duplicate digest issue
             // with no dedupe — including when validating the workflow,
