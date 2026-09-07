@@ -5,10 +5,10 @@
 # `mise install` at the repo root provisions it alongside go, node,
 # oapi-codegen, and golangci-lint.
 #
-# Groups: api, data, verify, web, preview, fly, submissions, smoke, ci.
+# Groups: api, data, verify, web, preview, fly, submissions, usage, smoke, ci.
 # Each group corresponds to a section comment below.
 
-set shell := ["bash", "-cu"]
+set shell := ["bash", "-euo", "pipefail", "-c"]
 
 # ── default ───────────────────────────────────────────
 
@@ -312,12 +312,81 @@ fly-secrets:
 fly-ssh:
     flyctl ssh console -a urbanist-atlas
 
+# query Fly's managed Prometheus (the ~30-day latency/5xx window that
+# the rollup table deliberately does NOT duplicate). Complements the
+# `usage` recipes below, which read the durable rollup table instead.
+#
+# The header is NOT `Bearer`: a Fly token is the string "FlyV1 fm2_...",
+# where FlyV1 is itself the Authorization scheme, so wrapping it in
+# Bearer nests one scheme inside another and Fly answers 401 with a
+# perfectly good token. Needs in the environment:
+#   - FLY_PROMETHEUS_TOKEN — full value incl. the "FlyV1 " prefix,
+#     from `flyctl tokens create readonly -o <org> --expiry 8760h`
+#   - FLY_ORG_SLUG — the Slug column of `flyctl orgs list` (not the name)
+# usage: just fly-prom
+#        just fly-prom 'sum(increase(atlas_http_requests_total[7d]))'
+[group('fly')]
+[doc('query Fly managed Prometheus (default: 30d non-probe request total)')]
+fly-prom query='sum(increase(atlas_http_requests_total{route!~"/healthz|/readyz"}[30d]))':
+    @: "${FLY_PROMETHEUS_TOKEN:?set FLY_PROMETHEUS_TOKEN (full value, incl. the 'FlyV1 ' prefix)}"
+    @: "${FLY_ORG_SLUG:?set FLY_ORG_SLUG (the Slug column of \`flyctl orgs list\`)}"
+    @resp="$(curl -sS -G -H "Authorization: $FLY_PROMETHEUS_TOKEN" \
+            --data-urlencode 'query={{query}}' \
+            "https://api.fly.io/prometheus/$FLY_ORG_SLUG/api/v1/query")"; \
+        out="$(printf '%s' "$resp" | jq -r 'if .status == "success" then (.data.result[]? | .value[1]) else error("fly prometheus \(.errorType // "error"): \(.error // "unknown")") end')"; \
+        if [ -z "$out" ]; then \
+            echo "(query returned no series — check the metric name and the window)" >&2; \
+        else \
+            printf '%s\n' "$out"; \
+        fi
+
+# ── internal: shared recipe helpers ───────────────────
+
+# Shared transport for the bearer-gated admin GETs. Emits the response
+# body on stdout; on 4xx/5xx it prints the RFC 9457 problem document
+# (status, detail, request_id) on stderr and exits 1.
+#
+# Without this, a filtered recipe fed a problem+json OBJECT to a jq
+# filter expecting an ARRAY and died with "Cannot index string with
+# string" — the operator lost the status, the detail, and the
+# request_id, and the recipe still exited 0 because the last stage of
+# the pipeline succeeded.
+[private]
+_admin-get url:
+    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN (see mise.local.toml.example)}"
+    @resp="$(curl -sS -w '\n%{http_code}' \
+            -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" "{{url}}")"; \
+        code="${resp##*$'\n'}"; body="${resp%$'\n'*}"; \
+        if [ "$code" -ge 400 ]; then \
+            echo "admin request failed: HTTP $code" >&2; \
+            printf '%s\n' "$body" | jq . >&2 || printf '%s\n' "$body" >&2; \
+            exit 1; \
+        fi; \
+        printf '%s\n' "$body"
+
+# First UTC day (YYYY-MM-DD) of a trailing N-day window that INCLUDES
+# today, so `30` spans 30 calendar days and not 31 — the server's range
+# filter is inclusive on both ends. Validates N first (an unvalidated
+# value word-splits into the `date` argv), tries BSD `date -v` then GNU
+# `date -d`, and fails loudly rather than letting an empty date reach
+# the query string.
+[private]
+_window-start days:
+    @n="{{days}}"; \
+        [[ "$n" =~ ^[0-9]+$ ]] || { echo "days must be a non-negative integer, got: $n" >&2; exit 1; }; \
+        back=$(( n > 0 ? n - 1 : 0 )); \
+        date -u -v-"$back"d +%F 2>/dev/null \
+        || date -u -d "$back days ago" +%F 2>/dev/null \
+        || { echo "no usable \`date\`: need BSD (-v) or GNU (-d)" >&2; exit 1; }
+
 # ── submissions: admin queue ops ──────────────────────
 # Thin curl wrappers around GET/POST /api/v1/admin/submissions so
 # triage doesn't require remembering bearer-auth invocations. All
 # three HTTP recipes need ONE secret in the environment, matching the
-# Fly secret of the same name (set it in mise.local.toml or your shell):
+# Fly secret of the same name:
 #   - URBANIST_ADMIN_TOKEN — bearer token for /api/v1/admin/*
+# Put it in mise.development.local.toml, NOT mise.local.toml — see
+# mise.local.toml.example for why.
 # They used to also require URBANIST_CLIENT_SECRET and send an
 # X-Atlas-Client header. That is no longer needed: /api/v1/admin/*
 # sits outside the phase-1 client-secret gate (design decision D10),
@@ -334,9 +403,7 @@ fly-ssh:
 [group('submissions')]
 [doc('GET /api/v1/admin/submissions (default status=pending)')]
 submissions-list status='pending' base='https://api.urbanistatlas.com':
-    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN (e.g. via mise.local.toml or your shell)}"
-    @curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-        "{{base}}/api/v1/admin/submissions?status={{status}}" | jq
+    @just _admin-get "{{base}}/api/v1/admin/submissions?status={{status}}" | jq
 
 # approve a pending submission; the API enqueues the GitHub-PR worker
 # and returns the updated row. The PR URL lands on the row a few
@@ -378,20 +445,24 @@ submissions-retry-pr id:
 # digest, so answering "what are people actually looking at" does not
 # mean hand-assembling a date range and a bearer header each time.
 #
-# Needs ONE secret in the environment (mise.local.toml or your shell):
+# Needs ONE secret in the environment:
 #   - URBANIST_ADMIN_TOKEN — must match the Fly secret of the same name
+# Put it in mise.development.local.toml, NOT mise.local.toml: under
+# MISE_ENV=development the former wins and the latter is shadowed by
+# mise.development.toml's dev token. See mise.local.toml.example.
 #
 # Unlike the submissions recipes above, these send no X-Atlas-Client:
 # /api/v1/admin/* sits outside the phase-1 client-secret gate, so the
 # bearer alone is necessary and sufficient (design decision D10).
 #
-# `days` is a trailing window ending today, UTC — the date arithmetic
-# tries BSD `date -v` first and falls back to GNU `date -d`, so the
-# recipes work on macOS and Linux alike. `base` defaults to the deployed
-# API; pass http://localhost:8080 to read a local server's DB.
+# `days` is a trailing window ending today, UTC, and INCLUDING today —
+# `30` spans 30 calendar days. The arithmetic runs in `_window-start`,
+# which handles BSD and GNU `date` alike.  `base` defaults to the
+# deployed API; pass http://localhost:8080 to read a local server's DB.
 #
 # Counts lag by up to the flush interval (60s), so a view you just made
-# will not appear instantly. See docs/deploy.md §Usage digest.
+# will not appear instantly. See the "Usage digest" bullet under
+# docs/deploy.md §Monitoring & incident response → What reports to you.
 
 # top buckets for one kind, summed over a trailing window.
 # kinds: region_view org_view lookup lookup_tier lookup_result lookup_country
@@ -401,83 +472,71 @@ submissions-retry-pr id:
 [group('usage')]
 [doc('GET /api/v1/admin/usage — top keys for one kind over a trailing window')]
 usage-top kind='region_view' days='30' limit='25' base='https://api.urbanistatlas.com':
-    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN (e.g. via mise.local.toml)}"
-    @from="$(date -u -v-{{days}}d +%F 2>/dev/null || date -u -d '{{days}} days ago' +%F)"; \
+    @from="$(just _window-start "{{days}}")"; \
         to="$(date -u +%F)"; \
+        rows="$(just _admin-get "{{base}}/api/v1/admin/usage?from=$from&to=$to&kind={{kind}}&group_by=key&limit={{limit}}")"; \
         echo "{{kind}}  $from .. $to  (top {{limit}})"; \
-        curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-            "{{base}}/api/v1/admin/usage?from=$from&to=$to&kind={{kind}}&group_by=key&limit={{limit}}" \
-        | jq -r 'if length == 0 then empty else (.[] | [.count, .key] | @tsv) end' \
+        { printf 'COUNT\tKEY\n'; \
+          printf '%s' "$rows" | jq -r '.[] | [.count, .key] | @tsv'; } \
         | column -t; \
         echo
 
-# per-day series for one kind, oldest first — for spotting a spike or a
+# per-day totals for one kind, oldest first — for spotting a spike or a
 # drop rather than a total. Same kinds as usage-top.
+#
+# The server returns one row per (day, key) ranked by single-day count
+# and cuts at `limit`, so this SUMS each day's rows client-side and
+# warns when the row count hits the cap: past that point whole days can
+# be missing and the printed totals are floors, not totals. (Same trap
+# api/internal/store/sqlite/usage.go documents for the digest.)
 # usage: just usage-days region_view 14
 [group('usage')]
-[doc('GET /api/v1/admin/usage — per-day rows for one kind (group_by=day)')]
+[doc('GET /api/v1/admin/usage — per-day totals for one kind (group_by=day)')]
 usage-days kind='region_view' days='14' limit='200' base='https://api.urbanistatlas.com':
-    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
-    @from="$(date -u -v-{{days}}d +%F 2>/dev/null || date -u -d '{{days}} days ago' +%F)"; \
+    @from="$(just _window-start "{{days}}")"; \
         to="$(date -u +%F)"; \
-        curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-            "{{base}}/api/v1/admin/usage?from=$from&to=$to&kind={{kind}}&group_by=day&limit={{limit}}" \
-        | jq -r 'sort_by(.day)[] | [.day, .count, .key] | @tsv' | column -t
+        rows="$(just _admin-get "{{base}}/api/v1/admin/usage?from=$from&to=$to&kind={{kind}}&group_by=day&limit={{limit}}")"; \
+        echo "{{kind}}  $from .. $to"; \
+        { printf 'DAY\tCOUNT\n'; \
+          printf '%s' "$rows" | jq -r 'group_by(.day)[] | [.[0].day, (map(.count) | add)] | @tsv'; } \
+        | column -t; \
+        n="$(printf '%s' "$rows" | jq 'length')"; \
+        if [ "$n" -ge "{{limit}}" ]; then \
+            echo "warning: hit the {{limit}}-row cap — the server ranks by single-day count before cutting, so days may be missing and these totals are floors. Narrow the window or raise the limit." >&2; \
+        fi
 
 # the three bounded-enum kinds at a glance: is the data serving people?
-# lookup_result says hit/miss, lookup_tier says which tier satisfied
-# them, lookup_country says the US/CA mix. A rising `miss` share is the
-# editorial signal to chase — cross-reference `just usage-gaps`.
+# lookup_result says hit/miss/military (military = an APO/FPO ZIP),
+# lookup_tier says which tier satisfied them, lookup_country says the
+# US/CA mix. A rising `miss` share is the editorial signal to chase —
+# cross-reference `just usage-gaps`.
+#
+# limit is hardcoded at 25 and that is load-bearing: all three kinds are
+# bounded enums well under 25 distinct keys, so no row can be truncated
+# and the totals are exact.
 # usage: just usage-summary
 #        just usage-summary 90
 [group('usage')]
 [doc('lookup_result + lookup_tier + lookup_country totals over a window')]
 usage-summary days='30' base='https://api.urbanistatlas.com':
-    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
-    @from="$(date -u -v-{{days}}d +%F 2>/dev/null || date -u -d '{{days}} days ago' +%F)"; \
+    @from="$(just _window-start "{{days}}")"; \
         to="$(date -u +%F)"; \
         echo "lookup outcomes  $from .. $to"; \
         for kind in lookup_result lookup_tier lookup_country; do \
             echo; echo "  $kind"; \
-            curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-                "{{base}}/api/v1/admin/usage?from=$from&to=$to&kind=$kind&group_by=key&limit=25" \
+            just _admin-get "{{base}}/api/v1/admin/usage?from=$from&to=$to&kind=$kind&group_by=key&limit=25" \
             | jq -r '.[] | [.count, .key] | @tsv' | column -t | sed 's/^/    /'; \
         done
 
 # postal codes and searches that found nothing — the coverage backlog.
-# Sampled and row-capped server-side, so this is a signal of where to
-# curate next, not an exhaustive log.
+# Sampled and row-capped server-side (200 max), so this is a signal of
+# where to curate next, not an exhaustive log.
 # usage: just usage-gaps
 #        just usage-gaps 200
 [group('usage')]
 [doc('GET /api/v1/admin/coverage-gaps — lookups that returned nothing')]
 usage-gaps limit='50' base='https://api.urbanistatlas.com':
-    @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
-    @curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-        "{{base}}/api/v1/admin/coverage-gaps?limit={{limit}}" | jq
-
-# query Fly's managed Prometheus (the ~30-day latency/5xx window that
-# the rollup table deliberately does NOT duplicate).
-#
-# The header is NOT `Bearer`: a Fly token is the string "FlyV1 fm2_...",
-# where FlyV1 is itself the Authorization scheme, so wrapping it in
-# Bearer nests one scheme inside another and Fly answers 401 with a
-# perfectly good token. Needs in the environment:
-#   - FLY_PROMETHEUS_TOKEN — full value incl. the "FlyV1 " prefix,
-#     from `flyctl tokens create readonly -o <org> --expiry 8760h`
-#   - FLY_ORG_SLUG — the Slug column of `flyctl orgs list` (not the name)
-# usage: just fly-prom
-#        just fly-prom 'sum(increase(atlas_http_requests_total[7d]))'
-[group('fly')]
-[doc('query Fly managed Prometheus (default: 30d non-probe request total)')]
-fly-prom query='sum(increase(atlas_http_requests_total{route!~"/healthz|/readyz"}[30d]))':
-    @: "${FLY_PROMETHEUS_TOKEN:?set FLY_PROMETHEUS_TOKEN (full value, incl. the 'FlyV1 ' prefix)}"
-    @: "${FLY_ORG_SLUG:?set FLY_ORG_SLUG (the Slug column of \`flyctl orgs list\`)}"
-    @curl -sS -G -H "Authorization: $FLY_PROMETHEUS_TOKEN" \
-        --data-urlencode 'query={{query}}' \
-        "https://api.fly.io/prometheus/$FLY_ORG_SLUG/api/v1/query" \
-    | jq -r '.data.result[]? | .value[1]' 
-
+    @just _admin-get "{{base}}/api/v1/admin/coverage-gaps?limit={{limit}}" | jq
 
 # ── smoke: live curl helpers (server must be running) ─
 

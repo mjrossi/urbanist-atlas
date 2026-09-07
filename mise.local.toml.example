@@ -18,10 +18,19 @@
 #
 # The `usage` and `submissions` just recipes read the admin bearer from
 # URBANIST_ADMIN_TOKEN. To point them at PRODUCTION (their default base),
-# this must be the value of the Fly secret of the same name, not a dev
-# token. Note that setting it here also overrides the dev token in
-# mise.development.toml for a locally-run server — harmless, but it
-# means `just api-run` will expect the production value too.
+# it must be the value of the Fly secret of the same name, not a dev token.
+#
+# Do NOT put that value in THIS file. mise loads mise.{env}.toml *after*
+# mise.local.toml, so under MISE_ENV=development the dev token in
+# mise.development.toml wins and every admin recipe 401s against
+# production. Precedence, lowest to highest:
+#
+#   mise.toml < mise.local.toml < mise.development.toml
+#             < mise.development.local.toml
+#
+# So the production token belongs in mise.development.local.toml
+# (gitignored, same ergonomics). That also keeps `just api-run` on the
+# dev token for a locally-run server, which is what you want.
 #
 # For `just fly-prom` (Fly managed Prometheus, ~30d of latency/5xx):
 # FLY_PROMETHEUS_TOKEN = "FlyV1 fm2_..."   # full value, prefix included

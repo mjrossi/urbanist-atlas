@@ -581,6 +581,30 @@ Both reuse one open issue (comment, not spam) until you close it.
   otherwise be ~90% of the reported traffic, deflate the 5xx rate by the
   same factor, and drag p95 toward zero.
 
+### Reading the same data ad hoc
+
+The digest is monthly; the `usage` just recipes read the same rollup
+table on demand, so you don't have to wait for the 2nd or hand-assemble
+a date range and a bearer header:
+
+| Question | Recipe |
+|----------|--------|
+| What regions/orgs are people looking at? | `just usage-top region_view` / `just usage-top org_view` |
+| Is that trending up or down? | `just usage-days region_view 14` |
+| Is the data serving people (hit/miss, tier, country)? | `just usage-summary` |
+| What should I curate next? | `just usage-gaps` |
+| Latency / 5xx over the last ~30d | `just fly-prom` (Prometheus, not the rollup table) |
+
+They need `URBANIST_ADMIN_TOKEN` set to the **Fly secret value** — put
+it in `mise.development.local.toml`, not `mise.local.toml`, which
+`mise.development.toml` shadows. `just fly-prom` additionally needs
+`FLY_PROMETHEUS_TOKEN` (the full `FlyV1 ...` value, *not* wrapped in
+`Bearer`) and `FLY_ORG_SLUG`. See `mise.local.toml.example`.
+
+Counts lag by up to the usage flush interval (60s), and `usage-days`
+warns when it hits the server's row cap — past that point whole days can
+be missing from the series.
+
 ### Triage
 
 | Symptom | First moves |
