@@ -421,7 +421,7 @@ jobs:
             // with no dedupe — including when validating the workflow,
             // which the design explicitly asks for before the first cron.
             if (process.env.DRY_RUN === 'true') {
-              core.summary.addRaw(body).write();
+              await core.summary.addRaw(body).write();
               core.info('dry run: rendered to the job summary, no issue opened');
               return;
             }
