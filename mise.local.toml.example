@@ -16,6 +16,17 @@
 # URBANIST_SEED_DIR    = "/path/to/your/seed/fork"
 # URBANIST_ADMIN_TOKEN = "my-personal-dev-token"
 #
+# The `usage` and `submissions` just recipes read the admin bearer from
+# URBANIST_ADMIN_TOKEN. To point them at PRODUCTION (their default base),
+# this must be the value of the Fly secret of the same name, not a dev
+# token. Note that setting it here also overrides the dev token in
+# mise.development.toml for a locally-run server — harmless, but it
+# means `just api-run` will expect the production value too.
+#
+# For `just fly-prom` (Fly managed Prometheus, ~30d of latency/5xx):
+# FLY_PROMETHEUS_TOKEN = "FlyV1 fm2_..."   # full value, prefix included
+# FLY_ORG_SLUG         = "personal"        # Slug column of `flyctl orgs list`
+#
 # Secret for scripts/verify-org-urls.compose.yml (gluetun + Proton VPN).
 # Generate at https://account.protonvpn.com/downloads → WireGuard.
 # WIREGUARD_PRIVATE_KEY = "…"
