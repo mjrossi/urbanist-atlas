@@ -315,16 +315,16 @@ fly-ssh:
 # ── submissions: admin queue ops ──────────────────────
 # Thin curl wrappers around GET/POST /api/v1/admin/submissions so
 # triage doesn't require remembering bearer-auth invocations. All
-# three HTTP recipes need two secrets in the environment, both
-# matching the corresponding Fly secret of the same name (set them
-# in mise.local.toml or your shell):
-#   - URBANIST_ADMIN_TOKEN   — bearer token for /api/v1/admin/*
-#   - URBANIST_CLIENT_SECRET — phase-1 X-Atlas-Client shared secret
+# three HTTP recipes need ONE secret in the environment, matching the
+# Fly secret of the same name (set it in mise.local.toml or your shell):
+#   - URBANIST_ADMIN_TOKEN — bearer token for /api/v1/admin/*
+# They used to also require URBANIST_CLIENT_SECRET and send an
+# X-Atlas-Client header. That is no longer needed: /api/v1/admin/*
+# sits outside the phase-1 client-secret gate (design decision D10),
+# so the bearer alone is necessary and sufficient, and demanding both
+# only broke callers holding the stronger credential.
 # `base` defaults to the deployed API; pass `http://localhost:8080`
-# to drive a local server instead. Against a local server the
-# client-secret gate is typically off, but the recipe still sends
-# the header (the gate ignores it when the server-side secret is
-# empty), so the same env works for both targets.
+# to drive a local server instead.
 
 # list submissions, default status=pending. Pass `approved` to see
 # `promotion_pr_url` / `promotion_error` for already-actioned rows.
@@ -335,9 +335,7 @@ fly-ssh:
 [doc('GET /api/v1/admin/submissions (default status=pending)')]
 submissions-list status='pending' base='https://api.urbanistatlas.com':
     @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN (e.g. via mise.local.toml or your shell)}"
-    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET (phase-1 X-Atlas-Client gate)}"
     @curl -sS -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-        -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
         "{{base}}/api/v1/admin/submissions?status={{status}}" | jq
 
 # approve a pending submission; the API enqueues the GitHub-PR worker
@@ -348,9 +346,7 @@ submissions-list status='pending' base='https://api.urbanistatlas.com':
 [doc('POST /api/v1/admin/submissions/{id}/approve (queues GitHub PR)')]
 submissions-approve id base='https://api.urbanistatlas.com':
     @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
-    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
     @curl -sS -X POST -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-        -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
         "{{base}}/api/v1/admin/submissions/{{id}}/approve" | jq
 
 # reject a pending submission with a moderator-facing reason. The
@@ -360,10 +356,8 @@ submissions-approve id base='https://api.urbanistatlas.com':
 [doc('POST /api/v1/admin/submissions/{id}/reject with a reason')]
 submissions-reject id reason base='https://api.urbanistatlas.com':
     @: "${URBANIST_ADMIN_TOKEN:?set URBANIST_ADMIN_TOKEN}"
-    @: "${URBANIST_CLIENT_SECRET:?set URBANIST_CLIENT_SECRET}"
     @body="$(jq -nc --arg r "{{reason}}" '{reason: $r}')"; \
         curl -sS -X POST -H "Authorization: Bearer $URBANIST_ADMIN_TOKEN" \
-            -H "X-Atlas-Client: $URBANIST_CLIENT_SECRET" \
             -H "Content-Type: application/json" -d "$body" \
             "{{base}}/api/v1/admin/submissions/{{id}}/reject" | jq
 
