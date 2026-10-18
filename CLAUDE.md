@@ -258,6 +258,12 @@ they are not departures from it:
 - **The wordmark.** "Urbanist Atlas", with "Atlas" as the
   `--amber-soft` accent word. The size is the core's single t-masthead
   clamp on every route.
+- **The lookup heading is the front page's headline.** "Find local
+  advocates by postal code." is set at display size: clamp(32px, 4.2vw,
+  48px), and 28px on phones. The masthead is one size on every route,
+  so the front page's sense of arrival comes from the thing readers
+  came for. It stays under the wordmark's 60.8px so the nameplate
+  leads, and the input must stay on the first screen at 390×844.
 - **A kicker dateline on the front page** ("The front page · Index by
   postal code"). Which routes carry a kicker is site layer.
 - **The "by the numbers" stats strip.** It is page content, not

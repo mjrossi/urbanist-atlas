@@ -1258,13 +1258,20 @@ a.tag:hover::before {
   margin-bottom: 10px;
 }
 
+/* The front page's headline (a site-layer decision). The masthead is
+   one size on every route (Family core), so the front page's sense of
+   arrival comes from its content instead — and from the thing readers
+   came for. Display size, but kept under the wordmark's 60.8px so the
+   nameplate still leads. */
 .lookup-title {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: clamp(22px, 3vw, 30px);
-  letter-spacing: -0.015em;
-  margin: 0 0 18px;
-  line-height: 1.1;
+  font-variation-settings: 'opsz' 144;
+  font-size: clamp(32px, 4.2vw, 48px);
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+  line-height: 1.05;
+  text-wrap: balance;
 }
 
 .lookup-row {
@@ -4108,8 +4115,8 @@ fieldset.field {
     pointer-events: none;
   }
   .lookup-title {
-    font-size: 22px;
-    line-height: 1.15;
+    font-size: 28px;
+    line-height: 1.1;
     margin-bottom: 14px;
   }
   .lookup-row {
