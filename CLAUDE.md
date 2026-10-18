@@ -250,45 +250,48 @@ once, in the masthead folio). It treats the `data-theme` attribute as
 the source of truth and observes it, so `theme.js`'s re-applies update
 its pressed state.
 
+### Site-layer decisions
+
+These are Atlas's own choices. The core leaves them to each site, so
+they are not departures from it:
+
+- **The wordmark.** "Urbanist Atlas", with "Atlas" as the
+  `--amber-soft` accent word. The size is the core's single t-masthead
+  clamp on every route.
+- **A kicker dateline on the front page** ("The front page · Index by
+  postal code"). Which routes carry a kicker is site layer.
+- **The "by the numbers" stats strip.** It is page content, not
+  chrome: for a directory, the counts are the news.
+- **Site-foot columns:** The Desks / Methodology / Contact.
+
 ### Local variations
 
 Where Atlas deliberately departs from the Family core. Anything not
-listed here should match the artifact. Add an entry, with its reason,
-in the same commit as the departure.
+listed here, or under Site-layer decisions above, should match the
+artifact. Add an entry, with its reason, in the same commit as the
+departure.
 
-- **One wordmark, at Atlas's size.** "Urbanist Atlas", clamp(40px, 9vw,
-  108px) on the front and 40–56px inside. Atlas is a single
-  publication, and the oversized wordmark is its front-page identity.
 - **Phone masthead drops the tagline and place meta.** It keeps the
   band, the folio (and so the toggle) and the wordmark. On a phone the
-  tagline cost vertical space before the reader can do anything. The
+  tagline costs vertical space before the reader can do anything. The
   folio's section label is also dropped there, because the nav drawer
   button names the section.
 - **Phone nav is a drawer** (≤768px), not the core's sideways-scrolling
   row. The desktop cells fit unaided from 769px (measured), so Atlas
   needs no tablet-band tightening.
-- **Live status in the nav, from 1024px** (the core's right-hand
-  cluster appears at 900px). Four cells plus the status need ~870px,
-  which the sheet only has from 1024px. The status carries counts and
-  a pulsing dot. The counts are a figure call-out in the chrome and
-  the pulse is ambient motion beyond the core's "almost none". Both
-  are kept because "live directory" is the claim the status makes.
+- **The nav's live status carries counts and a pulsing dot.** The
+  counts are a figure call-out in the chrome, and the pulse is ambient
+  motion beyond the core's "almost none". Both are kept because "live
+  directory" is the claim the status makes. Its 1024px breakpoint is
+  the core's.
 - **Scroll-progress hairline on phones** (`.sheet::after`). It is more
   motion than the core allows, kept as the phone's folio counter.
 - **Page grain on phones** (`body::after`). The core grains only the
   masthead band. On phones the whole sheet gets it so the screen reads
   as paper.
-- **A kicker dateline on the front page** ("The front page · Index by
-  postal code"). Which routes carry a kicker is site layer; recorded
-  so the front-page use is deliberate.
-- **The "by the numbers" stats strip.** The core keeps figures out of
-  the chrome, and this is page content. For a directory, the counts
-  are the news.
 - **Sheet width 1280px with an amber frame** at ≥1024px, not the
   family's 1100px `max`. Atlas's results and browse grids were
   designed on the 1280 sheet.
-- **Site-foot columns** are Atlas's own: The Desks / Methodology /
-  Contact.
 
 **Selected layouts:**
 - Homepage: two-column broadsheet (search + lede on the left; "Browse by

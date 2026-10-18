@@ -24,7 +24,7 @@ export function Masthead() {
   const { pathname } = useLocation();
   const isHome = pathname === '/';
   return (
-    <header className={`masthead${isHome ? '' : ' interior'}`}>
+    <header className="masthead">
       <div className="masthead-folio">
         <span>
           A directory<span className="dot">·</span>Vol. I
