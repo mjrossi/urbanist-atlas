@@ -8,7 +8,8 @@
  *
  * Vocabulary the React components rely on:
  *   .sheet           outer page chrome (was App.tsx wrapper)
- *   .masthead        full-bleed wordmark with folio + tagline
+ *   .masthead        grained amber band: folio, wordmark, tagline
+ *   .theme-toggle    Auto · Light · Dark glyphs in the masthead folio
  *   .nav             Roman-numeral primary nav + live status
  *   .kicker          breadcrumb / dateline row beneath nav
  *   .spread          two-column main + rail layout
@@ -835,19 +836,19 @@ a {
   max-width: 80px;
 }
 
+/* Page headlines (.lede h1, .org-feature .name, the front page's
+   .lookup-title) share one display size, kept under the masthead
+   wordmark's 60.8px so the nameplate leads on every route. A Local
+   variation: the core t-page-title is 32px; see CLAUDE.md. */
 .lede h1 {
   font-family: var(--serif);
   font-weight: 600;
   font-variation-settings: 'opsz' 144;
-  font-size: clamp(40px, 6.5vw, 72px);
+  font-size: clamp(32px, 4.2vw, 48px);
   line-height: 1;
   letter-spacing: -0.028em;
   margin: 0 0 22px;
   text-wrap: balance;
-}
-
-.lede h1.lg {
-  font-size: clamp(48px, 8vw, 92px);
 }
 
 /* Accent text — italicised amber emphasis. The plain `.accent` rule
@@ -1929,7 +1930,7 @@ a.tag:hover::before {
   font-family: var(--serif);
   font-weight: 600;
   font-variation-settings: 'opsz' 144;
-  font-size: clamp(40px, 7vw, 84px);
+  font-size: clamp(32px, 4.2vw, 48px);
   line-height: 1;
   letter-spacing: -0.03em;
   margin: 0 0 14px;
@@ -4044,7 +4045,7 @@ fieldset.field {
     margin-bottom: 24px;
   }
   .lede h1 {
-    font-size: 38px;
+    font-size: 32px;
     line-height: 1;
   }
   .lede .deck {
@@ -4331,7 +4332,7 @@ fieldset.field {
     margin-top: 20px;
   }
   .org-feature .name {
-    font-size: 40px;
+    font-size: 32px;
     line-height: 0.98;
   }
   .org-feature .url-line {
@@ -4522,7 +4523,7 @@ fieldset.field {
    ───────────────────────────────────────────────────────────────────── */
 @media (max-width: 360px) {
   .lede h1 {
-    font-size: 34px;
+    font-size: 30px;
   }
   .lookup-input {
     font-size: 22px;
@@ -4531,7 +4532,7 @@ fieldset.field {
     font-size: 32px;
   }
   .org-feature .name {
-    font-size: 38px;
+    font-size: 30px;
   }
 }
 

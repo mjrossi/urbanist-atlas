@@ -282,6 +282,12 @@ departure.
   tagline costs vertical space before the reader can do anything. The
   folio's section label is also dropped there, because the nav drawer
   button names the section.
+- **Page headlines at 32–48px, not the core's 32px t-page-title.**
+  `.lede h1` and `.org-feature .name` share the front-page lookup
+  heading's clamp(32px, 4.2vw, 48px): 32px on phones, 30px at ≤360px.
+  Atlas's region and org pages lead with one name and little else, so
+  the name carries the page. The cap keeps every headline under the
+  wordmark's 60.8px, so the nameplate leads on every route.
 - **Phone nav is a drawer** (≤768px), not the core's sideways-scrolling
   row. The desktop cells fit unaided from 769px (measured), so Atlas
   needs no tablet-band tightening.
