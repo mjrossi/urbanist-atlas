@@ -253,8 +253,10 @@ X-Data-Attribution: https://urbanistatlas.com
             <div className="rail-kicker">Type</div>
             <p className="text-sm">
               Set in <em>Fraunces</em>, <em>Source Serif 4</em>, <em>Inter</em>, and{' '}
-              <em>JetBrains Mono</em>. Cream <code>#FDF6EC</code>, amber{' '}
-              <code>#8F5520</code>, ink <code>#1A1612</code>.
+              <em>JetBrains Mono</em>. Cream <code>#FAF6F1</code>, amber{' '}
+              <code>#8F5520</code>, ink <code>#191511</code>; at night, brown-black paper
+              and a lighter amber. The palette is the Lexicon Family&rsquo;s, shared with{' '}
+              <em>Urbanist Lexicon</em>.
             </p>
           </div>
           <div className="rail-block muted">

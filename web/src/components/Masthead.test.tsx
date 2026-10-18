@@ -34,6 +34,18 @@ describe('Masthead', () => {
     expect(link.getAttribute('href')).toBe('/');
   });
 
+  it('renders the theme toggle exactly once, in the folio', () => {
+    render(
+      <MemoryRouter initialEntries={['/about']}>
+        <Masthead />
+      </MemoryRouter>,
+    );
+
+    const groups = screen.getAllByRole('group', { name: 'Colour theme' });
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.closest('.masthead-folio-right')).not.toBeNull();
+  });
+
   it('renders the italic tagline between two horizontal rules', () => {
     render(
       <MemoryRouter initialEntries={['/']}>

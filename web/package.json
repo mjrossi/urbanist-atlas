@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest",
-    "generate:api": "openapi-typescript ../api/openapi.yaml --output src/lib/api.gen.ts"
+    "generate:api": "openapi-typescript ../api/openapi.yaml --output src/lib/api.gen.ts",
+    "og": "node scripts/make-og.mjs"
   },
   "prettier": {
     "printWidth": 90,

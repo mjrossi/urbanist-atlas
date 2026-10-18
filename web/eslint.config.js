@@ -105,6 +105,13 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
 
+  // The pre-paint theme script is served as-is from public/ and runs in the
+  // browser, not Node (see the header of public/theme.js).
+  {
+    files: ['public/theme.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
+
   // Turn off any rules that would fight Prettier. Must stay last.
   eslintConfigPrettier,
 ]);
