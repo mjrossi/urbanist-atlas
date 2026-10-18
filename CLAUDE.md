@@ -229,9 +229,9 @@ Token map, family core → Atlas:
 Both repos also carry `--grain-opacity` / `--grain-blend` under the same
 names: multiply at 0.35 on Paper, screen at 0.12 on Night.
 
-**`--amber-soft` is display-only, at 24px and up.** It is ~3:1 on paper
-and 2.6:1 on the masthead band; the core keeps it there as the family's
-signature. It is used for the wordmark's "Atlas", the colophon title, and
+**`--amber-soft` is display-only, at 24px and up.** It is 3.6:1 on paper
+and 3.15:1 on the masthead band, so it clears the 3:1 large-text floor on
+every ground it lands on. It is used for the wordmark's "Atlas", the colophon title, and
 decorative fills such as the live dot and the cat portraits. A small
 numeral, a required-field mark, a glyph or a tagline takes `--amber` or
 `--amber-tagline` instead.

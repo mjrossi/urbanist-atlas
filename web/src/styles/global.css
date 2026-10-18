@@ -56,10 +56,9 @@
   --rule-strong: #b39a6e;
   --amber: #8f5520;
   --amber-hover: #7a4a1a;
-  /* Display only, 24px and up: ~3:1 on paper, 2.6:1 on the band (kept as
-     the family's signature). A small numeral, a
-     required mark or a tagline takes --amber or --amber-tagline. */
-  --amber-soft: #c97d3e;
+  /* Display only, 24px and up: 3.6:1 on paper, 3.15:1 on the band. A small
+     numeral, a required mark or a tagline takes --amber or --amber-tagline. */
+  --amber-soft: #b8702f;
   --amber-tint: rgba(143, 85, 32, 0.08);
   --amber-band: oklch(93% 0.04 70);
   --amber-band-border: oklch(84% 0.06 70);
@@ -441,12 +440,21 @@ a {
   padding: 0;
   border: 0;
   border-bottom: 1px solid transparent;
+  position: relative;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   transition:
     color 0.15s ease,
     border-color 0.15s ease;
+}
+
+/* A 24×24 hit area around the 22×18 box (WCAG 2.5.8), without growing
+   the folio row. */
+.theme-toggle button::before {
+  content: '';
+  position: absolute;
+  inset: -3px -1px;
 }
 
 .theme-toggle button:hover {
