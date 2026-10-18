@@ -54,6 +54,10 @@
 # legitimate reason to touch. `frame-ancestors 'none'` already
 # stops embedding, but explicit feature opt-out is cheap insurance.
 #
+# `/theme.js` is the render-blocking pre-paint theme script (see
+# index.html). Cloudflare's asset default revalidates on every request;
+# an hour of caching keeps it off the critical path for repeat visits.
+#
 # Adjust this file when adding a new origin (e.g. a future analytics
 # endpoint) — and document the change in `docs/deploy.md`.
 /*
@@ -62,3 +66,6 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
   Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()
+
+/theme.js
+  Cache-Control: public, max-age=3600

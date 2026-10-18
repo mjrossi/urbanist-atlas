@@ -112,7 +112,7 @@ export function Footer() {
         </span>
         <span>Set in Fraunces, Source Serif 4, Inter &amp; JetBrains Mono</span>
         <span>
-          Printed on cream — <span className="em">#FDF6EC</span>
+          Printed on cream — <span className="em">#FAF6F1</span>
         </span>
       </div>
     </>

@@ -163,17 +163,132 @@ before adding any library not in this list.**
 
 ## Design language
 
-The visual identity belongs to the *Urbanist Lexicon* family:
+Shared with mjrossi.com and its blog as the **Lexicon Family**: one
+paper, one amber, three typefaces. The Design System artifact at
+https://claude.ai/artifact/MqHpb7fJPnWU7VugYdtd57 (tokens, component
+guidelines, previews, and the token-name map between the two repos) is
+split into two layers with different owners:
 
-- Warm broadsheet palette (oklch warm off-white, amber accents `#8f5520` /
-  `#c97d3e`)
-- Newspaper masthead with double-rule and italic tagline between rules
-- Small-caps section labels, drop caps on opening paragraphs
-- Two-column "broadsheet body" for content-rich pages
+- **Family core: the artifact is canonical, for both sites.** It covers:
+  - tokens in both themes, and the Night mechanism;
+  - type families, scale and label conventions;
+  - spacing, square radii, and rules-not-shadows with their weights;
+  - the shared chrome primitives: masthead band, grain, double rule,
+    folio and tagline row; numbered nav cells and the tablet rule;
+    kicker; rail blocks; § tags; site-foot and colophon strip; the
+    icon theme toggle and the `theme.js` contract;
+  - the accessibility rules: contrast floors in both themes, the light
+    amber at ≥24px only, the focus ring, and no page-level horizontal
+    scroll.
 
-The canonical CSS lives at
-`~/dev/mjrossi-portfolio-website/src/styles/global.css`. When building UI
-here, port the relevant slice rather than reinventing.
+  A change to the core starts in the artifact, then lands in both repos.
+  If this repo's code disagrees with the core and the difference is not
+  listed under "Local variations" below, the code is the bug.
+- **Site layer: this repo is canonical.** It covers:
+  - what fills the shared shapes: the wordmark, taglines, folio text;
+  - site-only components built *from* core tokens: the lookup card,
+    results tiers, metro lists, the org strip, the submit slip, the
+    newsroom cat portraits, the nav's live status;
+  - per-page layout;
+  - platform constraints: React, and this CSP.
+- **Token names stay per repo.** Atlas keeps `--paper` / `--ink` /
+  `--amber`…; mjrossi.com keeps `--bg` / `--text` / `--accent`…. The
+  artifact holds the map. Renaming is churn with no visible payoff.
+- **A fix that would help both sites goes to the core**, not to Local
+  variations.
+- **Don't publish to the artifact without coordinating:** both repos'
+  agents write to it.
+
+**Two themes from one set of token names.** Paper is `:root` in
+`web/src/styles/global.css`. Night redefines the same tokens twice:
+- under `:root[data-theme='dark']`;
+- under `prefers-color-scheme: dark`, guarded by
+  `:root:not([data-theme='light'])` so an explicit Light beats a dark OS.
+
+Both blocks sit inside `@media screen`, so print always gets Paper.
+Keep the two blocks identical: `src/styles/nightParity.test.ts` compares
+them. Every colour resolves through a token, so a new rule never needs
+its own dark override. A literal colour (`white`, `#hex`, `rgba()`) in a
+rule is the bug, and so is a `box-shadow`. Site-layer components may add
+their own tokens with a Night value, e.g. `--amber-wash`,
+`--slip-stripe`, `--amber-on-ink`, and the `--cat-*` portrait palette.
+
+Token map, family core → Atlas:
+
+| Core | Atlas | | Core | Atlas |
+| --- | --- | --- | --- | --- |
+| `bg` | `--paper` | | `accent` | `--amber` |
+| `bg2` | `--paper-2` | | `accent-hover` | `--amber-hover` |
+| `border` | `--rule` | | `accent-surname` | `--amber-soft` |
+| `rule-strong` | `--rule-strong` | | `accent-tint` | `--amber-tint` |
+| `text` | `--ink` | | `accent-band` | `--amber-band` |
+| `text-2` | `--ink-2` | | `accent-band-border` | `--amber-band-border` |
+| `muted` | `--muted` | | `accent-rule` | `--amber-rule` |
+| | | | `accent-tagline` | `--amber-tagline` |
+
+**`--amber-soft` is display-only, at 24px and up.** It is ~3:1 on paper
+and is used for the wordmark's "Atlas", the colophon title, and
+decorative fills such as the live dot and the cat portraits. A small
+numeral, a required-field mark, a glyph or a tagline takes `--amber` or
+`--amber-tagline` instead.
+
+**The `theme.js` carve-out.** `web/public/theme.js` is the one script
+outside Vite's bundle. It is loaded as a classic, synchronous
+`<script src="/theme.js">` in `index.html`'s `<head>`, so `data-theme`
+is set before first paint and a stored Dark or Light never flashes the
+other theme. It has to be a static file:
+- a bundled module script is deferred, so it would run after first
+  paint;
+- the CSP (`web/public/_headers`) is `script-src 'self'`, so it can't
+  be inline.
+
+Besides setting `data-theme`, it sets `data-js`, and it re-applies the
+stored choice on `storage` (another tab) and on a back/forward-cache
+`pageshow`. `_headers` caches it for an hour because it is
+render-blocking. The toggle is React (`src/components/ThemeToggle.tsx`,
+once, in the masthead folio). It treats the `data-theme` attribute as
+the source of truth and observes it, so `theme.js`'s re-applies update
+its pressed state.
+
+### Local variations
+
+Where Atlas deliberately departs from the Family core. Anything not
+listed here should match the artifact. Add an entry, with its reason,
+in the same commit as the departure.
+
+- **One wordmark, at Atlas's size.** "Urbanist Atlas", clamp(40px, 9vw,
+  108px) on the front and 40–56px inside. Atlas is a single
+  publication, and the oversized wordmark is its front-page identity.
+- **Phone masthead drops the tagline and place meta.** It keeps the
+  band, the folio (and so the toggle) and the wordmark. On a phone the
+  tagline cost vertical space before the reader can do anything. The
+  folio's section label is also dropped there, because the nav drawer
+  button names the section.
+- **Phone nav is a drawer** (≤768px), not the core's sideways-scrolling
+  row. The desktop cells fit unaided from 769px (measured), so Atlas
+  needs no tablet-band tightening.
+- **Live status in the nav, from 1024px** (the core's right-hand
+  cluster appears at 900px). Four cells plus the status need ~870px,
+  which the sheet only has from 1024px. The status carries counts and
+  a pulsing dot. The counts are a figure call-out in the chrome and
+  the pulse is ambient motion beyond the core's "almost none". Both
+  are kept because "live directory" is the claim the status makes.
+- **Scroll-progress hairline on phones** (`.sheet::after`). It is more
+  motion than the core allows, kept as the phone's folio counter.
+- **Page grain on phones** (`body::after`). The core grains only the
+  masthead band. On phones the whole sheet gets it so the screen reads
+  as paper.
+- **A kicker dateline on the front page** ("The front page · Index by
+  postal code"). Which routes carry a kicker is site layer; recorded
+  so the front-page use is deliberate.
+- **The "by the numbers" stats strip.** The core keeps figures out of
+  the chrome, and this is page content. For a directory, the counts
+  are the news.
+- **Sheet width 1280px with an amber frame** at ≥1024px, not the
+  family's 1100px `max`. Atlas's results and browse grids were
+  designed on the 1280 sheet.
+- **Site-foot columns** are Atlas's own: The Desks / Methodology /
+  Contact.
 
 **Selected layouts:**
 - Homepage: two-column broadsheet (search + lede on the left; "Browse by

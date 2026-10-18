@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router';
 
+import { ThemeToggle } from './ThemeToggle.tsx';
+
 const FOLIO_LABELS: readonly [RegExp, string][] = [
   [/^\/$/, "Today's reading"],
   [/^\/about$/, 'About the Atlas'],
@@ -27,7 +29,10 @@ export function Masthead() {
         <span>
           A directory<span className="dot">·</span>Vol. I
         </span>
-        <span>{folioRight(pathname)}</span>
+        <span className="masthead-folio-right">
+          <span className="masthead-folio-label">{folioRight(pathname)}</span>
+          <ThemeToggle />
+        </span>
       </div>
       <div className="masthead-name-row">
         {isHome ? (
