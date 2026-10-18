@@ -56,7 +56,8 @@
   --rule-strong: #b39a6e;
   --amber: #8f5520;
   --amber-hover: #7a4a1a;
-  /* Display only, 24px and up: ~3:1 on paper. A small numeral, a
+  /* Display only, 24px and up: ~3:1 on paper, 2.6:1 on the band (kept as
+     the family's signature). A small numeral, a
      required mark or a tagline takes --amber or --amber-tagline. */
   --amber-soft: #c97d3e;
   --amber-tint: rgba(143, 85, 32, 0.08);
@@ -364,6 +365,12 @@ a {
   height: 2px;
   background: var(--amber-band-border);
   pointer-events: none;
+}
+
+/* The content paints above the grain, not under it (mjrossi.com gets the
+   same from its positioned .masthead-inner). */
+.masthead > * {
+  position: relative;
 }
 
 .masthead-folio {

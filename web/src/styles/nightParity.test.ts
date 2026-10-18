@@ -15,11 +15,17 @@ const css = readFileSync(resolve(process.cwd(), 'src/styles/global.css'), 'utf8'
 // The Lexicon Family core requires the two copies to stay identical; this
 // test is what holds them to it.
 
+// Font stacks are theme-independent; every other Paper token needs a Night value.
+const themeIndependent = ['--serif', '--serif-text', '--sans', '--mono'];
+
 function declarations(selector: string): Map<string, string> {
   const start = css.indexOf(`${selector} {`);
-  if (start === -1) throw new Error(`missing Night block ${selector}`);
+  if (start === -1) throw new Error(`missing block ${selector}`);
   const end = css.indexOf('}', start);
-  const body = css.slice(start + selector.length + 2, end);
+  // Strip comments first: one containing `:` or `;` would split a declaration.
+  const body = css
+    .slice(start + selector.length + 2, end)
+    .replace(/\/\*[\s\S]*?\*\//g, '');
   const decls = new Map<string, string>();
   for (const line of body.split(';')) {
     const colon = line.indexOf(':');
@@ -37,17 +43,11 @@ describe('Night theme blocks', () => {
     expect([...system.entries()].sort()).toEqual([...explicit.entries()].sort());
   });
 
-  it('redefine every core colour token', () => {
-    for (const token of [
-      '--paper',
-      '--ink',
-      '--muted',
-      '--rule',
-      '--amber',
-      '--amber-soft',
-    ]) {
-      expect([...explicit.keys()]).toContain(token);
-    }
+  it('redefine every Paper token, and nothing Paper lacks', () => {
+    const paper = [...declarations(':root').keys()].filter(
+      (k) => !themeIndependent.includes(k),
+    );
+    expect([...explicit.keys()].sort()).toEqual(paper.sort());
     expect(explicit.get('color-scheme')).toBe('dark');
   });
 
