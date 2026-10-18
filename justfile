@@ -242,6 +242,13 @@ web-build:
 web-oapi-gen:
     cd web && npm run generate:api
 
+# redraw public/og-image.png (the social card) from the current
+# palette; then bump `?v=` on og:image in web/index.html
+[group('web')]
+[doc('redraw the social card from the current palette; then bump og:image ?v=')]
+web-og:
+    cd web && npm run og
+
 # fail if api.gen.ts would change after a regen against the
 # current openapi.yaml. Mirrors api-gen-check; the wire contract
 # can't drift silently between the two halves.
