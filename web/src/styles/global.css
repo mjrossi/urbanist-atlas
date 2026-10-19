@@ -714,18 +714,6 @@ a {
   }
 }
 
-/* Scroll-driven progress hairline. Active only inside the mobile
-   block (where the .sheet::after rule lives) and only when the
-   browser supports scroll-driven animations. */
-@keyframes sheet-progress {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
 /* ── Kicker breadcrumb ─────────────────────────────── */
 
 .kicker {
@@ -3895,29 +3883,6 @@ fieldset.field {
   /* ── Sheet padding tightened so the wordmark hugs the edge ─── */
   .sheet {
     padding: 16px 20px 48px;
-  }
-
-  /* ── Reading-progress hairline: a thin amber bar at the top of
-     the viewport that fills as the user scrolls. Reads like a folio
-     counter on a paper sheet. Only renders where scroll-driven
-     animations are supported (Chromium ≥115, Safari 26+, etc.);
-     gracefully invisible otherwise. ────────────────────────────── */
-  @supports (animation-timeline: scroll()) {
-    .sheet::after {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--amber);
-      z-index: 100;
-      pointer-events: none;
-      transform-origin: left;
-      transform: scaleX(0);
-      animation: sheet-progress linear both;
-      animation-timeline: scroll(root);
-    }
   }
 
   /* ── Page-grain overlay: a barely-there procedural noise texture
