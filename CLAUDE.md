@@ -300,8 +300,6 @@ departure.
   motion beyond the core's "almost none". Both are kept because "live
   directory" is the claim the status makes. Its 1024px breakpoint is
   the core's.
-- **Scroll-progress hairline on phones** (`.sheet::after`). It is more
-  motion than the core allows, kept as the phone's folio counter.
 - **Page grain on phones** (`body::after`). The core grains only the
   masthead band. On phones the whole sheet gets it so the screen reads
   as paper.
