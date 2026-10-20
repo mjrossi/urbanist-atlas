@@ -9,7 +9,7 @@
  *    issue, kept as a fallback when the API is unreachable (5xx) so
  *    a determined submitter still has a path through.
  */
-import type { NewSubmissionRequest } from './api.ts';
+import { ApiError, type NewSubmissionRequest } from './api.ts';
 
 export type SubmissionType = 'new' | 'correction' | 'removal';
 export type Affiliation = 'none' | 'member' | 'other';
@@ -63,6 +63,34 @@ function check(condition: boolean): 'x' | ' ' {
 }
 
 /**
+ * The region fields as they apply to this submission type. react-hook-form
+ * keeps a hidden field's value, so a region entered before switching away
+ * from "new" must not ride along on a correction or removal.
+ */
+function regionFieldsFor(form: SubmitForm): { slugs: string[]; freeText: string } {
+  if (form.type !== 'new') return { slugs: [], freeText: '' };
+  return { slugs: form.regionSlugs, freeText: form.region.trim() };
+}
+
+/**
+ * True when the submission failed for a reason the submitter can't fix
+ * from the form (a 5xx or no response at all), so the GitHub-issue
+ * fallback should be offered.
+ */
+export function isServerOrUnreachable(err: Error): boolean {
+  return !(err instanceof ApiError) || err.status === 0 || err.status >= 500;
+}
+
+/**
+ * The human reference for a submission: the last 8 hex digits of its
+ * UUIDv7. The leading digits are a millisecond timestamp, so they repeat
+ * across submissions made close together.
+ */
+export function shortSubmissionId(id: string): string {
+  return id.replace(/-/g, '').slice(-8);
+}
+
+/**
  * Composes the Markdown body of the pre-filled GitHub issue from a
  * SubmitForm. The shape mirrors
  * `.github/ISSUE_TEMPLATE/org_correction_or_addition.md` so editorial
@@ -73,6 +101,9 @@ export function buildIssueBody(form: SubmitForm): string {
   const sources = form.sources.trim() || '_Not provided._';
   const contact = form.contact.trim();
   const submittedSuffix = contact ? ` by ${contact}` : '';
+  const { slugs, freeText } = regionFieldsFor(form);
+  const regionServed = [...slugs, freeText].filter(Boolean).join(', ');
+  const oneLineDesc = form.type === 'new' ? form.oneLineDesc : '';
   return `## Type
 
 - [${check(form.type === 'new')}] New organization to add
@@ -83,8 +114,8 @@ export function buildIssueBody(form: SubmitForm): string {
 
 - **Name:** ${form.name}
 - **Primary website:** ${form.website}
-- **Region served:** ${form.region}
-- **One-line description of what they actually do:** ${form.oneLineDesc}
+- **Region served:** ${regionServed}
+- **One-line description of what they actually do:** ${oneLineDesc}
 
 ## Why this org belongs
 
@@ -126,11 +157,9 @@ export function buildIssueUrl(form: SubmitForm): string {
  * Markdown-formatted `submitter_note` so moderators see the same
  * structured context they would on the old GitHub-issue path.
  *
- * Region: `regionSlugs` carries the canonical slugs the submitter
- * picked from the type-ahead, sent as `region_slugs`. When they
- * couldn't find their region the free-text `region` fallback is rolled
- * into `submitter_note` as a new-region request for the editor (see
- * buildSubmitterNote).
+ * Region: for a new org, the picked slugs go out as `region_slugs` and
+ * the free-text fallback becomes a new-region request in the note. A
+ * correction or removal sends neither.
  */
 export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionRequest {
   const submitterNote = buildSubmitterNote(form);
@@ -139,7 +168,7 @@ export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionReques
       name: form.name.trim(),
       short_desc: shortDescForWire(form),
       website_url: form.website.trim(),
-      region_slugs: form.regionSlugs,
+      region_slugs: regionFieldsFor(form).slugs,
     },
     submitter_note: submitterNote,
     ...(form.contact.trim() ? maybeContact(form.contact) : {}),
@@ -175,16 +204,12 @@ function maybeContact(raw: string): Partial<NewSubmissionRequest> {
 function buildSubmitterNote(form: SubmitForm): string {
   const lines: string[] = [];
   lines.push(`Submission type: ${labelForType(form.type)}.`);
-  // Picked region slugs also ride on the wire in `region_slugs`; echo
-  // them here so the editor sees the full context in the PR body.
-  if (form.regionSlugs.length > 0) {
-    lines.push(`Regions (picked): ${form.regionSlugs.join(', ')}.`);
+  const { slugs, freeText } = regionFieldsFor(form);
+  if (slugs.length > 0) {
+    lines.push(`Regions (picked): ${slugs.join(', ')}.`);
   }
-  // The free-text fallback is the "couldn't find my region" path. For
-  // correction/removal the input is hidden, so form.region is the
-  // SUBMIT_FORM_DEFAULTS empty string and this line drops out.
-  if (form.region.trim()) {
-    lines.push(`Region not found — new-region request: ${form.region.trim()}`);
+  if (freeText) {
+    lines.push(`Region not found — new-region request: ${freeText}`);
   }
   if (form.why.trim()) {
     lines.push('', '### Why this org belongs', '', form.why.trim());
