@@ -389,6 +389,9 @@ type Org struct {
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
+//   - `https://urbanistatlas.com/problems/admin-disabled` — admin
+//     endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+//     configured on the server (HTTP 503).
 //
 // These URIs are stable identifiers; they do not necessarily
 // dereference to a human-readable page yet.
@@ -863,6 +866,9 @@ type SubmissionID = openapi_types.UUID
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
+//   - `https://urbanistatlas.com/problems/admin-disabled` — admin
+//     endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+//     configured on the server (HTTP 503).
 //
 // These URIs are stable identifiers; they do not necessarily
 // dereference to a human-readable page yet.
@@ -899,6 +905,9 @@ type AdminUnavailable = ProblemDetails
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
+//   - `https://urbanistatlas.com/problems/admin-disabled` — admin
+//     endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+//     configured on the server (HTTP 503).
 //
 // These URIs are stable identifiers; they do not necessarily
 // dereference to a human-readable page yet.
@@ -935,6 +944,9 @@ type BadRequest = ProblemDetails
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
+//   - `https://urbanistatlas.com/problems/admin-disabled` — admin
+//     endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+//     configured on the server (HTTP 503).
 //
 // These URIs are stable identifiers; they do not necessarily
 // dereference to a human-readable page yet.
@@ -971,6 +983,9 @@ type InternalError = ProblemDetails
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
+//   - `https://urbanistatlas.com/problems/admin-disabled` — admin
+//     endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+//     configured on the server (HTTP 503).
 //
 // These URIs are stable identifiers; they do not necessarily
 // dereference to a human-readable page yet.
@@ -1007,6 +1022,9 @@ type NotFound = ProblemDetails
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
+//   - `https://urbanistatlas.com/problems/admin-disabled` — admin
+//     endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+//     configured on the server (HTTP 503).
 //
 // These URIs are stable identifiers; they do not necessarily
 // dereference to a human-readable page yet.
@@ -1043,6 +1061,9 @@ type TooManyRequests = ProblemDetails
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
+//   - `https://urbanistatlas.com/problems/admin-disabled` — admin
+//     endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+//     configured on the server (HTTP 503).
 //
 // These URIs are stable identifiers; they do not necessarily
 // dereference to a human-readable page yet.
@@ -1117,7 +1138,9 @@ type LookupParams struct {
 type SearchRegionsParams struct {
 	// Q The search term. Matched case-insensitively against region
 	// name and slug. Blank, whitespace-only, or omitted returns an
-	// empty result set.
+	// empty result set. At most 100 bytes; a longer `q` is
+	// rejected with a 400 problem document (`type`
+	// `https://urbanistatlas.com/problems/validation`).
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 
 	// Limit Maximum number of results to return. Capped at 20.
