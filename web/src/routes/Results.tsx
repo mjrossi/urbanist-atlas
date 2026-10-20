@@ -9,14 +9,14 @@ import { QueryState } from '../components/QueryState.tsx';
 import type { BreadcrumbItem } from '../components/RegionBreadcrumb.tsx';
 import { RegionBreadcrumb } from '../components/RegionBreadcrumb.tsx';
 import { reverseAncestry } from '../lib/ancestry.ts';
-import type { Country, LookupResult } from '../lib/api.ts';
+import type { LookupResult, SupportedCountry } from '../lib/api.ts';
 import { ApiError, isSupportedCountry, lookup } from '../lib/api.ts';
 import { totalEntries } from '../lib/orgBuckets.ts';
 import { normalizePostal } from '../lib/postal.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
-function parseCountry(raw: string | null): Country | null {
+function parseCountry(raw: string | null): SupportedCountry | null {
   if (raw === null) return 'US';
   return isSupportedCountry(raw) ? raw : null;
 }
@@ -27,7 +27,7 @@ export function Results() {
   const postalCode = normalizePostal(params.postalCode ?? '');
   const rawCountry = search.get('country');
   const country = parseCountry(rawCountry);
-  const effectiveCountry: Country = country ?? 'US';
+  const effectiveCountry: SupportedCountry = country ?? 'US';
 
   const query = useQuery<LookupResult, ApiError>({
     queryKey: queryKeys.lookup(postalCode, effectiveCountry),
@@ -95,7 +95,7 @@ function ResultsBody({
 }: {
   query: UseQueryResult<LookupResult, ApiError>;
   postalCode: string;
-  country: Country | null;
+  country: SupportedCountry | null;
   rawCountry: string | null;
 }) {
   // Pre-query gates: URL hasn't reached a state where a lookup makes sense yet.

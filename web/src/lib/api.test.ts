@@ -3,7 +3,7 @@
  * each test asserts the helper hits the right URL and parses the body
  * (or throws {@link ApiError} on a non-2xx response).
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
   ApiError,
@@ -15,6 +15,7 @@ import {
   listRecent,
   listRegions,
   lookup,
+  shouldRetry,
 } from './api.ts';
 
 function jsonResponse(
@@ -437,18 +438,16 @@ describe('apiFetch — happy path', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
     await apiFetch('/api/v1/anything');
     const [url] = fetchMock.mock.calls[0]!;
-    // Default apiBase is http://localhost:8080 in tests (no
-    // VITE_API_BASE set). Strict equality pins both the scheme/host
-    // (so a regression that quietly changes DEFAULT_API_BASE is caught)
-    // and the prepended path.
     expect(String(url)).toBe('http://localhost:8080/api/v1/anything');
   });
 
-  it('leaves absolute URLs un-prepended', async () => {
+  // The X-Atlas-Client secret rides on every request, so a path must
+  // never be able to send it to a host other than apiBase.
+  it('prefixes apiBase even when the path looks like an absolute URL', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
     await apiFetch('https://example.com/somewhere');
     const [url] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toBe('https://example.com/somewhere');
+    expect(String(url)).toBe('http://localhost:8080https://example.com/somewhere');
   });
 
   it('returns the parsed body as T', async () => {
@@ -514,7 +513,9 @@ describe('ApiError — rich shape from problem+json', () => {
     expect(apiErr.requestId).toBe('req-abc-123');
   });
 
-  it('uses problem.title as the Error message when present', async () => {
+  // The spec marks `detail` as safe to show end users; `title` is the
+  // generic per-type summary ("Bad Request"), so detail wins.
+  it('prefers problem.detail over problem.title as the Error message', async () => {
     fetchMock.mockResolvedValueOnce(
       problemResponse(400, {
         type: 'https://urbanistatlas.com/problems/validation',
@@ -530,22 +531,15 @@ describe('ApiError — rich shape from problem+json', () => {
       caught = err;
     }
     expect(caught).toBeInstanceOf(ApiError);
-    expect((caught as ApiError).message).toBe('Bad Request');
+    expect((caught as ApiError).message).toBe('postal_code is required');
   });
 
-  it('falls back to problem.detail when title is absent', async () => {
-    // Note: the fallback chain uses `??`, so it only triggers on
-    // undefined/null — an explicit empty string `title: ''` would
-    // win as the message. The wire shape (api.gen.ts) marks `title`
-    // as required, so in practice the server always sends one; this
-    // test pins the defensive fallback that triggers when the body
-    // omits it entirely (e.g. proxy mangles JSON, future spec lets
-    // it become optional).
+  it('falls back to problem.title when detail is absent', async () => {
     fetchMock.mockResolvedValueOnce(
-      problemResponse(400, {
-        type: 'https://urbanistatlas.com/problems/validation',
-        status: 400,
-        detail: 'postal_code is required',
+      problemResponse(503, {
+        type: 'https://urbanistatlas.com/problems/unavailable',
+        title: 'Service Unavailable',
+        status: 503,
       }),
     );
     let caught: unknown;
@@ -555,7 +549,25 @@ describe('ApiError — rich shape from problem+json', () => {
       caught = err;
     }
     expect(caught).toBeInstanceOf(ApiError);
-    expect((caught as ApiError).message).toBe('postal_code is required');
+    expect((caught as ApiError).message).toBe('Service Unavailable');
+  });
+
+  it('falls back to problem.title when detail is an empty string', async () => {
+    fetchMock.mockResolvedValueOnce(
+      problemResponse(400, {
+        type: 'https://urbanistatlas.com/problems/validation',
+        title: 'Bad Request',
+        status: 400,
+        detail: '',
+      }),
+    );
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/lookup');
+    } catch (err) {
+      caught = err;
+    }
+    expect((caught as ApiError).message).toBe('Bad Request');
   });
 
   it('falls back to `HTTP <status>` when title and detail are both absent', async () => {
@@ -954,5 +966,172 @@ describe('apiBase trailing-slash normalization (env-gated)', () => {
     await apiFetch('/api/v1/anything');
     const [url] = fetchMock.mock.calls[0]!;
     expect(String(url)).toBe('https://api.example.com/api/v1/anything');
+  });
+});
+
+describe('apiFetch — transport failures', () => {
+  let fetchMock: Mock<typeof fetch>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function signalOf(call: unknown[]): AbortSignal {
+    const init = call[1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    return init.signal!;
+  }
+
+  // Never resolves; rejects with the signal's reason once it aborts,
+  // the way a real fetch does.
+  function hangUntilAborted(_url: unknown, init?: RequestInit): Promise<Response> {
+    return new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(init.signal?.reason as Error);
+      });
+    });
+  }
+
+  it('wraps a rejected fetch in ApiError with status 0 and keeps the cause', async () => {
+    const cause = new TypeError('Failed to fetch');
+    fetchMock.mockRejectedValueOnce(cause);
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/anything');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    const apiErr = caught as ApiError;
+    expect(apiErr.status).toBe(0);
+    expect(apiErr.message).toMatch(/couldn.t reach/i);
+    expect(apiErr.problem).toBeUndefined();
+    expect(apiErr.requestId).toBeUndefined();
+    expect(apiErr.cause).toBe(cause);
+  });
+
+  it('rethrows the AbortError untouched when the caller signal aborts', async () => {
+    fetchMock.mockImplementationOnce(hangUntilAborted);
+    const controller = new AbortController();
+    const pending = apiFetch('/api/v1/anything', { signal: controller.signal });
+    controller.abort();
+    let caught: unknown;
+    try {
+      await pending;
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).not.toBeInstanceOf(ApiError);
+    expect((caught as DOMException).name).toBe('AbortError');
+  });
+
+  it('passes a signal to fetch that follows the caller signal', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    const controller = new AbortController();
+    await apiFetch('/api/v1/anything', { signal: controller.signal });
+    const signal = signalOf(fetchMock.mock.calls[0]!);
+    expect(signal.aborted).toBe(false);
+    controller.abort();
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('applies a 15s timeout and reports it as ApiError status 0', async () => {
+    const timeout = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+    fetchMock.mockImplementationOnce(hangUntilAborted);
+    const pending = apiFetch('/api/v1/anything');
+    timeout.abort(new DOMException('signal timed out', 'TimeoutError'));
+    let caught: unknown;
+    try {
+      await pending;
+    } catch (err) {
+      caught = err;
+    }
+    expect(timeoutSpy).toHaveBeenCalledWith(15_000);
+    expect(caught).toBeInstanceOf(ApiError);
+    expect((caught as ApiError).status).toBe(0);
+    expect((caught as ApiError).message).toMatch(/timed out/i);
+  });
+
+  it('reports a timeout while reading the success body as ApiError status 0', async () => {
+    const timeout = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+    const response = jsonResponse({ ok: true });
+    vi.spyOn(response, 'json').mockImplementation(() => {
+      timeout.abort(new DOMException('signal timed out', 'TimeoutError'));
+      return Promise.reject(timeout.signal.reason as Error);
+    });
+    fetchMock.mockResolvedValueOnce(response);
+    let caught: unknown;
+    try {
+      await apiFetch('/api/v1/anything');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    expect((caught as ApiError).status).toBe(0);
+    expect((caught as ApiError).message).toMatch(/timed out/i);
+  });
+});
+
+describe('shouldRetry', () => {
+  function apiErr(status: number): ApiError {
+    return new ApiError(status, 'x', undefined, undefined);
+  }
+
+  it.each([400, 401, 404, 422, 429])('never retries a %i', (status) => {
+    expect(shouldRetry(0, apiErr(status))).toBe(false);
+  });
+
+  it.each([0, 500, 502, 503])('retries a status-%i failure once', (status) => {
+    expect(shouldRetry(0, apiErr(status))).toBe(true);
+    expect(shouldRetry(1, apiErr(status))).toBe(false);
+  });
+
+  it('retries a non-ApiError failure once', () => {
+    expect(shouldRetry(0, new SyntaxError('bad json'))).toBe(true);
+    expect(shouldRetry(1, new SyntaxError('bad json'))).toBe(false);
+  });
+});
+
+describe('apiBase in production builds (env-gated)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('throws at module init when VITE_API_BASE is unset', async () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_API_BASE', undefined);
+    await expect(import('./api.ts')).rejects.toThrow(/VITE_API_BASE/);
+  });
+
+  it('throws at module init when VITE_API_BASE is empty', async () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_API_BASE', '');
+    await expect(import('./api.ts')).rejects.toThrow(/VITE_API_BASE/);
+  });
+
+  it('uses VITE_API_BASE when it is set', async () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_API_BASE', 'https://api.example.com');
+    const { apiBase } = await import('./api.ts');
+    expect(apiBase).toBe('https://api.example.com');
+  });
+
+  it('falls back to localhost outside production', async () => {
+    vi.stubEnv('PROD', false);
+    vi.stubEnv('VITE_API_BASE', undefined);
+    const { apiBase } = await import('./api.ts');
+    expect(apiBase).toBe('http://localhost:8080');
   });
 });
