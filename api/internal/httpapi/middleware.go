@@ -1,12 +1,10 @@
 package httpapi
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
-	"net"
 	"net/http"
 	"time"
 )
@@ -224,31 +222,4 @@ func (s *statusRecorder) Flush() {
 	}
 }
 
-// Hijack implements http.Hijacker so connection-upgrade handlers
-// (websockets, long-poll) can take ownership of the conn through the
-// middleware chain. Status tracking ends at hijack — the caller owns
-// the conn from that point.
-func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if h, ok := s.ResponseWriter.(http.Hijacker); ok {
-		return h.Hijack()
-	}
-	return nil, nil, http.ErrNotSupported
-}
-
-// Push implements http.Pusher so HTTP/2 server-push is propagated
-// through the middleware chain when the underlying writer supports it.
-func (s *statusRecorder) Push(target string, opts *http.PushOptions) error {
-	if p, ok := s.ResponseWriter.(http.Pusher); ok {
-		return p.Push(target, opts)
-	}
-	return http.ErrNotSupported
-}
-
-// Compile-time interface satisfaction. Mounting these as static
-// assertions means a future refactor that drops one of the methods
-// fails to build, not just regress at runtime.
-var (
-	_ http.Flusher  = (*statusRecorder)(nil)
-	_ http.Hijacker = (*statusRecorder)(nil)
-	_ http.Pusher   = (*statusRecorder)(nil)
-)
+var _ http.Flusher = (*statusRecorder)(nil)

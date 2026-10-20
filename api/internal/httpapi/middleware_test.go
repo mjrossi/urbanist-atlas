@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -487,20 +486,4 @@ func TestStatusRecorder_FlushNoopWhenInnerNotFlusher(t *testing.T) {
 
 	// Just must not panic — assertion-free.
 	sw.Flush()
-}
-
-// TestStatusRecorder_HijackPushReturnNotSupportedFallback covers the
-// negative path for both Hijack and Push: when the wrapped writer
-// doesn't implement the interface, the recorder returns
-// http.ErrNotSupported rather than panicking. (httptest.ResponseRecorder
-// implements neither, so it's the natural foil.)
-func TestStatusRecorder_HijackPushReturnNotSupportedFallback(t *testing.T) {
-	sw := &statusRecorder{ResponseWriter: httptest.NewRecorder(), status: http.StatusOK}
-
-	if _, _, err := sw.Hijack(); !errors.Is(err, http.ErrNotSupported) {
-		t.Errorf("Hijack: got err=%v, want http.ErrNotSupported", err)
-	}
-	if err := sw.Push("/some-resource", nil); !errors.Is(err, http.ErrNotSupported) {
-		t.Errorf("Push: got err=%v, want http.ErrNotSupported", err)
-	}
 }
