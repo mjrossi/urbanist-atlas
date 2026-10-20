@@ -45,4 +45,3 @@ func TestNewUUIDv7_isMonotonicAcrossClose(t *testing.T) {
 		prev = next
 	}
 }
-
