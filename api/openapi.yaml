@@ -372,7 +372,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RegionSearchResultsEnvelope'
         '400':
-          # q longer than 100 bytes, or limit outside 1–20.
+          # q longer than 100 characters, or limit outside 1–20.
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
