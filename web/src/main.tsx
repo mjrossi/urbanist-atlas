@@ -18,6 +18,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router';
 
+import { shouldRetry } from './lib/api.ts';
 import { installGlobalErrorLogging, reportClientError } from './lib/clientErrors.ts';
 import { router } from './router.tsx';
 
@@ -26,18 +27,15 @@ import { router } from './router.tsx';
 // production — there is no client error-tracking SaaS by design.
 installGlobalErrorLogging();
 
-// One QueryClient per browser session. `staleTime: 60_000` keeps the
-// data fresh for a minute (the API is read-mostly), and `retry: 1`
-// means one automatic retry on transient failures — the user can
-// trigger more by re-running the search. The cache-level `onError`
-// hooks give one central place to log every query/mutation failure
-// (with its request id) for dev debugging; components still render the
-// error via QueryState.
+// `staleTime: 60_000` because the API is read-mostly. The cache-level
+// `onError` hooks are the one place every query/mutation failure is
+// logged with its request id; components still render the error via
+// QueryState.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60_000,
-      retry: 1,
+      retry: shouldRetry,
     },
   },
   queryCache: new QueryCache({
