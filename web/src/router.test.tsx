@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { RouteObject } from 'react-router';
 import { createBrowserRouter, createMemoryRouter, RouterProvider } from 'react-router';
 import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,20 +21,8 @@ vi.mock('./lib/api.ts', async () => {
 
 const { routes } = await import('./router.tsx');
 
-// A router clears each `lazy` property on the route object once it has
-// loaded it, so a second router built from the same objects would find
-// nothing left to load. Each test router gets its own copy.
-function cloneRoutes(list: RouteObject[]): RouteObject[] {
-  return list.map((r) => ({
-    ...r,
-    ...(r.lazy && typeof r.lazy === 'object' ? { lazy: { ...r.lazy } } : {}),
-    ...(r.children ? { children: cloneRoutes(r.children) } : {}),
-  })) as RouteObject[];
-}
-const pristineRoutes = cloneRoutes(routes);
-
 function mountAt(path: string) {
-  const router = createMemoryRouter(cloneRoutes(pristineRoutes), {
+  const router = createMemoryRouter(routes, {
     initialEntries: [path],
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -136,7 +123,7 @@ describe('in-page jump links', () => {
 
   function mountBrowserAt(path: string) {
     window.history.replaceState(null, '', path);
-    const router = createBrowserRouter(cloneRoutes(pristineRoutes));
+    const router = createBrowserRouter(routes);
     dispose = () => {
       router.dispose();
     };

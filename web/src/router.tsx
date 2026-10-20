@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router';
 
 import { App } from './App.tsx';
 import { SheetLayout } from './components/SheetLayout.tsx';
+import { lazyComponent } from './lib/staleChunk.ts';
 import { RouteErrorBoundary } from './routes/ErrorBoundary.tsx';
 import { Home } from './routes/Home.tsx';
 
@@ -10,7 +11,8 @@ import { Home } from './routes/Home.tsx';
  * The site's route tree. The front page ships in the main bundle; every
  * other route is a lazy chunk. `errorElement` on the root catches
  * unmatched URLs (404), errors thrown by a route, and a chunk that
- * fails to load; it renders instead of `App` and wraps its own chrome.
+ * fails to load (see `lazyComponent`); it renders instead of `App` and
+ * wraps its own chrome.
  */
 export const routes: RouteObject[] = [
   {
@@ -23,33 +25,52 @@ export const routes: RouteObject[] = [
       { index: true, Component: Home },
       {
         path: 'r/:postalCode',
-        lazy: { Component: async () => (await import('./routes/Results.tsx')).Results },
+        lazy: lazyComponent(
+          () => import('./routes/Results.tsx'),
+          (m) => m.Results,
+        ),
       },
       {
         path: 'browse',
-        lazy: { Component: async () => (await import('./routes/Browse.tsx')).Browse },
+        lazy: lazyComponent(
+          () => import('./routes/Browse.tsx'),
+          (m) => m.Browse,
+        ),
       },
       {
         path: 'region/:regionSlug',
-        lazy: { Component: async () => (await import('./routes/Region.tsx')).Region },
+        lazy: lazyComponent(
+          () => import('./routes/Region.tsx'),
+          (m) => m.Region,
+        ),
       },
       {
         path: 'orgs/:slug',
-        lazy: { Component: async () => (await import('./routes/Org.tsx')).Org },
+        lazy: lazyComponent(
+          () => import('./routes/Org.tsx'),
+          (m) => m.Org,
+        ),
       },
       {
         path: 'submit',
-        lazy: { Component: async () => (await import('./routes/Submit.tsx')).Submit },
+        lazy: lazyComponent(
+          () => import('./routes/Submit.tsx'),
+          (m) => m.Submit,
+        ),
       },
       {
         path: 'about',
-        lazy: { Component: async () => (await import('./routes/About.tsx')).About },
+        lazy: lazyComponent(
+          () => import('./routes/About.tsx'),
+          (m) => m.About,
+        ),
       },
       {
         path: 'colophon',
-        lazy: {
-          Component: async () => (await import('./routes/Colophon.tsx')).Colophon,
-        },
+        lazy: lazyComponent(
+          () => import('./routes/Colophon.tsx'),
+          (m) => m.Colophon,
+        ),
       },
     ],
   },
