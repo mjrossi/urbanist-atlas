@@ -190,18 +190,18 @@ function shortDescForWire(form: SubmitForm): string {
   return '(removal request — see editor note)';
 }
 
+// Anything the API wouldn't accept as an email (an @handle, or an
+// x@y with no dot in the domain) still reaches the editor as
+// submitter_name.
 function maybeContact(raw: string): Partial<NewSubmissionRequest> {
-  // An @handle isn't a valid email; the API's optional email field is
-  // typed as `format: email`. Carry @handles in submitter_name so
-  // they're not lost.
   const trimmed = raw.trim();
-  if (trimmed.includes('@') && !trimmed.startsWith('@')) {
+  if (looksLikeEmail(trimmed)) {
     return { submitter_email: trimmed };
   }
   return { submitter_name: trimmed };
 }
 
-function buildSubmitterNote(form: SubmitForm): string {
+export function buildSubmitterNote(form: SubmitForm): string {
   const lines: string[] = [];
   lines.push(`Submission type: ${labelForType(form.type)}.`);
   const { slugs, freeText } = regionFieldsFor(form);
@@ -241,4 +241,109 @@ function labelForAffiliation(a: Affiliation): string {
     case 'other':
       return 'other';
   }
+}
+
+// The API's caps on submission fields. Character caps count code points
+// (the API counts runes, not UTF-16 units); the URL and email caps count
+// UTF-8 bytes.
+export const MAX_NAME_CHARS = 200;
+export const MAX_SHORT_DESC_CHARS = 1000;
+export const MAX_URL_BYTES = 500;
+export const MAX_SUBMITTER_NAME_CHARS = 200;
+export const MAX_SUBMITTER_EMAIL_BYTES = 320;
+export const MAX_SUBMITTER_NOTE_CHARS = 2000;
+
+/** Length in code points, not UTF-16 units. */
+export function charCount(s: string): number {
+  return Array.from(s).length;
+}
+
+function utf8Length(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
+function tooLong(max: number): string {
+  return `Keep it to ${max.toLocaleString('en-US')} characters or fewer.`;
+}
+
+/**
+ * The API's loose email shape: one '@' with text on both sides and a
+ * dot in the domain.
+ */
+export function looksLikeEmail(addr: string): boolean {
+  const at = addr.indexOf('@');
+  if (at <= 0 || at !== addr.lastIndexOf('@') || at === addr.length - 1) return false;
+  return addr.slice(at + 1).includes('.');
+}
+
+/** Inline error for the organization name, or undefined when it passes. */
+export function nameError(raw: string): string | undefined {
+  return charCount(raw.trim()) > MAX_NAME_CHARS ? tooLong(MAX_NAME_CHARS) : undefined;
+}
+
+/** Inline error for the one-line description, or undefined when it passes. */
+export function shortDescError(raw: string): string | undefined {
+  return charCount(raw.trim()) > MAX_SHORT_DESC_CHARS
+    ? tooLong(MAX_SHORT_DESC_CHARS)
+    : undefined;
+}
+
+/**
+ * Inline error for the website, or undefined when it passes or is empty
+ * (the required rule covers that). It needs an absolute http(s) URL with
+ * a host, split the way the API's URL parser splits it: fragment and
+ * query off first, then the authority after `//`, then any userinfo.
+ */
+export function websiteError(raw: string): string | undefined {
+  const url = raw.trim();
+  if (!url) return undefined;
+  if (utf8Length(url) > MAX_URL_BYTES) return tooLong(MAX_URL_BYTES);
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(url);
+  const name = scheme?.[1]?.toLowerCase();
+  if (!scheme || (name !== 'http' && name !== 'https')) {
+    return 'Start with http:// or https://.';
+  }
+  const rest = url.slice(scheme[0].length).split('#')[0]?.split('?')[0] ?? '';
+  const authority = rest.startsWith('//') ? (rest.slice(2).split('/')[0] ?? '') : '';
+  const host = authority.slice(authority.lastIndexOf('@') + 1);
+  return host ? undefined : 'Include the site’s address after the https://.';
+}
+
+/** Inline error for the contact field, or undefined when it passes. */
+export function contactError(raw: string): string | undefined {
+  const contact = raw.trim();
+  if (looksLikeEmail(contact)) {
+    return utf8Length(contact) > MAX_SUBMITTER_EMAIL_BYTES
+      ? tooLong(MAX_SUBMITTER_EMAIL_BYTES)
+      : undefined;
+  }
+  return charCount(contact) > MAX_SUBMITTER_NAME_CHARS
+    ? tooLong(MAX_SUBMITTER_NAME_CHARS)
+    : undefined;
+}
+
+/** The free-text fields that feed submitter_note, in page order. */
+export type NoteField = 'region' | 'why' | 'sources';
+
+/**
+ * Inline error for one of the fields composed into submitter_note, or
+ * undefined. When the note is over the cap, the error lands on the
+ * first field, in page order, whose text takes the note past it.
+ */
+export function noteFieldError(field: NoteField, form: SubmitForm): string | undefined {
+  const over = charCount(buildSubmitterNote(form)) - MAX_SUBMITTER_NOTE_CHARS;
+  if (over <= 0) return undefined;
+  const order: NoteField[] = ['region', 'why', 'sources'];
+  const partial: SubmitForm = { ...form, region: '', why: '', sources: '' };
+  let culprit: NoteField = 'sources';
+  for (const f of order) {
+    partial[f] = form[f];
+    if (charCount(buildSubmitterNote(partial)) > MAX_SUBMITTER_NOTE_CHARS) {
+      culprit = f;
+      break;
+    }
+  }
+  if (culprit !== field) return undefined;
+  const noun = over === 1 ? 'character' : 'characters';
+  return `Trim ${over.toLocaleString('en-US')} ${noun}. Your notes to the editor share a ${MAX_SUBMITTER_NOTE_CHARS.toLocaleString('en-US')}-character limit.`;
 }

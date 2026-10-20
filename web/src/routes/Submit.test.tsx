@@ -496,12 +496,10 @@ describe('Submit', () => {
     expect(screen.queryByText(/one or more fields failed validation/i)).toBeNull();
   });
 
-  it('surfaces unmapped/hidden-field validation errors in the top-level banner', async () => {
+  it('surfaces unmapped validation errors in the top-level banner', async () => {
     // `unrecognized_field` has no entry in FIELD_NAME_MAP (the client
-    // doesn't model every key the API might reject); `submitter_email`
-    // maps to the `contact` form field, which renders no inline error
-    // slot. Both would be swallowed if only `setError`-mapped fields
-    // showed.
+    // doesn't model every key the API might reject), so only the banner
+    // can show it; `submitter_email` maps to the contact field's slot.
     fetchSpy.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -523,12 +521,29 @@ describe('Submit', () => {
     await user.tab();
     await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
 
-    // Neither error has a home in the form, so both must appear in the
-    // banner rather than vanishing.
-    await waitFor(() => {
-      expect(screen.getByText(/unexpected validation failure/i)).toBeDefined();
-    });
+    const banner = await screen.findByText(/one or more fields failed validation/i);
+    const bannerBox = banner.closest<HTMLElement>('[role="alert"]')!;
+    expect(within(bannerBox).getByText(/unexpected validation failure/i)).toBeDefined();
+    expect(within(bannerBox).queryByText(/must be a valid email address/i)).toBeNull();
     expect(screen.getByText(/must be a valid email address/i)).toBeDefined();
+  });
+
+  it('flags input the API would reject inline, without posting', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user, { website: 'example.org' });
+    await user.click(screen.getByLabelText(/^sources/i));
+    await user.paste('s'.repeat(2100));
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    expect(await screen.findByText(/start with http:\/\/ or https:\/\//i)).toBeDefined();
+    const sources = screen.getByLabelText(/^sources/i);
+    const sourcesError = within(sources.closest<HTMLElement>('.field')!).getByRole(
+      'alert',
+    );
+    expect(sourcesError.textContent).toMatch(/2,000-character limit/);
+    expect(document.activeElement).toBe(screen.getByLabelText(/primary website/i));
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('shows the validation message when the API returns 400', async () => {
