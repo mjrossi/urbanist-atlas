@@ -2966,6 +2966,14 @@ fieldset.field {
   }
 }
 
+/* A floated legend isn't the fieldset's rendered legend (HTML rendering
+   spec), so it lays out as an ordinary grid item in the first cell, like
+   the other fields' labels. */
+fieldset.field > legend {
+  float: inline-start;
+  padding-inline: 0;
+}
+
 .field-label {
   font-family: var(--sans);
   font-size: 11px;
@@ -4074,7 +4082,6 @@ h1[tabindex='-1']:focus {
   .spread > aside {
     order: 2;
   }
-  .spread > main,
   .spread > div:first-child {
     order: 1;
   }

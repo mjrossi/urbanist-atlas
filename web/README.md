@@ -63,8 +63,10 @@ npm run build
 
 Point the SPA at a non-default API base by setting `VITE_API_BASE` in
 `.env.local` (e.g. `VITE_API_BASE=https://api.urbanistatlas.com`).
-The default is `http://localhost:8080`, which matches
-`cd ../api && just api-run`.
+The dev server and tests default to `http://localhost:8080`, which
+matches `cd ../api && just api-run`. `npm run build` (and so
+`just web-check`) fails unless `VITE_API_BASE` is set, so copy
+`.env.example` to `.env.local` before building locally.
 
 While the Phase 1 `X-Atlas-Client` gate is still in place (CLAUDE.md
 § Launch strategy), the API

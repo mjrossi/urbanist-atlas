@@ -13,6 +13,17 @@ function renderColophon() {
 }
 
 describe('Colophon', () => {
+  it('renders no landmark of its own inside the layout main', () => {
+    render(
+      <MemoryRouter initialEntries={['/colophon']}>
+        <main>
+          <Colophon />
+        </main>
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
   it('renders the page heading', () => {
     renderColophon();
     const h1 = screen.getByRole('heading', { level: 1 });

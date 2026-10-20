@@ -15,11 +15,17 @@ import { ApiError, createSubmission, type Submission } from '../lib/api.ts';
 import {
   buildIssueUrl,
   buildNewSubmissionRequest,
+  contactError,
   isServerOrUnreachable,
+  nameError,
+  type NoteField,
+  noteFieldError,
+  shortDescError,
   shortSubmissionId,
   type SubmissionType,
   SUBMIT_FORM_DEFAULTS,
   type SubmitForm,
+  websiteError,
 } from '../lib/submitForm.ts';
 import { useCountdown } from '../lib/timers.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -46,9 +52,33 @@ const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
   submitter_note: 'why',
 };
 
-// The fields with an inline error slot, top to bottom. The last two exist
-// only on a new-org submission.
-const ERROR_SLOT_FIELDS = ['name', 'website', 'regionSlugs', 'oneLineDesc'] as const;
+// The fields with an inline error slot, top to bottom.
+const ERROR_SLOT_FIELDS = [
+  'name',
+  'website',
+  'regionSlugs',
+  'region',
+  'oneLineDesc',
+  'why',
+  'sources',
+  'contact',
+] as const;
+
+// The slots rendered only on a new-org submission.
+const NEW_ORG_ONLY_FIELDS: ReadonlySet<FieldPath<SubmitForm>> = new Set([
+  'regionSlugs',
+  'region',
+  'oneLineDesc',
+]);
+
+// The fields composed into submitter_note re-check each other, since text
+// in one can push the note past its cap for the error shown on another.
+function noteFieldRules(field: NoteField) {
+  return {
+    validate: (_: unknown, form: SubmitForm) => noteFieldError(field, form) ?? true,
+    deps: (['region', 'why', 'sources'] as const).filter((f) => f !== field),
+  };
+}
 
 /**
  * Per-submission-type copy. The three flavors share one layout but swap
@@ -110,9 +140,8 @@ interface SubmitErrorView {
  *
  * `unmappedFieldErrors` are API field errors with no visible home in the
  * form — an unmapped API key, or one mapped to a field this submission
- * type hides (e.g. `region_slugs`/`short_desc` on a correction/removal,
- * or `contact`/`why`, which have no inline error slot). They'd otherwise
- * be swallowed, so the top-level banner surfaces them.
+ * type hides (e.g. `region_slugs`/`short_desc` on a correction/removal).
+ * They'd otherwise be swallowed, so the top-level banner surfaces them.
  */
 function deriveSubmitError(
   err: Error | null,
@@ -152,12 +181,7 @@ function deriveSubmitError(
   };
 }
 
-/**
- * A fieldset's legend, which must be the fieldset's first child to name
- * the group. A rendered legend sits in the fieldset's border, outside its
- * grid, so the accessible legend is visually hidden and a hidden-from-AT
- * copy keeps the label in the grid's first cell.
- */
+/** A fieldset's legend; it must be the fieldset's first child to name the group. */
 function FieldsetLegend({
   children,
   required,
@@ -165,20 +189,11 @@ function FieldsetLegend({
   children: string;
   required?: boolean;
 }) {
-  const mark = required ? <span className="required">*</span> : null;
   return (
-    <>
-      <legend className="sr-only">
-        {children}
-        {mark}
-      </legend>
-      <div aria-hidden="true">
-        <div className="field-label">
-          {children}
-          {mark}
-        </div>
-      </div>
-    </>
+    <legend className="field-label">
+      {children}
+      {required ? <span className="required">*</span> : null}
+    </legend>
   );
 }
 
@@ -310,7 +325,7 @@ export function Submit() {
   // type — drives which API field errors have a visible home; the rest
   // surface in the top-level banner (see deriveSubmitError).
   const visibleFieldErrorSlots = new Set<FieldPath<SubmitForm>>(
-    isNewOrg ? ERROR_SLOT_FIELDS : ['name', 'website'],
+    ERROR_SLOT_FIELDS.filter((f) => isNewOrg || !NEW_ORG_ONLY_FIELDS.has(f)),
   );
   const {
     isRateLimited,
@@ -414,7 +429,10 @@ export function Submit() {
                   type="text"
                   className="input"
                   placeholder="e.g. Transit Riders Union"
-                  {...register('name', { required: 'Required' })}
+                  {...register('name', {
+                    required: 'Required',
+                    validate: (v) => nameError(v) ?? true,
+                  })}
                 />
                 <FieldErrorSlot error={errors.name} />
               </div>
@@ -436,7 +454,10 @@ export function Submit() {
                   type="url"
                   className="input"
                   placeholder="https://"
-                  {...register('website', { required: 'Required' })}
+                  {...register('website', {
+                    required: 'Required',
+                    validate: (v) => websiteError(v) ?? true,
+                  })}
                 />
                 <FieldErrorSlot error={errors.website} />
               </div>
@@ -502,11 +523,13 @@ export function Submit() {
                     className="input"
                     placeholder="e.g. Ann Arbor, Michigan"
                     {...register('region', {
+                      ...noteFieldRules('region'),
                       // Typing here satisfies the region rule on the
                       // field above, so re-check that field as they type.
                       onChange: () => void trigger('regionSlugs'),
                     })}
                   />
+                  <FieldErrorSlot error={errors.region} />
                 </div>
 
                 <div className="field stacked">
@@ -522,7 +545,10 @@ export function Submit() {
                     className="textarea"
                     rows={2}
                     placeholder="Campaigns for better bus service."
-                    {...register('oneLineDesc', { required: 'Required' })}
+                    {...register('oneLineDesc', {
+                      required: 'Required',
+                      validate: (v) => shortDescError(v) ?? true,
+                    })}
                   />
                   <FieldErrorSlot error={errors.oneLineDesc} />
                 </div>
@@ -541,8 +567,9 @@ export function Submit() {
                 className="textarea tall"
                 rows={4}
                 placeholder={copy.editorialPlaceholder}
-                {...register('why')}
+                {...register('why', noteFieldRules('why'))}
               />
+              <FieldErrorSlot error={errors.why} />
             </div>
 
             <div className="field stacked">
@@ -558,8 +585,9 @@ export function Submit() {
                 rows={3}
                 placeholder="https://newspaper.com/article
 https://group.org/about"
-                {...register('sources')}
+                {...register('sources', noteFieldRules('sources'))}
               />
+              <FieldErrorSlot error={errors.sources} />
             </div>
 
             <fieldset className="field stacked">
@@ -607,8 +635,11 @@ https://group.org/about"
                   type="text"
                   className="input"
                   placeholder="you@example.com or @handle"
-                  {...register('contact')}
+                  {...register('contact', {
+                    validate: (v) => contactError(v) ?? true,
+                  })}
                 />
+                <FieldErrorSlot error={errors.contact} />
               </div>
             </div>
 

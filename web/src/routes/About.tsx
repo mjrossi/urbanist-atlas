@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useState, useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router';
 
+import { JumpLink } from '../components/JumpLink.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { openapiUrl } from '../lib/api.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
@@ -239,19 +240,19 @@ export function About() {
             <div className="rail-kicker">On this page</div>
             <ul className="plain">
               <li>
-                <a href="#mission">I &middot; Mission</a>
+                <JumpLink targetId="mission">I &middot; Mission</JumpLink>
               </li>
               <li>
-                <a href="#methodology">II &middot; Methodology</a>
+                <JumpLink targetId="methodology">II &middot; Methodology</JumpLink>
               </li>
               <li>
-                <a href="#corrections">III &middot; Independence</a>
+                <JumpLink targetId="corrections">III &middot; Independence</JumpLink>
               </li>
               <li>
-                <a href="#for-developers">IV &middot; For developers</a>
+                <JumpLink targetId="for-developers">IV &middot; For developers</JumpLink>
               </li>
               <li>
-                <a href="#acknowledgments">V &middot; Acknowledgments</a>
+                <JumpLink targetId="acknowledgments">V &middot; Acknowledgments</JumpLink>
               </li>
             </ul>
           </div>

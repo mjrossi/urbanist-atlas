@@ -34,7 +34,7 @@ export function Colophon() {
       </div>
 
       <div className="spread">
-        <main className="prose">
+        <div className="prose">
           <div className="section-kicker">§ I — Data sources</div>
           <h2>Where the geography comes from.</h2>
           <div className="h2-rule" />
@@ -206,7 +206,7 @@ X-Data-Attribution: https://urbanistatlas.com
               </figcaption>
             </figure>
           </div>
-        </main>
+        </div>
 
         <aside className="rail">
           <div className="rail-block">

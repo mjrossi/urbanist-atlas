@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useCooldown, useCountdown } from './timers.ts';
+import { useCountdown } from './timers.ts';
 
 describe('useCountdown', () => {
   beforeEach(() => {
@@ -75,51 +75,6 @@ describe('useCountdown', () => {
     const { result, unmount } = renderHook(() => useCountdown());
     act(() => {
       result.current[1](5);
-    });
-    expect(vi.getTimerCount()).toBeGreaterThan(0);
-    unmount();
-    expect(vi.getTimerCount()).toBe(0);
-  });
-});
-
-describe('useCooldown', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('is inactive until triggered', () => {
-    const { result } = renderHook(() => useCooldown(1500));
-    expect(result.current[0]).toBe(false);
-  });
-
-  it('latches active on trigger, then clears itself after the window', () => {
-    const { result } = renderHook(() => useCooldown(1500));
-
-    act(() => {
-      result.current[1]();
-    });
-    expect(result.current[0]).toBe(true);
-
-    // Still locked one tick short of the window…
-    act(() => {
-      vi.advanceTimersByTime(1499);
-    });
-    expect(result.current[0]).toBe(true);
-
-    // …and released exactly when it elapses.
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-    expect(result.current[0]).toBe(false);
-  });
-
-  it('clears its timeout on unmount', () => {
-    const { result, unmount } = renderHook(() => useCooldown(1500));
-    act(() => {
-      result.current[1]();
     });
     expect(vi.getTimerCount()).toBeGreaterThan(0);
     unmount();

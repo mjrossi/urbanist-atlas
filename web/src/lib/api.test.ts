@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
+  apiBase,
   ApiError,
   apiFetch,
   getOrg,
@@ -438,7 +439,7 @@ describe('apiFetch — happy path', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
     await apiFetch('/api/v1/anything');
     const [url] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toBe('http://localhost:8080/api/v1/anything');
+    expect(String(url)).toBe(`${apiBase}/api/v1/anything`);
   });
 
   // The X-Atlas-Client secret rides on every request, so a path must
@@ -447,7 +448,7 @@ describe('apiFetch — happy path', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
     await apiFetch('https://example.com/somewhere');
     const [url] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toBe('http://localhost:8080https://example.com/somewhere');
+    expect(String(url)).toBe(`${apiBase}https://example.com/somewhere`);
   });
 
   it('returns the parsed body as T', async () => {

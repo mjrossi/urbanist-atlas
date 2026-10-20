@@ -369,10 +369,10 @@ describe('Browse', () => {
     expect(new Set(ids).size).toBe(ids.length);
 
     const targets = [...container.querySelectorAll<HTMLAnchorElement>('.az-index a')].map(
-      (a) => a.getAttribute('href')?.slice(1) ?? '',
+      (a) => new URL(a.href).hash.slice(1),
     );
     expect(targets.sort()).toEqual([...ids].sort());
     const canadaT = screen.getByRole('navigation', { name: /jump to letter.*canada/i });
-    expect(canadaT.querySelector('a')?.getAttribute('href')).toBe('#CA-T');
+    expect(canadaT.querySelector('a')?.getAttribute('href')).toBe('/browse#CA-T');
   });
 });

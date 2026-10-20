@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router';
 
 import { EmptyState } from '../components/EmptyState.tsx';
+import { JumpLink } from '../components/JumpLink.tsx';
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { QueryState } from '../components/QueryState.tsx';
 import type { RegionSummary, Stats } from '../lib/api.ts';
@@ -254,9 +255,9 @@ function CountrySection({
         <span className="az-label">Jump to</span>
         {ALPHABET.map((letter) =>
           letters.has(letter) ? (
-            <a key={letter} href={`#${letterId(country.country, letter)}`}>
+            <JumpLink key={letter} targetId={letterId(country.country, letter)}>
               {letter}
-            </a>
+            </JumpLink>
           ) : (
             <span key={letter} className="dim">
               {letter}
