@@ -13,10 +13,9 @@ export interface paths {
         };
         /**
          * Liveness probe.
-         * @description Used by Fly as a liveness check. Deliberately does NOT touch
-         *     any downstream dependency (database, etc.) so a DB outage
-         *     doesn't cause Fly to recycle the machine and lose the recovery
-         *     window.
+         * @description Used by Fly as a liveness check. Does not touch any downstream
+         *     dependency (database, etc.), so it answers 200 whenever the
+         *     process is serving.
          */
         get: operations["getHealth"];
         put?: never;
@@ -89,9 +88,10 @@ export interface paths {
          *     and `regional` (metro/state/province/multi-state) groups, in
          *     that order of geographic specificity within each bucket.
          *
-         *     Canadian postal codes are normalized to the 3-character FSA
-         *     (e.g. `M5V 3A8` → `M5V`) server-side; clients may pass either
-         *     form.
+         *     A US ZIP+4 is truncated to its 5-digit ZIP (e.g. `11217-1234`
+         *     → `11217`), and a Canadian postal code is normalized to its
+         *     3-character FSA (e.g. `M5V 3A8` → `M5V`) server-side; clients
+         *     may pass either form.
          *
          *     A code with no mapped region returns 404. US military (APO/FPO)
          *     and diplomatic (DPO) ZIPs are a special case of that 404, carrying
@@ -1316,8 +1316,9 @@ export interface components {
     };
     parameters: {
         /**
-         * @description US ZIP code (e.g. `11217`) or ZIP+4 (e.g. `11217-1234`), or a
-         *     Canadian postal code or FSA (e.g. `M5V` or `M5V 3A8`).
+         * @description US ZIP code (e.g. `11217`) or ZIP+4 (`11217-1234` or
+         *     `112171234`), or a Canadian postal code or FSA (e.g. `M5V` or
+         *     `M5V 3A8`).
          *     Whitespace is trimmed; a ZIP+4 is truncated to its 5-digit ZIP
          *     and a CA code to its 3-character FSA server-side.
          */
@@ -1430,8 +1431,9 @@ export interface operations {
         parameters: {
             query: {
                 /**
-                 * @description US ZIP code (e.g. `11217`) or ZIP+4 (e.g. `11217-1234`), or a
-                 *     Canadian postal code or FSA (e.g. `M5V` or `M5V 3A8`).
+                 * @description US ZIP code (e.g. `11217`) or ZIP+4 (`11217-1234` or
+                 *     `112171234`), or a Canadian postal code or FSA (e.g. `M5V` or
+                 *     `M5V 3A8`).
                  *     Whitespace is trimmed; a ZIP+4 is truncated to its 5-digit ZIP
                  *     and a CA code to its 3-character FSA server-side.
                  */
@@ -1538,7 +1540,7 @@ export interface operations {
                 /**
                  * @description The search term. Matched case-insensitively against region
                  *     name and slug. Blank, whitespace-only, or omitted returns an
-                 *     empty result set. At most 100 bytes; a longer `q` is
+                 *     empty result set. At most 100 characters; a longer `q` is
                  *     rejected with a 400 problem document (`type`
                  *     `https://urbanistatlas.com/problems/validation`).
                  */
