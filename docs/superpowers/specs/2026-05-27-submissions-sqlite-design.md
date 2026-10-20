@@ -149,14 +149,25 @@ shapes are RFC 9457 problem documents.
 The Submission schema in `components/schemas/Submission` mirrors
 the `[[org]]` TOML shape: `slug`, `name`, `short_desc`,
 `website_url`, optional `contact_url`, `tags[]`, `region_slugs[]`,
-plus the submitter metadata. Validation runs server-side against
-the same rules `seedfiles.validateOrgs` already enforces on the
-seed file.
+plus the submitter metadata. Validation runs server-side in
+`atlas.ValidateSubmission`, which shares its field caps and URL rule
+with the seed loader's `seedfiles.ValidateOrgFields`.
 
-Rate limiting on `POST /submissions` is per-IP in-process for v1
-(simple sliding window), tightened to "a handful per hour per IP".
-Cloudflare's WAF rate-limit rule sits in front for additional
-defense.
+`POST /submissions` is throttled in-process only. The API is served
+by Fly directly, and nothing in this repo configures a WAF or any
+other rate limit in front of it. Three checks apply, all in
+`internal/httpapi/ratelimit.go`:
+
+- **Per source address:** a one-hour sliding window
+  (`--submissions-rate-per-hour`, default 5), keyed by IPv4 address
+  or IPv6 /64.
+- **Service-wide:** one shared budget across all clients per hour
+  (`submissionsGlobalPerWindow` in `tuning.go`).
+- **Pending-queue guard:** refuses new submissions while the
+  moderation queue holds `maxPendingSubmissions`.
+
+All three answer 429 with `Retry-After`. The limiter state is
+per-process and resets on restart.
 
 ## Approval flow
 
