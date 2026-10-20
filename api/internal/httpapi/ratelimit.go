@@ -136,6 +136,22 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
+// submissionRateLimit refuses a request with a 429 when limiter.allow
+// rejects its source address.
+func submissionRateLimit(limiter *ipRateLimiter, m *Metrics) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if ok, retry := limiter.allow(clientIP(r)); !ok {
+				m.incRateLimit("submissions")
+				m.incSubmissions("rate_limited")
+				writeRateLimited(w, r, retry, requestIDFromContext(r.Context()))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // writeRateLimited emits a 429 with Retry-After + the rate-limited
 // problem type.
 func writeRateLimited(w http.ResponseWriter, r *http.Request, retryAfterSec int, rid string) {

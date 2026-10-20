@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/go-cmp/cmp"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
@@ -95,7 +97,7 @@ func buildSubmissionRoutes(subs atlas.SubmissionStore, store atlas.Store, enq Pr
 	r := chi.NewRouter()
 	r.Use(requestIDMiddleware)
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/submissions", createSubmissionHandler(subs, store, limiter, logger, m))
+		r.With(submissionRateLimit(limiter, m)).Post("/submissions", createSubmissionHandler(subs, store, logger, m))
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(bearerAuthMiddleware(testAdminToken))
 			r.Get("/submissions", listSubmissionsHandler(subs, logger))
@@ -689,5 +691,115 @@ func TestReject_HappyPath(t *testing.T) {
 	}
 	if body["rejection_reason"] != "duplicate" {
 		t.Fatalf("reason: %v", body["rejection_reason"])
+	}
+}
+
+// TestCreateSubmission_FieldErrorEnvelope pins the full validation
+// problem document and per-field metrics for POST /submissions.
+func TestCreateSubmission_FieldErrorEnvelope(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	delete(body["payload"].(map[string]any), "name")
+	body["payload"].(map[string]any)["region_slugs"] = []string{"no-such-region"}
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", resp.StatusCode)
+	}
+	var problem map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&problem); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got, want := problem["title"], "Submission Validation Failed"; got != want {
+		t.Errorf("title = %v, want %q", got, want)
+	}
+	if got, want := problem["detail"], "One or more fields in the submission failed validation. See the errors map for per-field messages."; got != want {
+		t.Errorf("detail = %v, want %q", got, want)
+	}
+	wantErrs := map[string]any{
+		"name":         "Name is required.",
+		"region_slugs": `Region slug "no-such-region" does not match any known region.`,
+	}
+	if diff := cmp.Diff(wantErrs, problem["errors"]); diff != "" {
+		t.Errorf("errors (-want +got):\n%s", diff)
+	}
+	for _, field := range []string{"name", "region_slugs"} {
+		if got := testutil.ToFloat64(rig.metrics.submissionValidationFailures.WithLabelValues(field)); got != 1 {
+			t.Errorf("submission_validation_failures_total{field=%s} = %v, want 1", field, got)
+		}
+	}
+	if got := testutil.ToFloat64(rig.metrics.submissions.WithLabelValues("rejected_validation")); got != 1 {
+		t.Errorf("submissions_total{status=rejected_validation} = %v, want 1", got)
+	}
+}
+
+func TestCreateSubmission_EmptyBodyProblem(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	resp, err := http.Post(rig.srv.URL+"/api/v1/submissions", "application/json", http.NoBody)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", resp.StatusCode)
+	}
+	var problem map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&problem); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got, want := problem["title"], "Empty Request Body"; got != want {
+		t.Errorf("title = %v, want %q", got, want)
+	}
+	if got, want := problem["detail"], "The request body is empty; expected a NewSubmissionRequest JSON object."; got != want {
+		t.Errorf("detail = %v, want %q", got, want)
+	}
+	if _, ok := problem["errors"]; ok {
+		t.Errorf("parse failure carried a field errors map: %v", problem)
+	}
+	if got := testutil.ToFloat64(rig.metrics.submissions.WithLabelValues("rejected_validation")); got != 1 {
+		t.Errorf("submissions_total{status=rejected_validation} = %v, want 1", got)
+	}
+}
+
+// TestCreateSubmission_StoresTrimmedPayload pins that the stored row is
+// the normalized input, not the raw body.
+func TestCreateSubmission_StoresTrimmedPayload(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	body := goodSubmissionBody()
+	body["payload"].(map[string]any)["name"] = "  Brooklyn Greenways  "
+	body["payload"].(map[string]any)["region_slugs"] = []string{" brooklyn-ny ", " "}
+
+	resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", body, nil)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status: want 201, got %d", resp.StatusCode)
+	}
+	var created map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	payload := created["payload"].(map[string]any)
+	if got := payload["name"]; got != "Brooklyn Greenways" {
+		t.Errorf("payload.name = %v, want trimmed", got)
+	}
+	if diff := cmp.Diff([]any{"brooklyn-ny"}, payload["region_slugs"]); diff != "" {
+		t.Errorf("payload.region_slugs (-want +got):\n%s", diff)
+	}
+}
+
+func TestCreateSubmission_RateLimitedCountsMetrics(t *testing.T) {
+	rig := newSubmissionsTestServer(t)
+	for range 3 {
+		resp := postJSON(t, rig.srv.URL+"/api/v1/submissions", goodSubmissionBody(), nil)
+		_ = resp.Body.Close()
+	}
+	if got := testutil.ToFloat64(rig.metrics.submissions.WithLabelValues("rate_limited")); got != 1 {
+		t.Errorf("submissions_total{status=rate_limited} = %v, want 1", got)
+	}
+	if got := testutil.ToFloat64(rig.metrics.rateLimit.WithLabelValues("submissions")); got != 1 {
+		t.Errorf("rate_limit_total{endpoint=submissions} = %v, want 1", got)
 	}
 }

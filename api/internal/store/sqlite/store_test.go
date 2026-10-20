@@ -336,7 +336,7 @@ func TestListPage_CursorContinuity(t *testing.T) {
 func TestListPage_InvalidCursor(t *testing.T) {
 	s := newTestStore(t)
 	_, err := s.ListPage(context.Background(), atlas.ListSubmissionsQuery{Cursor: "not-valid-base64-$$$"})
-	if !errors.Is(err, sqlite.ErrInvalidCursor) {
+	if !errors.Is(err, atlas.ErrInvalidCursor) {
 		t.Fatalf("err = %v, want ErrInvalidCursor", err)
 	}
 }

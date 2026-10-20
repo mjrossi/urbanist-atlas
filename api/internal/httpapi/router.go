@@ -183,8 +183,10 @@ func New(cfg Config) http.Handler {
 			// group: it is browser-facing, so the deterrent applies.
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
-				r.With(pendingQueueGuard(cfg.Submissions, maxPendingSubmissions, logger, cfg.Metrics)).
-					Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger, cfg.Metrics))
+				r.With(
+					pendingQueueGuard(cfg.Submissions, maxPendingSubmissions, logger, cfg.Metrics),
+					submissionRateLimit(limiter, cfg.Metrics),
+				).Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, logger, cfg.Metrics))
 			}
 		})
 	})

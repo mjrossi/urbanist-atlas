@@ -29,11 +29,6 @@ import (
 	sqlitegen "github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite/gen"
 )
 
-// ErrInvalidCursor is returned by List/ListPage when the supplied
-// cursor isn't a value previously emitted by ListPage. The HTTP layer
-// surfaces this as a 400 problem document.
-var ErrInvalidCursor = errors.New("sqlite.List: invalid cursor")
-
 // SQLite stores timestamps as TEXT in this format so they round-trip
 // cleanly through strftime() defaults from the migration.
 const sqliteTimeFormat = "2006-01-02T15:04:05.000Z"
@@ -256,7 +251,7 @@ func encodeCursor(createdAt, publicID string) string {
 }
 
 // decodeCursor returns the components of a cursor previously produced
-// by encodeCursor, or ErrInvalidCursor on malformed input. Empty
+// by encodeCursor, or atlas.ErrInvalidCursor on malformed input. Empty
 // cursor means "no cursor" — returns hasCursor=false with no error.
 func decodeCursor(cursor string) (createdAt, publicID string, hasCursor bool, err error) {
 	if cursor == "" {
@@ -264,11 +259,11 @@ func decodeCursor(cursor string) (createdAt, publicID string, hasCursor bool, er
 	}
 	raw, derr := base64.RawURLEncoding.DecodeString(cursor)
 	if derr != nil {
-		return "", "", false, ErrInvalidCursor
+		return "", "", false, atlas.ErrInvalidCursor
 	}
 	sep := strings.IndexByte(string(raw), '|')
 	if sep <= 0 || sep == len(raw)-1 {
-		return "", "", false, ErrInvalidCursor
+		return "", "", false, atlas.ErrInvalidCursor
 	}
 	return string(raw[:sep]), string(raw[sep+1:]), true, nil
 }
