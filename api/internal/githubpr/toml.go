@@ -17,11 +17,9 @@ import (
 // That matters because git diffs on the seed file are the editorial-
 // review surface; consistent formatting keeps them signal-rich.
 //
-// Slug is derived from the submitted website hostname's last
-// path-safe label; the maintainer can rewrite it during PR review
-// without surprises (the slug isn't carried by the submission
-// payload — see CLAUDE.md / spec for why moderators own that
-// decision).
+// The caller supplies slug, normally DeriveSlug of the org name;
+// submissions don't carry one, so the maintainer may rewrite it
+// during PR review.
 //
 // addedAt is the approval date, sourced from the server clock at
 // approval time (typically sub.ProcessedAt). It's deliberately

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,18 +18,34 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// fakeGitHub captures the sequence of calls a PR-creation flow makes
-// against api.github.com and returns canned responses.
+// fakeRef is a branch head (or commit snapshot) in fakeGitHub. The repo
+// holds a single file, so a commit is fully described by that file's
+// content and blob SHA.
+type fakeRef struct {
+	commit  string
+	content string
+	fileSHA string
+}
+
+// fakeGitHub models just enough of the GitHub REST API for the PR
+// pipeline: per-branch file state, 409 on a stale blob SHA, `?ref=` on
+// reads, and 422 on a duplicate ref. It must reject what GitHub rejects,
+// or the tests only mirror the worker's own assumptions.
 type fakeGitHub struct {
 	mu          sync.Mutex
 	t           *testing.T
-	branchSHA   string
-	fileSHA     string
+	branchSHA   string // main's initial commit
+	fileSHA     string // main's initial blob
 	fileContent string
+
+	refs    map[string]fakeRef // branch name -> head
+	commits map[string]fakeRef // commit SHA -> snapshot
+	seq     int
 
 	getRefCalled         int
 	getContentsCalled    int
 	createRefCalled      int
+	updateRefCalled      int
 	createRefBody        map[string]string
 	putContentsBody      map[string]string
 	createPRBody         map[string]string
@@ -36,38 +53,62 @@ type fakeGitHub struct {
 	failOnCreatePRStatus int
 
 	// getRefTransientFailures: while > 0, the get-ref endpoint answers
-	// with getRefTransientStatus (default 503) and decrements, so a
-	// test can exercise the idempotent-GET retry path before the call
-	// finally succeeds.
+	// with getRefTransientStatus (default 503) and decrements.
 	getRefTransientFailures int
 	getRefTransientStatus   int
 
-	// createRefAlreadyExists makes the create-ref endpoint answer with a
-	// 422 "Reference already exists" body, simulating a branch a prior
-	// openPR attempt left behind. createBranch must treat that as success
-	// (idempotent whole-pipeline retry, issue #24).
-	createRefAlreadyExists bool
-
 	// getRefBlockUntilCtx makes the get-ref endpoint hang until the
-	// request's context is canceled (simulating a wedged GitHub call).
-	// Used by the issue #25 shutdown-drain-deadline test to prove a
-	// stuck remote can't pin process exit past shutdownDrainTimeout.
+	// request's context is canceled, simulating a wedged GitHub call.
 	getRefBlockUntilCtx bool
 }
 
 func newFakeGitHub(t *testing.T, fileContent string) *fakeGitHub {
-	return &fakeGitHub{
+	f := &fakeGitHub{
 		t:                   t,
 		branchSHA:           "deadbeefcafe00000000000000000000deadbeef",
 		fileSHA:             "filecontentsha000000000000000000feedface",
 		fileContent:         fileContent,
 		createPRResponseURL: "https://github.com/mjrossi/urbanist-atlas/pull/42",
+		refs:                map[string]fakeRef{},
+		commits:             map[string]fakeRef{},
 	}
+	main := fakeRef{commit: f.branchSHA, content: fileContent, fileSHA: f.fileSHA}
+	f.refs["main"] = main
+	f.commits[main.commit] = main
+	return f
+}
+
+// commitLocked records a new commit with content on branch. Caller holds f.mu.
+func (f *fakeGitHub) commitLocked(branch, content string) fakeRef {
+	f.seq++
+	ref := fakeRef{
+		commit:  fmt.Sprintf("commit-%d", f.seq),
+		content: content,
+		fileSHA: fmt.Sprintf("blob-%d", f.seq),
+	}
+	f.refs[branch] = ref
+	f.commits[ref.commit] = ref
+	return ref
+}
+
+// commit is commitLocked for test setup, e.g. moving main forward.
+func (f *fakeGitHub) commit(branch, content string) fakeRef {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.commitLocked(branch, content)
+}
+
+func (f *fakeGitHub) branch(name string) (fakeRef, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ref, ok := f.refs[name]
+	return ref, ok
 }
 
 func (f *fakeGitHub) handler() http.Handler {
+	const repo = "/repos/mjrossi/urbanist-atlas"
 	mux := http.NewServeMux()
-	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/git/ref/heads/main", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET "+repo+"/git/ref/heads/{branch...}", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.getRefCalled++
 		block := f.getRefBlockUntilCtx
@@ -81,53 +122,116 @@ func (f *fakeGitHub) handler() http.Handler {
 			http.Error(w, "transient", status)
 			return
 		}
+		ref, ok := f.refs[r.PathValue("branch")]
 		f.mu.Unlock()
 		if block {
-			// Hang until the client cancels (the request ctx fires when
-			// the worker's per-call deadline elapses). Never respond.
 			<-r.Context().Done()
 			return
 		}
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]any{"message": "Not Found"})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"object": map[string]string{"sha": f.branchSHA, "type": "commit"},
+			"object": map[string]string{"sha": ref.commit, "type": "commit"},
 		})
 	})
-	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/contents/api/seed/orgs.toml", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			f.mu.Lock()
-			defer f.mu.Unlock()
-			f.getContentsCalled++
-			writeJSON(w, http.StatusOK, map[string]any{
-				"content":  base64.StdEncoding.EncodeToString([]byte(f.fileContent)),
-				"encoding": "base64",
-				"sha":      f.fileSHA,
-			})
-		case http.MethodPut:
-			f.mu.Lock()
-			defer f.mu.Unlock()
-			body := readJSONStringMap(f.t, r.Body)
-			f.putContentsBody = body
-			writeJSON(w, http.StatusOK, map[string]any{"commit": map[string]string{"sha": "newcommitsha"}})
-		default:
-			http.NotFound(w, r)
+	mux.HandleFunc("GET "+repo+"/contents/api/seed/orgs.toml", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.getContentsCalled++
+		branch := r.URL.Query().Get("ref")
+		if branch == "" {
+			branch = "main"
 		}
+		ref, ok := f.refs[branch]
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]any{"message": "No commit found for the ref " + branch})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"content":  base64.StdEncoding.EncodeToString([]byte(ref.content)),
+			"encoding": "base64",
+			"sha":      ref.fileSHA,
+		})
 	})
-	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/git/refs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT "+repo+"/contents/api/seed/orgs.toml", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		body := readJSONStringMap(f.t, r.Body)
+		f.putContentsBody = body
+		branch := body["branch"]
+		if branch == "" {
+			branch = "main"
+		}
+		ref, ok := f.refs[branch]
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]any{"message": "Branch " + branch + " not found"})
+			return
+		}
+		if body["sha"] != ref.fileSHA {
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"message": "api/seed/orgs.toml does not match " + body["sha"],
+			})
+			return
+		}
+		content, err := base64.StdEncoding.DecodeString(body["content"])
+		if err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": "content is not valid Base64"})
+			return
+		}
+		next := f.commitLocked(branch, string(content))
+		writeJSON(w, http.StatusOK, map[string]any{"commit": map[string]string{"sha": next.commit}})
+	})
+	mux.HandleFunc("POST "+repo+"/git/refs", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.createRefCalled++
 		f.createRefBody = readJSONStringMap(f.t, r.Body)
-		if f.createRefAlreadyExists {
-			// Shape mirrors GitHub's real 422 for a duplicate ref.
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"message": "Reference already exists",
-			})
+		name := strings.TrimPrefix(f.createRefBody["ref"], "refs/heads/")
+		if _, exists := f.refs[name]; exists {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": "Reference already exists"})
 			return
 		}
+		snap, ok := f.commits[f.createRefBody["sha"]]
+		if !ok {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": "Object does not exist"})
+			return
+		}
+		f.refs[name] = snap
 		writeJSON(w, http.StatusCreated, map[string]any{"ref": f.createRefBody["ref"]})
 	})
-	mux.HandleFunc("/repos/mjrossi/urbanist-atlas/pulls", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PATCH "+repo+"/git/refs/heads/{branch...}", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.updateRefCalled++
+		var body struct {
+			SHA   string `json:"sha"`
+			Force bool   `json:"force"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			f.t.Errorf("decode update-ref body: %v", err)
+		}
+		name := r.PathValue("branch")
+		if _, exists := f.refs[name]; !exists {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": "Reference does not exist"})
+			return
+		}
+		snap, ok := f.commits[body.SHA]
+		if !ok {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": "Object does not exist"})
+			return
+		}
+		// The fake keeps no commit graph, so any non-forced move is
+		// treated as a non-fast-forward.
+		if !body.Force {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": "Update is not a fast forward"})
+			return
+		}
+		f.refs[name] = snap
+		writeJSON(w, http.StatusOK, map[string]any{"ref": "refs/heads/" + name})
+	})
+	mux.HandleFunc("POST "+repo+"/pulls", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.createPRBody = readJSONStringMap(f.t, r.Body)
@@ -279,15 +383,106 @@ func TestWorker_HappyPath_OpensPR(t *testing.T) {
 		t.Fatalf("existing content not preserved at top of file: %s", decoded[:min(200, len(decoded))])
 	}
 
-	// PR body must include the public id + submitter line.
 	if !strings.Contains(gh.createPRBody["body"], "01928200-3344-7000-9abc-000000000001") {
 		t.Fatalf("PR body missing public id: %q", gh.createPRBody["body"])
 	}
-	if !strings.Contains(gh.createPRBody["body"], "Jane") || !strings.Contains(gh.createPRBody["body"], "jane@example.org") {
-		t.Fatalf("PR body missing submitter info: %q", gh.createPRBody["body"])
-	}
-	if gh.createPRBody["title"] != "Add Brooklyn Greenways" {
+	if gh.createPRBody["title"] != "Add `Brooklyn Greenways`" {
 		t.Fatalf("PR title = %q", gh.createPRBody["title"])
+	}
+}
+
+// TestBuildPRBody_OmitsSubmitterPII: the PR lands on a public repo, and
+// the submit form tells submitters their email is for editor follow-up
+// only. Name, email and note must never reach the body.
+func TestBuildPRBody_OmitsSubmitterPII(t *testing.T) {
+	sub := sampleSubmission()
+	sub.SubmitterName = "Jane Q. Submitter"
+	sub.SubmitterEmail = "jane.private@example.org"
+	sub.SubmitterNote = "Call me on 555-0100 about the Ashland project."
+	body := buildPRBody(sub)
+
+	for _, secret := range []string{"Jane", "jane.private@example.org", "555-0100", "Ashland"} {
+		if strings.Contains(body, secret) {
+			t.Errorf("PR body leaks submitter data %q:\n%s", secret, body)
+		}
+	}
+	for _, want := range []string{
+		"`01928200-3344-7000-9abc-000000000001`",
+		"2026-05-28T14:30:00Z",
+		"`brooklyn-ny`",
+		"/api/v1/admin/submissions",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("PR body missing %q:\n%s", want, body)
+		}
+	}
+}
+
+// outsideCodeSpans returns s with every `...` code span removed. GitHub
+// renders neither @mentions nor Markdown inside a code span, so
+// whatever remains is what could ping someone.
+func outsideCodeSpans(s string) string {
+	var b strings.Builder
+	inCode := false
+	for _, r := range s {
+		if r == '`' {
+			inCode = !inCode
+			continue
+		}
+		if !inCode {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// TestPRText_NeutralisesMentionsAndMarkdown: the org name is submitter
+// text, so it must not be able to @mention a user or inject Markdown
+// into the PR title, body or commit message.
+func TestPRText_NeutralisesMentionsAndMarkdown(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	w := New(Config{BaseURL: server.URL, Token: "fake-token", Logger: slog.New(slog.DiscardHandler)})
+	sub := sampleSubmission()
+	sub.Payload.Name = "Riders `@someone` **now**\n# heading @other"
+	if _, err := w.ProcessNow(t.Context(), sub); err != nil {
+		t.Fatalf("ProcessNow: %v", err)
+	}
+
+	gh.mu.Lock()
+	defer gh.mu.Unlock()
+	texts := map[string]string{
+		"title":          gh.createPRBody["title"],
+		"body":           gh.createPRBody["body"],
+		"commit message": gh.putContentsBody["message"],
+	}
+	for field, text := range texts {
+		if strings.Count(text, "`")%2 != 0 {
+			t.Errorf("%s has an unbalanced backtick, so a code span can be escaped: %q", field, text)
+		}
+		outside := outsideCodeSpans(text)
+		for _, bad := range []string{"@someone", "@other", "**", "\n#"} {
+			if strings.Contains(outside, bad) {
+				t.Errorf("%s exposes %q outside a code span: %q", field, bad, text)
+			}
+		}
+	}
+	if want := "Add `Riders @someone **now** # heading @other`"; texts["title"] != want {
+		t.Errorf("title = %q, want %q", texts["title"], want)
+	}
+}
+
+func TestShortID_UsesRandomTail(t *testing.T) {
+	// Same millisecond timestamp prefix, different random tails.
+	a := "01928200-3344-7000-9abc-000000000001"
+	b := "01928200-3344-7000-9abc-000000000002"
+	if shortID(a) == shortID(b) {
+		t.Fatalf("shortID collides for same-timestamp IDs: %q", shortID(a))
+	}
+	if got := shortID(a); got != "00000001" {
+		t.Fatalf("shortID(%q) = %q, want last 8 hex digits", a, got)
 	}
 }
 
@@ -689,14 +884,13 @@ func TestWorker_RetriesExhaustGET(t *testing.T) {
 	}
 }
 
-// TestWorker_CreateBranch_AlreadyExistsIsIdempotent pins issue #24's
-// whole-pipeline idempotency: when the deterministic submission branch
-// already exists (a prior attempt got that far then failed), the 422
-// "Reference already exists" is treated as success and the pipeline
-// proceeds to put-contents + create-PR.
+// TestWorker_CreateBranch_AlreadyExistsIsIdempotent: when the
+// deterministic submission branch already exists with a different
+// orgs.toml blob than main, the pipeline must still put the file and
+// open the PR rather than 409 on a stale blob SHA.
 func TestWorker_CreateBranch_AlreadyExistsIsIdempotent(t *testing.T) {
 	gh := newFakeGitHub(t, "# orgs.toml\n")
-	gh.createRefAlreadyExists = true
+	gh.commit("submission/0192820033447000", "# orgs.toml\n# leftover from a prior attempt\n")
 	server := httptest.NewServer(gh.handler())
 	t.Cleanup(server.Close)
 
@@ -884,5 +1078,106 @@ func TestBackoffSleep_HonorsCancellation(t *testing.T) {
 func TestBackoffSleep_CompletesNormally(t *testing.T) {
 	if err := backoffSleep(context.Background(), 5*time.Millisecond); err != nil {
 		t.Fatalf("backoffSleep returned %v on clean completion, want nil", err)
+	}
+}
+
+// TestWorker_RetryAfterPartialRun is the `submissions retry-pr` path: a
+// first attempt committed to the submission branch and then failed to
+// open the PR, and main moved on before the retry. The retry must
+// succeed, and the branch must hold main's current file plus the new
+// block exactly once.
+func TestWorker_RetryAfterPartialRun(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.failOnCreatePRStatus = http.StatusBadGateway
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	w := New(Config{BaseURL: server.URL, Token: "fake-token", Logger: slog.New(slog.DiscardHandler)})
+	sub := sampleSubmission()
+	if _, err := w.ProcessNow(t.Context(), sub); err == nil {
+		t.Fatal("first attempt: want create-PR failure, got nil")
+	}
+	const branch = "submission/0192820033447000"
+	if ref, ok := gh.branch(branch); !ok || !strings.Contains(ref.content, "Brooklyn Greenways") {
+		t.Fatalf("first attempt should have committed the block to %s; ref=%+v ok=%v", branch, ref, ok)
+	}
+
+	const movedMain = "# orgs.toml\n\n[[org]]\nslug = \"merged-meanwhile\"\n"
+	gh.commit("main", movedMain)
+	gh.mu.Lock()
+	gh.failOnCreatePRStatus = 0
+	gh.mu.Unlock()
+
+	prURL, err := w.ProcessNow(t.Context(), sub)
+	if err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if prURL == "" {
+		t.Fatal("retry returned an empty PR URL")
+	}
+	ref, _ := gh.branch(branch)
+	if !strings.HasPrefix(ref.content, movedMain) {
+		t.Errorf("branch file does not start with main's current content:\n%s", ref.content)
+	}
+	if n := strings.Count(ref.content, "Brooklyn Greenways"); n != 1 {
+		t.Errorf("block appears %d times on the branch, want 1:\n%s", n, ref.content)
+	}
+}
+
+// TestWorker_EnqueueAfterStop_ReturnsErrStopped: once Stop has closed
+// the channel, a late approval (an HTTP handler still running after a
+// timed-out server Shutdown) must get an error it can persist as
+// promotion_error, not a send-on-closed-channel panic.
+func TestWorker_EnqueueAfterStop_ReturnsErrStopped(t *testing.T) {
+	w := New(Config{Token: "fake-token", Logger: slog.New(slog.DiscardHandler)})
+	go w.Run(context.Background())
+	if _, err := w.Stop(t.Context()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	if err := w.Enqueue(context.Background(), sampleSubmission()); !errors.Is(err, ErrStopped) {
+		t.Fatalf("Enqueue after Stop = %v, want ErrStopped", err)
+	}
+}
+
+// TestWorker_StopTimeout_ReportsInflightJob: when Stop's deadline fires
+// while a job is mid-flight, that job's ID must be in droppedIDs, since
+// the process is about to exit and its outcome will never be persisted.
+func TestWorker_StopTimeout_ReportsInflightJob(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.getRefBlockUntilCtx = true
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+	// Runs before server.Close (cleanups are LIFO) so the wedged
+	// request is severed and Close doesn't wait on it.
+	t.Cleanup(server.CloseClientConnections)
+
+	w := New(Config{BaseURL: server.URL, Token: "fake-token", Logger: slog.New(slog.DiscardHandler)})
+	go w.Run(context.Background())
+	sub := sampleSubmission()
+	if err := w.Enqueue(t.Context(), sub); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		gh.mu.Lock()
+		started := gh.getRefCalled > 0
+		gh.mu.Unlock()
+		if started {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("worker never reached get-ref")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	dropped, err := w.Stop(stopCtx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Stop err = %v, want DeadlineExceeded", err)
+	}
+	if len(dropped) != 1 || dropped[0] != sub.PublicID {
+		t.Fatalf("dropped = %v, want [%s]", dropped, sub.PublicID)
 	}
 }
