@@ -42,6 +42,12 @@ const maxAdminListLimit = 200
 // hard cap — the type-ahead never needs more than a screenful.
 const maxRegionSearchLimit = 20
 
+// maxRegionSearchQueryLen caps the raw `q` on GET /api/v1/regions/search,
+// in bytes, matching the spec's `maxLength: 100`. Empty results persist
+// q into coverage_gaps on the shared volume, so the cap also bounds what
+// one request can write there.
+const maxRegionSearchQueryLen = 100
+
 // Upper bounds on the raw `postal_code` and `country` query parameters
 // for GET /api/v1/lookup. Generous relative to the longest validators
 // in pkg/atlas/postal.go (PT is 7 chars after hyphen-strip; every

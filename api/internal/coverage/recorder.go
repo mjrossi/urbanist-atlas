@@ -10,6 +10,7 @@ import (
 	"context"
 	"log/slog"
 	"math/rand/v2"
+	"strings"
 	"sync"
 	"time"
 )
@@ -25,6 +26,13 @@ const writeTimeout = 2 * time.Second
 // connection. Samples over the cap are dropped (capture is best-effort),
 // which also keeps the shutdown drain bounded.
 const maxConcurrentWrites = 4
+
+// maxInputLen caps, in bytes, the input persisted per row. The table is
+// row-capped, not byte-capped, and shares its volume with submissions,
+// so the recorder bounds row size itself rather than trusting every
+// caller to. 100 matches the region-search q limit; postal codes are far
+// shorter.
+const maxInputLen = 100
 
 // GapStore is the persistence seam the Recorder writes through —
 // satisfied by *sqlite.Store.
@@ -88,6 +96,7 @@ func (r *Recorder) RecordEmpty(kind, country, input string) {
 	if r.rng() >= r.sampleRate {
 		return
 	}
+	input = truncate(input, maxInputLen)
 	// Acquire a write slot without blocking the caller. When the writer is
 	// saturated, drop the sample: the request path must never wait on a
 	// coverage write, and capture is best-effort (sampled + row-capped).
@@ -114,6 +123,15 @@ func (r *Recorder) RecordEmpty(kind, country, input string) {
 			r.logger.WarnContext(ctx, "coverage: prune failed", "err", err)
 		}
 	})
+}
+
+// truncate cuts s to at most n bytes, dropping any UTF-8 sequence the cut
+// splits.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return strings.ToValidUTF8(s[:n], "")
 }
 
 // Wait blocks until all in-flight coverage writes have finished, or until
