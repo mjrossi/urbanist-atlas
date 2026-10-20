@@ -28,21 +28,21 @@ import (
 // Seeder writes test fixtures into a Store implementation. Each
 // backing store provides its own Seeder; the contract tests call
 // these methods in a deterministic order so every implementation sees
-// the same rows.
+// the same rows. A fixture the store rejects fails tb.
 type Seeder interface {
 	// SeedRegion registers a region. Parent slugs in r.ParentSlugs
 	// must reference regions seeded earlier (parents-before-children).
-	SeedRegion(t *testing.T, r atlas.Region)
+	SeedRegion(tb testing.TB, r atlas.Region)
 	// SeedPostalCode registers a postal-code -> leaf-region mapping.
-	SeedPostalCode(t *testing.T, country atlas.Country, code string, leafRegionID int64)
+	SeedPostalCode(tb testing.TB, country atlas.Country, code string, leafRegionID int64)
 	// SeedOrg registers an approved organization and its region
 	// attachments. AddedAt should round-trip through OrgsForRegions
 	// and ListRecent.
-	SeedOrg(t *testing.T, org atlas.Org, regionIDs []int64)
+	SeedOrg(tb testing.TB, org atlas.Org, regionIDs []int64)
 	// SeedRollupState records a directional rollup_states edge: metroSlug's
 	// own orgs also surface on stateSlug's detail page (browse direction
 	// only). Both slugs must reference regions seeded earlier.
-	SeedRollupState(t *testing.T, metroSlug, stateSlug string)
+	SeedRollupState(tb testing.TB, metroSlug, stateSlug string)
 }
 
 // Factory builds a fresh, empty Store for one contract test and

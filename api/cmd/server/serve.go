@@ -147,7 +147,7 @@ func serveCommand() *cli.Command {
 			},
 			&cli.IntFlag{
 				Name:    "submissions-rate-per-hour",
-				Usage:   "per-IP cap on POST /api/v1/submissions",
+				Usage:   "hourly cap on POST /api/v1/submissions per source address (IPv4 address or IPv6 /64); a separate service-wide cap also applies",
 				Value:   5,
 				Sources: cli.EnvVars("URBANIST_SUBMISSIONS_RATE_PER_HOUR"),
 			},
