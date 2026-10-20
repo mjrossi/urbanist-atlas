@@ -7,8 +7,8 @@ import (
 
 // NormalizePostalCode applies per-country canonicalization rules:
 // uppercase + whitespace stripped for every country, plus country-
-// specific truncation (CA → FSA, UK → outward code). Unknown countries
-// get the generic uppercase/strip pass.
+// specific truncation (US ZIP+4 → ZIP, CA → FSA, UK → outward code).
+// Unknown countries get the generic uppercase/strip pass.
 //
 // Call sites:
 //   - internal/httpapi/lookup.go — once at the handler boundary so
@@ -21,6 +21,14 @@ import (
 func NormalizePostalCode(country Country, raw string) string {
 	s := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(raw), " ", ""))
 	switch country {
+	case CountryUS:
+		// The +4 add-on only narrows delivery within a ZIP, and the
+		// atlas maps 5-digit ZIPs. Anything that isn't exactly ZIP+4
+		// passes through so validation reports it as typed.
+		if zip, ok := zipFromZIP4(s); ok {
+			return zip
+		}
+		return s
 	case CountryCA:
 		if len(s) > 3 {
 			return s[:3]
@@ -146,6 +154,24 @@ func IsMilitaryPostalCode(country Country, code string) bool {
 // helper, not exported.
 func postalKey(country Country, code string) string {
 	return string(country) + ":" + NormalizePostalCode(country, code)
+}
+
+func zipFromZIP4(s string) (string, bool) {
+	var digits string
+	switch {
+	case len(s) == 10 && s[5] == '-':
+		digits = s[:5] + s[6:]
+	case len(s) == 9:
+		digits = s
+	default:
+		return "", false
+	}
+	for i := range len(digits) {
+		if !isDigit(digits[i]) {
+			return "", false
+		}
+	}
+	return s[:5], true
 }
 
 func isLetter(b byte) bool { return b >= 'A' && b <= 'Z' }
