@@ -19,6 +19,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -311,8 +312,8 @@ const openPRTimeout = 30 * time.Second
 // circuits immediately). cancel is deferred so the derived ctx is
 // always released.
 //
-// Retry strategy (issue #24) — conservative, idempotency-first:
-//   - The two GETs (getBranchSHA, getFile) go through
+// Retry strategy — conservative, idempotency-first:
+//   - The GETs (getBranchSHA, getFile, findOpenPR) go through
 //     doIdempotentRequest, which retries retryable statuses (429, 502,
 //     503, secondary-rate-limit 403) with a bounded ctx-aware backoff.
 //     Retrying a GET has no side effects, so this is always safe.
@@ -321,15 +322,12 @@ const openPRTimeout = 30 * time.Second
 //     it force-resets that branch to the current base, so the put below
 //     sends a blob SHA that matches the branch and the result equals a
 //     fresh run.
-//   - putFile and createPR stay single-shot with NO internal retry.
-//     NOTE: a blind retry of either could double-apply. A PUT contents
-//     with a now-stale base SHA returns 409 (handled as a hard error,
-//     not retried); a retried createPR after a transient 5xx that
-//     actually succeeded server-side would 422 on the second call
-//     ("a pull request already exists"). Until those are made
-//     idempotent (e.g. by GETing the existing PR on 422), they fail
-//     fast and surface as a promotion_error for operator retry — the
-//     same terminal semantics as before this change.
+//   - putFile and createPR have no internal retry, because a blind
+//     retry of either could double-apply. A PUT contents with a stale
+//     blob SHA returns 409 and fails the job. createPR answers a 422
+//     with the open PR already on the branch, if there is one, so an
+//     operator retry after a run that opened the PR but never recorded
+//     it reports that PR instead of failing.
 func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, openPRTimeout)
 	defer cancel()
@@ -690,8 +688,8 @@ func (w *Worker) createBranch(ctx context.Context, branch, sha string) error {
 	// 422 "Reference already exists" means a prior attempt left this
 	// submission's branch behind, possibly with its own commit or on an
 	// older base. Force-resetting it to sha keeps the branch's orgs.toml
-	// blob equal to the base's, which is the SHA putFile sends; an open
-	// PR on the branch survives the reset.
+	// blob equal to the base's, which is the SHA putFile sends. If that
+	// attempt also opened a PR, createPR resolves its duplicate 422 to it.
 	buf, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode == http.StatusUnprocessableEntity &&
 		strings.Contains(strings.ToLower(string(buf)), "reference already exists") {
@@ -747,6 +745,21 @@ func (w *Worker) createPR(ctx context.Context, title, body, head, base string) (
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnprocessableEntity {
+		// GitHub answers 422 when head already has an open PR into base,
+		// and also for other validation failures. Only an open PR found
+		// by the lookup turns the 422 into success.
+		createErr := apiError("create PR", resp)
+		prURL, err := w.findOpenPR(ctx, head, base)
+		switch {
+		case err != nil:
+			return "", fmt.Errorf("%w (existing PR lookup: %w)", createErr, err)
+		case prURL == "":
+			return "", createErr
+		default:
+			return prURL, nil
+		}
+	}
 	if err := expectStatus(resp, http.StatusCreated, "create PR"); err != nil {
 		return "", err
 	}
@@ -757,6 +770,35 @@ func (w *Worker) createPR(ctx context.Context, title, body, head, base string) (
 		return "", fmt.Errorf("decode PR response: %w", err)
 	}
 	return out.HTMLURL, nil
+}
+
+// findOpenPR returns the html_url of the open PR from head into base, or
+// "" when there is none.
+func (w *Worker) findOpenPR(ctx context.Context, head, base string) (string, error) {
+	q := url.Values{
+		"head":  {w.cfg.Owner + ":" + head},
+		"base":  {base},
+		"state": {"open"},
+	}
+	resp, err := w.doIdempotentRequest(ctx, http.MethodGet,
+		fmt.Sprintf("/repos/%s/%s/pulls?%s", w.cfg.Owner, w.cfg.Repo, q.Encode()))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if err := expectStatus(resp, http.StatusOK, "list PRs"); err != nil {
+		return "", err
+	}
+	var out []struct {
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", fmt.Errorf("decode PR list: %w", err)
+	}
+	if len(out) == 0 {
+		return "", nil
+	}
+	return out[0].HTMLURL, nil
 }
 
 func apiError(op string, resp *http.Response) error {
