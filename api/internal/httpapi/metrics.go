@@ -288,14 +288,8 @@ func metricsMiddleware(m *Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			// Reuse loggingMiddleware's recorder when it wraps this one, so
-			// a request carries one wrapper; wrap here otherwise.
-			rec, ok := w.(*statusRecorder)
-			if !ok {
-				rec = &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-				w = rec
-			}
-			next.ServeHTTP(w, r)
+			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+			next.ServeHTTP(rec, r)
 
 			route := chi.RouteContext(r.Context()).RoutePattern()
 			if route == "" {

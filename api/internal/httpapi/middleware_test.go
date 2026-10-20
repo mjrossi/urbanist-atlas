@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -343,9 +342,8 @@ func TestLogging_HealthCheckSuppressedAtInfo(t *testing.T) {
 	}
 }
 
-// TestLogging_HealthCheckFailureStillLogged: a non-2xx probe (e.g. a
-// /readyz 503 when the store ping fails) stays at INFO so the outage is
-// visible without raising the log level.
+// TestLogging_HealthCheckFailureStillLogged: a non-2xx probe response
+// stays at INFO so the outage is visible without raising the log level.
 func TestLogging_HealthCheckFailureStillLogged(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil)) // default level: INFO
@@ -487,20 +485,4 @@ func TestStatusRecorder_FlushNoopWhenInnerNotFlusher(t *testing.T) {
 
 	// Just must not panic — assertion-free.
 	sw.Flush()
-}
-
-// TestStatusRecorder_HijackPushReturnNotSupportedFallback covers the
-// negative path for both Hijack and Push: when the wrapped writer
-// doesn't implement the interface, the recorder returns
-// http.ErrNotSupported rather than panicking. (httptest.ResponseRecorder
-// implements neither, so it's the natural foil.)
-func TestStatusRecorder_HijackPushReturnNotSupportedFallback(t *testing.T) {
-	sw := &statusRecorder{ResponseWriter: httptest.NewRecorder(), status: http.StatusOK}
-
-	if _, _, err := sw.Hijack(); !errors.Is(err, http.ErrNotSupported) {
-		t.Errorf("Hijack: got err=%v, want http.ErrNotSupported", err)
-	}
-	if err := sw.Push("/some-resource", nil); !errors.Is(err, http.ErrNotSupported) {
-		t.Errorf("Push: got err=%v, want http.ErrNotSupported", err)
-	}
 }

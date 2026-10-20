@@ -3,6 +3,8 @@ package seedfiles
 import (
 	"strings"
 	"testing"
+
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 func TestValidateOrgFields_Required(t *testing.T) {
@@ -60,15 +62,15 @@ func TestValidateOrgFields_ContactURL_AcceptsMailto(t *testing.T) {
 }
 
 func TestValidateOrgFields_LengthCaps(t *testing.T) {
-	tooLongName := strings.Repeat("a", MaxNameLen+1)
+	tooLongName := strings.Repeat("a", atlas.MaxNameLen+1)
 	if err := ValidateOrgFields(tooLongName, "d", "https://x.org", "", nil, []string{"brooklyn"}); err == nil {
 		t.Fatal("oversize name should be rejected")
 	}
-	tooLongDesc := strings.Repeat("a", MaxShortDescLen+1)
+	tooLongDesc := strings.Repeat("a", atlas.MaxShortDescLen+1)
 	if err := ValidateOrgFields("n", tooLongDesc, "https://x.org", "", nil, []string{"brooklyn"}); err == nil {
 		t.Fatal("oversize short_desc should be rejected")
 	}
-	tooLongURL := "https://x.org/" + strings.Repeat("a", MaxURLLen)
+	tooLongURL := "https://x.org/" + strings.Repeat("a", atlas.MaxURLLen)
 	if err := ValidateOrgFields("n", "d", tooLongURL, "", nil, []string{"brooklyn"}); err == nil {
 		t.Fatal("oversize website_url should be rejected")
 	}

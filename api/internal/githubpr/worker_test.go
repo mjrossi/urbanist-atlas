@@ -27,10 +27,19 @@ type fakeRef struct {
 	fileSHA string
 }
 
+// fakePull is a pull request in fakeGitHub.
+type fakePull struct {
+	head    string // branch name, without the owner prefix
+	base    string
+	state   string // "open" or "closed"
+	htmlURL string
+}
+
 // fakeGitHub models just enough of the GitHub REST API for the PR
 // pipeline: per-branch file state, 409 on a stale blob SHA, `?ref=` on
-// reads, and 422 on a duplicate ref. It must reject what GitHub rejects,
-// or the tests only mirror the worker's own assumptions.
+// reads, 422 on a duplicate ref, and 422 on a second open PR for the
+// same head and base. It must reject what GitHub rejects, or the tests
+// only mirror the worker's own assumptions.
 type fakeGitHub struct {
 	mu          sync.Mutex
 	t           *testing.T
@@ -40,6 +49,7 @@ type fakeGitHub struct {
 
 	refs    map[string]fakeRef // branch name -> head
 	commits map[string]fakeRef // commit SHA -> snapshot
+	pulls   []fakePull
 	seq     int
 
 	getRefCalled         int
@@ -49,8 +59,8 @@ type fakeGitHub struct {
 	createRefBody        map[string]string
 	putContentsBody      map[string]string
 	createPRBody         map[string]string
-	createPRResponseURL  string
 	failOnCreatePRStatus int
+	listPullsCalled      int
 
 	// getRefTransientFailures: while > 0, the get-ref endpoint answers
 	// with getRefTransientStatus (default 503) and decrements.
@@ -64,13 +74,12 @@ type fakeGitHub struct {
 
 func newFakeGitHub(t *testing.T, fileContent string) *fakeGitHub {
 	f := &fakeGitHub{
-		t:                   t,
-		branchSHA:           "deadbeefcafe00000000000000000000deadbeef",
-		fileSHA:             "filecontentsha000000000000000000feedface",
-		fileContent:         fileContent,
-		createPRResponseURL: "https://github.com/mjrossi/urbanist-atlas/pull/42",
-		refs:                map[string]fakeRef{},
-		commits:             map[string]fakeRef{},
+		t:           t,
+		branchSHA:   "deadbeefcafe00000000000000000000deadbeef",
+		fileSHA:     "filecontentsha000000000000000000feedface",
+		fileContent: fileContent,
+		refs:        map[string]fakeRef{},
+		commits:     map[string]fakeRef{},
 	}
 	main := fakeRef{commit: f.branchSHA, content: fileContent, fileSHA: f.fileSHA}
 	f.refs["main"] = main
@@ -243,9 +252,71 @@ func (f *fakeGitHub) handler() http.Handler {
 			http.Error(w, "boom", status)
 			return
 		}
-		writeJSON(w, status, map[string]any{"html_url": f.createPRResponseURL})
+		head, base := f.createPRBody["head"], f.createPRBody["base"]
+		for _, p := range f.pulls {
+			if p.head == head && p.base == base && p.state == "open" {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+					"message": "Validation Failed",
+					"errors": []map[string]string{{
+						"resource": "PullRequest",
+						"code":     "custom",
+						"message":  "A pull request already exists for mjrossi:" + head + ".",
+					}},
+					"documentation_url": "https://docs.github.com/rest/pulls/pulls#create-a-pull-request",
+				})
+				return
+			}
+		}
+		pr := fakePull{
+			head:    head,
+			base:    base,
+			state:   "open",
+			htmlURL: fmt.Sprintf("https://github.com/mjrossi/urbanist-atlas/pull/%d", 42+len(f.pulls)),
+		}
+		f.pulls = append(f.pulls, pr)
+		writeJSON(w, status, map[string]any{"html_url": pr.htmlURL})
+	})
+	// List pulls filters on `head` (as owner:branch), `base` and `state`
+	// (default "open").
+	mux.HandleFunc("GET "+repo+"/pulls", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.listPullsCalled++
+		q := r.URL.Query()
+		state := q.Get("state")
+		if state == "" {
+			state = "open"
+		}
+		out := []map[string]any{}
+		for _, p := range f.pulls {
+			if h := q.Get("head"); h != "" && h != "mjrossi:"+p.head {
+				continue
+			}
+			if b := q.Get("base"); b != "" && b != p.base {
+				continue
+			}
+			if state != "all" && state != p.state {
+				continue
+			}
+			out = append(out, map[string]any{
+				"html_url": p.htmlURL,
+				"state":    p.state,
+				"head":     map[string]string{"ref": p.head, "label": "mjrossi:" + p.head},
+				"base":     map[string]string{"ref": p.base},
+			})
+		}
+		writeJSON(w, http.StatusOK, out)
 	})
 	return mux
+}
+
+// closePulls marks every PR as closed, as if a maintainer closed it.
+func (f *fakeGitHub) closePulls() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.pulls {
+		f.pulls[i].state = "closed"
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -522,8 +593,8 @@ func TestWorker_FailingPR_PersistsErrorAndDoesNotRetry(t *testing.T) {
 func TestEnqueue_DisabledWithoutToken(t *testing.T) {
 	w := New(Config{Logger: slog.New(slog.DiscardHandler)})
 	err := w.Enqueue(context.Background(), sampleSubmission())
-	if !errors.Is(err, ErrDisabled) {
-		t.Fatalf("err = %v, want ErrDisabled", err)
+	if !errors.Is(err, atlas.ErrPromotionDisabled) {
+		t.Fatalf("err = %v, want atlas.ErrPromotionDisabled", err)
 	}
 }
 
@@ -1121,6 +1192,82 @@ func TestWorker_RetryAfterPartialRun(t *testing.T) {
 	}
 	if n := strings.Count(ref.content, "Brooklyn Greenways"); n != 1 {
 		t.Errorf("block appears %d times on the branch, want 1:\n%s", n, ref.content)
+	}
+}
+
+// TestWorker_RetryAfterPROpened: the first attempt opened the PR but the
+// job died before PersistResult recorded the URL. The operator's retry
+// must resolve create-PR's duplicate 422 to the PR that already exists.
+func TestWorker_RetryAfterPROpened(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	w := New(Config{BaseURL: server.URL, Token: "fake-token", Logger: slog.New(slog.DiscardHandler)})
+	sub := sampleSubmission()
+	first, err := w.ProcessNow(t.Context(), sub)
+	if err != nil {
+		t.Fatalf("first attempt: %v", err)
+	}
+
+	second, err := w.ProcessNow(t.Context(), sub)
+	if err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if second != first {
+		t.Errorf("retry URL = %q, want the existing PR %q", second, first)
+	}
+	gh.mu.Lock()
+	defer gh.mu.Unlock()
+	if n := len(gh.pulls); n != 1 {
+		t.Errorf("fake holds %d PRs, want 1", n)
+	}
+	if ref := gh.refs["submission/0192820033447000"]; strings.Count(ref.content, "Brooklyn Greenways") != 1 {
+		t.Errorf("branch should hold the block exactly once:\n%s", ref.content)
+	}
+}
+
+// TestWorker_RetryAfterPRClosed: a closed PR does not block a new one,
+// so the retry opens a fresh PR rather than reporting the closed one.
+func TestWorker_RetryAfterPRClosed(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	w := New(Config{BaseURL: server.URL, Token: "fake-token", Logger: slog.New(slog.DiscardHandler)})
+	sub := sampleSubmission()
+	first, err := w.ProcessNow(t.Context(), sub)
+	if err != nil {
+		t.Fatalf("first attempt: %v", err)
+	}
+	gh.closePulls()
+
+	second, err := w.ProcessNow(t.Context(), sub)
+	if err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if second == first {
+		t.Errorf("retry returned the closed PR %q, want a new one", first)
+	}
+}
+
+// TestWorker_CreatePR422WithoutOpenPR_KeepsError: a 422 the list lookup
+// can't explain (no open PR on the head) stays a promotion error.
+func TestWorker_CreatePR422WithoutOpenPR_KeepsError(t *testing.T) {
+	gh := newFakeGitHub(t, "# orgs.toml\n")
+	gh.failOnCreatePRStatus = http.StatusUnprocessableEntity
+	server := httptest.NewServer(gh.handler())
+	t.Cleanup(server.Close)
+
+	w := New(Config{BaseURL: server.URL, Token: "fake-token", Logger: slog.New(slog.DiscardHandler)})
+	_, err := w.ProcessNow(t.Context(), sampleSubmission())
+	if err == nil || !strings.Contains(err.Error(), "create PR: github returned 422: boom") {
+		t.Fatalf("err = %v, want the original create-PR 422", err)
+	}
+	gh.mu.Lock()
+	defer gh.mu.Unlock()
+	if gh.listPullsCalled != 1 {
+		t.Errorf("list-PRs called %d times, want 1", gh.listPullsCalled)
 	}
 }
 

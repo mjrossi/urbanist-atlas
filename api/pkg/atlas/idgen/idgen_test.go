@@ -45,26 +45,3 @@ func TestNewUUIDv7_isMonotonicAcrossClose(t *testing.T) {
 		prev = next
 	}
 }
-
-func TestMustGenerate_propagates(t *testing.T) {
-	got := MustGenerate(NewUUIDv7())
-	if _, err := uuid.Parse(got); err != nil {
-		t.Fatalf("MustGenerate returned unparseable id: %q: %v", got, err)
-	}
-}
-
-func TestMustGenerate_panicsOnError(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic, got none")
-		}
-	}()
-	failing := Generator(func() (string, error) { return "", errBoom })
-	_ = MustGenerate(failing)
-}
-
-type sentinelErr string
-
-func (e sentinelErr) Error() string { return string(e) }
-
-var errBoom sentinelErr = "boom"

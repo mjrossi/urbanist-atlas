@@ -97,6 +97,8 @@ func TestRecorder_TruncatesInput(t *testing.T) {
 		{name: "ascii over cap", in: strings.Repeat("a", 10*maxInputLen), want: strings.Repeat("a", maxInputLen)},
 		// 3-byte runes: the cap falls mid-rune, so the partial rune is dropped.
 		{name: "multibyte over cap", in: strings.Repeat("€", maxInputLen), want: strings.Repeat("€", maxInputLen/3)},
+		// The longest q the region search accepts: 100 four-byte runes.
+		{name: "max search query", in: strings.Repeat("😀", 100), want: strings.Repeat("😀", 100)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

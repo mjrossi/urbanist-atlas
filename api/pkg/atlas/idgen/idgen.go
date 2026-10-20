@@ -25,15 +25,3 @@ func NewUUIDv7() Generator {
 		return id.String(), nil
 	}
 }
-
-// MustGenerate is a convenience for call sites where the generator's
-// error is treated as a server-internal panic-worthy condition (UUIDv7
-// only errors when the system entropy source fails, which is a
-// shutdown-class problem).
-func MustGenerate(g Generator) string {
-	id, err := g()
-	if err != nil {
-		panic("idgen: generator failed: " + err.Error())
-	}
-	return id
-}

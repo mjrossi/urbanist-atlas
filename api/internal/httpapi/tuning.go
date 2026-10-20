@@ -69,15 +69,16 @@ const maxAdminListLimit = 200
 const maxRegionSearchLimit = 20
 
 // maxRegionSearchQueryLen caps the raw `q` on GET /api/v1/regions/search,
-// in bytes, matching the spec's `maxLength: 100`. Empty results persist
-// q into coverage_gaps on the shared volume, so the cap also bounds what
-// one request can write there.
+// in characters (runes), matching the spec's `maxLength: 100`. Empty
+// results persist q into coverage_gaps on the shared volume; the
+// coverage recorder bounds that row in bytes on its own.
 const maxRegionSearchQueryLen = 100
 
 // Upper bounds on the raw `postal_code` and `country` query parameters
 // for GET /api/v1/lookup. Generous relative to the longest validators
-// in pkg/atlas/postal.go (PT is 7 chars after hyphen-strip; every
-// other supported country is ≤ 7) — they exist to reject pathological
+// in pkg/atlas/postal.go (a US ZIP+4 is 10 chars raw, 9 after the
+// hyphen is stripped; every other supported country is shorter) —
+// they exist to reject pathological
 // inputs (multi-MB strings the net/http header cap still allows)
 // before NormalizePostalCode allocates.
 const (

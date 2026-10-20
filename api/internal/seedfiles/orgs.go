@@ -5,29 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
-)
-
-// Field length caps shared by the seed loader and the submissions
-// handler. Generous next to current seed data (longest name is ~46
-// chars, longest short_desc ~383) but tight enough that a malicious
-// submission can't store megabytes of JSON or render an unreadable
-// orgs.toml entry. ValidateOrgFields enforces both the bounds and the
-// URL/host shape; callers don't need to pre-check.
-const (
-	MaxNameLen       = 200
-	MaxShortDescLen  = 1000
-	MaxURLLen        = 500
-	MaxTagLen        = 50
-	MaxTags          = 20
-	MaxRegionSlugLen = 100
-	MaxRegionSlugs   = 20
 )
 
 // OrgEntry is one [[org]] in orgs.toml. It embeds atlas.Org for the
@@ -102,27 +84,25 @@ func validateOrgs(os []OrgEntry) error {
 	return nil
 }
 
-// ValidateOrgFields runs the per-entry field checks shared between the
-// seed-file loader and the public submissions handler. It enforces
-// presence, length caps, URL shape (absolute http/https with host),
-// and per-element tag/slug bounds.
+// ValidateOrgFields runs the per-entry field checks for one orgs.toml
+// record: presence, the atlas length caps, URL shape and per-element
+// tag/slug bounds. Public submissions apply the same caps and URL rule
+// through atlas.ValidateSubmission.
 //
 // The slug/uniqueness checks live in validateOrgs because they're
-// only meaningful in a multi-row context; submissions don't carry a
-// slug at all (moderators assign one when approving). The submitter
-// fields are handler-only and validated separately.
+// only meaningful in a multi-row context.
 func ValidateOrgFields(name, shortDesc, websiteURL, contactURL string, tags, regionSlugs []string) error {
 	if name == "" {
 		return errors.New("name required")
 	}
-	if utf8.RuneCountInString(name) > MaxNameLen {
-		return fmt.Errorf("name must be at most %d characters", MaxNameLen)
+	if utf8.RuneCountInString(name) > atlas.MaxNameLen {
+		return fmt.Errorf("name must be at most %d characters", atlas.MaxNameLen)
 	}
 	if shortDesc == "" {
 		return errors.New("short_desc required")
 	}
-	if utf8.RuneCountInString(shortDesc) > MaxShortDescLen {
-		return fmt.Errorf("short_desc must be at most %d characters", MaxShortDescLen)
+	if utf8.RuneCountInString(shortDesc) > atlas.MaxShortDescLen {
+		return fmt.Errorf("short_desc must be at most %d characters", atlas.MaxShortDescLen)
 	}
 	if websiteURL == "" {
 		return errors.New("website_url required")
@@ -135,107 +115,50 @@ func ValidateOrgFields(name, shortDesc, websiteURL, contactURL string, tags, reg
 			return err
 		}
 	}
-	if len(tags) > MaxTags {
-		return fmt.Errorf("tags must have at most %d entries", MaxTags)
+	if len(tags) > atlas.MaxTags {
+		return fmt.Errorf("tags must have at most %d entries", atlas.MaxTags)
 	}
 	for i, tag := range tags {
 		if tag == "" {
 			return fmt.Errorf("tags[%d] empty", i)
 		}
-		if utf8.RuneCountInString(tag) > MaxTagLen {
-			return fmt.Errorf("tags[%d] must be at most %d characters", i, MaxTagLen)
+		if utf8.RuneCountInString(tag) > atlas.MaxTagLen {
+			return fmt.Errorf("tags[%d] must be at most %d characters", i, atlas.MaxTagLen)
 		}
 	}
 	if len(regionSlugs) == 0 {
 		return errors.New("region_slugs must have at least one entry")
 	}
-	if len(regionSlugs) > MaxRegionSlugs {
-		return fmt.Errorf("region_slugs must have at most %d entries", MaxRegionSlugs)
+	if len(regionSlugs) > atlas.MaxRegionSlugs {
+		return fmt.Errorf("region_slugs must have at most %d entries", atlas.MaxRegionSlugs)
 	}
 	for i, slug := range regionSlugs {
 		if slug == "" {
 			return fmt.Errorf("region_slugs[%d] empty", i)
 		}
-		if len(slug) > MaxRegionSlugLen {
-			return fmt.Errorf("region_slugs[%d] must be at most %d characters", i, MaxRegionSlugLen)
+		if len(slug) > atlas.MaxRegionSlugLen {
+			return fmt.Errorf("region_slugs[%d] must be at most %d characters", i, atlas.MaxRegionSlugLen)
 		}
 	}
 	return nil
 }
 
-// urlReason is the typed outcome of the shared URL validator. The two
-// caller styles — error-returning (loader) and sentence-returning
-// (submissions handler) — each map these codes to their own message
-// form, so the parse logic lives in exactly one place.
-type urlReason int
-
-const (
-	urlOK urlReason = iota
-	urlTooLong
-	urlParseFailed
-	urlBadScheme
-	urlMissingHost
-	urlMailtoNoAddress
-)
-
-// classifyURL is the single core URL validator behind validateHTTPURL /
-// checkHTTPURL (allowMailto=false) and validateContactURL /
-// checkContactURL (allowMailto=true). It enforces the length cap, an
-// absolute http(s) (or mailto, when allowed) scheme, a non-empty host
-// for http(s), and a non-empty address for mailto.
-//
-// The returned error is non-nil only for urlParseFailed and carries the
-// underlying url.Parse error so the loader callers can wrap it with
-// "%w"; the sentence callers ignore it. Any change here changes what
-// every caller accepts/rejects — this is the security-relevant parse
-// boundary for org URLs.
-func classifyURL(raw string, allowMailto bool) (urlReason, error) {
-	if len(raw) > MaxURLLen {
-		return urlTooLong, nil
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return urlParseFailed, err
-	}
-	switch strings.ToLower(u.Scheme) {
-	case "http", "https":
-		if u.Host == "" {
-			return urlMissingHost, nil
-		}
-		return urlOK, nil
-	case "mailto":
-		if !allowMailto {
-			return urlBadScheme, nil
-		}
-		if u.Opaque == "" {
-			return urlMailtoNoAddress, nil
-		}
-		return urlOK, nil
-	default:
-		return urlBadScheme, nil
-	}
-}
-
 // validateHTTPURL accepts only absolute http(s) URLs with a host. Used
-// for website_url. The length cap is generous (500 chars) but caps
-// the worst case so an attacker can't store megabytes of nonsense in
-// orgs.toml.
+// for website_url.
 func validateHTTPURL(field, raw string) error {
-	reason, perr := classifyURL(raw, false)
+	reason, perr := atlas.ClassifyURL(raw, false)
 	switch reason {
-	case urlOK:
+	case atlas.URLOK:
 		return nil
-	case urlTooLong:
-		return fmt.Errorf("%s must be at most %d characters", field, MaxURLLen)
-	case urlParseFailed:
+	case atlas.URLTooLong:
+		return fmt.Errorf("%s must be at most %d characters", field, atlas.MaxURLLen)
+	case atlas.URLParseFailed:
 		return fmt.Errorf("%s is not a valid URL: %w", field, perr)
-	case urlBadScheme:
+	case atlas.URLBadScheme:
 		return fmt.Errorf("%s must use http or https", field)
-	case urlMissingHost:
+	case atlas.URLMissingHost:
 		return fmt.Errorf("%s must include a host", field)
 	default:
-		// urlMailtoNoAddress is unreachable here (allowMailto=false
-		// classifies mailto as urlBadScheme), but keep a defensive arm.
 		return fmt.Errorf("%s must use http or https", field)
 	}
 }
@@ -245,19 +168,19 @@ func validateHTTPURL(field, raw string) error {
 // expose only a mailbox). mailto must include an address; opaque
 // schemes without one ("mailto:" alone) are rejected.
 func validateContactURL(raw string) error {
-	reason, perr := classifyURL(raw, true)
+	reason, perr := atlas.ClassifyURL(raw, true)
 	switch reason {
-	case urlOK:
+	case atlas.URLOK:
 		return nil
-	case urlTooLong:
-		return fmt.Errorf("contact_url must be at most %d characters", MaxURLLen)
-	case urlParseFailed:
+	case atlas.URLTooLong:
+		return fmt.Errorf("contact_url must be at most %d characters", atlas.MaxURLLen)
+	case atlas.URLParseFailed:
 		return fmt.Errorf("contact_url is not a valid URL: %w", perr)
-	case urlMissingHost:
+	case atlas.URLMissingHost:
 		return errors.New("contact_url must include a host")
-	case urlMailtoNoAddress:
+	case atlas.URLMailtoNoAddress:
 		return errors.New("contact_url mailto: must include an address")
-	default: // urlBadScheme
+	default: // atlas.URLBadScheme
 		return errors.New("contact_url must use http, https, or mailto")
 	}
 }

@@ -229,33 +229,37 @@ func TestRecorder_ConcurrentIncrements(t *testing.T) {
 	}
 }
 
-func TestRecorder_RunFlushesOnContextCancel(t *testing.T) {
-	// Shutdown path: Run must drain what's buffered when its context
-	// is canceled, so the last interval's counts aren't lost.
+func TestRecorder_StartFlushesOnContextCancel(t *testing.T) {
+	// Shutdown path: the flush goroutine must drain what's buffered when
+	// its context is canceled, so the last interval's counts aren't
+	// lost. Wait is not called until after the check because Wait
+	// flushes too and would mask a missing final flush.
 	store := &fakeStore{}
 	r := usage.New(store, time.Hour, 400, nil)
 	r.SetClock(fixedClock("2026-09-01"))
 	r.Increment(usage.KindRegionView, "chicago-il")
 
 	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		r.Run(ctx)
-		close(done)
-	}()
+	r.Start(ctx)
 	cancel()
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("Run did not return after context cancel")
-	}
 
+	deadline := time.After(2 * time.Second)
+	for len(store.flushed()) == 0 {
+		select {
+		case <-deadline:
+			t.Fatal("flush goroutine did not flush after context cancel")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	if err := r.Wait(context.Background()); err != nil {
+		t.Fatalf("wait: %v", err)
+	}
 	if got := store.flushed(); len(got) != 1 {
-		t.Errorf("Run should flush on shutdown, got %+v", got)
+		t.Errorf("want one flushed bucket on shutdown, got %+v", got)
 	}
 }
 
-func TestRecorder_RunFlushesOnInterval(t *testing.T) {
+func TestRecorder_StartFlushesOnInterval(t *testing.T) {
 	// The ticker path — counts must reach the store without any
 	// shutdown or manual Flush.
 	store := &fakeStore{}
@@ -264,7 +268,7 @@ func TestRecorder_RunFlushesOnInterval(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go r.Run(ctx)
+	r.Start(ctx)
 
 	r.Increment(usage.KindRegionView, "chicago-il")
 
@@ -365,11 +369,11 @@ func TestRecorder_CapsDistinctKeys(t *testing.T) {
 	}
 }
 
-func TestRecorder_WaitJoinsRunGoroutine(t *testing.T) {
+func TestRecorder_WaitJoinsFlushGoroutine(t *testing.T) {
 	// Wait must mean what coverage.Recorder.Wait means: when it returns,
 	// no further write will be issued, so the caller may close the store.
-	// Run does its own final flush on cancellation using a DETACHED
-	// context, so without the join that flush could still be in flight.
+	// The flush goroutine does its own final flush on cancellation
+	// using a DETACHED context, so without the join that flush could still be in flight.
 	store := &fakeStore{}
 	r := usage.New(store, time.Hour, 400, nil)
 	r.SetClock(fixedClock("2026-09-01"))
@@ -382,7 +386,7 @@ func TestRecorder_WaitJoinsRunGoroutine(t *testing.T) {
 	if err := r.Wait(context.Background()); err != nil {
 		t.Fatalf("wait: %v", err)
 	}
-	// The Run goroutine has exited, so this count is final: no late
+	// The flush goroutine has exited, so this count is final: no late
 	// flush can append to it after Wait returned.
 	if got := store.flushed(); len(got) != 1 || got[0].Count != 1 {
 		t.Errorf("want exactly one flushed count after Wait, got %+v", got)
@@ -404,6 +408,6 @@ func TestRecorder_WaitWithoutStartReturnsImmediately(t *testing.T) {
 			t.Errorf("wait: %v", err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("Wait blocked despite Run never being started")
+		t.Fatal("Wait blocked despite Start never being called")
 	}
 }

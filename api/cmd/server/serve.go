@@ -147,7 +147,7 @@ func serveCommand() *cli.Command {
 			},
 			&cli.IntFlag{
 				Name:    "submissions-rate-per-hour",
-				Usage:   "per-IP cap on POST /api/v1/submissions",
+				Usage:   "hourly cap on POST /api/v1/submissions per source address (IPv4 address or IPv6 /64); a separate service-wide cap also applies",
 				Value:   5,
 				Sources: cli.EnvVars("URBANIST_SUBMISSIONS_RATE_PER_HOUR"),
 			},
@@ -228,9 +228,6 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	var usageRec *usage.Recorder
 	if subs != nil {
 		usageRec = usage.New(subs, cfg.usageFlushInterval, cfg.usageKeepDays, logger)
-		// Start, not `go Run`: it registers with the recorder's
-		// WaitGroup synchronously, so the shutdown Wait below is
-		// guaranteed to join this goroutine.
 		usageRec.Start(ctx)
 	}
 

@@ -16,6 +16,15 @@ var ErrSubmissionNotFound = errors.New("atlas: submission not found")
 // The HTTP layer maps this to a 409 problem document.
 var ErrSubmissionNotPending = errors.New("atlas: submission not pending")
 
+// ErrInvalidCursor is returned by SubmissionStore.ListPage when the
+// cursor is not one ListPage emitted. The HTTP layer maps it to a 400.
+var ErrInvalidCursor = errors.New("atlas: invalid submission cursor")
+
+// ErrPromotionDisabled is returned when an approved submission cannot be
+// queued for a promotion PR because no GitHub token is configured. Its
+// text is persisted as the submission's promotion_error.
+var ErrPromotionDisabled = errors.New("atlas: promotion worker disabled (no token configured)")
+
 // SubmissionStatus mirrors the wire enum in openapi.yaml.
 type SubmissionStatus string
 

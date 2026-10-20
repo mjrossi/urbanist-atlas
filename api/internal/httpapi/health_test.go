@@ -2,15 +2,12 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 )
 
 func TestHealthz_ReturnsPlainOk(t *testing.T) {
@@ -25,11 +22,8 @@ func TestHealthz_ReturnsPlainOk(t *testing.T) {
 	}
 }
 
-// TestReadyz_WithoutPingerReturnsOk pins the contract: a store that
-// doesn't implement pinger collapses readiness to "200 ok". The
-// production file-backed MemStore has no downstream to ping, so
-// /readyz behaves the same as in this test; the pinger hook stays in
-// place for a future network-bound store (see readyHandler).
+// TestReadyz_WithoutPingerReturnsOk pins the submissions-disabled case:
+// with no pingable store, readiness is the same as liveness.
 func TestReadyz_WithoutPingerReturnsOk(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
 	h := readyHandler(struct{}{}, logger, nil) // not a pinger
@@ -59,30 +53,28 @@ func TestReadyz_PingerOk(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("status: want 200, got %d", rec.Code)
 	}
+	if got := rec.Body.String(); got != "ok\n" {
+		t.Errorf("body: want %q, got %q", "ok\n", got)
+	}
 }
 
-func TestReadyz_PingerFails_ReturnsProblem503(t *testing.T) {
+// TestReadyz_PingerFails_ReturnsDegraded200 pins that a failed store
+// ping never takes the machine out of rotation: reads are served from
+// memory, so only the body reports the write path is down.
+func TestReadyz_PingerFails_ReturnsDegraded200(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
 	h := readyHandler(fakePinger{err: errors.New("dial tcp: connection refused")}, logger, nil)
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Errorf("status: want 503, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Errorf("status: want 200, got %d", rec.Code)
 	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Errorf("content-type: want application/problem+json, got %q", ct)
+	if ct := rec.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+		t.Errorf("content-type: want text/plain; charset=utf-8, got %q", ct)
 	}
-
-	var problem oapi.ProblemDetails
-	if err := json.NewDecoder(rec.Body).Decode(&problem); err != nil {
-		t.Fatalf("decode problem: %v", err)
-	}
-	if want := "https://urbanistatlas.com/problems/not-ready"; problem.Type != want {
-		t.Errorf("problem.type: want %q, got %q", want, problem.Type)
-	}
-	if problem.Status != http.StatusServiceUnavailable {
-		t.Errorf("problem.status: want 503, got %d", problem.Status)
+	if got := rec.Body.String(); got != "degraded\n" {
+		t.Errorf("body: want %q, got %q", "degraded\n", got)
 	}
 }

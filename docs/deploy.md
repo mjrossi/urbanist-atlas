@@ -431,9 +431,10 @@ flyctl ssh sftp shell -a urbanist-atlas
 flyctl ssh console -a urbanist-atlas -C \
   "sh -c 'mv /data/atlas.db /data/atlas.db.bak && mv /data/atlas.db.new /data/atlas.db'"
 
-# 5. Restart and smoke-test.
+# 5. Restart and smoke-test. /readyz always answers 200; the body is
+#    `degraded` instead of `ok` when the database can't be reached.
 flyctl machines start <machine-id> -a urbanist-atlas
-curl -fsS https://api.urbanistatlas.com/readyz
+curl -fsS https://api.urbanistatlas.com/readyz | grep -qx ok && echo "db ok"
 ```
 
 ### Re-running a failed promotion PR
@@ -610,7 +611,7 @@ be missing from the series.
 | Symptom | First moves |
 |---------|-------------|
 | Uptime issue opened | `flyctl status -a urbanist-atlas` (machines up?), `flyctl logs`, check DNS/TLS for the apex. |
-| `/readyz` 503 / `atlas_store_ping_failures_total` climbing | The SQLite volume is unreachable. `flyctl status`, `flyctl volumes list -a urbanist-atlas`; reads still work (they're in-memory), writes (submissions) don't. |
+| `/readyz` answers `degraded` / `atlas_store_ping_failures_total` climbing | The SQLite volume is unreachable. `flyctl status`, `flyctl volumes list -a urbanist-atlas`; reads still work (they're in-memory), writes (submissions) don't. |
 | 5xx spike on the dashboard | Grab a recent `rid` from `flyctl logs`, follow it; check a recent deploy — `flyctl releases -a urbanist-atlas`, roll back if needed (see §Rollback). |
 | Backup issue opened | Not an outage. Re-run the workflow (Actions → SQLite nightly backup → Run workflow); if it keeps failing, check the Fly token / R2 creds (§GitHub Actions secrets) and take a manual snapshot (§Backups). |
 

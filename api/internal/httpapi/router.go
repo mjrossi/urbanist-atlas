@@ -36,9 +36,8 @@ type Config struct {
 	Submissions atlas.SubmissionStore
 
 	// PromotionEnqueuer queues approved submissions for the GitHub PR
-	// worker. Nil is a recognized "no worker configured" state — the
-	// approve handler still flips status but persists
-	// `promotion_error="worker disabled (no token configured)"`.
+	// worker. With nil, the approve handler still flips status and
+	// persists atlas.ErrPromotionDisabled as the promotion_error.
 	PromotionEnqueuer PromotionEnqueuer
 
 	// AdminToken gates admin endpoints behind a bearer token. Empty
@@ -183,8 +182,10 @@ func New(cfg Config) http.Handler {
 			// group: it is browser-facing, so the deterrent applies.
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
-				r.With(pendingQueueGuard(cfg.Submissions, maxPendingSubmissions, logger, cfg.Metrics)).
-					Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger, cfg.Metrics))
+				r.With(
+					pendingQueueGuard(cfg.Submissions, maxPendingSubmissions, logger, cfg.Metrics),
+					submissionRateLimit(limiter, cfg.Metrics),
+				).Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, logger, cfg.Metrics))
 			}
 		})
 	})

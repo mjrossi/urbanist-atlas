@@ -15,67 +15,31 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
-	"github.com/mjrossi/urbanist-atlas/api/internal/seedfiles"
-	"github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite"
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
-
-// ErrPromotionWorkerDisabled is the sentinel returned by a
-// PromotionEnqueuer when no GitHub credentials are configured. The
-// admin/approve handler maps it onto promotion_error so the caller
-// (or the PR retry CLI) knows the row was approved but the PR was
-// never queued.
-var ErrPromotionWorkerDisabled = errors.New("httpapi: promotion worker disabled (no token configured)")
 
 // PromotionEnqueuer is the seam the approve handler uses to hand an
 // approved submission off to the GitHub PR worker. Implementations
 // must return promptly — they should buffer the job and return nil,
-// not block on GitHub I/O. ErrPromotionWorkerDisabled is a recognized
-// "no worker configured" signal; any other error is treated as
-// "enqueue failed, persist promotion_error".
+// not block on GitHub I/O. Any error, atlas.ErrPromotionDisabled
+// included, is persisted as the submission's promotion_error.
 type PromotionEnqueuer interface {
 	Enqueue(ctx context.Context, sub atlas.Submission) error
 }
 
-// createSubmissionHandler answers POST /api/v1/submissions. Public
-// endpoint; gated by clientSecretMiddleware upstream + rate-limited
-// per-IP below.
-func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, limiter *ipRateLimiter, logger *slog.Logger, m *Metrics) http.HandlerFunc {
+// createSubmissionHandler answers POST /api/v1/submissions.
+func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
-		if ok, retry := limiter.allow(clientIP(r)); !ok {
-			m.incRateLimit("submissions")
-			m.incSubmissions("rate_limited")
-			writeRateLimited(w, r, retry, rid)
-			return
-		}
-
-		in, fieldErrs, parseErr := parseSubmission(w, r, regions)
-		if parseErr != nil {
-			// Malformed body (bad JSON / empty / oversize / trailing
-			// content): one problem document with a parse-specific
-			// title+detail, counted as a validation rejection.
+		var body oapi.NewSubmissionRequest
+		if perr := decodeOneJSONObject(w, r, &body, "NewSubmissionRequest"); perr != nil {
 			m.incSubmissions("rejected_validation")
-			writeProblem(w, r, http.StatusBadRequest, problemValidation, parseErr.title, parseErr.detail, rid)
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, perr.title, perr.detail, rid)
 			return
 		}
-		if len(fieldErrs) > 0 {
-			m.incSubmissions("rejected_validation")
-			for field := range fieldErrs {
-				m.incSubmissionValidationFailure(field)
-			}
-			writeProblemWithErrors(w, r, http.StatusBadRequest, problemValidation,
-				"Submission Validation Failed",
-				"One or more fields in the submission failed validation. See the errors map for per-field messages.",
-				rid, fieldErrs)
-			return
-		}
-
-		sub, err := subs.Create(r.Context(), in)
+		sub, err := atlas.CreateSubmission(r.Context(), regions, subs, fromOAPINewSubmission(body))
 		if err != nil {
-			m.incSubmissions("error")
-			logger.ErrorContext(r.Context(), "create submission failed", "err", err, "rid", rid)
-			writeInternalProblem(w, r, rid)
+			writeCreateSubmissionErr(w, r, err, rid, logger, m)
 			return
 		}
 		m.incSubmissions("created")
@@ -83,104 +47,35 @@ func createSubmissionHandler(subs atlas.SubmissionStore, regions atlas.Store, li
 	}
 }
 
-// fieldErrors maps a request field name to a human-readable validation
-// message, mirroring the `errors` object in the problem+json envelope.
-type fieldErrors = map[string]string
+// writeCreateSubmissionErr maps an atlas.CreateSubmission error onto a
+// 400 field-error problem or a 500.
+func writeCreateSubmissionErr(w http.ResponseWriter, r *http.Request, err error, rid string, logger *slog.Logger, m *Metrics) {
+	var verr *atlas.SubmissionValidationError
+	if !errors.As(err, &verr) {
+		m.incSubmissions("error")
+		logger.ErrorContext(r.Context(), "create submission failed", "err", err, "rid", rid)
+		writeInternalProblem(w, r, rid)
+		return
+	}
+	m.incSubmissions("rejected_validation")
+	for field := range verr.Fields {
+		m.incSubmissionValidationFailure(field)
+	}
+	writeProblemWithErrors(w, r, http.StatusBadRequest, problemValidation,
+		"Submission Validation Failed",
+		"One or more fields in the submission failed validation. See the errors map for per-field messages.",
+		rid, verr.Fields)
+}
 
 // submissionParseError carries the problem-document title+detail for a
-// malformed POST /submissions body. It is returned (not written) by
-// parseSubmission so the handler stays the single response-writing
-// site and owns the metric increment.
+// malformed request body. It is returned (not written) so the handler
+// stays the single response-writing site and owns the metric increment.
 type submissionParseError struct {
 	title  string
 	detail string
 }
 
 func (e *submissionParseError) Error() string { return e.title + ": " + e.detail }
-
-// parseSubmission decodes, trims, assembles, and validates a
-// NewSubmissionRequest body, returning the ready-to-store input. It
-// performs no I/O of its own beyond the region-existence store lookup
-// and writes nothing to w (it needs w only for http.MaxBytesReader's
-// oversize accounting) — the caller maps the outcome onto a response.
-//
-// Exactly one of the three result shapes is meaningful at a time:
-//   - parseErr != nil  → the body was malformed (bad JSON, empty,
-//     oversize, or had trailing content); in and fieldErrs are zero.
-//   - len(fieldErrs) > 0 → the body parsed but one or more fields
-//     failed shape or region-existence validation.
-//   - otherwise → in is a valid, validated NewSubmissionInput.
-func parseSubmission(w http.ResponseWriter, r *http.Request, regions atlas.Store) (atlas.NewSubmissionInput, fieldErrors, *submissionParseError) {
-	var body oapi.NewSubmissionRequest
-	if perr := decodeOneJSONObject(w, r, &body, "NewSubmissionRequest"); perr != nil {
-		return atlas.NewSubmissionInput{}, nil, perr
-	}
-
-	// region_slugs is optional on the wire; the SPA's region field
-	// is free-form text and most submissions don't carry a
-	// canonical slug. nil pointer and empty slice both flow through
-	// as zero-length input to ValidateSubmissionPayload.
-	var rawRegionSlugs []string
-	if body.Payload.RegionSlugs != nil {
-		rawRegionSlugs = *body.Payload.RegionSlugs
-	}
-	// Tags are intentionally not read from the wire: the public form
-	// doesn't collect them (an editor assigns tags in the promotion
-	// PR), and `tags` was dropped from SubmissionPayload. payload.Tags
-	// stays nil; the PR worker renders it as an empty `tags = []`
-	// placeholder for the editor to fill.
-	payload := atlas.SubmissionPayload{
-		Name:        strings.TrimSpace(body.Payload.Name),
-		ShortDesc:   strings.TrimSpace(body.Payload.ShortDesc),
-		WebsiteURL:  strings.TrimSpace(body.Payload.WebsiteUrl),
-		RegionSlugs: normalizeStringSlice(rawRegionSlugs),
-	}
-	if body.Payload.ContactUrl != nil {
-		payload.ContactURL = strings.TrimSpace(*body.Payload.ContactUrl)
-	}
-
-	in := atlas.NewSubmissionInput{Payload: payload}
-	if body.SubmitterName != nil {
-		in.SubmitterName = strings.TrimSpace(*body.SubmitterName)
-	}
-	if body.SubmitterEmail != nil {
-		in.SubmitterEmail = strings.TrimSpace(string(*body.SubmitterEmail))
-	}
-	if body.SubmitterNote != nil {
-		in.SubmitterNote = *body.SubmitterNote
-	}
-
-	fieldErrs := seedfiles.ValidateSubmissionPayload(
-		seedfiles.SubmissionPayloadInput{
-			Name:        payload.Name,
-			ShortDesc:   payload.ShortDesc,
-			WebsiteURL:  payload.WebsiteURL,
-			ContactURL:  payload.ContactURL,
-			RegionSlugs: payload.RegionSlugs,
-		},
-		seedfiles.SubmitterInput{
-			Name:  in.SubmitterName,
-			Email: in.SubmitterEmail,
-			Note:  in.SubmitterNote,
-		},
-	)
-
-	// Region-slug existence is the one check the shared validator
-	// can't do (it needs the store + context). Run it only when
-	// shape validation already passed for `region_slugs`, then merge
-	// the result into the field-errors map so the client receives a
-	// single per-field response.
-	if _, alreadyBad := fieldErrs["region_slugs"]; !alreadyBad {
-		if msg := checkRegionSlugsExist(r.Context(), regions, payload.RegionSlugs); msg != "" {
-			if fieldErrs == nil {
-				fieldErrs = map[string]string{}
-			}
-			fieldErrs["region_slugs"] = msg
-		}
-	}
-
-	return in, fieldErrs, nil
-}
 
 // decodeOneJSONObject decodes the request body into v under the
 // submission body-size limit, rejecting unknown fields and requiring
@@ -251,7 +146,7 @@ func listSubmissionsHandler(subs atlas.SubmissionStore, logger *slog.Logger) htt
 		}
 		page, err := subs.ListPage(r.Context(), q)
 		if err != nil {
-			if errors.Is(err, sqlite.ErrInvalidCursor) {
+			if errors.Is(err, atlas.ErrInvalidCursor) {
 				writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Cursor",
 					"The cursor query parameter is malformed; pass the value of the previous response's X-Next-Cursor header.", rid)
 				return
@@ -401,47 +296,37 @@ func adminOutcome(err error) string {
 
 func enqueueOrDisabled(ctx context.Context, enq PromotionEnqueuer, sub atlas.Submission) error {
 	if enq == nil {
-		return ErrPromotionWorkerDisabled
+		return atlas.ErrPromotionDisabled
 	}
 	return enq.Enqueue(ctx, sub)
 }
 
-// checkRegionSlugsExist resolves each region slug against the store
-// and returns a sentence-form message naming the first offender (or
-// "" when every slug resolves and no duplicates are present). The
-// existence check requires a context-bound store call so it lives
-// here rather than in seedfiles.ValidateSubmissionPayload.
-func checkRegionSlugsExist(ctx context.Context, regions atlas.Store, slugs []string) string {
-	if regions == nil {
-		// Defensive: a missing read-side store at this point would be
-		// a programmer error. Surface it as a validation failure rather
-		// than crash.
-		return "Region resolver is unavailable; cannot verify region slugs."
+// fromOAPINewSubmission maps the wire body onto atlas input. Tags are
+// not on the wire: editors assign them in the promotion PR.
+func fromOAPINewSubmission(body oapi.NewSubmissionRequest) atlas.NewSubmissionInput {
+	in := atlas.NewSubmissionInput{
+		Payload: atlas.SubmissionPayload{
+			Name:       body.Payload.Name,
+			ShortDesc:  body.Payload.ShortDesc,
+			WebsiteURL: body.Payload.WebsiteUrl,
+		},
 	}
-	seen := map[string]bool{}
-	for _, slug := range slugs {
-		if seen[slug] {
-			return fmt.Sprintf("Region slug %q appears more than once.", slug)
-		}
-		seen[slug] = true
-		if _, err := regions.ResolveRegionBySlug(ctx, slug); err != nil {
-			if errors.Is(err, atlas.ErrRegionNotFound) {
-				return fmt.Sprintf("Region slug %q does not match any known region.", slug)
-			}
-			return fmt.Sprintf("Region lookup failed for %q.", slug)
-		}
+	if body.Payload.RegionSlugs != nil {
+		in.Payload.RegionSlugs = *body.Payload.RegionSlugs
 	}
-	return ""
-}
-
-func normalizeStringSlice(in []string) []string {
-	out := make([]string, 0, len(in))
-	for _, s := range in {
-		if t := strings.TrimSpace(s); t != "" {
-			out = append(out, t)
-		}
+	if body.Payload.ContactUrl != nil {
+		in.Payload.ContactURL = *body.Payload.ContactUrl
 	}
-	return out
+	if body.SubmitterName != nil {
+		in.SubmitterName = *body.SubmitterName
+	}
+	if body.SubmitterEmail != nil {
+		in.SubmitterEmail = string(*body.SubmitterEmail)
+	}
+	if body.SubmitterNote != nil {
+		in.SubmitterNote = *body.SubmitterNote
+	}
+	return in
 }
 
 func toOAPISubmission(s atlas.Submission) oapi.Submission {

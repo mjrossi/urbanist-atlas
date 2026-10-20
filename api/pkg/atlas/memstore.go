@@ -308,9 +308,8 @@ func (s *MemStore) bfsUpwardFirstMatch(rootID int64, match func(Region) bool) (R
 // SearchRegions implements Store. Case-insensitive name/slug match over
 // the full non-national region graph, ranked for type-ahead relevance,
 // each result carrying a state-ancestor disambiguation label. The
-// ranking/collection/labeling cluster lives on regionSearcher
-// (regionsearch.go); this method owns query normalization, limit
-// clamping, and the read lock, then delegates the locked body.
+// ranking lives in regionsearch.go; this method owns query
+// normalization, limit clamping and the read lock.
 func (s *MemStore) SearchRegions(_ context.Context, query string, limit int) ([]RegionSearchResult, error) {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
@@ -326,7 +325,7 @@ func (s *MemStore) SearchRegions(_ context.Context, query string, limit int) ([]
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return regionSearcher{store: s}.collect(q, limit), nil
+	return s.searchRegionsLocked(q, limit), nil
 }
 
 // ResolveRegionBySlug implements Store. Returns ErrRegionNotFound for

@@ -20,48 +20,32 @@ func healthHandler() http.HandlerFunc {
 	}
 }
 
-// pinger is the (optional) interface a store implements when it has a
-// downstream dependency that can be health-pinged. The bundled
-// in-memory MemStore has no downstream and does not implement it, so
-// /readyz collapses to a process-up check today; the interface is kept
-// so a future downstream-bound store implementation can opt in.
-// Defined here (not in pkg/atlas) because the contract exists for the
-// HTTP readiness layer's benefit, not for orchestrators in pkg/atlas.
+// pinger is implemented by the SQLite submission store. Defined here
+// rather than in pkg/atlas because only the readiness probe needs it.
 type pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// readyHandler answers GET /readyz with 200 only when the pingable
-// dependency is reachable. Returns 503 with an RFC 9457 problem
-// document otherwise. The 1-second deadline keeps Fly's readiness check
-// predictable; a dependency that takes longer than 1s to acknowledge a
-// ping is effectively unavailable for handling a burst of requests.
-//
-// The pingable dependency is the SQLite submission store (the only
-// out-of-process surface that can fail at runtime while the process
-// stays up). The read-path MemStore is immutable in-memory and loaded
-// at boot, so it does not implement pinger. When submissions are
-// disabled (no --db-path), the passed-in value is a nil interface and
-// /readyz resolves to "200 ok" — same shape as /healthz.
+// readyHandler answers GET /readyz with 200 and `ok`, or `degraded` when
+// the submission store fails a 1-second ping. It never answers 503:
+// reads are served from the in-memory MemStore, so a SQLite problem must
+// not take the only machine out of rotation. With submissions disabled
+// pingable is nil and the probe always reports ok.
 func readyHandler(pingable any, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	p, _ := pingable.(pinger)
 	return func(w http.ResponseWriter, r *http.Request) {
+		body := "ok\n"
 		if p != nil {
 			ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 			defer cancel()
 			if err := p.Ping(ctx); err != nil {
 				m.incStorePingFailure()
 				logger.WarnContext(r.Context(), "readyz: store ping failed", "err", err)
-				writeProblem(w, r, http.StatusServiceUnavailable,
-					"https://urbanistatlas.com/problems/not-ready",
-					"Service not ready",
-					"The data store is not currently reachable; try again shortly.",
-					requestIDFromContext(r.Context()))
-				return
+				body = "degraded\n"
 			}
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok\n"))
+		_, _ = w.Write([]byte(body))
 	}
 }
