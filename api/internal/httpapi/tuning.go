@@ -33,6 +33,14 @@ const maxPendingSubmissions = 200
 // global limit admits in one interval.
 const pendingQueueCheckInterval = time.Minute
 
+// pendingQueueRetryInterval is how soon a failed pending-queue check is
+// retried, and pendingQueueQueryTimeout bounds the query itself since it
+// runs under the cache lock.
+const (
+	pendingQueueRetryInterval = 5 * time.Second
+	pendingQueueQueryTimeout  = 2 * time.Second
+)
+
 // rateLimitSweepInterval is how often the limiter walks its in-memory
 // hit map and discards entries whose hits have all aged out of the
 // window. Keeps the map from leaking memory under churning IPs without

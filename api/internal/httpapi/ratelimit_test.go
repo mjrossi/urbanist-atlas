@@ -138,10 +138,13 @@ type pendingListStore struct {
 	calls   int
 }
 
-func (s *pendingListStore) List(_ context.Context, q atlas.ListSubmissionsQuery) ([]atlas.Submission, error) {
+func (s *pendingListStore) List(ctx context.Context, q atlas.ListSubmissionsQuery) ([]atlas.Submission, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.calls++
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -237,5 +240,42 @@ func TestPendingQueueGuard_RechecksAfterInterval(t *testing.T) {
 	now = now.Add(pendingQueueCheckInterval)
 	if g.full(context.Background()) {
 		t.Error("full = true after the interval and the queue drained")
+	}
+}
+
+func TestPendingQueue_RefreshErrorKeepsLastAnswer(t *testing.T) {
+	store := &pendingListStore{pending: 5}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	g := newPendingQueue(store, 5, slog.New(slog.DiscardHandler))
+	g.nowFunc = func() time.Time { return now }
+
+	if !g.full(context.Background()) {
+		t.Fatal("full = false at cap")
+	}
+	store.mu.Lock()
+	store.err = errors.New("db down")
+	store.mu.Unlock()
+	now = now.Add(pendingQueueCheckInterval)
+	if !g.full(context.Background()) {
+		t.Error("a failed refresh reset a full queue to not-full")
+	}
+	calls := store.calls
+	if !g.full(context.Background()) || store.calls != calls {
+		t.Error("failed refresh was not held off for the retry interval")
+	}
+	now = now.Add(pendingQueueRetryInterval)
+	g.full(context.Background())
+	if store.calls != calls+1 {
+		t.Errorf("store List calls = %d, want a retry after the retry interval", store.calls-calls)
+	}
+}
+
+func TestPendingQueue_CanceledCallerDoesNotPoisonCache(t *testing.T) {
+	store := &pendingListStore{pending: 5}
+	g := newPendingQueue(store, 5, slog.New(slog.DiscardHandler))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if !g.full(ctx) {
+		t.Error("a canceled caller context made the guard report not-full")
 	}
 }

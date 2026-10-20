@@ -164,9 +164,12 @@ func newPendingQueue(subs atlas.SubmissionStore, maxPending int, logger *slog.Lo
 	return &pendingQueue{subs: subs, maxPending: maxPending, logger: logger, nowFunc: time.Now}
 }
 
-// full fails open on a store error: the create that follows would hit
-// the same store, and refusing every submission over a transient read
-// error is the worse failure.
+// full fails open on a store error until the first successful check:
+// the create that follows would hit the same store, and refusing every
+// submission over a transient read error is the worse failure. After
+// that, a failed refresh keeps the last known answer and retries
+// sooner. The query runs detached from the caller's context so one
+// client disconnecting cannot poison the cache for everyone else.
 func (q *pendingQueue) full(ctx context.Context) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -174,13 +177,15 @@ func (q *pendingQueue) full(ctx context.Context) bool {
 	if !q.checkedAt.IsZero() && now.Sub(q.checkedAt) < pendingQueueCheckInterval {
 		return q.isFull
 	}
-	items, err := q.subs.List(ctx, atlas.ListSubmissionsQuery{Status: atlas.SubmissionPending, Limit: q.maxPending})
+	qctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), pendingQueueQueryTimeout)
+	defer cancel()
+	items, err := q.subs.List(qctx, atlas.ListSubmissionsQuery{Status: atlas.SubmissionPending, Limit: q.maxPending})
 	if err != nil {
 		q.logger.ErrorContext(ctx, "pending queue check failed", "err", err)
-		q.isFull = false
-	} else {
-		q.isFull = len(items) >= q.maxPending
+		q.checkedAt = now.Add(pendingQueueRetryInterval - pendingQueueCheckInterval)
+		return q.isFull
 	}
+	q.isFull = len(items) >= q.maxPending
 	q.checkedAt = now
 	return q.isFull
 }
