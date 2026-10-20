@@ -8,13 +8,14 @@ import (
 // documented in api/openapi.yaml's ProblemDetails schema; mirror
 // changes here when the spec changes.
 const (
-	problemValidation   = "https://urbanistatlas.com/problems/validation"
-	problemNotFound     = "https://urbanistatlas.com/problems/not-found"
-	problemMilitaryZIP  = "https://urbanistatlas.com/problems/military-postal-code"
-	problemInternal     = "https://urbanistatlas.com/problems/internal"
-	problemUnauthorized = "https://urbanistatlas.com/problems/unauthorized"
-	problemConflict     = "https://urbanistatlas.com/problems/conflict"
-	problemRateLimited  = "https://urbanistatlas.com/problems/rate-limited"
+	problemValidation    = "https://urbanistatlas.com/problems/validation"
+	problemNotFound      = "https://urbanistatlas.com/problems/not-found"
+	problemMilitaryZIP   = "https://urbanistatlas.com/problems/military-postal-code"
+	problemInternal      = "https://urbanistatlas.com/problems/internal"
+	problemUnauthorized  = "https://urbanistatlas.com/problems/unauthorized"
+	problemConflict      = "https://urbanistatlas.com/problems/conflict"
+	problemRateLimited   = "https://urbanistatlas.com/problems/rate-limited"
+	problemAdminDisabled = "https://urbanistatlas.com/problems/admin-disabled"
 )
 
 // writeJSON emits an arbitrary value as application/json. Used for

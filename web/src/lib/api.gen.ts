@@ -300,17 +300,13 @@ export interface paths {
          *     most-recently-approved organizations across the whole atlas,
          *     newest first.
          *
-         *     Pagination: v1 returns the whole list in a single response and
-         *     will never default-truncate a today-complete result — a
-         *     response without a cursor means you have every row. When
-         *     pagination is introduced it will be additive and follow the
-         *     same opaque-cursor convention as the admin `listSubmissions`
-         *     endpoint: the response carries an `X-Next-Cursor` header (and
-         *     an optional `meta.next_cursor`) when more rows exist beyond the
-         *     current page; pass that value back as `?cursor=` to fetch the
-         *     next page. The cursor format is undocumented and may change
-         *     without notice — treat it as opaque. No `cursor` parameter is
-         *     accepted yet.
+         *     The list is capped at the 10 most recent organizations. It is a
+         *     fixed-size "latest additions" window, not a paginated
+         *     collection: there is no cursor, no `limit` parameter, and older
+         *     organizations are not reachable through this endpoint. Use
+         *     `GET /api/v1/regions/{slug}` or `/lookup` to reach the rest of
+         *     the directory. Organizations attached only to
+         *     `scope_tier='national'` regions are excluded.
          */
         get: operations["listRecent"];
         put?: never;
@@ -1151,6 +1147,9 @@ export interface components {
          *       is also returned.
          *     - `https://urbanistatlas.com/problems/internal` — an
          *       unexpected server error (HTTP 500).
+         *     - `https://urbanistatlas.com/problems/admin-disabled` — admin
+         *       endpoints are disabled because `URBANIST_ADMIN_TOKEN` is not
+         *       configured on the server (HTTP 503).
          *
          *     These URIs are stable identifiers; they do not necessarily
          *     dereference to a human-readable page yet.
@@ -1308,7 +1307,7 @@ export interface components {
          *     not configured on the server. Returned in preference to 401 so
          *     a misconfigured deployment is distinguishable from a bad token.
          *     Response body is an RFC 9457 problem document with
-         *     `type` `https://urbanistatlas.com/problems/internal`.
+         *     `type` `https://urbanistatlas.com/problems/admin-disabled`.
          */
         AdminUnavailable: {
             headers: {
@@ -1547,7 +1546,9 @@ export interface operations {
                 /**
                  * @description The search term. Matched case-insensitively against region
                  *     name and slug. Blank, whitespace-only, or omitted returns an
-                 *     empty result set.
+                 *     empty result set. At most 100 bytes; a longer `q` is
+                 *     rejected with a 400 problem document (`type`
+                 *     `https://urbanistatlas.com/problems/validation`).
                  */
                 q?: string;
                 /** @description Maximum number of results to return. Capped at 20. */
