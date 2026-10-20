@@ -295,6 +295,24 @@ describe('Home', () => {
       expect(statTile(/deepest coverage/i)?.textContent).toMatch(/New York Metro/);
     });
 
+    it('has no tile for the length of the capped /recent list', async () => {
+      listRegionsMock.mockResolvedValueOnce([
+        makeRegion('nyc-metro', 'New York Metro', 12),
+      ]);
+      listRecentMock.mockResolvedValueOnce(
+        Array.from({ length: 10 }, (_, i) =>
+          makeOrg(i + 1, `org-${String(i)}`, `Org ${String(i)}`),
+        ),
+      );
+      const { container } = renderHome();
+
+      await waitFor(() => {
+        expect(statTile(/deepest coverage/i)?.textContent).toMatch(/New York Metro/);
+      });
+      expect(screen.queryByText(/recently filed/i)).toBeNull();
+      expect(container.querySelectorAll('.stats .stat')).toHaveLength(3);
+    });
+
     it('shows a placeholder instead of a wrong total when stats fail', async () => {
       listRegionsMock.mockResolvedValueOnce([
         makeRegion('nyc-metro', 'New York Metro', 12),
@@ -311,5 +329,31 @@ describe('Home', () => {
       expect(statTile(/organizations on file/i)?.textContent).toMatch(/—/);
       expect(statTile(/organizations on file/i)?.textContent).not.toMatch(/12/);
     });
+  });
+
+  it('labels a top place by its kind, never by a raw parent slug', async () => {
+    const place = makeRegion('nyc-metro', 'New York Metro', 12);
+    place.region.parent_slugs = ['nyc-tristate'];
+    listRegionsMock.mockResolvedValueOnce([place]);
+    listRecentMock.mockReturnValue(new Promise(() => {}));
+    renderHome();
+
+    const link = await screen.findByRole('link', { name: /new york metro/i });
+    expect(link.textContent).toMatch(/US · Metropolitan area/);
+    expect(link.textContent).not.toMatch(/nyc-tristate/);
+  });
+
+  it('places a recent org by its primary region, whatever order the API sends', async () => {
+    const org = makeOrg(1, 'bike-nyc', 'Bike NYC');
+    org.regions = [
+      { ...makeRegion('ny', 'New York', 0).region, kind: 'us:state' },
+      { ...makeRegion('nyc-metro', 'New York Metro', 0).region },
+    ];
+    listRegionsMock.mockReturnValue(new Promise(() => {}));
+    listRecentMock.mockResolvedValueOnce([org]);
+    renderHome();
+
+    const card = await screen.findByRole('link', { name: /bike nyc/i });
+    expect(card.textContent).toMatch(/New York Metro · US/);
   });
 });

@@ -125,11 +125,6 @@ export function Browse() {
     stats.data?.by_country.find((c) => c.country === code)?.org_count ?? null;
 
   const grouped = useMemo(() => groupForBrowse(query.data ?? []), [query.data]);
-  const availableLetters = useMemo(() => {
-    const s = new Set<string>();
-    for (const g of grouped) for (const l of g.letters) s.add(l.letter);
-    return s;
-  }, [grouped]);
 
   return (
     <>
@@ -172,12 +167,7 @@ export function Browse() {
         </div>
       </div>
 
-      <BrowseBody
-        query={query}
-        grouped={grouped}
-        availableLetters={availableLetters}
-        orgCountFor={orgCountFor}
-      />
+      <BrowseBody query={query} grouped={grouped} orgCountFor={orgCountFor} />
 
       <section className="editors-note mt-56">
         <div className="label">Don&rsquo;t see your region?</div>
@@ -194,12 +184,10 @@ export function Browse() {
 function BrowseBody({
   query,
   grouped,
-  availableLetters,
   orgCountFor,
 }: {
   query: ReturnType<typeof useQuery<RegionSummary[], ApiError>>;
   grouped: ByCountry[];
-  availableLetters: Set<string>;
   orgCountFor: (country: string) => number | null;
 }) {
   return (
@@ -218,31 +206,15 @@ function BrowseBody({
         ),
       }}
     >
-      {() => (
-        <>
-          <div className="az-index" aria-label="Jump to letter">
-            <span className="az-label">Jump to</span>
-            {ALPHABET.map((letter) =>
-              availableLetters.has(letter) ? (
-                <a key={letter} href={`#${letter}`}>
-                  {letter}
-                </a>
-              ) : (
-                <span key={letter} className="dim">
-                  {letter}
-                </span>
-              ),
-            )}
-          </div>
-          {grouped.map((country) => (
-            <CountrySection
-              key={country.country}
-              country={country}
-              orgCount={orgCountFor(country.country)}
-            />
-          ))}
-        </>
-      )}
+      {() =>
+        grouped.map((country) => (
+          <CountrySection
+            key={country.country}
+            country={country}
+            orgCount={orgCountFor(country.country)}
+          />
+        ))
+      }
     </QueryState>
   );
 }
@@ -262,6 +234,7 @@ function CountrySection({
   // says "countrywide" to make the mixed provenance explicit.
   const total = country.total.length;
   const name = COUNTRY_TITLES[country.country] ?? country.country;
+  const letters = new Set(country.letters.map((l) => l.letter));
   return (
     <section className="country-section">
       <header className="country-head">
@@ -277,23 +250,48 @@ function CountrySection({
           ) : null}
         </div>
       </header>
+      <nav className="az-index" aria-label={`Jump to letter, ${name}`}>
+        <span className="az-label">Jump to</span>
+        {ALPHABET.map((letter) =>
+          letters.has(letter) ? (
+            <a key={letter} href={`#${letterId(country.country, letter)}`}>
+              {letter}
+            </a>
+          ) : (
+            <span key={letter} className="dim">
+              {letter}
+            </span>
+          ),
+        )}
+      </nav>
       {country.letters.map((group) => (
-        <LetterRow key={group.letter} letter={group.letter} anchors={group.anchors} />
+        <LetterRow
+          key={group.letter}
+          id={letterId(country.country, group.letter)}
+          letter={group.letter}
+          anchors={group.anchors}
+        />
       ))}
     </section>
   );
 }
 
+function letterId(country: string, letter: string): string {
+  return `${country}-${letter}`;
+}
+
 function LetterRow({
+  id,
   letter,
   anchors,
 }: {
+  id: string;
   letter: string;
   anchors: AnchorWithChildren[];
 }) {
   const totalRows = anchors.reduce((sum, a) => sum + 1 + a.children.length, 0);
   return (
-    <div className="index-letter-row" id={letter}>
+    <div className="index-letter-row" id={id}>
       <div className="index-letter">
         {letter}
         <span className="meta">

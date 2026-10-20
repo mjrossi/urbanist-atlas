@@ -21,7 +21,7 @@
  *   .org-entry       metro page entry
  *   .org-strip       4-up home recently-added cards
  *   .org-feature     organization page lede
- *   .stats           4-up by-the-numbers strip
+ *   .stats           3-up by-the-numbers strip
  *   .tag             hairline-outlined small-caps pill
  *   .topic-filter    filter chip (active = ink-on-paper)
  *   .az-index        Browse alphabet jump strip
@@ -2067,7 +2067,7 @@ a.tag:hover::before {
 
 @media (min-width: 720px) {
   .stats {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 0;
   }
 }
@@ -4258,9 +4258,9 @@ h1[tabindex='-1']:focus {
     line-height: 1.5;
   }
 
-  /* ── Stats grid: clean 2×2 with correct borders. The desktop rules
-     leave stat 3 with a stray right border at the column gridline and
-     padding-left that shifts content off-axis; reset and redo. ─────── */
+  /* ── Stats grid: two columns, an odd last stat spanning both. The
+     desktop rules leave a stray right border at the column gridline
+     and padding-left that shifts content off-axis; reset and redo. ── */
   .stats {
     grid-template-columns: 1fr 1fr;
     gap: 0;
@@ -4286,11 +4286,12 @@ h1[tabindex='-1']:focus {
   .stats .stat:nth-child(2) {
     border-bottom: 1px solid var(--rule);
   }
-  /* Override the desktop-era :last-child reset that would otherwise
-     strip the 4th stat's borders we never set anyway. */
   .stats .stat:last-child {
     padding-right: 0;
     border-right: none;
+  }
+  .stats .stat:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
   .stats .stat .n {
     font-size: 36px;
@@ -4477,45 +4478,49 @@ h1[tabindex='-1']:focus {
     letter-spacing: 0.22em;
   }
 
-  /* ── About-page <details> accordion. CSS-only; first section is
-     opened by the `open` attribute in About.tsx. The +/- toggle
-     glyph rotates to match the disclosure state. ──────────────── */
-  .prose details {
+  /* ── About-page sections fold on phones; About.tsx renders the
+     disclosure buttons at this same breakpoint. ───────────────── */
+  .prose .method-section {
     border-bottom: 1px solid var(--rule);
-  }
-  .prose details > summary {
-    list-style: none;
     padding: 16px 0;
-    min-height: 56px;
+  }
+  .prose .method-section .section-kicker {
+    margin: 0;
+  }
+  .prose .method-section h2 {
+    margin: 4px 0 0;
+  }
+  .prose .method-section h2 + .h2-rule {
+    display: none;
+  }
+  .method-toggle {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    cursor: pointer;
     gap: 16px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: left;
+    cursor: pointer;
   }
-  .prose details > summary::-webkit-details-marker {
-    display: none;
-  }
-  .prose details > summary::after {
+  .method-toggle::after {
     content: '+';
+    content: '+' / '';
     font-family: var(--serif);
     font-size: 26px;
     line-height: 1;
     color: var(--amber);
     flex-shrink: 0;
   }
-  .prose details[open] > summary::after {
+  .method-toggle[aria-expanded='true']::after {
     content: '−';
-  }
-  .prose details > summary .section-kicker {
-    margin: 0;
-    padding: 0;
-  }
-  .prose details > summary h2 {
-    margin: 4px 0 0;
-  }
-  .prose details > summary .h2-rule {
-    display: none;
+    content: '−' / '';
   }
 
   /* ── Editor's notes: tighter padding. */
@@ -4572,45 +4577,6 @@ h1[tabindex='-1']:focus {
   }
   .org-feature .name {
     font-size: 30px;
-  }
-}
-
-/* ─────────────────────────────────────────────────────────────────────
-   Desktop guard for the About <details> accordion. Restore the
-   pre-accordion DOM look: the <summary> is the visible section
-   header (it carries the kicker + h2 + h2-rule), and body content
-   stays rendered regardless of [open] state. Explicit `display:
-   block` (not `revert`) overrides the UA's
-   `details:not([open]) > :not(summary) { display: none }`.
-   ───────────────────────────────────────────────────────────────────── */
-@media (min-width: 769px) {
-  .prose details {
-    display: block;
-    border: none;
-  }
-  .prose details > summary {
-    display: block;
-    list-style: none;
-    padding: 0;
-    min-height: 0;
-    cursor: default;
-  }
-  .prose details > summary::-webkit-details-marker {
-    display: none;
-  }
-  .prose details > summary::after {
-    content: none;
-  }
-  /* `.prose h2 + .h2-rule` doesn't match here (rule isn't adjacent
-     to h2 inside summary), so render it explicitly. */
-  .prose details > summary .h2-rule {
-    display: block;
-    height: 1px;
-    background: var(--rule);
-    margin-bottom: 24px;
-  }
-  .prose details > :not(summary) {
-    display: block;
   }
 }
 

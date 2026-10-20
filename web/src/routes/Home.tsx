@@ -10,6 +10,7 @@ import type { Org, RegionSummary, Stats } from '../lib/api.ts';
 import { ApiError, getStats, listRecent, listRegions } from '../lib/api.ts';
 import { formatAddedAt, pluralize } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
+import { primaryRegion, regionKindLabel } from '../lib/regionKind.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 const TOP_PLACES_LIMIT = 7;
@@ -103,7 +104,7 @@ export function Home() {
       </div>
 
       <RecentlyFiled query={recent} />
-      <ByTheNumbers places={places} recent={recent} stats={stats} />
+      <ByTheNumbers places={places} stats={stats} />
       <TopicIndex tags={TOPIC_TAGS} />
     </>
   );
@@ -134,8 +135,7 @@ function TopPlaces({ query }: { query: UseQueryResult<RegionSummary[], ApiError>
                   <div>
                     <p className="name">{p.region.name}</p>
                     <div className="meta">
-                      {p.region.country}
-                      {p.region.parent_slugs[0] ? ` · ${p.region.parent_slugs[0]}` : ''}
+                      {p.region.country} · {regionKindLabel(p.region.kind)}
                     </div>
                   </div>
                   <div className="count">
@@ -212,11 +212,9 @@ function RecentBody({ query }: { query: UseQueryResult<Org[], ApiError> }) {
 
 function ByTheNumbers({
   places,
-  recent,
   stats,
 }: {
   places: UseQueryResult<RegionSummary[], ApiError>;
-  recent: UseQueryResult<Org[], ApiError>;
   stats: UseQueryResult<Stats, ApiError>;
 }) {
   // Counts come from `/api/v1/stats`, never from summing over
@@ -239,7 +237,6 @@ function ByTheNumbers({
   // sorts by org_count DESC, so the head of the list is the answer —
   // no scan needed.
   const topRegion = places.data?.[0] ?? null;
-  const recentCount = recent.data?.length ?? null;
 
   return (
     <>
@@ -268,11 +265,6 @@ function ByTheNumbers({
           <div className="sub">
             {usCount !== null ? `${usCount} US · ${caCount} Canada` : 'Two countries, v1'}
           </div>
-        </div>
-        <div className="stat">
-          <div className="n">{formatNumber(recentCount)}</div>
-          <div className="label">Recently filed</div>
-          <div className="sub">Latest editorial additions</div>
         </div>
         <div className="stat">
           <div className="n">
@@ -330,7 +322,7 @@ function TopicIndex({ tags }: { tags: readonly string[] }) {
 }
 
 function primaryRegionLabel(org: Org): string | null {
-  const r = org.regions[0];
+  const r = primaryRegion(org.regions);
   if (!r) return null;
   return `${r.name} · ${r.country}`;
 }

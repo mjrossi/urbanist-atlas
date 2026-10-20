@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { isBrowseableKind, isMetroKind, regionKindLabel } from './regionKind.ts';
+import {
+  isBrowseableKind,
+  isMetroKind,
+  primaryRegion,
+  regionKindLabel,
+} from './regionKind.ts';
 
 // The dev-mode unknown-kind console.warn introduced for schema-drift
 // detection fires whenever a kind isn't in REGION_KINDS. Restore the
@@ -75,5 +80,31 @@ describe('regionKind', () => {
     // Cities are browseable but NOT metro-equivalent.
     expect(isMetroKind('us:city')).toBe(false);
     expect(isMetroKind('ca:city')).toBe(false);
+  });
+
+  describe('primaryRegion', () => {
+    const r = (slug: string, kind: string) => ({ slug, kind });
+
+    it('prefers a metro-equivalent kind over an earlier non-metro', () => {
+      expect(primaryRegion([r('ny', 'us:state'), r('nyc-metro', 'us:metro')])?.slug).toBe(
+        'nyc-metro',
+      );
+    });
+
+    it('breaks ties by slug, so the API order never matters', () => {
+      const a = [r('sf-bay', 'us:metro'), r('la-metro', 'us:metro'), r('ca', 'us:state')];
+      expect(primaryRegion(a)?.slug).toBe('la-metro');
+      expect(primaryRegion([...a].reverse())?.slug).toBe('la-metro');
+    });
+
+    it('falls back to the lowest slug when no region is a metro', () => {
+      expect(
+        primaryRegion([r('ny', 'us:state'), r('brooklyn', 'us:borough')])?.slug,
+      ).toBe('brooklyn');
+    });
+
+    it('returns undefined for an org with no regions', () => {
+      expect(primaryRegion<{ kind: string; slug: string }>([])).toBeUndefined();
+    });
   });
 });

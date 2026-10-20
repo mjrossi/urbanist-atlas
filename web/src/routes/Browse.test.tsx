@@ -351,4 +351,28 @@ describe('Browse', () => {
       expect(document.title).toMatch(/browse.*urbanist atlas/i);
     });
   });
+
+  it('gives each letter section a unique id that a jump link reaches', async () => {
+    listRegionsMock.mockResolvedValueOnce([
+      makeRegion({ id: 1, slug: 'tampa', name: 'Tampa Bay' }, 2),
+      makeRegion(
+        { id: 2, slug: 'toronto', name: 'Toronto', country: 'CA', kind: 'ca:cma' },
+        3,
+      ),
+      makeRegion({ id: 3, slug: 'austin', name: 'Austin' }, 1),
+    ]);
+    const { container } = renderBrowse();
+    await screen.findByRole('link', { name: /toronto/i });
+
+    const ids = [...container.querySelectorAll('.index-letter-row')].map((el) => el.id);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const targets = [...container.querySelectorAll<HTMLAnchorElement>('.az-index a')].map(
+      (a) => a.getAttribute('href')?.slice(1) ?? '',
+    );
+    expect(targets.sort()).toEqual([...ids].sort());
+    const canadaT = screen.getByRole('navigation', { name: /jump to letter.*canada/i });
+    expect(canadaT.querySelector('a')?.getAttribute('href')).toBe('#CA-T');
+  });
 });
