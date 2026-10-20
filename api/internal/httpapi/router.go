@@ -45,8 +45,8 @@ type Config struct {
 	// disables admin endpoints entirely (they return 503).
 	AdminToken string
 
-	// SubmissionsRatePerHour caps POST /api/v1/submissions per source
-	// IP. Zero or negative falls back to a default (5/hour).
+	// SubmissionsRatePerHour caps POST /api/v1/submissions per client
+	// (IPv4 address or IPv6 /64). Zero or negative falls back to 5/hour.
 	SubmissionsRatePerHour int
 
 	// Metrics, when non-nil, enables the Prometheus request middleware
@@ -183,7 +183,8 @@ func New(cfg Config) http.Handler {
 			// group: it is browser-facing, so the deterrent applies.
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
-				r.Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger, cfg.Metrics))
+				r.With(pendingQueueGuard(cfg.Submissions, maxPendingSubmissions, logger, cfg.Metrics)).
+					Post("/submissions", createSubmissionHandler(cfg.Submissions, cfg.Store, limiter, logger, cfg.Metrics))
 			}
 		})
 	})

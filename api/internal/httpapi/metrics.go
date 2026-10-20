@@ -78,7 +78,7 @@ func NewMetrics() *Metrics {
 		rateLimit: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "atlas",
 			Name:      "rate_limit_hits_total",
-			Help:      "Total requests rejected by the per-IP rate limiter, by endpoint.",
+			Help:      "Total requests rejected by rate limiting (per-client, global, or full moderation queue), by endpoint.",
 		}, []string{"endpoint"}),
 		lookupResults: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "atlas",
