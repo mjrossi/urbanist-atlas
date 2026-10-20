@@ -78,6 +78,27 @@ The dev loop has no external dependencies: `mise install`, then
 
 ## Tech conventions
 
+### Comments
+
+Applies to both halves.
+
+- A comment explains a non-obvious *why*: an invariant, a trade-off, or
+  an external constraint (spec, platform, CSP, upstream-data quirk).
+  Code that reads clearly gets no comment.
+- Delete comments that restate the code, narrate steps, or record
+  history (slice/PR numbers, "previously…", "now…"). Git history and PR
+  bodies hold history.
+- Never assert another component's behaviour (a WAF in front, proxy
+  headers, middleware order, what a caller does) unless a test pins it.
+  An AI code review found many confident comments describing behaviour
+  the code didn't have.
+- Long design rationale lives in `docs/`; the code links to it in one
+  line.
+- Doc comments on exported identifiers stay, at one or two sentences.
+  Go package docs may be longer.
+- When you change code, fix or remove the comments it invalidates in
+  the same commit.
+
 ### Go (`api/`)
 
 - **Standard library first.** Pull a dependency only when stdlib genuinely
@@ -94,6 +115,12 @@ The dev loop has no external dependencies: `mise install`, then
     `api/internal/store/sqlite/generate.go`, and drift-gated by
     `just api-gen-check`.
   - `github.com/prometheus/client_golang` — Prometheus instrumentation for the `/metrics` endpoint (Phase 1 analytics/observability stack)
+  - `github.com/oapi-codegen/runtime` — runtime support for the generated types (`openapi_types.Date` / `Email`)
+  - `github.com/google/uuid` — UUIDv7 public IDs for submission rows (`pkg/atlas/idgen`)
+  - `modernc.org/sqlite` — pure-Go SQLite driver for the submission/usage store, so the build needs no cgo
+  - `github.com/pressly/goose/v3` — embedded SQLite schema migrations, applied by `Store.Migrate` on boot
+  - `github.com/jonas-p/go-shp` — reads the StatsCan FSA + CMA boundary shapefiles in the CA ETL
+  - `github.com/ctessum/polyclip-go` — polygon intersection for the CA ETL's FSA→CMA max-overlap spatial join
 - **Logging:** `log/slog` (stdlib). JSON in prod, text in dev.
 - **Errors:** stdlib `errors` + `fmt.Errorf("...: %w", err)`. No third-party
   errors libraries.
@@ -131,7 +158,7 @@ before adding any library not in this list.**
 
 - **Language:** TypeScript, strict mode.
 - **Build:** Vite.
-- **Routing:** `react-router` v7 (SPA / data mode).
+- **Routing:** `react-router` v8 (SPA / data mode).
 - **Server state / data fetching:** `@tanstack/react-query` v5. One
   `useQuery` per endpoint. No global client-state library.
 - **Forms:** `react-hook-form` for the submission form. Plain state for
@@ -139,7 +166,8 @@ before adding any library not in this list.**
 - **Styling:** plain CSS via `src/styles/global.css`, ported from
   mjrossi.com. Custom properties for design tokens. No Tailwind, no
   CSS-in-JS, no CSS modules in v1.
-- **Fonts:** Fraunces (display), Source Serif 4 (body), Inter (UI), all via
+- **Fonts:** Fraunces (display), Source Serif 4 (body), Inter (UI),
+  JetBrains Mono (`--mono`: URLs, code, receipt values), all via
   `@fontsource-variable/*`. Self-hosted, no external font requests.
 - **Tests:** Vitest + React Testing Library.
 - **Lint/format:** ESLint flat config (`web/eslint.config.js`) with
