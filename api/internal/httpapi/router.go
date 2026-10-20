@@ -88,37 +88,24 @@ func New(cfg Config) http.Handler {
 
 	r := chi.NewRouter()
 
-	// Order matters: securityHeaders first so the hardening pair lands
-	// on every response — including problem+json errors and the
-	// /healthz probe; requestID next so every later layer (logger,
-	// recoverer, handlers) sees a consistent rid; timeoutMiddleware
-	// next so every handler runs with a per-request deadline ctx;
-	// recoverer next so panics in business logic don't escape;
-	// logger last so the access log records the final status
-	// (including 500s from recoverer).
+	// Order matters. securityHeaders is outermost so every response,
+	// errors and probes included, carries the hardening headers, and
+	// requestID precedes everything that logs. The recoverer is innermost
+	// so a panic becomes a 500 that logging and metrics still record
+	// (TestNew_PanicIsLoggedAndCounted). Metrics sits inside CORS so the
+	// preflight 204s CORS answers itself aren't counted as "unmatched",
+	// and inside logging so it can reuse logging's *statusRecorder.
 	r.Use(securityHeadersMiddleware)
 	r.Use(requestIDMiddleware)
 	r.Use(timeoutMiddleware(requestTimeout))
-	r.Use(recovererMiddleware(logger))
 	r.Use(loggingMiddleware(logger))
 	if len(cfg.CORSOrigins) > 0 {
 		r.Use(corsMiddleware(cfg.CORSOrigins))
 	}
-	// metricsMiddleware sits inside corsMiddleware so the preflight
-	// OPTIONS that CORS short-circuits with a 204 aren't recorded as
-	// "unmatched" request noise.
-	//
-	// LOAD-BEARING ORDERING: metricsMiddleware MUST be registered after
-	// (i.e. nested inside) loggingMiddleware above. metricsMiddleware
-	// type-asserts the http.ResponseWriter to *statusRecorder to reuse
-	// loggingMiddleware's wrapper instead of allocating a second one; that
-	// assert only succeeds while loggingMiddleware runs outside it. Flip
-	// the order and the assert silently falls back to a private recorder
-	// (still correct, one extra allocation per request). See the matching
-	// note at the type-assert in metricsMiddleware (metrics.go).
 	if cfg.Metrics != nil {
 		r.Use(metricsMiddleware(cfg.Metrics))
 	}
+	r.Use(recovererMiddleware(logger))
 
 	// chi's defaults answer an unmatched route with a stdlib text/plain
 	// 404 and an unmatched method with an empty 405 — both violate the

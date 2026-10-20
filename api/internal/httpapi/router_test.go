@@ -1,10 +1,18 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
 // TestHEAD_PublicRoutes_Return200WithEmptyBody pins the contract that
@@ -245,5 +253,64 @@ func TestMethodNotAllowed_ReturnsProblemJSON(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// panickingListStore panics from the /regions handler's store call so a
+// test can drive a real panic through the full New() middleware stack.
+type panickingListStore struct{ atlas.Store }
+
+func (panickingListStore) ListRegions(context.Context) ([]atlas.RegionSummary, error) {
+	panic("boom")
+}
+
+// TestNew_PanicIsLoggedAndCounted pins that a panicking handler still
+// gets an access-log line and a status="500" request metric, i.e. that
+// the recoverer runs inside the logging and metrics middleware.
+func TestNew_PanicIsLoggedAndCounted(t *testing.T) {
+	mem := atlas.NewMemStore()
+	atlas.LoadDevFixtures(mem)
+	logs := &captureHandler{}
+	m := NewMetrics()
+	srv := httptest.NewServer(New(Config{
+		Store:       panickingListStore{mem},
+		Logger:      slog.New(logs),
+		Metrics:     m,
+		CORSOrigins: []string{"https://allowed.example"},
+	}))
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/v1/regions")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/problem+json") {
+		t.Errorf("Content-Type = %q, want application/problem+json", ct)
+	}
+
+	if got := testutil.ToFloat64(m.httpRequests.WithLabelValues("/api/v1/regions", http.MethodGet, "500")); got != 1 {
+		t.Errorf(`atlas_http_requests_total{route="/api/v1/regions",method="GET",status="500"} = %v, want 1`, got)
+	}
+
+	logs.mu.Lock()
+	defer logs.mu.Unlock()
+	var accessStatus int64 = -1
+	for _, rec := range logs.records {
+		if rec.Message != "http" {
+			continue
+		}
+		rec.Attrs(func(a slog.Attr) bool {
+			if a.Key == "status" {
+				accessStatus = a.Value.Int64()
+			}
+			return true
+		})
+	}
+	if accessStatus != http.StatusInternalServerError {
+		t.Errorf("access-log status = %d, want 500 (-1 means no access-log line)", accessStatus)
 	}
 }
