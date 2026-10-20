@@ -91,9 +91,10 @@ grace_period = '10s'
 method = 'GET'
 path = '/healthz'
 
-# Readiness: traffic-gating. /readyz pings the SQLite submission store
-# and answers 503 when the ping fails, so a volume problem takes this
-# single machine out of rotation (see internal/httpapi/health.go).
+# Readiness: /readyz pings the SQLite submission store but always
+# answers 200 (body `degraded` on a failed ping), so a volume problem
+# never takes this single machine out of rotation: reads are served
+# from memory (see api/internal/httpapi/health.go).
 [[http_service.checks]]
 interval = '15s'
 timeout = '5s'

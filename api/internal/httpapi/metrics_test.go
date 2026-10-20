@@ -341,8 +341,8 @@ func TestMetrics_StorePingFailure(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want 503", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	if got := testutil.ToFloat64(m.storePingFailures); got != 1 {
 		t.Errorf("atlas_store_ping_failures_total = %v, want 1", got)

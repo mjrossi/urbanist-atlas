@@ -162,8 +162,9 @@ func isHealthCheckPath(p string) bool {
 // loggingMiddleware emits one structured access-log line per request.
 // Successful (2xx/3xx) liveness/readiness probes are logged at DEBUG so
 // they don't drown the access log at the default INFO level; a failing
-// probe (>=400, e.g. a /readyz 503) stays at INFO so outages are
-// visible without raising the log level.
+// probe (>=400) stays at INFO so outages are visible without raising
+// the log level. A degraded /readyz is a 200 and is logged by
+// readyHandler itself.
 func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

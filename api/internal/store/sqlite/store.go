@@ -98,9 +98,8 @@ func Open(path string) (*Store, error) {
 // Close releases the underlying *sql.DB.
 func (s *Store) Close() error { return s.db.Close() }
 
-// Ping verifies the underlying database connection is alive. It
-// satisfies the httpapi readiness pinger contract so /readyz can gate
-// traffic on the SQLite volume being reachable.
+// Ping verifies the underlying database connection is alive. /readyz
+// uses it to report a degraded write path.
 func (s *Store) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
