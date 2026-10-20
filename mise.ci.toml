@@ -7,3 +7,6 @@
 
 [env]
 URBANIST_LOG_FORMAT = "text"
+# The web production build fails without it (web/vite.config.ts). CI
+# builds aren't deployed; Workers Builds sets its own value.
+VITE_API_BASE = "https://api.urbanistatlas.com"
