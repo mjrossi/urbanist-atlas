@@ -7,8 +7,20 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#faf6f1" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#17130e" media="(prefers-color-scheme: dark)" />
+    <!-- --paper in each theme. theme.js and ThemeToggle switch their
+         media when the reader picks a theme explicitly. -->
+    <meta
+      name="theme-color"
+      content="#faf6f1"
+      data-scheme="light"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#17130e"
+      data-scheme="dark"
+      media="(prefers-color-scheme: dark)"
+    />
 
     <!--
       Synchronous on purpose: sets data-theme on <html> before first
@@ -47,16 +59,12 @@
 
     <meta name="twitter:card" content="summary_large_image" />
 
-    <!--
-      An <link rel="alternate"> pointing at the OpenAPI spec belongs
-      here, but the URL has to be env-aware (Phase 1 only runs
-      qa-api.urbanistatlas.com; api.urbanistatlas.com is unreachable
-      until Phase 2 cutover). Vite doesn't substitute import.meta.env
-      into index.html without a custom transformIndexHtml hook, so the
-      link is exposed instead via the env-aware About + Colophon
-      "OpenAPI spec" links. Restore here once the API host name
-      stabilizes.
-    -->
+    <link
+      rel="alternate"
+      type="application/yaml"
+      title="Urbanist Atlas API (OpenAPI)"
+      href="https://api.urbanistatlas.com/api/v1/openapi.yaml"
+    />
 
     <script type="module" src="/src/main.tsx"></script>
 

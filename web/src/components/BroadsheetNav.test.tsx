@@ -1,4 +1,7 @@
-import { screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Stats } from '../lib/api.ts';
@@ -54,11 +57,21 @@ describe('BroadsheetNav', () => {
     expect(submitLink.getAttribute('aria-current')).toBeNull();
   });
 
-  it('treats /browse, /region/*, /orgs/*, and /r/* as the Browse section', () => {
-    renderWithProviders(<BroadsheetNav />, { initialEntries: ['/region/seattle'] });
+  it('marks Browse as the current page only on /browse itself', () => {
+    renderWithProviders(<BroadsheetNav />, { initialEntries: ['/browse'] });
     const browseLink = screen.getByRole('link', { name: /browse/i });
     expect(browseLink.getAttribute('aria-current')).toBe('page');
   });
+
+  it.each(['/region/seattle', '/orgs/bike-pgh', '/r/10027'])(
+    'marks Browse as the current section, not page, on %s',
+    (path) => {
+      renderWithProviders(<BroadsheetNav />, { initialEntries: [path] });
+      const browseLink = screen.getByRole('link', { name: /browse/i });
+      expect(browseLink.getAttribute('aria-current')).toBe('true');
+      expect(browseLink.className).toBe('current');
+    },
+  );
 
   it('keeps the active entry as a Link so it stays keyboard-focusable', () => {
     renderWithProviders(<BroadsheetNav />, { initialEntries: ['/about'] });
@@ -96,5 +109,49 @@ describe('BroadsheetNav', () => {
     getStatsMock.mockReturnValue(new Promise(() => {}));
     renderWithProviders(<BroadsheetNav />, { initialEntries: ['/about'] });
     expect(screen.queryByText(/orgs ·/)).toBeNull();
+  });
+
+  describe('phone drawer', () => {
+    function mountNav(path: string) {
+      const router = createMemoryRouter([{ path: '*', Component: BroadsheetNav }], {
+        initialEntries: [path],
+      });
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={client}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>,
+      );
+      return router;
+    }
+
+    const toggle = () => screen.getByRole('button', { name: /menu/i });
+
+    it('closes when the route changes by any means', async () => {
+      const user = userEvent.setup();
+      const router = mountNav('/about');
+      await user.click(toggle());
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
+      await act(() => router.navigate('/region/seattle'));
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('closes on Escape and returns focus to the toggle', async () => {
+      const user = userEvent.setup();
+      mountNav('/about');
+      await user.click(toggle());
+      await user.tab();
+      expect(document.activeElement).not.toBe(toggle());
+      await user.keyboard('{Escape}');
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(toggle());
+    });
+
+    it('ignores Escape while closed', async () => {
+      const user = userEvent.setup();
+      mountNav('/about');
+      await user.keyboard('{Escape}');
+      expect(document.activeElement).toBe(document.body);
+    });
   });
 });

@@ -29,9 +29,28 @@
     }
   };
 
+  // Same as syncThemeColor in ThemeToggle.tsx: an explicit choice forces
+  // its scheme's theme-color meta on and the other off.
+  const syncThemeColor = (choice) => {
+    for (const meta of document.querySelectorAll(
+      'meta[name="theme-color"][data-scheme]',
+    )) {
+      const scheme = meta.getAttribute('data-scheme');
+      meta.setAttribute(
+        'media',
+        choice === 'auto'
+          ? `(prefers-color-scheme: ${scheme})`
+          : scheme === choice
+            ? 'all'
+            : 'not all',
+      );
+    }
+  };
+
   const apply = (choice) => {
     if (choice === 'auto') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', choice);
+    syncThemeColor(choice);
   };
 
   apply(read());

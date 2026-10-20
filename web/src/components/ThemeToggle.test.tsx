@@ -1,3 +1,7 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from 'react';
@@ -102,5 +106,65 @@ describe('ThemeToggle', () => {
     expect(
       await screen.findByRole('button', { name: /^light theme$/i, pressed: true }),
     ).toBeDefined();
+  });
+
+  describe('theme-color', () => {
+    // Mirrors the two metas in index.html.
+    function addThemeColorMetas() {
+      for (const scheme of ['light', 'dark']) {
+        const meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        meta.setAttribute('data-scheme', scheme);
+        meta.setAttribute('media', `(prefers-color-scheme: ${scheme})`);
+        document.head.append(meta);
+      }
+    }
+
+    function mediaOf(scheme: string) {
+      return document
+        .querySelector(`meta[name="theme-color"][data-scheme="${scheme}"]`)
+        ?.getAttribute('media');
+    }
+
+    afterEach(() => {
+      for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.remove();
+    });
+
+    it('makes the chosen theme colour win over the system scheme', async () => {
+      addThemeColorMetas();
+      const user = userEvent.setup();
+      render(<ThemeToggle />);
+
+      await user.click(screen.getByRole('button', { name: /^dark theme$/i }));
+      expect(mediaOf('dark')).toBe('all');
+      expect(mediaOf('light')).toBe('not all');
+
+      await user.click(screen.getByRole('button', { name: /^light theme$/i }));
+      expect(mediaOf('light')).toBe('all');
+      expect(mediaOf('dark')).toBe('not all');
+    });
+
+    it('hands the choice back to the system scheme on Auto', async () => {
+      addThemeColorMetas();
+      const user = userEvent.setup();
+      render(<ThemeToggle />);
+
+      await user.click(screen.getByRole('button', { name: /^dark theme$/i }));
+      await user.click(screen.getByRole('button', { name: /match system theme/i }));
+      expect(mediaOf('light')).toBe('(prefers-color-scheme: light)');
+      expect(mediaOf('dark')).toBe('(prefers-color-scheme: dark)');
+    });
+
+    it('is set by theme.js before first paint from the stored choice', () => {
+      addThemeColorMetas();
+      localStorage.setItem('theme', 'dark');
+      const script = readFileSync(resolve(process.cwd(), 'public/theme.js'), 'utf8');
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      new Function(script)();
+
+      expect(root.getAttribute('data-theme')).toBe('dark');
+      expect(mediaOf('dark')).toBe('all');
+      expect(mediaOf('light')).toBe('not all');
+    });
   });
 });

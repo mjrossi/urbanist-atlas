@@ -39,6 +39,26 @@ function choose(next: ThemeChoice) {
   const root = document.documentElement;
   if (next === 'auto') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', next);
+  syncThemeColor(next);
+}
+
+/**
+ * Point the browser chrome at the chosen theme's paper colour. index.html
+ * carries one theme-color meta per scheme (`data-scheme`), each gated on
+ * prefers-color-scheme; an explicit choice forces its own meta on and the
+ * other off. Keep in step with the same function in public/theme.js.
+ */
+function syncThemeColor(choice: ThemeChoice) {
+  for (const meta of document.querySelectorAll('meta[name="theme-color"][data-scheme]')) {
+    const scheme = meta.getAttribute('data-scheme') ?? '';
+    const media =
+      choice === 'auto'
+        ? `(prefers-color-scheme: ${scheme})`
+        : scheme === choice
+          ? 'all'
+          : 'not all';
+    meta.setAttribute('media', media);
+  }
 }
 
 const OPTIONS: readonly { choice: ThemeChoice; label: string; title: string }[] = [

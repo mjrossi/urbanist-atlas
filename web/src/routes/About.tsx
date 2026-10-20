@@ -47,8 +47,8 @@ export function About() {
     };
   }, []);
 
-  // Open the surrounding <details> on mobile before the global
-  // useScrollToTop lands on a kicker whose body is still collapsed.
+  // Open the surrounding <details> on mobile before the
+  // scroll lands on a kicker whose body is still collapsed.
   useEffect(() => {
     const id = decodeURIComponent(hash.replace(/^#/, ''));
     if (!id) return;
