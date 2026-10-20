@@ -1343,11 +1343,9 @@ region_slugs = ["louisville-jefferson-county-ky-metro"]
 
 # --- New Orleans ---
 #
-# Bike Easy is multi-anchored at [new-orleans-la-metro, la-state]
-# at its existing state-floor entry below (slice 7.6 Louisiana
-# section) — same precedent as The Street Trust at
-# [portland-or-metro, or]. New Orleans metro coverage thus comes
-# from the state-floor org + Ride New Orleans (added in slice 7.8).
+# Bike Easy's entry sits in the Louisiana section below, anchored at
+# new-orleans-la-metro only. New Orleans metro coverage comes from it
+# and Ride New Orleans.
 
 [[org]]
 slug = "ride-new-orleans"
@@ -1603,10 +1601,8 @@ tags = ["cycling", "advocacy", "safe-streets", "education"]
 region_slugs = ["fresno-ca-metro"]
 
 # --- Albuquerque NM ---
-# Covered by the pre-existing BikeABQ entry under "New Mexico" below,
-# multi-anchored at [albuquerque-nm-metro, nm] per the Street Trust
-# precedent. BikeABQ plays both the city-leaf role for ABQ-metro ZIPs
-# and the de-facto NM-statewide role; one row, two anchors.
+# Covered by the BikeABQ entry in the New Mexico section below,
+# anchored at albuquerque-nm-metro only.
 
 # Additional city-leaf candidates surveyed but not admitted:
 # - Lexington KY: BikeLex couldn't be verified for 12-month activity.
@@ -2634,7 +2630,7 @@ region_slugs = ["quebec-cma"]
 # --- Winnipeg ---
 #
 # Bike Winnipeg's entry sits in the Manitoba (provincial) section
-# below, anchored at winnipeg-cma only since 2026-10-20. Functional
+# below, anchored at winnipeg-cma only. Functional
 # Transit Winnipeg and Bike to the Future were considered but couldn't
 # be verified to clear the 12-month activity bar in 2025-2026 (search
 # surfaced primarily 2018-2022 activity).
@@ -2823,7 +2819,7 @@ region_slugs = ["ab"]
 #
 # Bike Winnipeg is anchored at the CMA only, not mb: its own mission is
 # "a healthy, sustainable, and equitable city". The province floor is
-# held by Climate Action Team Manitoba, admitted 2026-10-20 under the
+# held by Climate Action Team Manitoba, admitted under the
 # multi-issue precedent (a broader mission plus a named transit or
 # streets program). Green Action Centre was considered and rejected
 # 2026-10-20: its transportation work is mainly promotion and
