@@ -5,6 +5,11 @@
 
 app = 'urbanist-atlas'
 primary_region = 'iad'
+# Seconds between the kill signal and SIGKILL (Fly's default is 5). Must
+# exceed the server's shutdown budget, shutdownHTTPTimeout +
+# shutdownTeardownTimeout in api/cmd/server/serve.go (13s), or the PR
+# worker drain and the final SQLite writes get cut off.
+kill_timeout = 15
 
 [build]
 dockerfile = 'Dockerfile'
@@ -86,10 +91,9 @@ grace_period = '10s'
 method = 'GET'
 path = '/healthz'
 
-# Readiness: traffic-gating. The file-backed store has no external
-# dependency, so /readyz collapses to a process-up check. Kept
-# separate from /healthz so it stays a meaningful traffic gate if
-# a write surface (SQLite) is added later.
+# Readiness: traffic-gating. /readyz pings the SQLite submission store
+# and answers 503 when the ping fails, so a volume problem takes this
+# single machine out of rotation (see internal/httpapi/health.go).
 [[http_service.checks]]
 interval = '15s'
 timeout = '5s'

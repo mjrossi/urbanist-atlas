@@ -203,12 +203,11 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		worker   *githubpr.Worker
 	)
 	if subs != nil {
-		worker = githubpr.New(githubpr.Config{
+		worker = startPromotionWorker(ctx, githubpr.Config{
 			Token:         cfg.githubToken,
 			Logger:        logger,
 			PersistResult: subs.AttachPromotionResult,
 		})
-		go worker.Run(ctx)
 		enqueuer = worker
 	}
 
@@ -294,14 +293,25 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	}()
 
 	return awaitShutdown(ctx, logger, shutdownDeps{
-		srv:         srv,
-		serverErr:   serverErr,
-		metricsSrv:  metricsSrv,
-		metricsDone: metricsDone,
-		worker:      worker,
-		recorder:    recorder,
-		usageRec:    usageRec,
+		srv:             srv,
+		serverErr:       serverErr,
+		metricsSrv:      metricsSrv,
+		metricsDone:     metricsDone,
+		worker:          worker,
+		recorder:        recorder,
+		usageRec:        usageRec,
+		httpTimeout:     shutdownHTTPTimeout,
+		teardownTimeout: shutdownTeardownTimeout,
 	})
+}
+
+// startPromotionWorker launches the PR worker detached from ctx's
+// cancellation. Approvals keep arriving while srv.Shutdown drains, so
+// the worker must keep reading until awaitShutdown calls Stop.
+func startPromotionWorker(ctx context.Context, cfg githubpr.Config) *githubpr.Worker {
+	w := githubpr.New(cfg)
+	go w.Run(context.WithoutCancel(ctx))
+	return w
 }
 
 // logServeConfig emits the single consolidated boot line so an operator
@@ -340,7 +350,18 @@ type shutdownDeps struct {
 	worker      *githubpr.Worker
 	recorder    *coverage.Recorder
 	usageRec    *usage.Recorder
+
+	httpTimeout     time.Duration
+	teardownTimeout time.Duration
 }
+
+// The two shutdown phases run back to back, so their sum (13s) must stay
+// under fly.toml's kill_timeout (15s) or Fly SIGKILLs mid-teardown.
+// Teardown gets its own budget so a slow HTTP drain can't starve it.
+const (
+	shutdownHTTPTimeout     = 6 * time.Second
+	shutdownTeardownTimeout = 7 * time.Second
+)
 
 // awaitShutdown blocks until either the OS signal (ctx cancellation) or
 // the main HTTP listener errors, then performs the dependency-ordered
@@ -348,58 +369,51 @@ type shutdownDeps struct {
 // first, then drain GitHub-PR jobs queued by approvals that landed in the
 // last few seconds (reversing it would let a fresh approval squeeze in
 // after the worker stopped), then flush sampled coverage-gap writes
-// before the deferred store Close runs. Every teardown step shares one
-// shutdownCtx deadline; whichever step hits it first wins.
+// before the deferred store Close runs. Every step runs even when an
+// earlier one fails, and the failures are joined.
 func awaitShutdown(ctx context.Context, logger *slog.Logger, d shutdownDeps) error {
 	select {
 	case <-ctx.Done():
 		logger.Info("shutdown signal received")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+		var errs []error
 
-		if err := d.srv.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("graceful shutdown: %w", err)
+		httpCtx, cancelHTTP := context.WithTimeout(context.Background(), d.httpTimeout)
+		defer cancelHTTP()
+		if err := d.srv.Shutdown(httpCtx); err != nil {
+			errs = append(errs, fmt.Errorf("graceful shutdown: %w", err))
 		}
 		if d.metricsSrv != nil {
-			if err := d.metricsSrv.Shutdown(shutdownCtx); err != nil {
+			if err := d.metricsSrv.Shutdown(httpCtx); err != nil {
 				logger.Warn("metrics graceful shutdown incomplete", "err", err)
 			}
-			// Join the metrics goroutine so a slow drain can't race
-			// process exit. Shutdown already closed the listener, so
-			// ListenAndServe has returned (or is about to); this is the
-			// symmetric counterpart to the <-serverErr join below.
 			<-d.metricsDone
 		}
+
+		teardownCtx, cancelTeardown := context.WithTimeout(context.Background(), d.teardownTimeout)
+		defer cancelTeardown()
 		if d.worker != nil {
-			dropped, stopErr := d.worker.Stop(shutdownCtx)
+			dropped, stopErr := d.worker.Stop(teardownCtx)
 			if stopErr != nil {
 				logger.Warn("githubpr: drain incomplete on shutdown",
 					"err", stopErr,
 					"dropped_count", len(dropped),
 					"dropped_ids", dropped)
+				errs = append(errs, fmt.Errorf("githubpr drain: %w", stopErr))
 			}
 		}
-		// Drain in-flight coverage-gap writes before the deferred store
-		// Close runs, so sampled rows aren't lost on shutdown. Bounded by
-		// the shared shutdownCtx so a wedged write can't overrun the
-		// shutdown budget; stragglers (sampled, best-effort) are dropped.
-		// Nil-safe.
-		if err := d.recorder.Wait(shutdownCtx); err != nil {
-			logger.Warn("coverage: drain incomplete on shutdown", "err", err)
+		// Both recorders are nil-safe. Waiting on them before the
+		// deferred store Close keeps their last writes from racing it;
+		// coverage stragglers are sampled and best-effort.
+		if err := d.recorder.Wait(teardownCtx); err != nil {
+			errs = append(errs, fmt.Errorf("coverage drain: %w", err))
 		}
-		// Flush buffered usage counts and join the recorder's ticker
-		// goroutine before the deferred store Close runs, so the last
-		// interval isn't lost and no flush is still in flight when the
-		// database closes. The goroutine does its own final flush on ctx
-		// cancellation using a detached context, so the join — not just
-		// the flush — is what makes closing the store safe here.
-		// Nil-safe.
-		if err := d.usageRec.Wait(shutdownCtx); err != nil {
-			logger.Warn("usage: final flush incomplete on shutdown", "err", err)
+		if err := d.usageRec.Wait(teardownCtx); err != nil {
+			errs = append(errs, fmt.Errorf("usage final flush: %w", err))
 		}
-		// Wait for ListenAndServe to return (it will, with ErrServerClosed).
+		// Shutdown closes the listener before draining, so this returns
+		// promptly even when the drain timed out.
 		<-d.serverErr
-		return nil
+		return errors.Join(errs...)
 	case err := <-d.serverErr:
 		if err != nil {
 			return fmt.Errorf("listen: %w", err)

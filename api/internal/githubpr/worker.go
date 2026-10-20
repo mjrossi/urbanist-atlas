@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
@@ -70,6 +71,9 @@ var ErrDisabled = errors.New("githubpr: worker disabled (no token configured)")
 // the handler can persist a clear error rather than block.
 var ErrBufferFull = errors.New("githubpr: enqueue buffer full")
 
+// ErrStopped is returned by Enqueue after Stop has begun.
+var ErrStopped = errors.New("githubpr: worker stopped")
+
 // Worker drives the PR-creation pipeline.
 type Worker struct {
 	cfg  Config
@@ -78,10 +82,13 @@ type Worker struct {
 	// own ctx) so callers know whether the goroutine actually
 	// drained or whether the deadline elapsed first.
 	done chan struct{}
-	// closeOnce guards close(jobs) so Stop is idempotent — a second
-	// SIGTERM (or any future caller that calls Stop twice) won't
-	// panic on close-of-closed.
-	closeOnce sync.Once
+	// mu guards stopped. Enqueue holds the read lock across its send so
+	// Stop can't close jobs between the check and the send.
+	mu      sync.RWMutex
+	stopped bool
+	// inflight is the public ID of the job process() is running, so a
+	// Stop that times out can report it as dropped.
+	inflight atomic.Pointer[string]
 }
 
 // New constructs a Worker. Run is what actually starts the goroutine.
@@ -118,11 +125,17 @@ func New(cfg Config) *Worker {
 }
 
 // Enqueue implements httpapi.PromotionEnqueuer. Returns ErrDisabled
-// when no token configured, ErrBufferFull when the channel is at
-// capacity. Otherwise the job is queued and processed by Run.
+// when no token configured, ErrStopped once Stop has begun, and
+// ErrBufferFull when the channel is at capacity. Otherwise the job is
+// queued and processed by Run.
 func (w *Worker) Enqueue(_ context.Context, sub atlas.Submission) error {
 	if w.cfg.Token == "" {
 		return ErrDisabled
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.stopped {
+		return ErrStopped
 	}
 	select {
 	case w.jobs <- sub:
@@ -132,41 +145,36 @@ func (w *Worker) Enqueue(_ context.Context, sub atlas.Submission) error {
 	}
 }
 
-// Run consumes the job channel until ctx is canceled. Blocks until
-// done; intended to be launched in its own goroutine at boot.
+// Run consumes the job channel until Stop closes it, then returns. It
+// blocks, so launch it in its own goroutine at boot.
 //
-// On ctx cancellation, Run drains whatever jobs are already in the
-// channel (it does NOT accept new ones — Enqueue's non-blocking send
-// races against a closed-for-write channel from Stop's perspective)
-// so a SIGTERM mid-flight still finishes the moderator approvals
-// that were already queued. The persist write inside process() uses
-// a detached context (see context.WithoutCancel) so the SQLite row
-// for "PR opened" still lands even after the parent ctx is gone.
-//
-// Pair with Stop for the shutdown-side coordination: Stop closes the
-// jobs channel and blocks until this loop exits.
+// ctx must outlive HTTP request handling, so don't pass the signal
+// context: approvals keep arriving while the server drains, and a job
+// enqueued after Run returned would sit in the buffer unread, with no
+// PR and no promotion_error. Canceling ctx is a hard abort: in-flight
+// GitHub calls are cut off and buffered jobs are attempted under
+// shutdownDrainTimeout, each outcome still persisted.
 func (w *Worker) Run(ctx context.Context) {
 	defer close(w.done)
 	for {
 		select {
 		case job, ok := <-w.jobs:
 			if !ok {
-				// Stop closed the channel; we've drained whatever was
-				// buffered.
 				w.cfg.Logger.Info("githubpr: worker drained, shutting down")
 				return
 			}
-			w.process(ctx, job)
+			w.processTracked(ctx, job)
 		case <-ctx.Done():
-			// Drain whatever's already buffered, then exit. This is the
-			// hard-cancel path: a job that's mid-flight in process()
-			// finishes whatever GitHub-side step it's on (the GitHub
-			// HTTP client respects ctx), and the persist call inside
-			// process() uses a detached ctx so it lands regardless.
 			w.drainAndExit()
 			return
 		}
 	}
+}
+
+func (w *Worker) processTracked(ctx context.Context, job atlas.Submission) {
+	w.inflight.Store(&job.PublicID)
+	defer w.inflight.Store(nil)
+	w.process(ctx, job)
 }
 
 // shutdownDrainTimeout bounds a single job's process() during the
@@ -200,7 +208,7 @@ func (w *Worker) drainAndExit() {
 				return
 			}
 			drainCtx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
-			w.process(drainCtx, job)
+			w.processTracked(drainCtx, job)
 			cancel()
 		default:
 			w.cfg.Logger.Info("githubpr: worker shutting down")
@@ -209,33 +217,29 @@ func (w *Worker) drainAndExit() {
 	}
 }
 
-// Stop signals the worker to finish draining its job buffer and
-// exit, then blocks until Run returns or the supplied ctx expires
-// (whichever comes first). Idempotent — a second call is a no-op
-// re: closing the channel; it still waits on Run's completion.
+// Stop makes Enqueue refuse new jobs, lets Run finish the buffered
+// ones, and blocks until Run returns or ctx expires. Idempotent.
 //
-// Returns nil on a clean drain. When ctx expires before Run exits,
-// Stop returns ctx.Err() along with the public IDs of jobs that
-// were observed in the channel when the deadline fired. Callers
-// (serve.go's shutdown path) log them at slog.Warn so the operator
-// can re-queue with `urbanist-atlas-server submissions retry-pr`.
-//
-// The droppedIDs list is **best-effort**: when the parent ctx is
-// also canceled, Run.drainAndExit is consuming the same channel
-// concurrently, so some IDs reported here may have been processed
-// (or attempted) by Run before the process exits. Conversely, IDs
-// drainAndExit pulled but whose GitHub call was cut off by process
-// exit won't appear here either. The canonical source of truth is
-// the `submissions` row's `promoted_pr_url` (set on success) and
-// `promotion_error` (set on failure) — operators should treat
-// droppedIDs as a "needs investigation" hint, not a definitive
-// loss list.
+// Returns nil on a clean drain. When ctx expires first, Stop returns
+// ctx.Err() and the public IDs of the in-flight job and of jobs still
+// buffered, for the operator to re-queue with `urbanist-atlas-server
+// submissions retry-pr`. The list is best-effort, because Run keeps
+// consuming the buffer concurrently. The submission row's
+// promoted_pr_url / promotion_error is the source of truth.
 func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
-	w.closeOnce.Do(func() { close(w.jobs) })
+	w.mu.Lock()
+	if !w.stopped {
+		w.stopped = true
+		close(w.jobs)
+	}
+	w.mu.Unlock()
 	select {
 	case <-w.done:
 		return nil, nil
 	case <-ctx.Done():
+		if id := w.inflight.Load(); id != nil {
+			droppedIDs = append(droppedIDs, *id)
+		}
 		// Drain whatever's still in the buffer for the operator log.
 		// Receives on a closed channel never block past the buffered
 		// count, so this terminates either via ok==false or via the
@@ -256,14 +260,9 @@ func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
 
 // ProcessNow runs the PR-creation pipeline synchronously for a single
 // submission and returns the resulting PR URL or the wrapped error.
-// It does NOT call PersistResult — the caller (typically the retry-pr
-// CLI) owns persistence so it can format the outcome for the
-// operator.
-//
-// Unlike Enqueue, ProcessNow runs even with an empty Token (so the
-// caller can pass an ad-hoc token on the CLI without configuring the
-// long-lived worker first). It returns ErrDisabled only when the
-// Config has no Token AND nothing was set on the live Worker.
+// It does not call PersistResult: the caller (the retry-pr CLI) owns
+// persistence. Like Enqueue, it returns ErrDisabled when Config.Token
+// is empty.
 func (w *Worker) ProcessNow(ctx context.Context, sub atlas.Submission) (string, error) {
 	if w.cfg.Token == "" {
 		return "", ErrDisabled
@@ -323,11 +322,11 @@ const openPRTimeout = 30 * time.Second
 //     doIdempotentRequest, which retries retryable statuses (429, 502,
 //     503, secondary-rate-limit 403) with a bounded ctx-aware backoff.
 //     Retrying a GET has no side effects, so this is always safe.
-//   - createBranch is single-shot but tolerant of 422 "Reference
-//     already exists" — so a *whole-pipeline* re-run (operator
-//     retry-pr after a partial failure) doesn't trip over a branch a
-//     prior attempt left behind. The branch name is deterministic per
-//     submission, which is what makes that safe.
+//   - createBranch is single-shot. If a prior attempt (retry-pr after a
+//     partial failure) left the deterministic submission branch behind,
+//     it force-resets that branch to the current base, so the put below
+//     sends a blob SHA that matches the branch and the result equals a
+//     fresh run.
 //   - putFile and createPR stay single-shot with NO internal retry.
 //     NOTE: a blind retry of either could double-apply. A PUT contents
 //     with a now-stale base SHA returns 409 (handled as a hard error,
@@ -373,12 +372,12 @@ func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, erro
 		return "", fmt.Errorf("create branch %q: %w", branchName, err)
 	}
 
-	commitMsg := fmt.Sprintf("Add %s (submission %s)", sub.Payload.Name, shortID(sub.PublicID))
+	commitMsg := fmt.Sprintf("Add %s (submission %s)", codeSpan(sub.Payload.Name), shortID(sub.PublicID))
 	if err := w.putFile(ctx, w.cfg.SeedFilePath, branchName, newContent, existing.SHA, commitMsg); err != nil {
 		return "", fmt.Errorf("put file on %q: %w", branchName, err)
 	}
 
-	prTitle := "Add " + sub.Payload.Name
+	prTitle := "Add " + codeSpan(sub.Payload.Name)
 	prBody := buildPRBody(sub)
 	prURL, err := w.createPR(ctx, prTitle, prBody, branchName, w.cfg.BaseBranch)
 	if err != nil {
@@ -391,15 +390,15 @@ func submissionBranchName(publicID string) string {
 	return "submission/" + branchSuffix(publicID)
 }
 
-// shortID returns the first 8 hex characters of the UUIDv7. UUIDv7's
-// leading bits are a millisecond timestamp, so this is human-readable
-// at a glance — useful in commit messages and PR titles.
+// shortID returns the last 8 hex characters of the UUIDv7. The leading
+// characters are its millisecond timestamp, so a prefix would collide
+// for submissions made about a minute apart; the tail is random.
 func shortID(publicID string) string {
 	clean := strings.ReplaceAll(publicID, "-", "")
 	if len(clean) < 8 {
 		return clean
 	}
-	return clean[:8]
+	return clean[len(clean)-8:]
 }
 
 // branchSuffix returns 16 hex characters of the UUIDv7. The first 12
@@ -426,35 +425,41 @@ func ensureTrailingNewline(s string) string {
 	return s + "\n"
 }
 
+// buildPRBody carries no submitter name, email or note: the repo is
+// public, and the submit form promises the email is only for editor
+// follow-up.
 func buildPRBody(sub atlas.Submission) string {
 	var b strings.Builder
-	b.WriteString("Promotes public submission `")
-	b.WriteString(sub.PublicID)
-	b.WriteString("` (received ")
+	b.WriteString("Promotes public submission ")
+	b.WriteString(codeSpan(sub.PublicID))
+	b.WriteString(" (received ")
 	b.WriteString(sub.CreatedAt.UTC().Format(time.RFC3339))
 	b.WriteString(") to the seed bundle.\n\n")
-	if sub.SubmitterName != "" || sub.SubmitterEmail != "" {
-		b.WriteString("**Submitter:** ")
-		if sub.SubmitterName != "" {
-			b.WriteString(sub.SubmitterName)
-		}
-		if sub.SubmitterEmail != "" {
-			if sub.SubmitterName != "" {
-				b.WriteString(" ")
-			}
-			b.WriteString("<")
-			b.WriteString(sub.SubmitterEmail)
-			b.WriteString(">")
-		}
-		b.WriteString("\n\n")
+	b.WriteString("Regions: ")
+	if len(sub.Payload.RegionSlugs) == 0 {
+		b.WriteString("none")
 	}
-	if sub.SubmitterNote != "" {
-		b.WriteString("**Note from submitter:**\n\n")
-		b.WriteString(sub.SubmitterNote)
-		b.WriteString("\n\n")
+	for i, slug := range sub.Payload.RegionSlugs {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(codeSpan(slug))
 	}
+	b.WriteString("\n\n")
+	b.WriteString("Submitter contact details and notes are private. Editors can read them through the admin API, ")
+	b.WriteString("`GET /api/v1/admin/submissions`, by the submission ID above.\n\n")
 	b.WriteString("_Auto-opened by the Urbanist Atlas submissions worker. Merge after editorial review._\n")
 	return b.String()
+}
+
+// codeSpan wraps submitter-controlled text in a Markdown code span, so
+// GitHub renders it literally: no @mention notifications, links or
+// formatting. Backticks are dropped so the text can't close the span,
+// and line breaks are flattened so it can't start a block.
+func codeSpan(s string) string {
+	s = strings.ReplaceAll(s, "`", "")
+	s = strings.Join(strings.Fields(s), " ")
+	return "`" + s + "`"
 }
 
 // --- GitHub API plumbing ---
@@ -688,22 +693,32 @@ func (w *Worker) createBranch(ctx context.Context, branch, sha string) error {
 	if resp.StatusCode == http.StatusCreated {
 		return nil
 	}
-	// Idempotency: GitHub answers a duplicate branch with 422
-	// "Reference already exists". A previous openPR attempt that created
-	// the branch but failed at a later step (put/createPR) would leave
-	// the ref behind; on a manual retry-pr re-run the same submission
-	// derives the same deterministic branch name, so treat an existing
-	// ref as success and let the pipeline proceed (putFile/createPR are
-	// keyed on the branch, not on having just created it). buf is read
-	// once and reused for both the existence check and apiError so the
-	// body isn't consumed twice.
+	// 422 "Reference already exists" means a prior attempt left this
+	// submission's branch behind, possibly with its own commit or on an
+	// older base. Force-resetting it to sha keeps the branch's orgs.toml
+	// blob equal to the base's, which is the SHA putFile sends; an open
+	// PR on the branch survives the reset.
 	buf, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode == http.StatusUnprocessableEntity &&
 		strings.Contains(strings.ToLower(string(buf)), "reference already exists") {
-		return nil
+		return w.resetBranch(ctx, branch, sha)
 	}
 	return fmt.Errorf("create ref: github returned %d: %s",
 		resp.StatusCode, strings.TrimSpace(string(buf)))
+}
+
+func (w *Worker) resetBranch(ctx context.Context, branch, sha string) error {
+	resp, err := w.doRequest(ctx, http.MethodPatch,
+		fmt.Sprintf("/repos/%s/%s/git/refs/heads/%s", w.cfg.Owner, w.cfg.Repo, branch),
+		map[string]any{
+			"sha":   sha,
+			"force": true,
+		})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return expectStatus(resp, http.StatusOK, "reset ref")
 }
 
 func (w *Worker) putFile(ctx context.Context, path, branch, content, sha, message string) error {
