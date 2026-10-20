@@ -101,4 +101,31 @@ describe('SearchBox', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/five digits/i);
     expect(getLocation().pathname).toBe('/');
   });
+
+  it.each(['10027-1234', '10027 1234', '100271234'])(
+    'accepts ZIP+4 %s and looks up only the five-digit ZIP',
+    async (input) => {
+      const user = userEvent.setup();
+      renderWithRouter();
+      await user.type(getInput(), input);
+      await user.click(getButton());
+
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(getLocation().pathname).toBe('/r/10027');
+      expect(getLocation().search).toBe('?country=US');
+    },
+  );
+
+  it.each(['10027-12', '10027-12345', '1002-71234'])(
+    'still rejects a malformed ZIP+4 like %s',
+    async (input) => {
+      const user = userEvent.setup();
+      renderWithRouter();
+      await user.type(getInput(), input);
+      await user.click(getButton());
+
+      expect(screen.getByRole('alert').textContent).toMatch(/zip/i);
+      expect(getLocation().pathname).toBe('/');
+    },
+  );
 });

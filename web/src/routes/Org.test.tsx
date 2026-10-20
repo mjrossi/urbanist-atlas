@@ -297,4 +297,66 @@ describe('Org', () => {
     expect(alert.textContent).toContain('Database is on fire');
     expect(alert.textContent).toContain('req-org-2');
   });
+
+  it('adds no main landmark of its own inside the layout’s main', async () => {
+    getOrgMock.mockResolvedValueOnce(makeOrg());
+    renderWithProviders(
+      <main>
+        <Org />
+      </main>,
+      { initialEntries: ['/orgs/transalt'], routePath: '/orgs/:slug' },
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Transportation Alternatives' });
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
+  it('names each region’s kind in words, never the taxonomy string', async () => {
+    getOrgMock.mockResolvedValueOnce(makeOrg());
+    renderAt('/orgs/transalt');
+    await screen.findByRole('heading', { level: 1, name: 'Transportation Alternatives' });
+    expect(screen.queryByText(/us:borough|us:metro/)).toBeNull();
+    expect(screen.getByText('US · Borough')).toBeDefined();
+  });
+
+  it('picks the primary metro by kind and slug, not by API order', async () => {
+    const metro = (id: number, slug: string, name: string) => ({
+      id,
+      kind: 'us:metro',
+      name,
+      slug,
+      country: 'US' as const,
+      scope_tier: 'regional' as const,
+      parent_slugs: [],
+    });
+    const regions = [
+      { ...metro(1, 'ny', 'New York State'), kind: 'us:state' },
+      metro(2, 'nyc-metro', 'New York Metro'),
+      metro(3, 'albany-metro', 'Albany Metro'),
+    ];
+    getOrgMock.mockResolvedValueOnce(makeOrg({ regions }));
+    renderAt('/orgs/transalt');
+    await screen.findByRole('heading', { level: 1, name: 'Transportation Alternatives' });
+    expect(screen.getByText(/Other groups in/).textContent).toBe(
+      'Other groups in Albany Metro',
+    );
+    expect(document.querySelector('.dateline')?.textContent).toMatch(/Albany Metro, US/);
+  });
+
+  it('titles the tab for a missing org instead of leaving it loading', async () => {
+    getOrgMock.mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', undefined, 'req-o-4'),
+    );
+    renderAt('/orgs/nobody');
+    await waitFor(() => {
+      expect(document.title).toBe('Organization not found — Urbanist Atlas');
+    });
+  });
+
+  it('titles the tab for a failed org load', async () => {
+    getOrgMock.mockRejectedValueOnce(new ApiError(500, 'boom', undefined, 'req-o-5'));
+    renderAt('/orgs/transalt');
+    await waitFor(() => {
+      expect(document.title).toBe('Organization unavailable — Urbanist Atlas');
+    });
+  });
 });

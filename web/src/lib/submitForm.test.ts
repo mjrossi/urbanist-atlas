@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { ApiError } from './api.ts';
 import {
   buildIssueBody,
   buildIssueUrl,
   buildNewSubmissionRequest,
+  isServerOrUnreachable,
+  shortSubmissionId,
   SUBMIT_FORM_DEFAULTS,
   type SubmitForm,
   titlePrefix,
@@ -64,10 +67,20 @@ describe('buildNewSubmissionRequest', () => {
     expect(req.submitter_note).toMatch(/nyc/i);
   });
 
-  it('every type rolls the free-text region fallback into submitter_note', () => {
-    for (const type of ['new', 'correction', 'removal'] as const) {
-      const req = buildNewSubmissionRequest(formFor(type, { region: 'Brooklyn, NY' }));
-      expect(req.submitter_note).toMatch(/Brooklyn, NY/);
+  it('new: rolls the free-text region fallback into submitter_note', () => {
+    const req = buildNewSubmissionRequest(formFor('new', { region: 'Brooklyn, NY' }));
+    expect(req.submitter_note).toMatch(/Brooklyn, NY/);
+  });
+
+  it('correction/removal: drop region values left over from the new-org fields', () => {
+    for (const type of ['correction', 'removal'] as const) {
+      const req = buildNewSubmissionRequest(
+        formFor(type, { regionSlugs: ['queens'], region: 'Ann Arbor, MI' }),
+      );
+      expect(req.payload.region_slugs).toEqual([]);
+      expect(req.submitter_note).not.toMatch(/queens/i);
+      expect(req.submitter_note).not.toMatch(/Ann Arbor/);
+      expect(req.submitter_note).not.toMatch(/new-region request/i);
     }
   });
 
@@ -135,5 +148,62 @@ describe('buildIssueBody / buildIssueUrl (5xx fallback path)', () => {
       'https://github.com/mjrossi/urbanist-atlas/issues/new',
     );
     expect(url.searchParams.get('title')).toBe('[Correction] Existing Org');
+  });
+
+  it('the issue body lists the picked region slugs alongside the free-text region', () => {
+    const body = buildIssueBody(
+      formFor('new', { regionSlugs: ['queens', 'nyc'], region: 'Ann Arbor, MI' }),
+    );
+    expect(body).toContain('**Region served:** queens, nyc, Ann Arbor, MI');
+  });
+
+  it('the issue body lists picked slugs when no free-text region was given', () => {
+    const body = buildIssueBody(formFor('new', { regionSlugs: ['queens'], region: '' }));
+    expect(body).toContain('**Region served:** queens\n');
+  });
+
+  it('the issue body leaves out new-org fields on a correction', () => {
+    const body = buildIssueBody(
+      formFor('correction', {
+        regionSlugs: ['queens'],
+        region: 'Ann Arbor, MI',
+        oneLineDesc: 'Stale description',
+      }),
+    );
+    expect(body).not.toContain('queens');
+    expect(body).not.toContain('Ann Arbor');
+    expect(body).not.toContain('Stale description');
+  });
+});
+
+describe('isServerOrUnreachable', () => {
+  it('is true for a 5xx, a status-0 ApiError, and a non-ApiError failure', () => {
+    expect(isServerOrUnreachable(new ApiError(503, 'down', undefined, undefined))).toBe(
+      true,
+    );
+    expect(isServerOrUnreachable(new ApiError(0, 'offline', undefined, undefined))).toBe(
+      true,
+    );
+    expect(isServerOrUnreachable(new TypeError('Failed to fetch'))).toBe(true);
+  });
+
+  it('is false for 4xx responses, which have their own banners', () => {
+    for (const status of [400, 422, 429]) {
+      expect(isServerOrUnreachable(new ApiError(status, 'x', undefined, undefined))).toBe(
+        false,
+      );
+    }
+  });
+});
+
+describe('shortSubmissionId', () => {
+  it('takes the random tail of the UUIDv7, not the timestamp prefix', () => {
+    expect(shortSubmissionId('01928200-3344-7000-9abc-0000deadbeef')).toBe('deadbeef');
+  });
+
+  it('differs for two ids minted in the same timestamp window', () => {
+    const a = shortSubmissionId('01928200-3344-7000-9abc-000000000001');
+    const b = shortSubmissionId('01928200-3344-7000-9abc-000000000002');
+    expect(a).not.toBe(b);
   });
 });

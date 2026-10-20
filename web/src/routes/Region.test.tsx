@@ -410,4 +410,42 @@ describe('Region', () => {
     expect(alert.textContent).toContain('Database is on fire');
     expect(alert.textContent).toContain('req-region-2');
   });
+
+  it('adds no main landmark of its own inside the layout’s main', async () => {
+    getRegionMock.mockResolvedValueOnce(makeDetail());
+    renderWithProviders(
+      <main>
+        <Region />
+      </main>,
+      { initialEntries: ['/region/nyc-metro'], routePath: '/region/:regionSlug' },
+    );
+    await screen.findByRole('heading', { level: 1, name: /new york metro/i });
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
+  it('names the region kind in words in the rail', async () => {
+    getRegionMock.mockResolvedValueOnce(makeDetail());
+    renderAt('/region/nyc-metro');
+    await screen.findByRole('heading', { level: 1, name: /new york metro/i });
+    expect(screen.queryByText('us:metro')).toBeNull();
+    expect(screen.getByText(/region kind/i).textContent).toMatch(/metropolitan area/i);
+  });
+
+  it('titles the tab for a missing region instead of leaving it loading', async () => {
+    getRegionMock.mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', undefined, 'req-region-4'),
+    );
+    renderAt('/region/nowhere');
+    await waitFor(() => {
+      expect(document.title).toBe('Region not found — Urbanist Atlas');
+    });
+  });
+
+  it('titles the tab for a failed region load', async () => {
+    getRegionMock.mockRejectedValueOnce(new ApiError(500, 'boom', undefined, 'req-r-5'));
+    renderAt('/region/nyc-metro');
+    await waitFor(() => {
+      expect(document.title).toBe('Region unavailable — Urbanist Atlas');
+    });
+  });
 });

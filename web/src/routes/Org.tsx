@@ -8,7 +8,12 @@ import type { Org as OrgT } from '../lib/api.ts';
 import { ApiError, getOrg } from '../lib/api.ts';
 import { domainOf, formatAddedAt, prettyTag } from '../lib/format.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
-import { isBrowseableKind, isMetroKind } from '../lib/regionKind.ts';
+import {
+  isBrowseableKind,
+  isMetroKind,
+  primaryRegion,
+  regionKindLabel,
+} from '../lib/regionKind.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
 export function Org() {
@@ -23,7 +28,11 @@ export function Org() {
   useDocumentTitle(
     query.data
       ? `${query.data.name} — Urbanist Atlas`
-      : 'Loading organization — Urbanist Atlas',
+      : query.error
+        ? query.error.status === 404
+          ? 'Organization not found — Urbanist Atlas'
+          : 'Organization unavailable — Urbanist Atlas'
+        : 'Loading organization — Urbanist Atlas',
   );
 
   return (
@@ -90,12 +99,11 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 }
 
 function OrgContent({ org }: { org: OrgT }) {
-  const primaryMetro = org.regions.find((r) => isMetroKind(r.kind));
-  // "Primary metro, else first region served" — the dateline and the
-  // country stat fall back to the first region when an org has no
-  // metro-kind region. The Primary-metro affordances below stay strict
-  // (they only render for a real metro).
-  const displayRegion = primaryMetro ?? org.regions[0];
+  // The dateline and country stat use any primary region; the
+  // Primary-metro affordances only render for a real metro.
+  const displayRegion = primaryRegion(org.regions);
+  const primaryMetro =
+    displayRegion && isMetroKind(displayRegion.kind) ? displayRegion : undefined;
   const tagsTopline = org.tags.slice(0, 3).map(prettyTag).join(' · ');
 
   const atAGlance = (
@@ -208,7 +216,7 @@ function OrgContent({ org }: { org: OrgT }) {
       </header>
 
       <div className="spread mt-0">
-        <main className="prose">
+        <div className="prose">
           <div className="glance-mobile">{atAGlance}</div>
           <div className="section-kicker">§ I — The entry</div>
           <h2>The directory record.</h2>
@@ -244,7 +252,7 @@ function OrgContent({ org }: { org: OrgT }) {
                         )}
                       </div>
                       <div className="meta">
-                        {region.country} · {region.kind}
+                        {region.country} · {regionKindLabel(region.kind)}
                       </div>
                     </div>
                   </li>
@@ -262,7 +270,7 @@ function OrgContent({ org }: { org: OrgT }) {
               fix it.
             </p>
           </div>
-        </main>
+        </div>
 
         <aside className="rail">
           <div className="glance-desktop">{atAGlance}</div>

@@ -34,7 +34,11 @@ export function Region() {
   useDocumentTitle(
     query.data
       ? `${query.data.region.name} — Urbanist Atlas`
-      : 'Loading region — Urbanist Atlas',
+      : query.error
+        ? query.error.status === 404
+          ? 'Region not found — Urbanist Atlas'
+          : 'Region unavailable — Urbanist Atlas'
+        : 'Loading region — Urbanist Atlas',
   );
 
   // Breadcrumb wants ancestors broad-first (left-to-right reads
@@ -158,7 +162,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
       </div>
 
       <div className="spread mt-32">
-        <main>
+        <div>
           {totalOrgs === 0 ? (
             <EmptyState
               className="mt-24"
@@ -186,7 +190,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
               cut.
             </p>
           </div>
-        </main>
+        </div>
 
         <aside className="rail">
           <div className="rail-block">
@@ -224,10 +228,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
                   <strong>{tagCount}</strong> distinct editorial tags
                 </li>
                 <li>
-                  Region kind{' '}
-                  <strong>
-                    <code>{region.kind}</code>
-                  </strong>
+                  Region kind <strong>{kindLabel}</strong>
                 </li>
               </ul>
             </div>

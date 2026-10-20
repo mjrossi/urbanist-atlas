@@ -101,21 +101,51 @@ describe('Submit', () => {
     expect(current.getAttribute('aria-current')).toBe('page');
   });
 
-  it('submit button is disabled when required fields are empty', () => {
+  it('names both radio groups from their legends', () => {
     renderSubmit();
-    const button = screen.getByRole('button', { name: /send to editorial queue/i });
-    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole('group', { name: /type of submission/i })).toBeDefined();
+    expect(screen.getByRole('group', { name: /disclosure/i })).toBeDefined();
   });
 
-  it('submit button is enabled once required fields are filled', async () => {
+  it('submitting an untouched form shows the errors and focuses the first invalid field', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    const button = screen.getByRole('button', { name: /send to editorial queue/i });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText(/organization name/i));
+    });
+    expect(screen.getAllByText(/^required$/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/pick at least one region/i)).toBeDefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('disables the submit button while the POST is in flight', async () => {
+    fetchSpy.mockReturnValue(new Promise<Response>(() => undefined));
     const user = userEvent.setup();
     renderSubmit();
     await fillRequired(user);
-    await user.tab();
-    const button = screen.getByRole('button', { name: /send to editorial queue/i });
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    const sending = await screen.findByRole('button', { name: /sending/i });
+    expect((sending as HTMLButtonElement).disabled).toBe(true);
+    await user.click(sending);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('focuses the region type-ahead when it is the first invalid field', async () => {
+    const user = userEvent.setup();
+    renderSubmit();
+    await user.type(screen.getByLabelText(/organization name/i), 'No Region Org');
+    await user.type(screen.getByLabelText(/primary website/i), 'https://example.org');
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
     await waitFor(() => {
-      expect((button as HTMLButtonElement).disabled).toBe(false);
+      expect(document.activeElement).toBe(screen.getByLabelText(/region served/i));
     });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('happy-path submit POSTs to the API and shows the receipt card', async () => {
@@ -129,16 +159,17 @@ describe('Submit', () => {
     });
     await user.click(button);
 
-    // Receipt card appears, with the first 8 hex chars of the UUIDv7
-    // surfaced as the human reference.
-    await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { level: 1, name: /tip received/i }),
-      ).toBeDefined();
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: /tip received/i,
     });
-    // Short id appears in both the headline and the receipt row — at
-    // least one match is enough.
-    expect(screen.getAllByText('#01928200').length).toBeGreaterThan(0);
+    // The form's focused button unmounted with the form; focus moves to
+    // the receipt rather than dropping to <body>.
+    expect(document.activeElement).toBe(heading);
+    // The reference is the UUIDv7's random tail: its leading digits are
+    // a timestamp shared by every submission in the same minute.
+    expect(screen.getAllByText('#00000001').length).toBeGreaterThan(0);
+    expect(screen.queryByText('#01928200')).toBeNull();
 
     // Fetch was called with the API payload.
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -310,12 +341,72 @@ describe('Submit', () => {
     });
     const [, init] = fetchSpy.mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
-    // Wire contract: short_desc is required but synthesized for
-    // correction; region_slugs is optional (always sent as []).
+    // short_desc is required on the wire, so a correction synthesizes it.
     expect(body.payload.name).toBe('Existing Org');
     expect(body.payload.short_desc).toMatch(/correction request/i);
     expect(body.payload.region_slugs).toEqual([]);
     expect(body.submitter_note).toMatch(/correction to an existing entry/i);
+  });
+
+  it('switching from new to correction drops the region picked for the new org', async () => {
+    const queens = {
+      region: {
+        id: 1,
+        kind: 'us:borough',
+        name: 'Queens',
+        slug: 'queens',
+        country: 'US',
+        scope_tier: 'local',
+        parent_slugs: ['ny'],
+      },
+      context_label: 'New York',
+    };
+    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      if (url.includes('/api/v1/regions/search')) {
+        return Promise.resolve(jsonResponse({ data: [queens] }));
+      }
+      return Promise.resolve(jsonResponse(SUCCESS_BODY, { status: 201 }));
+    });
+
+    const user = userEvent.setup();
+    renderSubmit();
+    await user.type(screen.getByLabelText(/region served/i), 'queens');
+    await user.click(await screen.findByRole('option', { name: /queens/i }));
+    await user.type(screen.getByLabelText(/can.?t find your region/i), 'Ann Arbor, MI');
+
+    await user.click(
+      screen.getByRole('radio', { name: /a correction to an existing entry/i }),
+    );
+    await user.type(screen.getByLabelText(/organization name/i), 'Existing Org');
+    await user.type(screen.getByLabelText(/primary website/i), 'https://example.org');
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    await screen.findByRole('heading', { level: 1, name: /tip received/i });
+    const submitCall = fetchSpy.mock.calls.find((call: unknown[]) => {
+      const init = call[1] as RequestInit | undefined;
+      return String(call[0]).includes('/api/v1/submissions') && init?.method === 'POST';
+    });
+    expect(submitCall).toBeDefined();
+    const body = JSON.parse((submitCall![1] as RequestInit).body as string);
+    expect(body.payload.region_slugs).toEqual([]);
+    expect(body.submitter_note).not.toMatch(/queens/i);
+    expect(body.submitter_note).not.toMatch(/Ann Arbor/);
+  });
+
+  it('shows the server banner and GitHub-issue fallback when the network fails', async () => {
+    fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user, { name: 'Offline Org' });
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    const fallback = await screen.findByRole('link', {
+      name: /open this as a github issue instead/i,
+    });
+    expect(screen.getByText(/submission queue is having a moment/i)).toBeDefined();
+    const url = new URL(fallback.getAttribute('href') ?? '');
+    expect(url.searchParams.get('body') ?? '').toContain('Offline Org');
   });
 
   it('shows the rate-limit message with a Retry-After countdown when the API returns 429', async () => {

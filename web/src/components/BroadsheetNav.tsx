@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import type { ApiError, Stats } from '../lib/api.ts';
@@ -32,10 +32,7 @@ function isActive(entry: NavEntry, pathname: string): boolean {
   return pathname === entry.to || pathname.startsWith(`${entry.to}/`);
 }
 
-// The drawer label echoes the current page when collapsed and reads
-// "Close" when expanded. The fallback to NAV_ENTRIES[0] only matters on
-// routes that don't match any entry (e.g. /colophon, /r/*); NAV_ENTRIES
-// is a non-empty tuple, so element 0 is always defined.
+// The fallback only matters on routes no entry claims (e.g. /colophon).
 function currentLabel(pathname: string): string {
   const active = NAV_ENTRIES.find((e) => isActive(e, pathname));
   return active ? active.label : NAV_ENTRIES[0].label;
@@ -43,10 +40,27 @@ function currentLabel(pathname: string): string {
 
 export function BroadsheetNav() {
   const { pathname } = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const closeMenu = () => {
-    setMenuOpen(false);
-  };
+  // Keyed by the path it was opened on, so any route change closes it:
+  // a nav link, a link in the page, or Back.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  // Cleared on the change itself, not just ignored: otherwise Back to
+  // the opening path would reopen the drawer.
+  if (openOn !== null && openOn !== pathname) setOpenOn(null);
+  const menuOpen = openOn === pathname;
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpenOn(null);
+      toggleRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
 
   // The masthead tally reads `/api/v1/stats` rather than summing over
   // `/api/v1/regions`. That list is the browseable subset (metros and
@@ -67,13 +81,14 @@ export function BroadsheetNav() {
   return (
     <nav className={`nav${menuOpen ? ' nav-open' : ''}`} aria-label="Primary">
       <button
+        ref={toggleRef}
         type="button"
         className="nav-toggle"
         aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={menuOpen}
         aria-controls="primary-nav-list"
         onClick={() => {
-          setMenuOpen((o) => !o);
+          setOpenOn(menuOpen ? null : pathname);
         }}
       >
         <span className="nav-toggle-icon" aria-hidden="true">
@@ -92,9 +107,13 @@ export function BroadsheetNav() {
             <li key={entry.to} className="nav-item">
               <Link
                 to={entry.to}
-                onClick={closeMenu}
+                onClick={() => {
+                  setOpenOn(null);
+                }}
                 className={active ? 'current' : undefined}
-                aria-current={active ? 'page' : undefined}
+                aria-current={
+                  pathname === entry.to ? 'page' : active ? 'true' : undefined
+                }
               >
                 <span className="roman">{entry.roman}</span>
                 {entry.label}

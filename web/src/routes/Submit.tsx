@@ -1,5 +1,12 @@
 import { useMutation } from '@tanstack/react-query';
-import { Controller, type FieldPath, useForm, useWatch } from 'react-hook-form';
+import { useEffect, useRef } from 'react';
+import {
+  Controller,
+  type FieldErrors,
+  type FieldPath,
+  useForm,
+  useWatch,
+} from 'react-hook-form';
 import { Link } from 'react-router';
 
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
@@ -8,16 +15,14 @@ import { ApiError, createSubmission, type Submission } from '../lib/api.ts';
 import {
   buildIssueUrl,
   buildNewSubmissionRequest,
+  isServerOrUnreachable,
+  shortSubmissionId,
   type SubmissionType,
   SUBMIT_FORM_DEFAULTS,
   type SubmitForm,
 } from '../lib/submitForm.ts';
-import { useCooldown, useCountdown } from '../lib/timers.ts';
+import { useCountdown } from '../lib/timers.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
-
-// Brief lockout after a successful submit so a triple-click can't
-// trigger duplicate POSTs.
-const SUBMIT_COOLDOWN_MS = 1500;
 
 // Map from API field names (snake-case wire shape, see
 // SubmissionPayload + NewSubmissionRequest in openapi.yaml and the
@@ -27,13 +32,9 @@ const SUBMIT_COOLDOWN_MS = 1500;
 // doesn't render are intentionally absent — they fall through to the
 // top-level `detail` banner instead of being silently swallowed.
 //
-// Caveat: `region_slugs` and `short_desc` map to inputs that the form
-// HIDES for correction/removal submissions. In practice both API
-// errors are unreachable for those types (the SPA sends `[]` for
-// region_slugs and a short synthetic placeholder for short_desc), so
-// the hidden-field path doesn't surface. If a future API change makes
-// either reachable, render the top-level banner alongside the
-// invisible field error.
+// `region_slugs` and `short_desc` map to inputs hidden on a correction or
+// removal; an error for either then has no visible slot and surfaces in
+// the top-level banner (see deriveSubmitError).
 const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
   name: 'name',
   website_url: 'website',
@@ -44,6 +45,10 @@ const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
   submitter_name: 'contact',
   submitter_note: 'why',
 };
+
+// The fields with an inline error slot, top to bottom. The last two exist
+// only on a new-org submission.
+const ERROR_SLOT_FIELDS = ['name', 'website', 'regionSlugs', 'oneLineDesc'] as const;
 
 /**
  * Per-submission-type copy. The three flavors share one layout but swap
@@ -101,7 +106,7 @@ interface SubmitErrorView {
  * Collapse a failed submission into the flags the error banners need.
  * Pulled out of the component so the precedence between per-field,
  * top-level-validation, rate-limit, and server-error states stays
- * readable (and unit-testable).
+ * readable.
  *
  * `unmappedFieldErrors` are API field errors with no visible home in the
  * form — an unmapped API key, or one mapped to a field this submission
@@ -110,17 +115,19 @@ interface SubmitErrorView {
  * be swallowed, so the top-level banner surfaces them.
  */
 function deriveSubmitError(
-  err: ApiError | null,
+  err: Error | null,
   visibleFieldErrorSlots: ReadonlySet<FieldPath<SubmitForm>>,
 ): SubmitErrorView {
-  if (!err) {
-    return {
-      isRateLimited: false,
-      isServerErr: false,
-      showTopLevelValidationErr: false,
-      validationMessage: '',
-      unmappedFieldErrors: [],
-    };
+  const view: SubmitErrorView = {
+    isRateLimited: false,
+    isServerErr: false,
+    showTopLevelValidationErr: false,
+    validationMessage: '',
+    unmappedFieldErrors: [],
+  };
+  if (!err) return view;
+  if (!(err instanceof ApiError) || isServerOrUnreachable(err)) {
+    return { ...view, isServerErr: true };
   }
 
   const isValidationErr = err.status === 400 || err.status === 422;
@@ -136,13 +143,43 @@ function deriveSubmitError(
     !!err.fieldErrors && Object.keys(err.fieldErrors).length > 0;
 
   return {
+    ...view,
     isRateLimited: err.status === 429,
-    isServerErr: err.status >= 500,
     showTopLevelValidationErr:
       isValidationErr && (!hasMappedFieldErrors || unmappedFieldErrors.length > 0),
     validationMessage: err.problem?.detail ?? err.message,
     unmappedFieldErrors,
   };
+}
+
+/**
+ * A fieldset's legend, which must be the fieldset's first child to name
+ * the group. A rendered legend sits in the fieldset's border, outside its
+ * grid, so the accessible legend is visually hidden and a hidden-from-AT
+ * copy keeps the label in the grid's first cell.
+ */
+function FieldsetLegend({
+  children,
+  required,
+}: {
+  children: string;
+  required?: boolean;
+}) {
+  const mark = required ? <span className="required">*</span> : null;
+  return (
+    <>
+      <legend className="sr-only">
+        {children}
+        {mark}
+      </legend>
+      <div aria-hidden="true">
+        <div className="field-label">
+          {children}
+          {mark}
+        </div>
+      </div>
+    </>
+  );
 }
 
 /**
@@ -174,14 +211,18 @@ export function Submit() {
   const {
     register,
     handleSubmit,
-    formState: { isValid, errors },
+    formState: { errors },
     setError,
     control,
     trigger,
     reset,
+    setFocus,
   } = useForm<SubmitForm>({
     mode: 'onBlur',
     defaultValues: SUBMIT_FORM_DEFAULTS,
+    // RHF focuses in registration order, and the region Controller
+    // registers after the inputs that follow it; onInvalid uses page order.
+    shouldFocusError: false,
   });
 
   // The form adapts to the submission type. For "new" we ask for the
@@ -199,19 +240,16 @@ export function Submit() {
   const isNewOrg = submissionType === 'new';
   const copy = SUBMISSION_COPY[submissionType];
 
-  // Brief post-submit lockout (stops triple-click dupes) and the 429
-  // Retry-After countdown; both disable the submit button until they
-  // elapse. retryAfter is (re)armed from ApiError.retryAfterSeconds in
-  // the mutation's onError below.
-  const [cooldown, startCooldown] = useCooldown(SUBMIT_COOLDOWN_MS);
+  // The 429 Retry-After countdown, armed in onError below. The submit
+  // button stays disabled until it elapses.
   const [retryAfter, setRetryAfter] = useCountdown();
 
-  const mutation = useMutation<Submission, ApiError, SubmitForm>({
+  // Error, not ApiError: a failure with no response may not be an
+  // ApiError, and it still has to reach the server-error banner.
+  const mutation = useMutation<Submission, Error, SubmitForm>({
     mutationFn: (form) => createSubmission(buildNewSubmissionRequest(form)),
-    onSuccess: () => {
-      startCooldown();
-    },
     onError: (err) => {
+      if (!(err instanceof ApiError)) return;
       // Per-field validation errors (W1.4): hand each known field
       // to react-hook-form so the input shows its own error. The
       // top-level fallback below renders when no field map matched.
@@ -233,8 +271,12 @@ export function Submit() {
   });
 
   const onValid = (form: SubmitForm) => {
-    if (cooldown || mutation.isPending || retryAfter > 0) return;
+    if (mutation.isPending || retryAfter > 0) return;
     mutation.mutate(form);
+  };
+  const onInvalid = (fieldErrors: FieldErrors<SubmitForm>) => {
+    const first = ERROR_SLOT_FIELDS.find((f) => fieldErrors[f]);
+    if (first) setFocus(first);
   };
 
   // Subscribe to every form value so the GitHub-issue fallback link
@@ -268,7 +310,7 @@ export function Submit() {
   // type — drives which API field errors have a visible home; the rest
   // surface in the top-level banner (see deriveSubmitError).
   const visibleFieldErrorSlots = new Set<FieldPath<SubmitForm>>(
-    isNewOrg ? ['name', 'website', 'regionSlugs', 'oneLineDesc'] : ['name', 'website'],
+    isNewOrg ? ERROR_SLOT_FIELDS : ['name', 'website'],
   );
   const {
     isRateLimited,
@@ -306,7 +348,7 @@ export function Submit() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit(onValid)} noValidate className="slip">
+          <form onSubmit={handleSubmit(onValid, onInvalid)} noValidate className="slip">
             <div className="slip-head">
               <div className="stamp-l">Submission slip</div>
               <div className="title">Tip sheet</div>
@@ -314,12 +356,7 @@ export function Submit() {
             </div>
 
             <fieldset className="field stacked">
-              <div>
-                <legend className="field-label">
-                  Type of submission
-                  <span className="required">*</span>
-                </legend>
-              </div>
+              <FieldsetLegend required>Type of submission</FieldsetLegend>
               <div className="choices">
                 <label className="choice">
                   <input
@@ -430,13 +467,13 @@ export function Submit() {
                       }}
                       render={({ field, fieldState }) => (
                         <RegionCombobox
+                          ref={field.ref}
                           id="submit-region"
                           value={field.value}
                           onChange={(next) => {
                             field.onChange(next);
-                            // Re-validate so the cross-field rule (and the
-                            // submit button's isValid gate) update the
-                            // instant a region is picked or cleared.
+                            // Re-validate now, not on blur, so a shown
+                            // error clears the instant a region is picked.
                             void trigger('regionSlugs');
                           }}
                           onBlur={field.onBlur}
@@ -465,9 +502,8 @@ export function Submit() {
                     className="input"
                     placeholder="e.g. Ann Arbor, Michigan"
                     {...register('region', {
-                      // Typing here satisfies the region requirement above
-                      // (pick OR describe), so keep that rule's isValid in
-                      // sync as they type the fallback.
+                      // Typing here satisfies the region rule on the
+                      // field above, so re-check that field as they type.
                       onChange: () => void trigger('regionSlugs'),
                     })}
                   />
@@ -527,12 +563,7 @@ https://group.org/about"
             </div>
 
             <fieldset className="field stacked">
-              <div>
-                <legend className="field-label">
-                  Disclosure
-                  <span className="required">*</span>
-                </legend>
-              </div>
+              <FieldsetLegend required>Disclosure</FieldsetLegend>
               <div className="choices inline">
                 <label className="choice">
                   <input
@@ -617,7 +648,7 @@ https://group.org/about"
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={!isValid || cooldown || mutation.isPending || retryAfter > 0}
+                disabled={mutation.isPending || retryAfter > 0}
               >
                 {mutation.isPending ? (
                   'Sending…'
@@ -719,7 +750,12 @@ interface SubmissionReceivedProps {
 }
 
 function SubmissionReceived({ submission, onAnother }: SubmissionReceivedProps) {
-  const shortId = submission.id.replace(/-/g, '').slice(0, 8);
+  const shortId = shortSubmissionId(submission.id);
+  // The receipt replaces the form, unmounting the button that had focus.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
   return (
     <>
       <PageBreadcrumb
@@ -734,7 +770,7 @@ function SubmissionReceived({ submission, onAnother }: SubmissionReceivedProps) 
               № II — Submissions desk
               <span className="eyebrow-rule" />
             </div>
-            <h1>
+            <h1 ref={headingRef} tabIndex={-1}>
               Tip received — <span className="accent">#{shortId}</span>
             </h1>
             <p className="deck">

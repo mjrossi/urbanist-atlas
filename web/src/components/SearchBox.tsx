@@ -21,6 +21,14 @@ function detectCountry(raw: string): DetectedCountry {
   return null;
 }
 
+// The +4 suffix names a delivery route inside the ZIP, finer than any
+// region the Atlas anchors to, so the lookup only ever needs the five.
+function stripZipPlus4(normalized: string, country: Country): string {
+  if (country !== 'US') return normalized;
+  const m = /^(\d{5})-?\d{4}$/.exec(normalized);
+  return m?.[1] ?? normalized;
+}
+
 function validate(normalized: string, country: Country): string | null {
   if (normalized.length === 0) return 'Enter a US ZIP code or Canadian postal code.';
   if (country === 'US') {
@@ -49,7 +57,10 @@ export function SearchBox() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const inputId = useId();
   const effectiveCountry: Country = detectCountry(raw) ?? 'US';
-  const normalized = useMemo(() => normalizePostal(raw), [raw]);
+  const normalized = useMemo(
+    () => stripZipPlus4(normalizePostal(raw), effectiveCountry),
+    [raw, effectiveCountry],
+  );
 
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();

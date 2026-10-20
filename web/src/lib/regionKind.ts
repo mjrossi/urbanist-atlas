@@ -9,8 +9,8 @@
  *   non-national (the server returns 404 for `scope_tier='national'`
  *   slugs); editorial policy keeps national kinds out of the map
  *   entirely.
- * - `metro`: true if the kind is metro-equivalent — the "primary
- *   metro" rail on org pages picks the first region with this set.
+ * - `metro`: true if the kind is metro-equivalent; {@link primaryRegion}
+ *   prefers these.
  *
  * The default browse set (kinds returned by `/api/v1/regions`) is
  * `browseable && (metro || …)` — those are the metros + cities the
@@ -87,4 +87,25 @@ export function isBrowseableKind(kind: string): boolean {
 
 export function isMetroKind(kind: string): boolean {
   return infoFor(kind).metro;
+}
+
+/**
+ * The region to name an org by: a metro-equivalent kind if it has one,
+ * then the lowest slug. `org.regions` is unordered on the wire, so this
+ * must not depend on array order.
+ */
+export function primaryRegion<R extends { kind: string; slug: string }>(
+  regions: readonly R[],
+): R | undefined {
+  let best: R | undefined;
+  for (const r of regions) {
+    if (!best) {
+      best = r;
+      continue;
+    }
+    const rMetro = isMetroKind(r.kind);
+    const bestMetro = isMetroKind(best.kind);
+    if (rMetro !== bestMetro ? rMetro : r.slug < best.slug) best = r;
+  }
+  return best;
 }

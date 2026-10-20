@@ -1,8 +1,8 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { ApiError } from '../lib/api.ts';
+import { ApiError, apiFetch } from '../lib/api.ts';
 import { QueryState } from './QueryState.tsx';
 
 function mkQuery<T>(
@@ -32,6 +32,60 @@ describe('QueryState', () => {
     const node = screen.getByRole('alert');
     expect(node.textContent).toContain('Boom');
     expect(node.textContent).toContain('rid-123');
+  });
+
+  it('shows the problem detail, not the generic title, for an API error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            type: 'https://urbanistatlas.com/problems/validation',
+            title: 'Bad Request',
+            status: 400,
+            detail: 'postal_code is required',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+    let apiErr: ApiError | undefined;
+    try {
+      await apiFetch('/api/v1/lookup');
+    } catch (err) {
+      apiErr = err as ApiError;
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    render(
+      <QueryState query={mkQuery<string>({ isError: true, error: apiErr })}>
+        {(d) => <p>{d}</p>}
+      </QueryState>,
+    );
+    const node = screen.getByRole('alert');
+    expect(node.textContent).toContain('postal_code is required');
+    expect(node.textContent).not.toContain('Bad Request');
+  });
+
+  it('shows the network message for a status-0 API error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')),
+    );
+    let apiErr: ApiError | undefined;
+    try {
+      await apiFetch('/api/v1/lookup');
+    } catch (err) {
+      apiErr = err as ApiError;
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    render(
+      <QueryState query={mkQuery<string>({ isError: true, error: apiErr })}>
+        {(d) => <p>{d}</p>}
+      </QueryState>,
+    );
+    expect(screen.getByRole('alert').textContent).toMatch(/couldn.t reach/i);
   });
 
   it('falls through to the default error view when the error callback returns undefined', () => {

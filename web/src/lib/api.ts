@@ -7,8 +7,8 @@
  * need something new, add it to the spec and run `npm run generate:api`.
  *
  * The base URL is read from `import.meta.env.VITE_API_BASE` at build
- * time and defaults to the dev server URL. Set it in `.env.production`
- * (or via the Cloudflare Pages dashboard) for prod builds.
+ * time. Dev and test builds fall back to the local API server; a
+ * production build without it fails at load (see {@link apiBase}).
  */
 import type { components } from './api.gen.ts';
 
@@ -37,31 +37,41 @@ export type NewSubmissionRequest = components['schemas']['NewSubmissionRequest']
 export type ProblemDetails = components['schemas']['ProblemDetails'];
 
 /**
- * Countries the SPA actively exposes to users. The wire `Country`
- * type is open (just `string` — the API accepts any code seed data
- * defines), but the UI is gated on this narrower set so a stray
- * `?country=…` value renders an error instead of silently coercing.
- * Bump this and SearchBox.tsx's `<select>` options together when a
- * new country goes user-facing.
+ * A country the SPA exposes to users. The wire {@link Country} is an
+ * open `string` (the API accepts any code the seed data defines), so
+ * the UI gates on this narrower set and a stray `?country=…` renders
+ * an error instead of silently coercing.
  */
-export const SUPPORTED_COUNTRIES = ['US', 'CA'] as const satisfies readonly Country[];
+export type SupportedCountry = 'US' | 'CA';
+
+export const SUPPORTED_COUNTRIES: readonly SupportedCountry[] = ['US', 'CA'];
 
 /** True if `raw` is one of {@link SUPPORTED_COUNTRIES}. */
-export function isSupportedCountry(raw: string): raw is Country {
+export function isSupportedCountry(raw: string): raw is SupportedCountry {
   return (SUPPORTED_COUNTRIES as readonly string[]).includes(raw);
 }
 
 const DEFAULT_API_BASE = 'http://localhost:8080';
 
+function resolveApiBase(): string {
+  const raw = import.meta.env.VITE_API_BASE;
+  if (raw !== undefined && raw !== '') return raw.replace(/\/+$/, '');
+  // The CSP's connect-src does not allow localhost, so a production
+  // bundle on the fallback would fail every request with no clear cause.
+  if (import.meta.env.PROD) {
+    throw new Error(
+      'VITE_API_BASE is not set. Production builds must set it to the deployed API origin (see docs/deploy.md).',
+    );
+  }
+  return DEFAULT_API_BASE;
+}
+
 /**
- * Where the API lives. Set `VITE_API_BASE` to override at build time. A
- * trailing slash (if any) is stripped so callers can join paths as
- * `${apiBase}/api/v1/…` — both {@link openapiUrl} and the {@link apiFetch}
- * path join do this — without risking a `//` in the URL.
+ * Where the API lives, from `VITE_API_BASE` with any trailing slash
+ * stripped so `${apiBase}/api/v1/…` never doubles up. Throws at module
+ * load in a production build that leaves it unset or empty.
  */
-export const apiBase: string = (
-  import.meta.env.VITE_API_BASE ?? DEFAULT_API_BASE
-).replace(/\/+$/, '');
+export const apiBase: string = resolveApiBase();
 
 /**
  * Canonical URL of the served OpenAPI document, derived from
@@ -85,31 +95,18 @@ export const openapiUrl = `${apiBase}/api/v1/openapi.yaml`;
  */
 const apiClientSecret: string = import.meta.env.VITE_API_CLIENT_SECRET ?? '';
 
-/**
- * Map of field name to human-readable error message, as returned by
- * the API in a problem+json `errors` extension on 400/422 responses.
- *
- * The current API only surfaces a top-level `detail` string (see
- * `internal/httpapi/submissions.go`), so this map will be `undefined`
- * in production today. Wired through ahead of a parallel pre-launch
- * API change that may add field-level errors; the SPA degrades to
- * the top-level `detail` when this is missing or empty.
- */
+/** Per-field validation messages from the problem+json `errors` extension. */
 export type FieldErrors = Readonly<Record<string, string>>;
 
 /**
- * Error thrown for any non-2xx response from the API. Carries the HTTP
- * status, the parsed RFC 9457 problem document (when the server sent
- * one), and the request ID for log correlation.
+ * Error thrown for any failed API request. `status` is the HTTP status
+ * of a non-2xx response, or `0` when no response arrived (network
+ * failure, CORS/CSP block, or the request timed out); the original
+ * error is then kept as `cause`. `problem` is the parsed RFC 9457
+ * document when the server sent one.
  *
- * Two extras lifted out of common headers / extensions:
- *   - {@link retryAfterSeconds}: parsed `Retry-After` (seconds or
- *     HTTP-date), used by the submission form to render a countdown
- *     after a 429.
- *   - {@link fieldErrors}: per-field validation errors when the
- *     problem+json envelope includes an `errors` extension. Falls
- *     back to top-level `detail` rendering at the call site when
- *     this is undefined.
+ * `retryAfterSeconds` is the parsed `Retry-After` on a 429;
+ * `fieldErrors` is the `errors` extension when present and non-empty.
  */
 export class ApiError extends Error {
   readonly status: number;
@@ -126,9 +123,10 @@ export class ApiError extends Error {
     extras?: {
       retryAfterSeconds?: number;
       fieldErrors?: FieldErrors;
+      cause?: unknown;
     },
   ) {
-    super(message);
+    super(message, extras?.cause === undefined ? undefined : { cause: extras.cause });
     this.name = 'ApiError';
     this.status = status;
     this.problem = problem;
@@ -168,37 +166,98 @@ export function parseRetryAfter(
 }
 
 /**
- * Best-effort extractor for per-field validation errors from a
- * problem+json envelope. Looks for an `errors` extension shaped as
- * `{ [field]: string }` (the convention this project will adopt if
- * the parallel API worktree adds it). Anything else returns
- * undefined and the caller falls back to top-level `detail`.
+ * Keeps only non-empty string entries of the `errors` extension: the
+ * body is parsed with a cast, so its shape is not guaranteed.
  */
 function extractFieldErrors(
   problem: ProblemDetails | undefined,
 ): FieldErrors | undefined {
-  if (!problem || typeof problem !== 'object') return undefined;
-  const raw = (problem as { errors?: unknown }).errors;
+  const raw: unknown = problem?.errors;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) {
-    if (typeof k !== 'string' || k === '') continue;
-    if (typeof v === 'string' && v !== '') out[k] = v;
+    if (k !== '' && typeof v === 'string' && v !== '') out[k] = v;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+// `detail` is the occurrence-specific text the spec marks safe to show
+// end users; `title` is the generic per-type summary.
+function problemMessage(status: number, problem: ProblemDetails | undefined): string {
+  if (problem?.detail) return problem.detail;
+  if (problem?.title) return problem.title;
+  return `HTTP ${status}`;
+}
+
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * Maps a rejection from `fetch` or a body read to an {@link ApiError}
+ * with status 0. A caller-initiated abort is returned untouched, so
+ * the caller sees its own cancellation as an AbortError.
+ */
+/**
+ * Aborts when either signal does. `AbortSignal.any` would do this, but it
+ * needs Safari 17.4, and react-query passes a signal on every query, so
+ * older iOS would fail every request.
+ */
+function anySignal(a: AbortSignal, b: AbortSignal): AbortSignal {
+  const controller = new AbortController();
+  for (const signal of [a, b]) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      break;
+    }
+    signal.addEventListener(
+      'abort',
+      () => {
+        controller.abort(signal.reason);
+      },
+      {
+        once: true,
+        signal: controller.signal,
+      },
+    );
+  }
+  return controller.signal;
+}
+
+function transportError(
+  err: unknown,
+  callerSignal: AbortSignal | null | undefined,
+  timeoutSignal: AbortSignal,
+): unknown {
+  if (callerSignal?.aborted) return err;
+  if (timeoutSignal.aborted) {
+    return new ApiError(
+      0,
+      'The Urbanist Atlas API timed out. Try again in a moment.',
+      undefined,
+      undefined,
+      { cause: err },
+    );
+  }
+  if (err instanceof SyntaxError) return err;
+  return new ApiError(
+    0,
+    "Couldn't reach the Urbanist Atlas API. Check your connection and try again.",
+    undefined,
+    undefined,
+    { cause: err },
+  );
+}
+
 /**
  * Low-level fetch wrapper. Prepends {@link apiBase} to `path`, sets
- * `Accept: application/json`, throws {@link ApiError} on non-2xx
- * responses (parsing `application/problem+json` bodies when present),
- * and returns the parsed JSON body as `T`.
+ * `Accept: application/json`, applies a 15s timeout, and returns the
+ * parsed JSON body as `T`. Throws {@link ApiError} for a non-2xx
+ * response or a request that got no response; rethrows the caller's
+ * own abort as-is.
  *
  * Callers should usually reach for a higher-level wrapper (e.g.
  * {@link lookup}) rather than calling this directly.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = path.startsWith('http') ? path : `${apiBase}${path}`;
   const headers = new Headers(init?.headers);
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json');
@@ -207,7 +266,16 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     headers.set('X-Atlas-Client', apiClientSecret);
   }
 
-  const response = await fetch(url, { ...init, headers });
+  const callerSignal = init?.signal;
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = callerSignal ? anySignal(callerSignal, timeoutSignal) : timeoutSignal;
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}${path}`, { ...init, headers, signal });
+  } catch (err) {
+    throw transportError(err, callerSignal, timeoutSignal);
+  }
   const requestId = response.headers.get('X-Request-ID') ?? undefined;
 
   if (!response.ok) {
@@ -217,23 +285,41 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       try {
         problem = (await response.json()) as ProblemDetails;
       } catch {
-        // Body wasn't valid JSON after all; ignore and fall through to a
-        // bare-status error.
+        // An unreadable problem body still yields a bare-status error.
       }
     }
-    const message = problem?.title ?? problem?.detail ?? `HTTP ${response.status}`;
     const retryAfterSeconds =
       response.status === 429
         ? parseRetryAfter(response.headers.get('Retry-After'))
         : undefined;
-    const fieldErrors = extractFieldErrors(problem);
-    throw new ApiError(response.status, message, problem, requestId, {
-      retryAfterSeconds,
-      fieldErrors,
-    });
+    throw new ApiError(
+      response.status,
+      problemMessage(response.status, problem),
+      problem,
+      requestId,
+      {
+        retryAfterSeconds,
+        fieldErrors: extractFieldErrors(problem),
+      },
+    );
   }
 
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch (err) {
+    throw transportError(err, callerSignal, timeoutSignal);
+  }
+}
+
+/**
+ * react-query `retry` predicate: never retries a 4xx (the request
+ * itself is wrong, or rate-limited), and retries anything else once.
+ */
+export function shouldRetry(failureCount: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+    return false;
+  }
+  return failureCount < 1;
 }
 
 /**

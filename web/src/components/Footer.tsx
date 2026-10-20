@@ -111,8 +111,11 @@ export function Footer() {
           The Atlas · Vol. I · <span className="em">2026 Edition</span>
         </span>
         <span>Set in Fraunces, Source Serif 4, Inter &amp; JetBrains Mono</span>
-        <span>
+        <span className="colophon-paper">
           Printed on cream — <span className="em">#FAF6F1</span>
+        </span>
+        <span className="colophon-paper night">
+          Printed on lamp-black — <span className="em">#17130E</span>
         </span>
       </div>
     </>

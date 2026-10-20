@@ -1,70 +1,57 @@
-import { useEffect } from 'react';
+import type { ReactNode } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import { PageBreadcrumb } from '../components/PageBreadcrumb.tsx';
 import { openapiUrl } from '../lib/api.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
+const PHONE_QUERY = '(max-width: 768px)';
+
+function subscribePhone(onChange: () => void): () => void {
+  const mq = window.matchMedia(PHONE_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => {
+    mq.removeEventListener('change', onChange);
+  };
+}
+
+function isPhone(): boolean {
+  return window.matchMedia(PHONE_QUERY).matches;
+}
+
+function sectionIdFrom(hash: string): string {
+  try {
+    return decodeURIComponent(hash.replace(/^#/, ''));
+  } catch {
+    return '';
+  }
+}
+
 export function About() {
   useDocumentTitle('About — Urbanist Atlas');
   const { hash } = useLocation();
+  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(['methodology']));
 
-  // On desktop, all sections must render expanded. Chrome's UA stylesheet
-  // hides closed-<details> body content through a mechanism that author
-  // CSS — even with !important — can't override (the ::details-content
-  // internal slot). The reliable fix is to keep [open] true at desktop
-  // widths and prevent the summary click from toggling it back closed.
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 769px)');
-    const sections = Array.from(
-      document.querySelectorAll<HTMLDetailsElement>('.method-section'),
-    );
-    const summaries = sections
-      .map((d) => d.querySelector('summary'))
-      .filter((s): s is HTMLElement => s !== null);
+  // A link to a collapsed section (e.g. /about#corrections) opens it.
+  const target = sectionIdFrom(hash);
+  const [openedFor, setOpenedFor] = useState('');
+  if (target !== openedFor) {
+    setOpenedFor(target);
+    if (target && !open.has(target)) setOpen(new Set(open).add(target));
+  }
 
-    const forceOpenIfDesktop = () => {
-      if (!mq.matches) return;
-      for (const d of sections) {
-        if (!d.open) d.open = true;
-      }
-    };
-    const preventToggleOnDesktop = (e: MouseEvent) => {
-      if (mq.matches) e.preventDefault();
-    };
-
-    forceOpenIfDesktop();
-    mq.addEventListener('change', forceOpenIfDesktop);
-    summaries.forEach((s) => {
-      s.addEventListener('click', preventToggleOnDesktop);
-    });
-
-    return () => {
-      mq.removeEventListener('change', forceOpenIfDesktop);
-      summaries.forEach((s) => {
-        s.removeEventListener('click', preventToggleOnDesktop);
-      });
-    };
-  }, []);
-
-  // Open the surrounding <details> on mobile before the global
-  // useScrollToTop lands on a kicker whose body is still collapsed.
-  useEffect(() => {
-    const id = decodeURIComponent(hash.replace(/^#/, ''));
-    if (!id) return;
-    const target = document.getElementById(id);
-    if (!target) return;
-    const details = target.closest('details');
-    if (details && !details.open) {
-      details.open = true;
-    }
-    const raf = requestAnimationFrame(() => {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-    };
-  }, [hash]);
+  const section = (id: string) => ({
+    id,
+    phone,
+    open: open.has(id),
+    onToggle: () => {
+      const next = new Set(open);
+      if (!next.delete(id)) next.add(id);
+      setOpen(next);
+    },
+  });
 
   const atAGlance = (
     <div className="rail-block amber">
@@ -101,7 +88,7 @@ export function About() {
       </div>
 
       <div className="spread">
-        <main className="prose">
+        <div className="prose">
           <div className="glance-mobile">{atAGlance}</div>
           <div className="section-kicker" id="mission">
             § I — Mission
@@ -115,16 +102,11 @@ export function About() {
             for better streets and better transit nearby, in under a minute.
           </p>
 
-          <details className="method-section" open>
-            <summary>
-              <div>
-                <div className="section-kicker" id="methodology">
-                  § II — Methodology
-                </div>
-                <h2>How we curate.</h2>
-              </div>
-              <div className="h2-rule" />
-            </summary>
+          <MethodSection
+            {...section('methodology')}
+            kicker="§ II — Methodology"
+            title="How we curate."
+          >
             <p>
               Every entry passes through an editor before it gets in. No scraper, no
               algorithm picking favorites — just the criteria below, applied case by case,
@@ -181,18 +163,13 @@ export function About() {
                 <span className="verdict no">Excluded</span>
               </div>
             </div>
-          </details>
+          </MethodSection>
 
-          <details className="method-section">
-            <summary>
-              <div>
-                <div className="section-kicker" id="corrections">
-                  § III — Independence and corrections
-                </div>
-                <h2>How we keep ourselves honest.</h2>
-              </div>
-              <div className="h2-rule" />
-            </summary>
+          <MethodSection
+            {...section('corrections')}
+            kicker="§ III — Independence and corrections"
+            title="How we keep ourselves honest."
+          >
             <p>
               The Atlas is an independent reference work. It isn&rsquo;t affiliated with,
               endorsed by, or representing any of the organizations listed here. Entries
@@ -206,18 +183,13 @@ export function About() {
               . Corrections are read and applied by the same editor who maintains the
               directory.
             </p>
-          </details>
+          </MethodSection>
 
-          <details className="method-section">
-            <summary>
-              <div>
-                <div className="section-kicker" id="for-developers">
-                  § IV — For developers
-                </div>
-                <h2>The dataset is open.</h2>
-              </div>
-              <div className="h2-rule" />
-            </summary>
+          <MethodSection
+            {...section('for-developers')}
+            kicker="§ IV — For developers"
+            title="The dataset is open."
+          >
             <p>
               The Atlas runs on a small Go service. Every endpoint and response shape
               lives in the OpenAPI document at{' '}
@@ -242,18 +214,13 @@ export function About() {
               </a>{' '}
               and we&rsquo;ll set one up by hand.
             </p>
-          </details>
+          </MethodSection>
 
-          <details className="method-section">
-            <summary>
-              <div>
-                <div className="section-kicker" id="acknowledgments">
-                  § V — Acknowledgments
-                </div>
-                <h2>Who the directory rests on.</h2>
-              </div>
-              <div className="h2-rule" />
-            </summary>
+          <MethodSection
+            {...section('acknowledgments')}
+            kicker="§ V — Acknowledgments"
+            title="Who the directory rests on."
+          >
             <p>
               Above all, this directory rests on the work of the organizations it indexes
               — the volunteers, organizers, and staff who show up to their city&rsquo;s
@@ -264,8 +231,8 @@ export function About() {
               <a href="https://www.statcan.gc.ca">Statistics Canada</a>&rsquo;s boundary
               files, both public-domain or open-licensed.
             </p>
-          </details>
-        </main>
+          </MethodSection>
+        </div>
 
         <aside className="rail">
           <div className="rail-block rail-toc">
@@ -324,5 +291,56 @@ export function About() {
         </aside>
       </div>
     </>
+  );
+}
+
+/**
+ * A methodology section. On phones its heading is a disclosure button
+ * (sections fold to save scrolling); on wider screens it is a plain
+ * heading and the text always shows, so nothing announces a toggle.
+ */
+function MethodSection({
+  id,
+  kicker,
+  title,
+  phone,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string;
+  kicker: string;
+  title: string;
+  phone: boolean;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const bodyId = `${id}-body`;
+  return (
+    <div className="method-section">
+      <div className="section-kicker" id={id}>
+        {kicker}
+      </div>
+      <h2>
+        {phone ? (
+          <button
+            type="button"
+            className="method-toggle"
+            aria-expanded={open}
+            aria-controls={bodyId}
+            onClick={onToggle}
+          >
+            {title}
+          </button>
+        ) : (
+          title
+        )}
+      </h2>
+      <div className="h2-rule" />
+      <div id={bodyId} hidden={phone && !open}>
+        {children}
+      </div>
+    </div>
   );
 }
