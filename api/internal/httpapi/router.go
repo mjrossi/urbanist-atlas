@@ -36,9 +36,8 @@ type Config struct {
 	Submissions atlas.SubmissionStore
 
 	// PromotionEnqueuer queues approved submissions for the GitHub PR
-	// worker. Nil is a recognized "no worker configured" state — the
-	// approve handler still flips status but persists
-	// `promotion_error="worker disabled (no token configured)"`.
+	// worker. With nil, the approve handler still flips status and
+	// persists atlas.ErrPromotionDisabled as the promotion_error.
 	PromotionEnqueuer PromotionEnqueuer
 
 	// AdminToken gates admin endpoints behind a bearer token. Empty

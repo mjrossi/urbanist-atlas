@@ -558,8 +558,8 @@ func TestApprove_PersistsWorkerDisabledError(t *testing.T) {
 	if err := json.NewDecoder(ar.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if errStr, _ := body["promotion_error"].(string); !strings.Contains(strings.ToLower(errStr), "worker disabled") {
-		t.Fatalf("promotion_error should mention worker disabled, got %v", body["promotion_error"])
+	if got, want := body["promotion_error"], atlas.ErrPromotionDisabled.Error(); got != want {
+		t.Fatalf("promotion_error = %v, want %q", got, want)
 	}
 	if body["status"] != "approved" {
 		t.Fatalf("status should be approved even when worker disabled, got %v", body["status"])

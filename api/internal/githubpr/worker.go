@@ -39,9 +39,8 @@ type Config struct {
 	// BaseURL defaults to https://api.github.com. Tests inject an
 	// httptest.NewServer URL.
 	BaseURL string
-	// Token is the GitHub PAT. Empty disables the worker — Enqueue
-	// returns ErrDisabled so the handler can persist a clear
-	// promotion_error.
+	// Token is the GitHub PAT. Empty disables the worker: Enqueue
+	// returns atlas.ErrPromotionDisabled.
 	Token string
 	// Owner / Repo / BaseBranch identify the target. Defaults are
 	// mjrossi / urbanist-atlas / main.
@@ -60,11 +59,6 @@ type Config struct {
 	// BufferSize overrides the channel capacity. Zero = default.
 	BufferSize int
 }
-
-// ErrDisabled is returned by Enqueue when the worker has no GitHub
-// token configured. The httpapi layer recognizes this and persists a
-// "worker disabled" promotion_error.
-var ErrDisabled = errors.New("githubpr: worker disabled (no token configured)")
 
 // ErrBufferFull is returned by Enqueue when the job channel is full.
 // Practically unreachable at the project's volume but expressed so
@@ -124,13 +118,13 @@ func New(cfg Config) *Worker {
 	}
 }
 
-// Enqueue implements httpapi.PromotionEnqueuer. Returns ErrDisabled
+// Enqueue implements httpapi.PromotionEnqueuer. Returns atlas.ErrPromotionDisabled
 // when no token configured, ErrStopped once Stop has begun, and
 // ErrBufferFull when the channel is at capacity. Otherwise the job is
 // queued and processed by Run.
 func (w *Worker) Enqueue(_ context.Context, sub atlas.Submission) error {
 	if w.cfg.Token == "" {
-		return ErrDisabled
+		return atlas.ErrPromotionDisabled
 	}
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -261,11 +255,11 @@ func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
 // ProcessNow runs the PR-creation pipeline synchronously for a single
 // submission and returns the resulting PR URL or the wrapped error.
 // It does not call PersistResult: the caller (the retry-pr CLI) owns
-// persistence. Like Enqueue, it returns ErrDisabled when Config.Token
-// is empty.
+// persistence. Like Enqueue, it returns atlas.ErrPromotionDisabled when
+// Config.Token is empty.
 func (w *Worker) ProcessNow(ctx context.Context, sub atlas.Submission) (string, error) {
 	if w.cfg.Token == "" {
-		return "", ErrDisabled
+		return "", atlas.ErrPromotionDisabled
 	}
 	return w.openPR(ctx, sub)
 }

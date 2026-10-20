@@ -522,8 +522,8 @@ func TestWorker_FailingPR_PersistsErrorAndDoesNotRetry(t *testing.T) {
 func TestEnqueue_DisabledWithoutToken(t *testing.T) {
 	w := New(Config{Logger: slog.New(slog.DiscardHandler)})
 	err := w.Enqueue(context.Background(), sampleSubmission())
-	if !errors.Is(err, ErrDisabled) {
-		t.Fatalf("err = %v, want ErrDisabled", err)
+	if !errors.Is(err, atlas.ErrPromotionDisabled) {
+		t.Fatalf("err = %v, want atlas.ErrPromotionDisabled", err)
 	}
 }
 

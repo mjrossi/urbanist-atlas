@@ -18,19 +18,11 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// ErrPromotionWorkerDisabled is the sentinel returned by a
-// PromotionEnqueuer when no GitHub credentials are configured. The
-// admin/approve handler maps it onto promotion_error so the caller
-// (or the PR retry CLI) knows the row was approved but the PR was
-// never queued.
-var ErrPromotionWorkerDisabled = errors.New("httpapi: promotion worker disabled (no token configured)")
-
 // PromotionEnqueuer is the seam the approve handler uses to hand an
 // approved submission off to the GitHub PR worker. Implementations
 // must return promptly — they should buffer the job and return nil,
-// not block on GitHub I/O. ErrPromotionWorkerDisabled is a recognized
-// "no worker configured" signal; any other error is treated as
-// "enqueue failed, persist promotion_error".
+// not block on GitHub I/O. Any error, atlas.ErrPromotionDisabled
+// included, is persisted as the submission's promotion_error.
 type PromotionEnqueuer interface {
 	Enqueue(ctx context.Context, sub atlas.Submission) error
 }
@@ -304,7 +296,7 @@ func adminOutcome(err error) string {
 
 func enqueueOrDisabled(ctx context.Context, enq PromotionEnqueuer, sub atlas.Submission) error {
 	if enq == nil {
-		return ErrPromotionWorkerDisabled
+		return atlas.ErrPromotionDisabled
 	}
 	return enq.Enqueue(ctx, sub)
 }
