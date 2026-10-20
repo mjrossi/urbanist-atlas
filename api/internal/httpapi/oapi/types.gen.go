@@ -385,7 +385,8 @@ type Org struct {
 //     state transition is not valid given current state (e.g.
 //     approving a non-pending submission) (HTTP 409).
 //   - `https://urbanistatlas.com/problems/rate-limited` — too many
-//     requests from this source (HTTP 429). A `Retry-After` header
+//     requests from this source or across the service, or the
+//     moderation queue is full (HTTP 429). A `Retry-After` header
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
@@ -862,7 +863,8 @@ type SubmissionID = openapi_types.UUID
 //     state transition is not valid given current state (e.g.
 //     approving a non-pending submission) (HTTP 409).
 //   - `https://urbanistatlas.com/problems/rate-limited` — too many
-//     requests from this source (HTTP 429). A `Retry-After` header
+//     requests from this source or across the service, or the
+//     moderation queue is full (HTTP 429). A `Retry-After` header
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
@@ -901,7 +903,8 @@ type AdminUnavailable = ProblemDetails
 //     state transition is not valid given current state (e.g.
 //     approving a non-pending submission) (HTTP 409).
 //   - `https://urbanistatlas.com/problems/rate-limited` — too many
-//     requests from this source (HTTP 429). A `Retry-After` header
+//     requests from this source or across the service, or the
+//     moderation queue is full (HTTP 429). A `Retry-After` header
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
@@ -940,7 +943,8 @@ type BadRequest = ProblemDetails
 //     state transition is not valid given current state (e.g.
 //     approving a non-pending submission) (HTTP 409).
 //   - `https://urbanistatlas.com/problems/rate-limited` — too many
-//     requests from this source (HTTP 429). A `Retry-After` header
+//     requests from this source or across the service, or the
+//     moderation queue is full (HTTP 429). A `Retry-After` header
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
@@ -979,7 +983,8 @@ type InternalError = ProblemDetails
 //     state transition is not valid given current state (e.g.
 //     approving a non-pending submission) (HTTP 409).
 //   - `https://urbanistatlas.com/problems/rate-limited` — too many
-//     requests from this source (HTTP 429). A `Retry-After` header
+//     requests from this source or across the service, or the
+//     moderation queue is full (HTTP 429). A `Retry-After` header
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
@@ -1018,7 +1023,8 @@ type NotFound = ProblemDetails
 //     state transition is not valid given current state (e.g.
 //     approving a non-pending submission) (HTTP 409).
 //   - `https://urbanistatlas.com/problems/rate-limited` — too many
-//     requests from this source (HTTP 429). A `Retry-After` header
+//     requests from this source or across the service, or the
+//     moderation queue is full (HTTP 429). A `Retry-After` header
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
@@ -1057,7 +1063,8 @@ type TooManyRequests = ProblemDetails
 //     state transition is not valid given current state (e.g.
 //     approving a non-pending submission) (HTTP 409).
 //   - `https://urbanistatlas.com/problems/rate-limited` — too many
-//     requests from this source (HTTP 429). A `Retry-After` header
+//     requests from this source or across the service, or the
+//     moderation queue is full (HTTP 429). A `Retry-After` header
 //     is also returned.
 //   - `https://urbanistatlas.com/problems/internal` — an
 //     unexpected server error (HTTP 500).
@@ -1125,9 +1132,11 @@ type ListUsageParamsGroupBy string
 
 // LookupParams defines parameters for Lookup.
 type LookupParams struct {
-	// PostalCode US ZIP code (e.g. `11217`) or Canadian postal code or FSA
-	// (e.g. `M5V` or `M5V 3A8`). Whitespace is trimmed; CA codes are
-	// truncated to their 3-character FSA server-side.
+	// PostalCode US ZIP code (e.g. `11217`) or ZIP+4 (`11217-1234` or
+	// `112171234`), or a Canadian postal code or FSA (e.g. `M5V` or
+	// `M5V 3A8`).
+	// Whitespace is trimmed; a ZIP+4 is truncated to its 5-digit ZIP
+	// and a CA code to its 3-character FSA server-side.
 	PostalCode PostalCodeQuery `form:"postal_code" json:"postal_code"`
 
 	// Country ISO-style country code. Case-insensitive.
@@ -1138,7 +1147,7 @@ type LookupParams struct {
 type SearchRegionsParams struct {
 	// Q The search term. Matched case-insensitively against region
 	// name and slug. Blank, whitespace-only, or omitted returns an
-	// empty result set. At most 100 bytes; a longer `q` is
+	// empty result set. At most 100 characters; a longer `q` is
 	// rejected with a 400 problem document (`type`
 	// `https://urbanistatlas.com/problems/validation`).
 	Q *string `form:"q,omitempty" json:"q,omitempty"`

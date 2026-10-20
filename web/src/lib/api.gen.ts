@@ -13,10 +13,9 @@ export interface paths {
         };
         /**
          * Liveness probe.
-         * @description Used by Fly as a liveness check. Deliberately does NOT touch
-         *     any downstream dependency (database, etc.) so a DB outage
-         *     doesn't cause Fly to recycle the machine and lose the recovery
-         *     window. Pair with `/readyz` for the downstream-aware probe.
+         * @description Used by Fly as a liveness check. Does not touch any downstream
+         *     dependency (database, etc.), so it answers 200 whenever the
+         *     process is serving.
          */
         get: operations["getHealth"];
         put?: never;
@@ -36,19 +35,12 @@ export interface paths {
         };
         /**
          * Readiness probe.
-         * @description Returns 200 only when the data store is reachable (a 1-second
-         *     store ping has succeeded). Returns 503 with an
-         *     `application/problem+json` body (`type=https://urbanistatlas.com/problems/not-ready`)
-         *     when the store is unavailable. Use this as the Fly readiness
-         *     check so traffic stops routing to a machine that can't serve
-         *     queries; keep `/healthz` as the liveness check so a transient
-         *     downstream blip doesn't trigger a machine recycle.
-         *
-         *     The bundled in-memory FileStore currently has no out-of-process
-         *     dependency to ping, so `/readyz` resolves to 200 as soon as the
-         *     process is up. The probe stays in place so a future
-         *     network-bound store implementation can opt in to the
-         *     readiness gate without an API change.
+         * @description Always returns 200 once the process is serving. Every read
+         *     endpoint is answered from memory, so an unreachable submission
+         *     store must not take the service out of rotation. When the
+         *     submission store fails a 1-second ping, the body is
+         *     `degraded\n` instead of `ok\n`, so a probe can still tell the
+         *     write path is unavailable.
          */
         get: operations["getReady"];
         put?: never;
@@ -96,9 +88,10 @@ export interface paths {
          *     and `regional` (metro/state/province/multi-state) groups, in
          *     that order of geographic specificity within each bucket.
          *
-         *     Canadian postal codes are normalized to the 3-character FSA
-         *     (e.g. `M5V 3A8` → `M5V`) server-side; clients may pass either
-         *     form.
+         *     A US ZIP+4 is truncated to its 5-digit ZIP (e.g. `11217-1234`
+         *     → `11217`), and a Canadian postal code is normalized to its
+         *     3-character FSA (e.g. `M5V 3A8` → `M5V`) server-side; clients
+         *     may pass either form.
          *
          *     A code with no mapped region returns 404. US military (APO/FPO)
          *     and diplomatic (DPO) ZIPs are a special case of that 404, carrying
@@ -365,7 +358,8 @@ export interface paths {
          * @description Anyone can submit an organization. The submission lands in the
          *     moderation queue with `status: pending` and is reviewed by a
          *     maintainer before becoming visible in lookups. Rate-limited
-         *     per source IP.
+         *     per source address (IPv6 by /64) and by a service-wide hourly
+         *     cap, and refused with 429 while the moderation queue is full.
          */
         post: operations["createSubmission"];
         delete?: never;
@@ -1143,7 +1137,8 @@ export interface components {
          *       state transition is not valid given current state (e.g.
          *       approving a non-pending submission) (HTTP 409).
          *     - `https://urbanistatlas.com/problems/rate-limited` — too many
-         *       requests from this source (HTTP 429). A `Retry-After` header
+         *       requests from this source or across the service, or the
+         *       moderation queue is full (HTTP 429). A `Retry-After` header
          *       is also returned.
          *     - `https://urbanistatlas.com/problems/internal` — an
          *       unexpected server error (HTTP 500).
@@ -1275,7 +1270,8 @@ export interface components {
             };
         };
         /**
-         * @description Rate limit exceeded. Includes a `Retry-After` header.
+         * @description Rate limit exceeded: the per-source limit, the service-wide
+         *     cap, or a full moderation queue. Includes a `Retry-After` header.
          *     Response body is an RFC 9457 problem document with
          *     `type` `https://urbanistatlas.com/problems/rate-limited`.
          */
@@ -1320,9 +1316,11 @@ export interface components {
     };
     parameters: {
         /**
-         * @description US ZIP code (e.g. `11217`) or Canadian postal code or FSA
-         *     (e.g. `M5V` or `M5V 3A8`). Whitespace is trimmed; CA codes are
-         *     truncated to their 3-character FSA server-side.
+         * @description US ZIP code (e.g. `11217`) or ZIP+4 (`11217-1234` or
+         *     `112171234`), or a Canadian postal code or FSA (e.g. `M5V` or
+         *     `M5V 3A8`).
+         *     Whitespace is trimmed; a ZIP+4 is truncated to its 5-digit ZIP
+         *     and a CA code to its 3-character FSA server-side.
          */
         PostalCodeQuery: string;
         /** @description ISO-style country code. Case-insensitive. */
@@ -1395,22 +1393,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Service can serve queries (store is reachable). */
+            /**
+             * @description Service can serve reads. The body is `ok\n`, or
+             *     `degraded\n` when the submission store is unreachable.
+             */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description Service is up but the data store is unreachable. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                    "text/plain": "ok\n" | "degraded\n";
                 };
             };
         };
@@ -1439,9 +1431,11 @@ export interface operations {
         parameters: {
             query: {
                 /**
-                 * @description US ZIP code (e.g. `11217`) or Canadian postal code or FSA
-                 *     (e.g. `M5V` or `M5V 3A8`). Whitespace is trimmed; CA codes are
-                 *     truncated to their 3-character FSA server-side.
+                 * @description US ZIP code (e.g. `11217`) or ZIP+4 (`11217-1234` or
+                 *     `112171234`), or a Canadian postal code or FSA (e.g. `M5V` or
+                 *     `M5V 3A8`).
+                 *     Whitespace is trimmed; a ZIP+4 is truncated to its 5-digit ZIP
+                 *     and a CA code to its 3-character FSA server-side.
                  */
                 postal_code: components["parameters"]["PostalCodeQuery"];
                 /** @description ISO-style country code. Case-insensitive. */
@@ -1546,7 +1540,7 @@ export interface operations {
                 /**
                  * @description The search term. Matched case-insensitively against region
                  *     name and slug. Blank, whitespace-only, or omitted returns an
-                 *     empty result set. At most 100 bytes; a longer `q` is
+                 *     empty result set. At most 100 characters; a longer `q` is
                  *     rejected with a 400 problem document (`type`
                  *     `https://urbanistatlas.com/problems/validation`).
                  */
