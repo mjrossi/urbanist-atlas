@@ -15,10 +15,7 @@
 # Anchorage, Ann Arbor, Boulder, New Haven, Tucson, Albany, Spokane,
 # Tallahassee, Charleston SC, Grand Rapids, Fresno, Albuquerque,
 # Halifax, Mississauga). +73 net-new orgs, growing the dataset
-# from 130 to 203. Albuquerque is covered by multi-anchoring the
-# pre-existing BikeABQ entry at [albuquerque-nm-metro, nm] per the
-# Street Trust precedent, rather than adding a new city-leaf row.
-# Gaps documented inline at the relevant section headers
+# from 130 to 203. Gaps documented inline at the relevant section headers
 # (Jacksonville, Oklahoma City, Birmingham, Lexington, Reno,
 # Worcester, Tulsa, Long Beach, Chattanooga, Knoxville, etc.).
 #
@@ -1992,15 +1989,19 @@ region_slugs = ["ms"]
 # effort re-forms.
 
 # --- Louisiana ---
+# gap: no statewide-scoped ped/bike advocacy org verified as of
+# 2026-10-20. Bike Easy is anchored at the metro only, not la-state:
+# its own mission is "everyone in Greater New Orleans" and its legal
+# name is "Metro Bicycle Coalition of New Orleans".
 
 [[org]]
 slug = "bike-easy"
 added_at = 2026-05-22
 name = "Bike Easy"
-short_desc = "Greater New Orleans bicycle education and advocacy nonprofit, and Louisiana's de facto statewide cycling voice. Leads the two-year Moving New Orleans Bikes campaign for more than 600 miles of low-stress bikeways across Orleans Parish in coalition with 30 partner organizations."
+short_desc = "Greater New Orleans bicycle education and advocacy nonprofit. Leads the two-year Moving New Orleans Bikes campaign for more than 600 miles of low-stress bikeways across Orleans Parish in coalition with 30 partner organizations."
 website_url = "https://bikeeasy.org"
 tags = ["cycling", "advocacy", "safe-streets", "education"]
-region_slugs = ["new-orleans-la-metro", "la-state"]
+region_slugs = ["new-orleans-la-metro"]
 
 # --- Oklahoma ---
 # gap: BikeOklahoma (Oklahoma Bicycling Coalition) is in the process of
@@ -2324,15 +2325,19 @@ tags = ["cycling", "safe-streets", "advocacy", "policy"]
 region_slugs = ["reno-nv-metro"]
 
 # --- New Mexico ---
+# gap: no statewide-scoped ped/bike advocacy org verified as of
+# 2026-10-20. BikeABQ is anchored at the metro only, not nm: its own
+# mission is "bicycling in Albuquerque". Lead to check: the Bicycle
+# Coalition of New Mexico (named on BikeABQ's About page).
 
 [[org]]
 slug = "bike-abq"
 added_at = 2026-05-22
 name = "BikeABQ"
-short_desc = "Albuquerque cycling advocacy nonprofit since 1999, founded by Gail Ryba (who also founded the Bicycle Coalition of New Mexico) and the de facto statewide cycling voice for New Mexico. Its 11-member board attends design reviews, writes advisory letters, runs Bike to Work Day and League Certified Instructor classes, and pushed for Albuquerque's April 2026 traffic-law overhaul."
+short_desc = "Albuquerque cycling advocacy nonprofit since 1999, founded by Gail Ryba (who also founded the Bicycle Coalition of New Mexico). Its 11-member board attends design reviews, writes advisory letters, runs Bike to Work Day and League Certified Instructor classes, and pushed for Albuquerque's April 2026 traffic-law overhaul."
 website_url = "https://www.bikeabq.org"
 tags = ["cycling", "advocacy", "safe-streets", "education"]
-region_slugs = ["albuquerque-nm-metro", "nm"]
+region_slugs = ["albuquerque-nm-metro"]
 
 # --- Oregon ---
 # Coverage satisfied by The Street Trust (see Portland OR section
@@ -2790,27 +2795,34 @@ tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["ab"]
 
 # --- Manitoba (provincial) ---
+# gap: no province-scoped ped/bike advocacy org verified as of
+# 2026-10-20. Bike Winnipeg is anchored at the CMA only, not mb: its
+# own mission is "a healthy, sustainable, and equitable city".
 
 [[org]]
 slug = "bike-winnipeg"
 added_at = 2026-05-23
 name = "Bike Winnipeg"
-short_desc = "Winnipeg cycling-advocacy nonprofit and Manitoba's de facto provincial cycling-advocacy voice. Runs annual volunteer bike counts (a multi-year data series), pushes for separated cycling on Phase 2 of the Southwest Rapid Transit Corridor, and advocates for cycling inclusion in Polo Park infrastructure work."
+short_desc = "Winnipeg cycling-advocacy nonprofit. Runs annual volunteer bike counts (a multi-year data series), pushes for separated cycling on Phase 2 of the Southwest Rapid Transit Corridor, and advocates for cycling inclusion in Polo Park infrastructure work."
 website_url = "https://www.bikewinnipeg.ca"
 tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
-region_slugs = ["winnipeg-cma", "mb"]
+region_slugs = ["winnipeg-cma"]
 
 # --- Saskatchewan (provincial) ---
+# gap: no province-scoped ped/bike advocacy org verified as of
+# 2026-10-20. Saskatoon Cycles is anchored at the CMA only, not sk: its
+# own mission is "a Saskatoon where cycling is a viable, year-round
+# mode of transportation".
 
 [[org]]
 slug = "saskatoon-cycles"
 added_at = 2026-06-03
 name = "Saskatoon Cycles"
-short_desc = "Saskatoon cycling and active-transportation advocacy nonprofit, incorporated 2010, and Saskatchewan's de facto provincial cycling voice. Runs the SafeConnect campaign pressing the city for a continuous, protected bikeway network."
+short_desc = "Saskatoon cycling and active-transportation advocacy nonprofit, incorporated 2010. Runs the SafeConnect campaign pressing the city for a continuous, protected bikeway network."
 website_url = "https://saskatooncycles.org"
 contact_url = "https://saskatooncycles.org/contact-us/"
 tags = ["cycling", "safe-streets", "advocacy", "complete-streets", "grassroots"]
-region_slugs = ["saskatoon-cma", "sk"]
+region_slugs = ["saskatoon-cma"]
 
 # --- Nova Scotia (provincial) ---
 
