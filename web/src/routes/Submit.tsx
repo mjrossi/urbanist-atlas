@@ -27,7 +27,7 @@ import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 // Map from API field names (snake-case wire shape, see
 // SubmissionPayload + NewSubmissionRequest in openapi.yaml and the
 // API-side `errors` extension keys emitted by
-// seedfiles.ValidateSubmissionPayload) to the matching
+// atlas.ValidateSubmission) to the matching
 // react-hook-form field names in SubmitForm. Server fields the form
 // doesn't render are intentionally absent — they fall through to the
 // top-level `detail` banner instead of being silently swallowed.

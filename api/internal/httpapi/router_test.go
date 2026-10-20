@@ -34,10 +34,8 @@ func TestHEAD_PublicRoutes_Return200WithEmptyBody(t *testing.T) {
 			wantContent: "text/plain",
 		},
 		{
-			name: "readyz",
-			path: "/readyz",
-			// FileStore doesn't implement pinger so /readyz collapses
-			// to plaintext "ok" — same shape as /healthz.
+			name:        "readyz",
+			path:        "/readyz",
 			wantContent: "text/plain",
 		},
 		{

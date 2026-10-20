@@ -15,7 +15,7 @@ import {
 // Per-type wire-shape coverage for the public submissions endpoint.
 // The form's three submission types (`new` / `correction` / `removal`)
 // adapt the visible fields but must always produce a payload the
-// backend's `ValidateSubmissionPayload` accepts. `region_slugs` carries
+// backend's `atlas.ValidateSubmission` accepts. `region_slugs` carries
 // the slugs the submitter picked from the type-ahead; when none are
 // picked the free-text fallback rides along in `submitter_note`.
 

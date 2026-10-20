@@ -50,8 +50,9 @@ URBANIST_PORT = '8080'
 #
 # The submission write path lives on the mounted volume:
 URBANIST_DB_PATH = '/data/atlas.db'
-# Submissions per IP per hour (in-process limiter; the WAF rule at
-# the edge is the first defense).
+# Hourly submission cap per source address (an IPv4 address or an
+# IPv6 /64), enforced in-process. A separate service-wide hourly cap
+# also applies.
 URBANIST_SUBMISSIONS_RATE_PER_HOUR = '5'
 # URBANIST_ADMIN_TOKEN and URBANIST_GITHUB_TOKEN are Fly secrets, set
 # via:  flyctl secrets set URBANIST_ADMIN_TOKEN=… URBANIST_GITHUB_TOKEN=…

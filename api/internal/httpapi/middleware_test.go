@@ -342,9 +342,8 @@ func TestLogging_HealthCheckSuppressedAtInfo(t *testing.T) {
 	}
 }
 
-// TestLogging_HealthCheckFailureStillLogged: a non-2xx probe (e.g. a
-// /readyz 503 when the store ping fails) stays at INFO so the outage is
-// visible without raising the log level.
+// TestLogging_HealthCheckFailureStillLogged: a non-2xx probe response
+// stays at INFO so the outage is visible without raising the log level.
 func TestLogging_HealthCheckFailureStillLogged(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil)) // default level: INFO
