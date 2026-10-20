@@ -309,8 +309,21 @@ func metricsMiddleware(m *Metrics) func(http.Handler) http.Handler {
 			if route == "" {
 				route = "unmatched"
 			}
-			m.httpRequests.WithLabelValues(route, r.Method, strconv.Itoa(rec.status)).Inc()
-			m.httpDuration.WithLabelValues(route, r.Method).Observe(time.Since(start).Seconds())
+			method := metricMethod(r.Method)
+			m.httpRequests.WithLabelValues(route, method, strconv.Itoa(rec.status)).Inc()
+			m.httpDuration.WithLabelValues(route, method).Observe(time.Since(start).Seconds())
 		})
+	}
+}
+
+// metricMethod clamps the request method to the set the API serves.
+// net/http accepts any method token and this middleware runs before
+// chi's 405, so the raw value would be unbounded label input.
+func metricMethod(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodOptions:
+		return method
+	default:
+		return "other"
 	}
 }
