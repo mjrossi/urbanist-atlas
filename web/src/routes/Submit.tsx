@@ -152,12 +152,7 @@ function deriveSubmitError(
   };
 }
 
-/**
- * A fieldset's legend, which must be the fieldset's first child to name
- * the group. A rendered legend sits in the fieldset's border, outside its
- * grid, so the accessible legend is visually hidden and a hidden-from-AT
- * copy keeps the label in the grid's first cell.
- */
+/** A fieldset's legend; it must be the fieldset's first child to name the group. */
 function FieldsetLegend({
   children,
   required,
@@ -165,20 +160,11 @@ function FieldsetLegend({
   children: string;
   required?: boolean;
 }) {
-  const mark = required ? <span className="required">*</span> : null;
   return (
-    <>
-      <legend className="sr-only">
-        {children}
-        {mark}
-      </legend>
-      <div aria-hidden="true">
-        <div className="field-label">
-          {children}
-          {mark}
-        </div>
-      </div>
-    </>
+    <legend className="field-label">
+      {children}
+      {required ? <span className="required">*</span> : null}
+    </legend>
   );
 }
 

@@ -1,32 +1,8 @@
 import { useEffect, useState } from 'react';
 
-// Two small timer hooks backing the /submit button's disabled state: a
-// post-submit cooldown latch and a 429 Retry-After countdown. They live
-// here, not in Submit.tsx, so they can be unit-tested in isolation — a
-// component module can't export non-component helpers without tripping
-// react-refresh/only-export-components (and `--max-warnings 0` fails on it).
-
-/**
- * A latch that goes true when `trigger()` is called, then clears itself
- * after `ms`. Backs the brief post-submit lockout that stops a
- * triple-click from firing duplicate POSTs.
- */
-export function useCooldown(ms: number) {
-  const [active, setActive] = useState(false);
-  useEffect(() => {
-    if (!active) return;
-    const id = setTimeout(() => {
-      setActive(false);
-    }, ms);
-    return () => {
-      clearTimeout(id);
-    };
-  }, [active, ms]);
-  const trigger = () => {
-    setActive(true);
-  };
-  return [active, trigger] as const;
-}
+// Lives here, not in Submit.tsx, so it can be unit-tested: a component
+// module can't export non-component helpers without tripping
+// react-refresh/only-export-components.
 
 /**
  * A per-second countdown. `seconds` ticks down to zero; the returned

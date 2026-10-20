@@ -2966,6 +2966,14 @@ fieldset.field {
   }
 }
 
+/* A floated legend is no longer rendered in the fieldset's border, so it
+   becomes an ordinary grid item and takes the first cell like the other
+   fields' labels. */
+fieldset.field > legend {
+  float: inline-start;
+  padding-inline: 0;
+}
+
 .field-label {
   font-family: var(--sans);
   font-size: 11px;

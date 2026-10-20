@@ -107,6 +107,12 @@ describe('Submit', () => {
     expect(screen.getByRole('group', { name: /disclosure/i })).toBeDefined();
   });
 
+  it('renders each fieldset label once', () => {
+    renderSubmit();
+    expect(screen.getAllByText('Type of submission')).toHaveLength(1);
+    expect(screen.getAllByText('Disclosure')).toHaveLength(1);
+  });
+
   it('submitting an untouched form shows the errors and focuses the first invalid field', async () => {
     const user = userEvent.setup();
     renderSubmit();
