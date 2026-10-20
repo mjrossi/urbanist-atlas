@@ -2634,9 +2634,10 @@ region_slugs = ["quebec-cma"]
 # --- Winnipeg ---
 #
 # Bike Winnipeg's entry sits in the Manitoba (provincial) section
-# below, anchored at winnipeg-cma only since 2026-10-20. Functional Transit Winnipeg and Bike to the Future were considered
-# but couldn't be verified to clear the 12-month activity bar in
-# 2025-2026 (search surfaced primarily 2018-2022 activity).
+# below, anchored at winnipeg-cma only since 2026-10-20. Functional
+# Transit Winnipeg and Bike to the Future were considered but couldn't
+# be verified to clear the 12-month activity bar in 2025-2026 (search
+# surfaced primarily 2018-2022 activity).
 
 # --- Hamilton ---
 
