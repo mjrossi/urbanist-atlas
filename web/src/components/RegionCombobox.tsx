@@ -1,5 +1,12 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type KeyboardEvent, useId, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type Ref,
+  useCallback,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 
 import { type RegionSearchResult, searchRegions } from '../lib/api.ts';
 import { queryKeys } from '../lib/queryKeys.ts';
@@ -18,6 +25,8 @@ interface RegionComboboxProps {
   describedById?: string;
   /** Marks the control invalid for assistive tech + styling. */
   invalid?: boolean;
+  /** Receives the text input, so react-hook-form can focus it on a failed submit. */
+  ref?: Ref<HTMLInputElement>;
 }
 
 const MIN_QUERY_LEN = 2;
@@ -43,6 +52,7 @@ export function RegionCombobox({
   onBlur,
   describedById,
   invalid,
+  ref,
 }: RegionComboboxProps) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -54,10 +64,22 @@ export function RegionCombobox({
   );
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const setInputRef = useCallback(
+    (el: HTMLInputElement | null) => {
+      inputRef.current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref],
+  );
 
   const query = useDebouncedValue(text.trim(), SEARCH_DEBOUNCE_MS);
   const enabled = query.length >= MIN_QUERY_LEN;
-  const { data: results = [], isError } = useQuery({
+  const {
+    data: results = [],
+    isError,
+    isPlaceholderData,
+  } = useQuery({
     queryKey: queryKeys.regionSearch(query),
     queryFn: ({ signal }) => searchRegions(query, SEARCH_LIMIT, { signal }),
     enabled,
@@ -68,6 +90,9 @@ export function RegionCombobox({
   // Hide already-picked regions from the option list.
   const options = results.filter((r) => !value.includes(r.region.slug));
   const showList = open && enabled && options.length > 0;
+  // keepPreviousData leaves the last query's options on screen through the
+  // debounce and the next fetch; they don't answer what is typed now.
+  const resultsAreCurrent = query === text.trim() && !isPlaceholderData;
   // A failed search (5xx / network drop) yields no options, which is
   // indistinguishable from "no matches" — surface it so the submitter
   // knows to fall back to the free-text field instead of silently
@@ -114,15 +139,15 @@ export function RegionCombobox({
         setActiveIndex((i) => Math.max(i - 1, 0));
         break;
       case 'Enter': {
-        // While the suggestion list is open, Enter picks the highlighted
-        // option — or the first one if none is highlighted yet — rather
-        // than submitting the form. With the list closed, Enter falls
-        // through to the native form submit.
-        const active = showList ? (options[activeIndex] ?? options[0]) : undefined;
-        if (active) {
-          e.preventDefault();
-          select(active);
-        }
+        // Enter on a typed query picks the highlighted (or first) option,
+        // and never submits the form, even while results are still stale.
+        if (text.trim() === '') break;
+        e.preventDefault();
+        const active =
+          showList && resultsAreCurrent
+            ? (options[activeIndex] ?? options[0])
+            : undefined;
+        if (active) select(active);
         break;
       }
       case 'Escape':
@@ -145,6 +170,14 @@ export function RegionCombobox({
   const optionId = (slug: string) => `${listboxId}-opt-${slug}`;
   const activeOption = showList && activeIndex >= 0 ? options[activeIndex] : undefined;
   const activeOptionId = activeOption ? optionId(activeOption.region.slug) : undefined;
+
+  let announcement = '';
+  if (open && enabled && resultsAreCurrent && !isError) {
+    announcement =
+      options.length === 0
+        ? 'No matching regions'
+        : `${String(options.length)} matching ${options.length === 1 ? 'region' : 'regions'}`;
+  }
 
   return (
     <div className="combobox">
@@ -176,7 +209,7 @@ export function RegionCombobox({
       ) : null}
 
       <input
-        ref={inputRef}
+        ref={setInputRef}
         id={id}
         type="text"
         className="input"
@@ -236,6 +269,10 @@ export function RegionCombobox({
           ))}
         </ul>
       ) : null}
+
+      <p className="sr-only" aria-live="polite">
+        {announcement}
+      </p>
 
       {searchFailed ? (
         <p className="combobox-status" role="status">

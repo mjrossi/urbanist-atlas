@@ -126,6 +126,56 @@ describe('RegionCombobox', () => {
     expect(screen.getByTestId('val').textContent).toBe('queens');
   });
 
+  it('ignores Enter while the shown options belong to an earlier query', async () => {
+    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      const q = url.searchParams.get('q');
+      return Promise.resolve(searchResponse(q === 'qu' ? [QUEENS] : []));
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Host />);
+
+    await user.type(screen.getByRole('combobox'), 'qu');
+    await screen.findByRole('option', { name: /queens/i });
+    // "qux" is still inside the debounce window, so the Queens option on
+    // screen is the answer to "qu", not to what is now typed.
+    await user.keyboard('x{Enter}');
+
+    expect(screen.getByTestId('val').textContent).toBe('');
+  });
+
+  it('exposes the highlighted option via aria-activedescendant', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Host />);
+
+    const input = screen.getByRole('combobox');
+    await user.type(input, 'queens');
+    const option = await screen.findByRole('option', { name: /queens/i });
+    await user.keyboard('{ArrowDown}');
+
+    expect(input.getAttribute('aria-activedescendant')).toBe(option.id);
+  });
+
+  it('announces the result count in a polite live region', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Host />);
+
+    await user.type(screen.getByRole('combobox'), 'queens');
+    const live = await screen.findByText(/1 matching region/i);
+    expect(live.getAttribute('aria-live')).toBe('polite');
+    expect(live.className).toContain('sr-only');
+  });
+
+  it('announces when a search has no matches', async () => {
+    fetchSpy.mockResolvedValue(searchResponse([]));
+    const user = userEvent.setup();
+    renderWithProviders(<Host />);
+
+    await user.type(screen.getByRole('combobox'), 'zzz');
+    const live = await screen.findByText(/no matching regions/i);
+    expect(live.getAttribute('aria-live')).toBe('polite');
+  });
+
   it('removes the last chip when Backspace is pressed on an empty input', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Host />);
