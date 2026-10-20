@@ -1041,6 +1041,20 @@ describe('apiFetch — transport failures', () => {
     expect(signal.aborted).toBe(true);
   });
 
+  it('follows the caller signal without AbortSignal.any', async () => {
+    const any = vi.spyOn(AbortSignal, 'any').mockImplementation(() => {
+      throw new TypeError('AbortSignal.any is not a function');
+    });
+    const controller = new AbortController();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await apiFetch('/api/v1/anything', { signal: controller.signal });
+    const signal = signalOf(fetchMock.mock.calls[0]!);
+    expect(any).not.toHaveBeenCalled();
+    expect(signal.aborted).toBe(false);
+    controller.abort();
+    expect(signal.aborted).toBe(true);
+  });
+
   it('applies a 15s timeout and reports it as ApiError status 0', async () => {
     const timeout = new AbortController();
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);

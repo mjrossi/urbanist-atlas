@@ -136,6 +136,15 @@ describe('BroadsheetNav', () => {
       expect(toggle().getAttribute('aria-expanded')).toBe('false');
     });
 
+    it('stays closed when Back returns to the path it was opened on', async () => {
+      const user = userEvent.setup();
+      const router = mountNav('/about');
+      await user.click(toggle());
+      await act(() => router.navigate('/browse'));
+      await act(() => router.navigate(-1));
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    });
+
     it('closes on Escape and returns focus to the toggle', async () => {
       const user = userEvent.setup();
       mountNav('/about');

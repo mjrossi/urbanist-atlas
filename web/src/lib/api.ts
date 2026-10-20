@@ -196,6 +196,32 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * with status 0. A caller-initiated abort is returned untouched, so
  * the caller sees its own cancellation as an AbortError.
  */
+/**
+ * Aborts when either signal does. `AbortSignal.any` would do this, but it
+ * needs Safari 17.4, and react-query passes a signal on every query, so
+ * older iOS would fail every request.
+ */
+function anySignal(a: AbortSignal, b: AbortSignal): AbortSignal {
+  const controller = new AbortController();
+  for (const signal of [a, b]) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      break;
+    }
+    signal.addEventListener(
+      'abort',
+      () => {
+        controller.abort(signal.reason);
+      },
+      {
+        once: true,
+        signal: controller.signal,
+      },
+    );
+  }
+  return controller.signal;
+}
+
 function transportError(
   err: unknown,
   callerSignal: AbortSignal | null | undefined,
@@ -242,9 +268,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   const callerSignal = init?.signal;
   const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const signal = callerSignal
-    ? AbortSignal.any([callerSignal, timeoutSignal])
-    : timeoutSignal;
+  const signal = callerSignal ? anySignal(callerSignal, timeoutSignal) : timeoutSignal;
 
   let response: Response;
   try {

@@ -43,6 +43,9 @@ export function BroadsheetNav() {
   // Keyed by the path it was opened on, so any route change closes it:
   // a nav link, a link in the page, or Back.
   const [openOn, setOpenOn] = useState<string | null>(null);
+  // Cleared on the change itself, not just ignored: otherwise Back to
+  // the opening path would reopen the drawer.
+  if (openOn !== null && openOn !== pathname) setOpenOn(null);
   const menuOpen = openOn === pathname;
   const toggleRef = useRef<HTMLButtonElement>(null);
 
