@@ -1989,10 +1989,25 @@ region_slugs = ["ms"]
 # effort re-forms.
 
 # --- Louisiana ---
-# gap: no statewide-scoped ped/bike advocacy org verified as of
-# 2026-10-20. Bike Easy is anchored at the metro only, not la-state:
+# gap: no statewide-scoped transit or ped/bike advocacy org verified as
+# of 2026-10-20. Bike Easy is anchored at the metro only, not la-state:
 # its own mission is "everyone in Greater New Orleans" and its legal
-# name is "Metro Bicycle Coalition of New Orleans".
+# name is "Metro Bicycle Coalition of New Orleans". Candidates checked
+# 2026-10-20, none qualified:
+#   - Bike Walk Louisiana: one undated press mention of its founding,
+#     no website or other own surface found.
+#   - CPEX (Center for Planning Excellence): a Baton Rouge planning
+#     nonprofit whose mission is "planning", not transportation; its
+#     complete-streets work is project-based and Baton Rouge-local
+#     (newest such post 2025-08-22).
+#   - Louisiana Association of Railroad Passengers: state affiliate of
+#     the Rail Passengers Association, with no own site found.
+#   - Louisiana Public Transit Association: a trade association of
+#     transit providers, not public advocacy; no dated activity found.
+#   - Bike Lafayette and Bike Baton Rouge are metro-scoped, and Bike
+#     Baton Rouge stepped back in 2023. AARP Louisiana is a chapter.
+# The League of American Bicyclists' 2024 Louisiana report card also
+# lists "No statewide non-profit bike advocacy organization".
 
 [[org]]
 slug = "bike-easy"
@@ -2325,10 +2340,21 @@ tags = ["cycling", "safe-streets", "advocacy", "policy"]
 region_slugs = ["reno-nv-metro"]
 
 # --- New Mexico ---
-# gap: no statewide-scoped ped/bike advocacy org verified as of
-# 2026-10-20. BikeABQ is anchored at the metro only, not nm: its own
-# mission is "bicycling in Albuquerque". Lead to check: the Bicycle
-# Coalition of New Mexico (named on BikeABQ's About page).
+# gap: no statewide-scoped transit or ped/bike advocacy org verified as
+# of 2026-10-20. BikeABQ is anchored at the metro only, not nm: its own
+# mission is "bicycling in Albuquerque". Candidates checked 2026-10-20,
+# none qualified:
+#   - Bicycle Coalition of New Mexico (bikenm.org, statewide 501(c)(3)
+#     founded 2002): the site does not answer (connections to ports 80
+#     and 443 time out), and no owned social account or dated activity
+#     was found. Unverifiable, so not added. Re-check if bikenm.org
+#     comes back.
+#   - New Mexico Transit Association: a trade association of transit
+#     providers (training and technical support for rural providers),
+#     not public advocacy. Its 2026 activity is the joint SWTA provider
+#     conference.
+#   - Safer New Mexico Now: traffic-safety education (car seats, seat
+#     belts, teen and older drivers), not safe-streets advocacy.
 
 [[org]]
 slug = "bike-abq"
@@ -2607,10 +2633,8 @@ region_slugs = ["quebec-cma"]
 
 # --- Winnipeg ---
 #
-# Bike Winnipeg is multi-anchored at [winnipeg-cma, mb] at its
-# existing province-floor entry below (Manitoba section). Same
-# precedent as The Street Trust at [portland-or-metro, or].
-# Functional Transit Winnipeg and Bike to the Future were considered
+# Bike Winnipeg's entry sits in the Manitoba (provincial) section
+# below, anchored at winnipeg-cma only since 2026-10-20. Functional Transit Winnipeg and Bike to the Future were considered
 # but couldn't be verified to clear the 12-month activity bar in
 # 2025-2026 (search surfaced primarily 2018-2022 activity).
 
@@ -2795,9 +2819,32 @@ tags = ["cycling", "advocacy", "safe-streets", "policy"]
 region_slugs = ["ab"]
 
 # --- Manitoba (provincial) ---
-# gap: no province-scoped ped/bike advocacy org verified as of
-# 2026-10-20. Bike Winnipeg is anchored at the CMA only, not mb: its
-# own mission is "a healthy, sustainable, and equitable city".
+#
+# Bike Winnipeg is anchored at the CMA only, not mb: its own mission is
+# "a healthy, sustainable, and equitable city". The province floor is
+# held by Climate Action Team Manitoba and Green Action Centre, both
+# admitted 2026-10-20 under the multi-issue precedent (a broader
+# mission plus a named transit or streets program).
+
+[[org]]
+slug = "climate-action-team-manitoba"
+added_at = 2026-10-20
+name = "Climate Action Team Manitoba"
+short_desc = "Coalition of Manitoba environmental organizations working on provincial climate policy. Runs the Next Stop: 50-50 campaign, launched May 2026, which presses the province to restore matching transit operating funding to municipalities and organizes bus riders in Winnipeg and Brandon."
+website_url = "https://climateactionmb.ca"
+contact_url = "https://climateactionmb.ca/contact/"
+tags = ["transit", "advocacy", "policy", "coalition", "climate"]
+region_slugs = ["mb"]
+
+[[org]]
+slug = "green-action-centre"
+added_at = 2026-10-20
+name = "Green Action Centre"
+short_desc = "Winnipeg-based environmental charity serving Manitoba since 1985. Its sustainable-transportation program runs Active and Safe Routes to School, School Streets, the Commuter Challenge and the province-wide GoManitoba commuting platform. Its 2026 municipal wish list calls for 30 km/h residential streets, more transit funding and funded walking and cycling networks."
+website_url = "https://greenactioncentre.ca"
+contact_url = "https://greenactioncentre.ca/connect"
+tags = ["transit", "walking", "cycling", "safe-streets", "advocacy", "education"]
+region_slugs = ["mb"]
 
 [[org]]
 slug = "bike-winnipeg"
@@ -2809,10 +2856,20 @@ tags = ["cycling", "advocacy", "safe-streets", "grassroots"]
 region_slugs = ["winnipeg-cma"]
 
 # --- Saskatchewan (provincial) ---
-# gap: no province-scoped ped/bike advocacy org verified as of
-# 2026-10-20. Saskatoon Cycles is anchored at the CMA only, not sk: its
-# own mission is "a Saskatoon where cycling is a viable, year-round
-# mode of transportation".
+# gap: no province-scoped transit or ped/bike advocacy org verified as
+# of 2026-10-20. Saskatoon Cycles is anchored at the CMA only, not sk:
+# its own mission is "a Saskatoon where cycling is a viable, year-round
+# mode of transportation". Candidates checked 2026-10-20, none
+# qualified:
+#   - Saskatchewan Cycling Association: mission is "the recreational
+#     and competitive sport of cycling"; its 2026 items are a race
+#     calendar and an AGM notice.
+#   - Saskatchewan Environmental Society: provincial, but it has no
+#     transportation program; its 2026 work is coal and power policy.
+#   - The campaigns to restore the STC intercity bus (Stop the Cuts and
+#     others) date from 2017 to 2020 and are dormant.
+#   - Bike Regina (no current site found) and Walking Saskatoon are
+#     city-scoped.
 
 [[org]]
 slug = "saskatoon-cycles"
