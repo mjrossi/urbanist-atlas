@@ -84,6 +84,32 @@ func TestIPRateLimiter_GlobalCap(t *testing.T) {
 	}
 }
 
+// Requests the global cap rejects from new addresses must not grow the
+// per-client map, or a flood of fresh addresses during a full window
+// would hold memory until the next sweep.
+func TestIPRateLimiter_GlobalDenialStoresNoEntry(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	l := newIPRateLimiter(5, time.Hour)
+	l.nowFunc = func() time.Time { return now }
+	l.globalMax = 2
+
+	for _, ip := range []string{"203.0.113.1", "203.0.113.2"} {
+		if ok, _ := l.allow(ip); !ok {
+			t.Fatalf("allow(%s) = false, want true (under global cap)", ip)
+		}
+	}
+	before := len(l.hits)
+	for i := range 50 {
+		ip := "198.51.100." + strconv.Itoa(i+1)
+		if ok, _ := l.allow(ip); ok {
+			t.Fatalf("allow(%s) = true past the global cap", ip)
+		}
+	}
+	if got := len(l.hits); got != before {
+		t.Errorf("hit map holds %d keys after global denials, want %d", got, before)
+	}
+}
+
 // A request the per-IP limit rejects must not also spend the shared
 // global budget, or one noisy client could exhaust it for everyone.
 func TestIPRateLimiter_PerIPDenialSparesGlobalBudget(t *testing.T) {

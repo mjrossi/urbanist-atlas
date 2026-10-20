@@ -73,12 +73,17 @@ func (l *ipRateLimiter) allow(ip string) (ok bool, retryAfter int) {
 	}
 
 	recent := keepRecent(l.hits[key], cutoff)
-	l.hits[key] = recent
 	if len(recent) >= l.maxPerWin {
+		l.hits[key] = recent
 		return false, l.retryAfter(recent[0], now)
 	}
 	l.global = keepRecent(l.global, cutoff)
 	if len(l.global) >= l.globalMax {
+		if len(recent) == 0 {
+			delete(l.hits, key)
+		} else {
+			l.hits[key] = recent
+		}
 		return false, l.retryAfter(l.global[0], now)
 	}
 	l.hits[key] = append(recent, now)
