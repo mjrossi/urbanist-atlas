@@ -148,6 +148,29 @@ func TestBuildMemStore_CleanFixtureLoads(t *testing.T) {
 	}
 }
 
+// A postal code mapped to two different leaves is a load error rather
+// than last-row-wins, and the error names the code and both regions.
+func TestBuildMemStore_DuplicatePostalCodeConflict(t *testing.T) {
+	regionTOML := map[string]string{
+		"v_top": regionTable("State", "v:state", "regional", nil),
+		"v_leaves": regionTable("Brooklyn", "v:leaf", "local", []string{"State"}) +
+			regionTable("Queens", "v:leaf", "local", []string{"State"}),
+	}
+	postal := postalHeaderCSV() + "11217,V,brooklyn\n11101,V,queens\n11217,V,queens\n"
+	fs := fixtureFS(regionTOML, map[string]string{"v": postal}, orgFor("brooklyn"))
+
+	cs := []countrySpec{{Code: "V", RegionFiles: []string{"v_top", "v_leaves"}, Postal: "v"}}
+	_, err := buildMemStore(nil, fs, cs)
+	if err == nil {
+		t.Fatal("expected duplicate postal code error, got nil")
+	}
+	for _, want := range []string{"11217", `"brooklyn"`, `"queens"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %s", err, want)
+		}
+	}
+}
+
 // TestBuildMemStore_OrphanLeaf proves RGN-02b: a leaf region with no
 // postal anchor, no attached org, and no anchoring descendant fails the
 // build, and the error names the orphan slug.
