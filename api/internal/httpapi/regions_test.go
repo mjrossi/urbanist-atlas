@@ -3,9 +3,11 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 )
@@ -163,8 +165,9 @@ func TestSearchRegions_BadLimit_Returns400(t *testing.T) {
 }
 
 // TestSearchRegions_QueryTooLong_Returns400 pins the spec's
-// `maxLength: 100` on q: one byte over is a validation problem, the cap
-// itself still searches.
+// `maxLength: 100` on q, which counts characters: one character over is
+// a validation problem, the cap itself still searches, and multibyte
+// characters count once each.
 func TestSearchRegions_QueryTooLong_Returns400(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -174,15 +177,18 @@ func TestSearchRegions_QueryTooLong_Returns400(t *testing.T) {
 	}{
 		{q: strings.Repeat("a", maxRegionSearchQueryLen), want: http.StatusOK},
 		{q: strings.Repeat("a", maxRegionSearchQueryLen+1), want: http.StatusBadRequest},
+		{q: strings.Repeat("é", maxRegionSearchQueryLen), want: http.StatusOK},
+		{q: strings.Repeat("€", maxRegionSearchQueryLen), want: http.StatusOK},
+		{q: strings.Repeat("€", maxRegionSearchQueryLen+1), want: http.StatusBadRequest},
 	} {
-		resp, err := http.Get(srv.URL + "/api/v1/regions/search?q=" + tc.q)
+		resp, err := http.Get(srv.URL + "/api/v1/regions/search?q=" + url.QueryEscape(tc.q))
 		if err != nil {
-			t.Fatalf("GET len=%d: %v", len(tc.q), err)
+			t.Fatalf("GET chars=%d: %v", utf8.RuneCountInString(tc.q), err)
 		}
 		func() {
 			defer resp.Body.Close()
 			if resp.StatusCode != tc.want {
-				t.Fatalf("len=%d: status want %d, got %d", len(tc.q), tc.want, resp.StatusCode)
+				t.Fatalf("chars=%d: status want %d, got %d", utf8.RuneCountInString(tc.q), tc.want, resp.StatusCode)
 			}
 			if tc.want != http.StatusBadRequest {
 				return

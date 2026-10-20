@@ -69,9 +69,9 @@ const maxAdminListLimit = 200
 const maxRegionSearchLimit = 20
 
 // maxRegionSearchQueryLen caps the raw `q` on GET /api/v1/regions/search,
-// in bytes, matching the spec's `maxLength: 100`. Empty results persist
-// q into coverage_gaps on the shared volume, so the cap also bounds what
-// one request can write there.
+// in characters (runes), matching the spec's `maxLength: 100`. Empty
+// results persist q into coverage_gaps on the shared volume; the
+// coverage recorder bounds that row in bytes on its own.
 const maxRegionSearchQueryLen = 100
 
 // Upper bounds on the raw `postal_code` and `country` query parameters

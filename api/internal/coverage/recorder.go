@@ -30,9 +30,10 @@ const maxConcurrentWrites = 4
 // maxInputLen caps, in bytes, the input persisted per row. The table is
 // row-capped, not byte-capped, and shares its volume with submissions,
 // so the recorder bounds row size itself rather than trusting every
-// caller to. 100 matches the region-search q limit; postal codes are far
-// shorter.
-const maxInputLen = 100
+// caller to. 400 is the region-search q limit of 100 characters at
+// UTF-8's 4-byte maximum, so a q the handler accepts is stored whole;
+// postal codes are far shorter.
+const maxInputLen = 400
 
 // GapStore is the persistence seam the Recorder writes through —
 // satisfied by *sqlite.Store.

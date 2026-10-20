@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 
@@ -54,9 +55,9 @@ func searchRegionsHandler(store atlas.Store, logger *slog.Logger, m *Metrics, re
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		rawQ := r.URL.Query().Get("q")
-		if len(rawQ) > maxRegionSearchQueryLen {
+		if utf8.RuneCountInString(rawQ) > maxRegionSearchQueryLen {
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Query",
-				fmt.Sprintf("The q query parameter must be at most %d bytes.", maxRegionSearchQueryLen), rid)
+				fmt.Sprintf("The q query parameter must be at most %d characters.", maxRegionSearchQueryLen), rid)
 			return
 		}
 		q := strings.TrimSpace(rawQ)
