@@ -172,3 +172,31 @@ func TestCORS_WildcardSuffixEnforcesHTTPSScheme(t *testing.T) {
 		})
 	}
 }
+
+// TestCORS_ExposesResponseHeaders pins that allowed origins can read the
+// non-safelisted response headers the SPA depends on (web/src/lib/api.ts
+// reads X-Request-ID and Retry-After). Without Access-Control-Expose-Headers
+// the browser hides them from cross-origin script.
+func TestCORS_ExposesResponseHeaders(t *testing.T) {
+	mw := corsMiddleware([]string{"https://allowed.example"})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	const want = "X-Request-ID, Retry-After, X-Next-Cursor"
+	for _, tc := range []struct {
+		origin string
+		want   string
+	}{
+		{origin: "https://allowed.example", want: want},
+		{origin: "https://attacker.example", want: ""},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Origin", tc.origin)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		if got := rr.Header().Get("Access-Control-Expose-Headers"); got != tc.want {
+			t.Errorf("origin %q: Access-Control-Expose-Headers = %q, want %q", tc.origin, got, tc.want)
+		}
+	}
+}

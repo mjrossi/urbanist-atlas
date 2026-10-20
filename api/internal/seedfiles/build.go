@@ -121,7 +121,9 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 					localTier[r.Slug] = true
 				}
 				nextRegionID++
-				store.AddRegion(r)
+				if err := store.AddRegion(r); err != nil {
+					return nil, fmt.Errorf("seedfiles: regions %s/%s: %w", c.Code, suffix, err)
+				}
 				kindBySlug[r.Slug] = r.Kind
 				if len(r.RollupStates) > 0 {
 					rollupSources = append(rollupSources, r)
@@ -187,7 +189,9 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 				return nil, fmt.Errorf("seedfiles: postal %s/%s: leaf_region_slug %q not found", row.Country, row.PostalCode, row.LeafRegionSlug)
 			}
 			anchoredSlugs[row.LeafRegionSlug] = true
-			store.AddPostalCode(row.Country, row.PostalCode, leafID)
+			if err := store.AddPostalCode(row.Country, row.PostalCode, leafID); err != nil {
+				return nil, fmt.Errorf("seedfiles: postal %s: %w", c.Code, err)
+			}
 		}
 		postalTotal += len(rows)
 		if logger != nil {

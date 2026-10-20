@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -295,13 +296,21 @@ func fetchOnce(ctx context.Context, client *http.Client, src etl.SourceDescripto
 	if err != nil {
 		return false, fmt.Errorf("create %s: %w", dst, err)
 	}
-	defer f.Close()
 
 	h := sha256.New()
 	n, err := io.Copy(io.MultiWriter(f, h), resp.Body)
+	// The hash covers the streamed bytes, not what reached disk; a failed
+	// Close is the signal that the two may differ.
+	var closeErr error
+	if cerr := f.Close(); cerr != nil {
+		closeErr = fmt.Errorf("close %s: %w", dst, cerr)
+	}
 	if err != nil {
 		// A read cut short mid-stream (dropped connection) is transient.
-		return true, fmt.Errorf("write %s: %w", dst, err)
+		return true, errors.Join(fmt.Errorf("write %s: %w", dst, err), closeErr)
+	}
+	if closeErr != nil {
+		return false, closeErr
 	}
 	got := hex.EncodeToString(h.Sum(nil))
 

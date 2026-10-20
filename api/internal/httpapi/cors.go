@@ -72,6 +72,9 @@ func corsMiddleware(allowed []string) func(http.Handler) http.Handler {
 					h.Set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS")
 					h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Atlas-Client, X-Request-ID")
 					h.Set("Access-Control-Max-Age", "86400")
+					// Browsers hide non-safelisted response headers from
+					// cross-origin script unless they are listed here.
+					h.Set("Access-Control-Expose-Headers", "X-Request-ID, Retry-After, X-Next-Cursor")
 				}
 			}
 			if r.Method == http.MethodOptions {

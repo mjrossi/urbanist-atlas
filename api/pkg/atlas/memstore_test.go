@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -152,6 +153,69 @@ func BenchmarkMemStore_ListRegions(b *testing.B) {
 	for b.Loop() {
 		if _, err := s.ListRegions(context.Background()); err != nil {
 			b.Fatalf("ListRegions: %v", err)
+		}
+	}
+}
+
+func TestMemStore_AddRegionUnknownParentErrors(t *testing.T) {
+	s := NewMemStore()
+	if err := s.AddRegion(Region{ID: 1, Kind: "us:state", Name: "New York", Slug: "ny", ScopeTier: ScopeRegional}); err != nil {
+		t.Fatalf("AddRegion(ny): %v", err)
+	}
+	err := s.AddRegion(Region{ID: 2, Kind: "us:city", Name: "NYC", Slug: "nyc", ScopeTier: ScopeLocal, ParentSlugs: []string{"ny", "nyc-metro"}})
+	if err == nil {
+		t.Fatal("AddRegion with unknown parent slug: want error, got nil")
+	}
+	for _, want := range []string{`"nyc"`, `"nyc-metro"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %s", err, want)
+		}
+	}
+	if _, err := s.ResolveRegionBySlug(context.Background(), "nyc"); !errors.Is(err, ErrRegionNotFound) {
+		t.Errorf("rejected region was registered anyway: ResolveRegionBySlug err = %v", err)
+	}
+}
+
+func TestMemStore_AddPostalCodeConflictErrors(t *testing.T) {
+	s := NewMemStore()
+	_ = s.AddRegion(Region{ID: 1, Kind: "us:city", Name: "Brooklyn", Slug: "brooklyn", ScopeTier: ScopeLocal})
+	_ = s.AddRegion(Region{ID: 2, Kind: "us:city", Name: "Queens", Slug: "queens", ScopeTier: ScopeLocal})
+	if err := s.AddPostalCode(CountryUS, "11217", 1); err != nil {
+		t.Fatalf("first AddPostalCode: %v", err)
+	}
+	if err := s.AddPostalCode(CountryUS, " 11217 ", 1); err != nil {
+		t.Errorf("re-adding the same mapping: want nil, got %v", err)
+	}
+	err := s.AddPostalCode(CountryUS, "11217-0001", 2)
+	if err == nil {
+		t.Fatal("conflicting AddPostalCode: want error, got nil")
+	}
+	for _, want := range []string{"11217", `"brooklyn"`, `"queens"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %s", err, want)
+		}
+	}
+	leaf, err := s.ResolveLeafRegion(context.Background(), CountryUS, "11217")
+	if err != nil {
+		t.Fatalf("ResolveLeafRegion: %v", err)
+	}
+	if leaf.Slug != "brooklyn" {
+		t.Errorf("conflict overwrote the first mapping: leaf = %q, want brooklyn", leaf.Slug)
+	}
+}
+
+func TestMemStore_ResolveZIP4(t *testing.T) {
+	s := NewMemStore()
+	_ = s.AddRegion(Region{ID: 1, Kind: "us:city", Name: "Brooklyn", Slug: "brooklyn", ScopeTier: ScopeLocal})
+	_ = s.AddPostalCode(CountryUS, "11217", 1)
+	for _, in := range []string{"11217-1234", "112171234"} {
+		leaf, err := s.ResolveLeafRegion(context.Background(), CountryUS, in)
+		if err != nil {
+			t.Errorf("ResolveLeafRegion(%q): %v", in, err)
+			continue
+		}
+		if leaf.Slug != "brooklyn" {
+			t.Errorf("ResolveLeafRegion(%q) = %q, want brooklyn", in, leaf.Slug)
 		}
 	}
 }

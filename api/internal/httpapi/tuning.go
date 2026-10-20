@@ -8,12 +8,38 @@ import "time"
 // explaining the rationale — change the rationale when you change the
 // number.
 
-// rateLimitWindow is the per-IP sliding window for the public
-// submission endpoint. Combined with --submissions-rate-per-hour
-// (default 5), an IP gets at most N requests in this window before
-// being told to back off. One hour matches the flag name and is a
-// gentle deterrent — Cloudflare's WAF is the real edge throttle.
+// rateLimitWindow is the sliding window for the public submission
+// endpoint's limits. Combined with --submissions-rate-per-hour, a
+// client gets at most N requests in this window before being told to
+// back off. One hour matches the flag name.
 const rateLimitWindow = time.Hour
+
+// submissionsGlobalPerWindow caps submission attempts across all clients
+// per rateLimitWindow. The per-client limit alone is beaten by anyone
+// holding many addresses, and the limiter is the only throttle the
+// endpoint has. 30 an hour is far above organic volume for a directory
+// of advocacy groups while bounding how fast the shared volume can fill.
+const submissionsGlobalPerWindow = 30
+
+// maxPendingSubmissions stops new submissions while this many await
+// moderation. It must not exceed the store's List page cap (200), or
+// the guard could never observe the queue as full. At the 64 KiB body
+// limit, a full queue is at most ~12.5 MiB of the 1 GiB volume.
+const maxPendingSubmissions = 200
+
+// pendingQueueCheckInterval is how long the pending-queue answer is
+// cached, so the guard costs one store query per interval however many
+// POSTs arrive. The queue can overshoot the cap by at most what the
+// global limit admits in one interval.
+const pendingQueueCheckInterval = time.Minute
+
+// pendingQueueRetryInterval is how soon a failed pending-queue check is
+// retried, and pendingQueueQueryTimeout bounds the query itself since it
+// runs under the cache lock.
+const (
+	pendingQueueRetryInterval = 5 * time.Second
+	pendingQueueQueryTimeout  = 2 * time.Second
+)
 
 // rateLimitSweepInterval is how often the limiter walks its in-memory
 // hit map and discards entries whose hits have all aged out of the
@@ -41,6 +67,12 @@ const maxAdminListLimit = 200
 // Matches the `maximum: 20` in the OpenAPI spec and the store's own
 // hard cap — the type-ahead never needs more than a screenful.
 const maxRegionSearchLimit = 20
+
+// maxRegionSearchQueryLen caps the raw `q` on GET /api/v1/regions/search,
+// in bytes, matching the spec's `maxLength: 100`. Empty results persist
+// q into coverage_gaps on the shared volume, so the cap also bounds what
+// one request can write there.
+const maxRegionSearchQueryLen = 100
 
 // Upper bounds on the raw `postal_code` and `country` query parameters
 // for GET /api/v1/lookup. Generous relative to the longest validators

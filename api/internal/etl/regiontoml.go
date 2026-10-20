@@ -137,12 +137,10 @@ func writeStringList(w *bufio.Writer, key string, items []string) error {
 	return err
 }
 
-// tomlString wraps s in TOML double-quoted basic-string syntax.
-// Backslashes and double quotes are escaped; UTF-8 multibyte chars
-// pass through unchanged (TOML basic strings accept any UTF-8), so a
-// name like "Montréal" stays "Montréal" rather than the \xXX escapes
-// Go's %q would emit. Control characters (newline, tab, …) follow the
-// TOML spec and become \n / \t.
+// tomlString wraps s in a TOML 1.0 basic string. Non-ASCII UTF-8 passes
+// through, so "Montréal" stays readable instead of Go %q's \xXX escapes.
+// TOML forbids raw U+0000–U+001F and U+007F in a basic string, so those
+// become short escapes where the spec has one and \uXXXX otherwise.
 func tomlString(s string) string {
 	var b strings.Builder
 	b.Grow(len(s) + 2)
@@ -153,13 +151,21 @@ func tomlString(s string) string {
 			b.WriteString(`\\`)
 		case '"':
 			b.WriteString(`\"`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\r':
-			b.WriteString(`\r`)
+		case '\b':
+			b.WriteString(`\b`)
 		case '\t':
 			b.WriteString(`\t`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\f':
+			b.WriteString(`\f`)
+		case '\r':
+			b.WriteString(`\r`)
 		default:
+			if r < 0x20 || r == 0x7f {
+				fmt.Fprintf(&b, `\u%04X`, r)
+				continue
+			}
 			b.WriteRune(r)
 		}
 	}

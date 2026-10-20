@@ -2,7 +2,9 @@ package atlas
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -43,23 +45,25 @@ func NewMemStore() *MemStore {
 }
 
 // AddRegion registers a region. Later calls with the same ID overwrite.
-// ParentSlugs on the supplied region is used to populate the parents
-// map; referenced parent slugs must already be registered (call order
-// matters: add parents before children).
-func (s *MemStore) AddRegion(r Region) {
+// Every slug in r.ParentSlugs must already be registered, so add parents
+// before children; an unknown parent is an error and r is not added.
+func (s *MemStore) AddRegion(r Region) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	parentIDs := make([]int64, 0, len(r.ParentSlugs))
+	for _, ps := range r.ParentSlugs {
+		pid, ok := s.regionsBySlug[ps]
+		if !ok {
+			return fmt.Errorf("atlas: region %q references unknown parent slug %q (add the parent first)", r.Slug, ps)
+		}
+		parentIDs = append(parentIDs, pid)
+	}
 	s.regionsByID[r.ID] = r
 	s.regionsBySlug[r.Slug] = r.ID
-	if len(r.ParentSlugs) > 0 {
-		parentIDs := make([]int64, 0, len(r.ParentSlugs))
-		for _, ps := range r.ParentSlugs {
-			if pid, ok := s.regionsBySlug[ps]; ok {
-				parentIDs = append(parentIDs, pid)
-			}
-		}
+	if len(parentIDs) > 0 {
 		s.parents[r.ID] = parentIDs
 	}
+	return nil
 }
 
 // AddRollupState records that metroSlug's OWN orgs should additionally
@@ -103,11 +107,28 @@ func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
 }
 
 // AddPostalCode registers a (country, postal code) → leaf region id
-// mapping. The code is normalized via NormalizePostalCode.
-func (s *MemStore) AddPostalCode(country Country, code string, leafRegionID int64) {
+// mapping. The code is normalized via NormalizePostalCode. Re-adding an
+// identical mapping is a no-op; mapping a code to a second region is an
+// error, and the first mapping is kept.
+func (s *MemStore) AddPostalCode(country Country, code string, leafRegionID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.postalToLeaf[postalKey(country, code)] = leafRegionID
+	key := postalKey(country, code)
+	if prev, ok := s.postalToLeaf[key]; ok && prev != leafRegionID {
+		return fmt.Errorf("atlas: duplicate postal code %s %s: already mapped to region %s, cannot also map to %s",
+			country, NormalizePostalCode(country, code), s.regionLabel(prev), s.regionLabel(leafRegionID))
+	}
+	s.postalToLeaf[key] = leafRegionID
+	return nil
+}
+
+// regionLabel names a region by slug for error messages, falling back
+// to the ID for one not yet registered. Caller must hold s.mu.
+func (s *MemStore) regionLabel(id int64) string {
+	if r, ok := s.regionsByID[id]; ok {
+		return strconv.Quote(r.Slug)
+	}
+	return "id " + strconv.FormatInt(id, 10)
 }
 
 // Slugs returns every registered region slug — the FULL set across all

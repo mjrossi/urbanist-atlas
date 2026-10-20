@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -78,6 +79,15 @@ func TestBearerAuthMiddleware_EmptyTokenFailsClosed(t *testing.T) {
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want %d (admin endpoints disabled when no token configured)", rec.Code, http.StatusServiceUnavailable)
+	}
+	var p struct {
+		Type string `json:"type"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&p); err != nil {
+		t.Fatalf("decode problem: %v", err)
+	}
+	if p.Type != problemAdminDisabled {
+		t.Errorf("problem type = %q, want %q", p.Type, problemAdminDisabled)
 	}
 	if nextCalled {
 		t.Error("next handler was reached with no admin token configured — must fail closed")

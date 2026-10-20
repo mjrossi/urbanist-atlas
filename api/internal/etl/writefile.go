@@ -1,23 +1,21 @@
 package etl
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 )
 
-// WriteFile creates path and hands the open file to write, closing it
-// when write returns. It factors out the os.Create → wrap error →
-// defer Close → delegate shape shared by every per-country seed
-// writer. Only the create error is wrapped (as
-// "<errPrefix>: create <path>: <err>", preserving the country plans'
-// "etl us:" / "etl ca:" prefixes); errors from write pass through
-// unwrapped, exactly like the previously inlined wrappers.
+// WriteFile creates path, hands the open file to write, and closes it.
+// Only the create error is wrapped (as "<errPrefix>: create <path>:
+// <err>"); write and Close errors are returned joined, unwrapped,
+// because a failed Close can mean the data never reached disk.
 func WriteFile(path, errPrefix string, write func(io.Writer) error) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("%s: create %s: %w", errPrefix, path, err)
 	}
-	defer f.Close()
-	return write(f)
+	werr := write(f)
+	return errors.Join(werr, f.Close())
 }
