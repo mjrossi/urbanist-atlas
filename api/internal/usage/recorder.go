@@ -85,7 +85,7 @@ type Recorder struct {
 	keepDays int
 	logger   *slog.Logger
 
-	// wg tracks the Run goroutine so Wait can join it, matching
+	// wg tracks the flush goroutine so Wait can join it, matching
 	// coverage.Recorder.Wait's contract — see Wait.
 	wg sync.WaitGroup
 
@@ -148,11 +148,11 @@ func (r *Recorder) Increment(kind, key string) {
 	r.buf[bk]++
 }
 
-// Start launches Run in its own goroutine, registering it with the
-// WaitGroup *before* returning so a Wait that follows immediately is
-// guaranteed to see it. Production callers should use this rather than
-// `go rec.Run(ctx)`, which registers from inside the new goroutine and
-// so races a Wait on a very short-lived process. Nil-safe.
+// Start launches the flush goroutine, which flushes on every interval
+// until ctx is canceled and then flushes once more so the last
+// interval's counts survive shutdown. It registers with the WaitGroup
+// before returning, so a Wait that follows immediately is guaranteed to
+// join it. Nil-safe.
 func (r *Recorder) Start(ctx context.Context) {
 	if r == nil || r.store == nil {
 		return
@@ -164,21 +164,8 @@ func (r *Recorder) Start(ctx context.Context) {
 	}()
 }
 
-// Run drives the flush ticker until ctx is canceled, then performs one
-// final flush so the last interval's counts survive shutdown. Intended
-// to be called in its own goroutine; prefer Start, which closes the
-// registration race.
-func (r *Recorder) Run(ctx context.Context) {
-	if r == nil || r.store == nil {
-		return
-	}
-	r.wg.Add(1)
-	defer r.wg.Done()
-	r.run(ctx)
-}
-
-// run is the ticker loop shared by Start and Run. It assumes the caller
-// has already registered with r.wg.
+// run is the flush loop behind Start. The caller has already
+// registered with r.wg.
 func (r *Recorder) run(ctx context.Context) {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
@@ -250,16 +237,16 @@ func (r *Recorder) Flush(ctx context.Context) error {
 	return nil
 }
 
-// Wait performs a final flush and then blocks until the Run goroutine
+// Wait performs a final flush and then blocks until the flush goroutine
 // has exited, or until ctx is done — whichever comes first. Called
 // during graceful shutdown alongside coverage.Recorder.Wait, and it
 // means the same thing there: when Wait returns nil, no further write
 // will be issued, so the caller may safely close the store.
 //
-// Joining matters because Run performs its own final flush on ctx
+// Joining matters because that goroutine does its own final flush on ctx
 // cancellation using a *detached* context. Without the join, Wait could
 // return while that flush is still in flight and the deferred store
-// Close would race it. If Run was never started the WaitGroup is empty
+// Close would race it. If Start was never called the WaitGroup is empty
 // and the join returns immediately. Nil-safe.
 func (r *Recorder) Wait(ctx context.Context) error {
 	if r == nil {

@@ -228,9 +228,6 @@ func runServe(ctx context.Context, c *cli.Command) error {
 	var usageRec *usage.Recorder
 	if subs != nil {
 		usageRec = usage.New(subs, cfg.usageFlushInterval, cfg.usageKeepDays, logger)
-		// Start, not `go Run`: it registers with the recorder's
-		// WaitGroup synchronously, so the shutdown Wait below is
-		// guaranteed to join this goroutine.
 		usageRec.Start(ctx)
 	}
 
