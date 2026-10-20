@@ -162,6 +162,44 @@ func TestSearchRegions_BadLimit_Returns400(t *testing.T) {
 	}
 }
 
+// TestSearchRegions_QueryTooLong_Returns400 pins the spec's
+// `maxLength: 100` on q: one byte over is a validation problem, the cap
+// itself still searches.
+func TestSearchRegions_QueryTooLong_Returns400(t *testing.T) {
+	srv := newTestServer(t)
+
+	for _, tc := range []struct {
+		q    string
+		want int
+	}{
+		{q: strings.Repeat("a", maxRegionSearchQueryLen), want: http.StatusOK},
+		{q: strings.Repeat("a", maxRegionSearchQueryLen+1), want: http.StatusBadRequest},
+	} {
+		resp, err := http.Get(srv.URL + "/api/v1/regions/search?q=" + tc.q)
+		if err != nil {
+			t.Fatalf("GET len=%d: %v", len(tc.q), err)
+		}
+		func() {
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.want {
+				t.Fatalf("len=%d: status want %d, got %d", len(tc.q), tc.want, resp.StatusCode)
+			}
+			if tc.want != http.StatusBadRequest {
+				return
+			}
+			var p struct {
+				Type string `json:"type"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&p); err != nil {
+				t.Fatalf("decode problem: %v", err)
+			}
+			if p.Type != problemValidation {
+				t.Errorf("problem type want %q, got %q", problemValidation, p.Type)
+			}
+		}()
+	}
+}
+
 // TestSearchRegions_DoesNotShadowGetRegionSlug pins that the static
 // "/regions/search" route resolves to the search handler (200 envelope)
 // rather than being captured by "/regions/{slug}" as slug="search"

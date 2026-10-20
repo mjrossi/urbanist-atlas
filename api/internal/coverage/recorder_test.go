@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 type fakeGapStore struct {
@@ -80,6 +82,44 @@ func TestRecorder_AlwaysSamples(t *testing.T) {
 		if n != 100 {
 			t.Errorf("prune cap = %d, want 100", n)
 		}
+	}
+}
+
+// The recorder persists raw user input, so it caps what it stores even if
+// a caller forgets to bound the input first. A cut never leaves a partial
+// UTF-8 sequence behind.
+func TestRecorder_TruncatesInput(t *testing.T) {
+	cases := []struct {
+		name, in, want string
+	}{
+		{name: "short", in: "nope", want: "nope"},
+		{name: "at cap", in: strings.Repeat("a", maxInputLen), want: strings.Repeat("a", maxInputLen)},
+		{name: "ascii over cap", in: strings.Repeat("a", 10*maxInputLen), want: strings.Repeat("a", maxInputLen)},
+		// 3-byte runes: the cap falls mid-rune, so the partial rune is dropped.
+		{name: "multibyte over cap", in: strings.Repeat("€", maxInputLen), want: strings.Repeat("€", maxInputLen/3)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := &fakeGapStore{}
+			r := New(store, 1.0, 100, discardLogger())
+			r.SetRNG(func() float64 { return 0.0 })
+			r.RecordEmpty("search", "", tc.in)
+			if err := r.Wait(context.Background()); err != nil {
+				t.Fatalf("Wait: %v", err)
+			}
+			store.mu.Lock()
+			defer store.mu.Unlock()
+			if len(store.records) != 1 {
+				t.Fatalf("recorded %d rows, want 1", len(store.records))
+			}
+			got := store.records[0].input
+			if got != tc.want {
+				t.Errorf("stored input len=%d %q, want len=%d", len(got), got, len(tc.want))
+			}
+			if !utf8.ValidString(got) {
+				t.Errorf("stored input is not valid UTF-8: %q", got)
+			}
+		})
 	}
 }
 

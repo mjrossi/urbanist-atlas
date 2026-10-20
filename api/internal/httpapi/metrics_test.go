@@ -349,6 +349,67 @@ func TestMetrics_StorePingFailure(t *testing.T) {
 	}
 }
 
+// TestMetrics_UnknownMethodBucketed pins that arbitrary method tokens
+// collapse to "other": chi runs r.Use middleware before its own method
+// check, so a raw r.Method label would let a client mint one series per
+// made-up method.
+func TestMetrics_UnknownMethodBucketed(t *testing.T) {
+	srv, m := newMetricsTestServer(t)
+
+	for _, method := range []string{"FOO1", "FOO2", http.MethodPatch} {
+		req, err := http.NewRequest(method, srv.URL+"/api/v1/lookup", nil)
+		if err != nil {
+			t.Fatalf("new request %s: %v", method, err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s: %v", method, err)
+		}
+		resp.Body.Close()
+	}
+
+	families, err := m.reg.Gather()
+	if err != nil {
+		t.Fatalf("gather: %v", err)
+	}
+	methods := map[string]bool{}
+	for _, f := range families {
+		switch f.GetName() {
+		case "atlas_http_requests_total", "atlas_http_request_duration_seconds":
+		default:
+			continue
+		}
+		for _, metric := range f.GetMetric() {
+			for _, lp := range metric.GetLabel() {
+				if lp.GetName() == "method" {
+					methods[lp.GetValue()] = true
+				}
+			}
+		}
+	}
+	if len(methods) != 1 || !methods["other"] {
+		t.Errorf("method labels = %v, want only \"other\"", methods)
+	}
+}
+
+func TestMetricMethod(t *testing.T) {
+	cases := map[string]string{
+		http.MethodGet:     http.MethodGet,
+		http.MethodHead:    http.MethodHead,
+		http.MethodPost:    http.MethodPost,
+		http.MethodOptions: http.MethodOptions,
+		http.MethodPut:     "other",
+		"get":              "other",
+		"FOO1":             "other",
+		"":                 "other",
+	}
+	for in, want := range cases {
+		if got := metricMethod(in); got != want {
+			t.Errorf("metricMethod(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 // createPendingSubmissionID posts a valid submission and returns its public id.
 func createPendingSubmissionID(t *testing.T, rig *submissionsTestRig) string {
 	t.Helper()

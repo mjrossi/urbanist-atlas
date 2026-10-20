@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -52,7 +53,13 @@ func listRegionsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc
 func searchRegionsHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *coverage.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
-		q := strings.TrimSpace(r.URL.Query().Get("q"))
+		rawQ := r.URL.Query().Get("q")
+		if len(rawQ) > maxRegionSearchQueryLen {
+			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Query",
+				fmt.Sprintf("The q query parameter must be at most %d bytes.", maxRegionSearchQueryLen), rid)
+			return
+		}
+		q := strings.TrimSpace(rawQ)
 		limit, ok := parseLimitParam(w, r, maxRegionSearchLimit, rid)
 		if !ok {
 			return

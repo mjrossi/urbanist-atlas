@@ -1,25 +1,31 @@
 package httpapi
 
 import (
+	"context"
+	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// ipRateLimiter is a tiny per-IP sliding-window limiter for the public
-// submission endpoint. It's deliberately in-process and simple — the
-// goal is "a handful per hour per IP" deterrence, not a hard
-// guarantee. Cloudflare's WAF rate-limit rule provides the real
-// throttling at the edge; this is the second line of defense the API
-// retains when traffic ever bypasses the CDN.
+// ipRateLimiter is an in-process sliding-window limiter for the public
+// submission endpoint: a per-client budget (see rateLimitKey) plus one
+// budget shared by every client. Nothing in front of the API throttles
+// submissions, so this is the only rate limit they meet. State is
+// per-process and resets on restart.
 type ipRateLimiter struct {
 	mu         sync.Mutex
 	hits       map[string][]time.Time
+	global     []time.Time
 	window     time.Duration
 	maxPerWin  int
+	globalMax  int
 	nowFunc    func() time.Time
 	lastSwept  time.Time
 	sweepEvery time.Duration
@@ -36,17 +42,19 @@ func newIPRateLimiter(maxPerWindow int, window time.Duration) *ipRateLimiter {
 		hits:       make(map[string][]time.Time),
 		window:     window,
 		maxPerWin:  maxPerWindow,
+		globalMax:  submissionsGlobalPerWindow,
 		nowFunc:    time.Now,
 		sweepEvery: rateLimitSweepInterval,
 	}
 }
 
-// allow reports whether ip is within budget. The boolean is true on
-// success; on failure, retryAfter is the seconds until the oldest
-// hit ages out of the window (>= 1).
+// allow reports whether ip is within both its own budget and the shared
+// one. On failure, retryAfter is the seconds until the blocking window's
+// oldest hit ages out (>= 1). A rejected request spends neither budget.
 func (l *ipRateLimiter) allow(ip string) (ok bool, retryAfter int) {
 	now := l.nowFunc()
 	cutoff := now.Add(-l.window)
+	key := rateLimitKey(ip)
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -64,15 +72,22 @@ func (l *ipRateLimiter) allow(ip string) (ok bool, retryAfter int) {
 		l.lastSwept = now
 	}
 
-	recent := keepRecent(l.hits[ip], cutoff)
+	recent := keepRecent(l.hits[key], cutoff)
+	l.hits[key] = recent
 	if len(recent) >= l.maxPerWin {
-		oldest := recent[0]
-		retry := max(int(oldest.Add(l.window).Sub(now).Seconds())+1, 1)
-		l.hits[ip] = recent
-		return false, retry
+		return false, l.retryAfter(recent[0], now)
 	}
-	l.hits[ip] = append(recent, now)
+	l.global = keepRecent(l.global, cutoff)
+	if len(l.global) >= l.globalMax {
+		return false, l.retryAfter(l.global[0], now)
+	}
+	l.hits[key] = append(recent, now)
+	l.global = append(l.global, now)
 	return true, 0
+}
+
+func (l *ipRateLimiter) retryAfter(oldest, now time.Time) int {
+	return max(int(oldest.Add(l.window).Sub(now).Seconds())+1, 1)
 }
 
 func keepRecent(ts []time.Time, cutoff time.Time) []time.Time {
@@ -85,33 +100,33 @@ func keepRecent(ts []time.Time, cutoff time.Time) []time.Time {
 	return out
 }
 
-// clientIP picks the most plausible source IP from r.
+// rateLimitKey buckets a client address for the limiter. IPv4 is keyed
+// per address. IPv6 is keyed by its /64, because a single subscriber is
+// routinely handed a whole /64 and could otherwise rotate addresses
+// within it for a fresh budget each time. Unparseable input is kept
+// verbatim.
+func rateLimitKey(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return ip
+	}
+	addr = addr.Unmap().WithZone("")
+	if addr.Is4() {
+		return addr.String()
+	}
+	return netip.PrefixFrom(addr, 64).Masked().String()
+}
+
+// clientIP picks the source IP the limiter keys on.
 //
-// Proxy-trust model. The production deployment runs behind exactly
-// one proxy hop: Fly's edge layer. Fly strips any inbound
-// `Fly-Client-IP` header on the way in and sets its own value on the
-// way out to the app — so on every request reaching this handler,
-// `Fly-Client-IP` is the real client IP as observed at the Fly edge.
-// We trust it unconditionally for that reason.
-//
-// X-Forwarded-For is a fallback for non-Fly deployments (local dev,
-// a future move behind a different fronting CDN). We only accept the
-// single-value form: a multi-hop XFF chain requires picking the
-// "rightmost trusted" entry, and we don't currently configure that
-// trusted-proxy list. Picking the wrong index is a worse failure
-// mode (rate-limit bypass) than over-limiting one upstream proxy.
-//
-// If the API ever moves behind a CDN other than Fly (e.g. Cloudflare
-// in front of Fly), update this function to: (1) drop the
-// unconditional Fly-Client-IP trust, (2) add an allowlist of the new
-// proxy's source CIDRs, and (3) parse the new proxy's client-IP
-// header (e.g. `CF-Connecting-IP`) only when the request's
-// RemoteAddr is in that allowlist.
+// It trusts Fly-Client-IP, on the assumption that the only route to the
+// app is Fly's proxy and that the proxy overwrites any client-supplied
+// value. If the API is ever served any other way, that header becomes
+// client-controlled and this must change. X-Forwarded-For is never
+// trusted: without a proxy that rewrites it, a client could choose its
+// own bucket on every request.
 func clientIP(r *http.Request) string {
 	if v := r.Header.Get("Fly-Client-IP"); v != "" {
-		return strings.TrimSpace(v)
-	}
-	if v := r.Header.Get("X-Forwarded-For"); v != "" && !strings.Contains(v, ",") {
 		return strings.TrimSpace(v)
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -127,6 +142,69 @@ func writeRateLimited(w http.ResponseWriter, r *http.Request, retryAfterSec int,
 	w.Header().Set("Retry-After", strconv.Itoa(retryAfterSec))
 	writeProblem(w, r, http.StatusTooManyRequests, problemRateLimited,
 		"Too Many Requests",
-		"You have exceeded the submission rate limit for your IP address. Try again after the Retry-After interval.",
+		"Too many submissions have been received. Try again after the Retry-After interval.",
 		rid)
+}
+
+// pendingQueue reports whether the moderation queue holds maxPending or
+// more submissions. The answer is cached for pendingQueueCheckInterval
+// so a flood of POSTs costs one store query per interval.
+type pendingQueue struct {
+	subs       atlas.SubmissionStore
+	maxPending int
+	logger     *slog.Logger
+	nowFunc    func() time.Time
+
+	mu        sync.Mutex
+	checkedAt time.Time
+	isFull    bool
+}
+
+func newPendingQueue(subs atlas.SubmissionStore, maxPending int, logger *slog.Logger) *pendingQueue {
+	return &pendingQueue{subs: subs, maxPending: maxPending, logger: logger, nowFunc: time.Now}
+}
+
+// full fails open on a store error: the create that follows would hit
+// the same store, and refusing every submission over a transient read
+// error is the worse failure.
+func (q *pendingQueue) full(ctx context.Context) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	now := q.nowFunc()
+	if !q.checkedAt.IsZero() && now.Sub(q.checkedAt) < pendingQueueCheckInterval {
+		return q.isFull
+	}
+	items, err := q.subs.List(ctx, atlas.ListSubmissionsQuery{Status: atlas.SubmissionPending, Limit: q.maxPending})
+	if err != nil {
+		q.logger.ErrorContext(ctx, "pending queue check failed", "err", err)
+		q.isFull = false
+	} else {
+		q.isFull = len(items) >= q.maxPending
+	}
+	q.checkedAt = now
+	return q.isFull
+}
+
+// pendingQueueGuard refuses new submissions with a 429 while the
+// moderation queue is at maxPending, bounding what unreviewed
+// submissions can occupy on the shared volume.
+func pendingQueueGuard(subs atlas.SubmissionStore, maxPending int, logger *slog.Logger, m *Metrics) func(http.Handler) http.Handler {
+	q := newPendingQueue(subs, maxPending, logger)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !q.full(r.Context()) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			rid := requestIDFromContext(r.Context())
+			logger.WarnContext(r.Context(), "submission refused: pending queue full", "max_pending", maxPending, "rid", rid)
+			m.incRateLimit("submissions")
+			m.incSubmissions("rate_limited")
+			w.Header().Set("Retry-After", strconv.Itoa(int(rateLimitWindow.Seconds())))
+			writeProblem(w, r, http.StatusTooManyRequests, problemRateLimited,
+				"Too Many Requests",
+				"The moderation queue is full. Try again after the Retry-After interval.",
+				rid)
+		})
+	}
 }

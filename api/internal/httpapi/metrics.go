@@ -78,7 +78,7 @@ func NewMetrics() *Metrics {
 		rateLimit: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "atlas",
 			Name:      "rate_limit_hits_total",
-			Help:      "Total requests rejected by the per-IP rate limiter, by endpoint.",
+			Help:      "Total requests rejected by rate limiting (per-client, global, or full moderation queue), by endpoint.",
 		}, []string{"endpoint"}),
 		lookupResults: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "atlas",
@@ -288,16 +288,8 @@ func metricsMiddleware(m *Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			// LOAD-BEARING ORDERING: this type-assert succeeds only because
-			// loggingMiddleware is registered BEFORE metricsMiddleware in
-			// router.go's r.Use chain, so it wraps w in a *statusRecorder
-			// before this middleware sees it. We reuse that recorder (rather
-			// than allocate a second wrapper) so a request carries at most
-			// one. If the r.Use order is ever flipped the assert simply
-			// fails and we fall back to our own recorder below — still
-			// correct, just an extra allocation — but keep the ordering so
-			// the common path stays single-wrapper. See the matching note at
-			// the r.Use site in router.go.
+			// Reuse loggingMiddleware's recorder when it wraps this one, so
+			// a request carries one wrapper; wrap here otherwise.
 			rec, ok := w.(*statusRecorder)
 			if !ok {
 				rec = &statusRecorder{ResponseWriter: w, status: http.StatusOK}
@@ -309,8 +301,21 @@ func metricsMiddleware(m *Metrics) func(http.Handler) http.Handler {
 			if route == "" {
 				route = "unmatched"
 			}
-			m.httpRequests.WithLabelValues(route, r.Method, strconv.Itoa(rec.status)).Inc()
-			m.httpDuration.WithLabelValues(route, r.Method).Observe(time.Since(start).Seconds())
+			method := metricMethod(r.Method)
+			m.httpRequests.WithLabelValues(route, method, strconv.Itoa(rec.status)).Inc()
+			m.httpDuration.WithLabelValues(route, method).Observe(time.Since(start).Seconds())
 		})
+	}
+}
+
+// metricMethod clamps the request method to the set the API serves.
+// net/http accepts any method token and this middleware runs before
+// chi's 405, so the raw value would be unbounded label input.
+func metricMethod(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodOptions:
+		return method
+	default:
+		return "other"
 	}
 }

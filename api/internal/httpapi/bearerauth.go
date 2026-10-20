@@ -21,7 +21,7 @@ func bearerAuthMiddleware(adminToken string) func(http.Handler) http.Handler {
 	if adminToken == "" {
 		return func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				writeProblem(w, r, http.StatusServiceUnavailable, problemInternal,
+				writeProblem(w, r, http.StatusServiceUnavailable, problemAdminDisabled,
 					"Admin Endpoints Disabled",
 					"URBANIST_ADMIN_TOKEN is not configured on this server.",
 					requestIDFromContext(r.Context()))
