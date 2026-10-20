@@ -2822,9 +2822,12 @@ region_slugs = ["ab"]
 #
 # Bike Winnipeg is anchored at the CMA only, not mb: its own mission is
 # "a healthy, sustainable, and equitable city". The province floor is
-# held by Climate Action Team Manitoba and Green Action Centre, both
-# admitted 2026-10-20 under the multi-issue precedent (a broader
-# mission plus a named transit or streets program).
+# held by Climate Action Team Manitoba, admitted 2026-10-20 under the
+# multi-issue precedent (a broader mission plus a named transit or
+# streets program). Green Action Centre was considered and rejected
+# 2026-10-20: its transportation work is mainly promotion and
+# education (school travel, the Commuter Challenge, GoManitoba), not
+# advocacy, and it is already a member of Climate Action Team Manitoba.
 
 [[org]]
 slug = "climate-action-team-manitoba"
@@ -2834,16 +2837,6 @@ short_desc = "Coalition of Manitoba environmental organizations working on provi
 website_url = "https://climateactionmb.ca"
 contact_url = "https://climateactionmb.ca/contact/"
 tags = ["transit", "advocacy", "policy", "coalition", "climate"]
-region_slugs = ["mb"]
-
-[[org]]
-slug = "green-action-centre"
-added_at = 2026-10-20
-name = "Green Action Centre"
-short_desc = "Winnipeg-based environmental charity serving Manitoba since 1985. Its sustainable-transportation program runs Active and Safe Routes to School, School Streets, the Commuter Challenge and the province-wide GoManitoba commuting platform. Its 2026 municipal wish list calls for 30 km/h residential streets, more transit funding and funded walking and cycling networks."
-website_url = "https://greenactioncentre.ca"
-contact_url = "https://greenactioncentre.ca/connect"
-tags = ["transit", "walking", "cycling", "safe-streets", "advocacy", "education"]
 region_slugs = ["mb"]
 
 [[org]]
