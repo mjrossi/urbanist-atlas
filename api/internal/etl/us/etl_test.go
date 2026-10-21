@@ -152,7 +152,7 @@ func TestAssignMSASlugs_OverrideWins(t *testing.T) {
 }
 
 // TestBuildRegionRows_OverriddenMultiStateGetsPortions locks the unified
-// metro model (GitHub #79): an overridden multi-state CBSA (here NYC,
+// metro model: an overridden multi-state CBSA (here NYC,
 // spanning NY+NJ) generates one us:metro-portion per spanned state and the
 // portion anchor lookup, exactly like a non-overridden multi-state metro.
 // The override's curated slug/name and advocacy-node parent flow through
@@ -353,9 +353,7 @@ func TestWritePostalCodesCSV_MergesAndDedupsWithZCTAWinning(t *testing.T) {
 }
 
 func TestWritePostalCodesCSV_NilHUDPreservesZCTAOnlyBehavior(t *testing.T) {
-	// Pre-#7.5.5 callers (none post-merge, but defensive) can still
-	// pass nil for the HUD slice and get ZCTA-only output sorted by
-	// postal code.
+	// A nil HUD slice gives ZCTA-only output sorted by postal code.
 	zcta := []PostalAnchor{
 		{PostalCode: "20002", AnchorSlug: "washington-dc"},
 		{PostalCode: "10001", AnchorSlug: "manhattan"},

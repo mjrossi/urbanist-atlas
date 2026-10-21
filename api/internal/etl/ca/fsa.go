@@ -8,25 +8,16 @@ import (
 	"io"
 )
 
-// fsaRow is one entry from the StatsCan FSA boundary file's attribute
-// table. We keep only the fields we need for the smallest-anchor
-// crosswalk.
+// fsaRow is one entry from the FSA boundary file's DBF table.
 type fsaRow struct {
-	// CFSAUID is the 3-character Forward Sortation Area code (e.g.,
-	// "M5V"). The first letter encodes the province; the digit and
-	// trailing letter further subdivide.
+	// CFSAUID is the 3-character Forward Sortation Area code (e.g. "M5V").
 	CFSAUID string
-	// PRUID is the 2-digit Statistics Canada province/territory code
-	// (e.g., "35" for Ontario). Maps to a province slug via
-	// provinceUIDToSlug in mappings.go.
+	// PRUID is the 2-digit StatsCan province/territory code (e.g. "35").
 	PRUID string
 }
 
-// parseFSAs reads the StatsCan FSA boundary file zip (downloaded from
-// https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip)
-// and returns one fsaRow per FSA. The function parses only the DBF
-// attribute table inside the zip; the much-larger shapefile geometry
-// is ignored.
+// parseFSAs reads the FSA boundary zip's DBF table into one fsaRow per
+// FSA.
 func parseFSAs(zipPath string) ([]fsaRow, error) {
 	dbf, closer, err := openDBFFromZip(zipPath, ".dbf")
 	if err != nil {
@@ -53,9 +44,8 @@ func parseFSAs(zipPath string) ([]fsaRow, error) {
 	return rows, nil
 }
 
-// openDBFFromZip locates the first .dbf entry in zipPath, reads it
-// into memory (~150KB; trivial), and returns a dbfReader. The
-// returned closer must be called by the caller.
+// openDBFFromZip reads the first entry ending in ext into memory and
+// returns a reader over it. The caller must call the returned closer.
 func openDBFFromZip(zipPath, ext string) (*dbfReader, func(), error) {
 	zr, err := zip.OpenReader(zipPath)
 	if err != nil {

@@ -1,12 +1,11 @@
-// Package githubpr implements the asynchronous worker that opens a
-// GitHub pull request appending an approved submission to
-// api/seed/orgs.toml. The PR is the editorial-review surface — a
-// maintainer reviews/merges, the next API deploy rebuilds the
-// embedded seed bundle, and the org becomes visible.
+// Package githubpr is the asynchronous worker that opens a GitHub pull
+// request appending an approved submission to api/seed/orgs.toml. The PR
+// is the editorial-review surface; once merged, the next deploy ships the
+// org.
 //
-// The worker is intentionally a single goroutine consuming a buffered
-// channel: the design spec calls for serialized PR creation so
-// near-simultaneous approvals can't produce conflicting branches.
+// One goroutine consumes a buffered channel, so PRs are created one at a
+// time and near-simultaneous approvals can't produce conflicting
+// branches.
 package githubpr
 
 import (
@@ -28,42 +27,36 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// Default channel buffer. A moderator can't realistically approve more
-// than a handful at once; 32 is comfortable headroom.
+// defaultBufferSize is far more approvals than a moderator makes at once.
 const defaultBufferSize = 32
 
-// Config configures a Worker. Token is the fine-grained PAT scoped to
-// the urbanist-atlas repo only (Contents R/W + Pull requests R/W).
+// Config configures a Worker. Token is a fine-grained PAT scoped to the
+// repo (Contents and Pull requests read/write).
 type Config struct {
 	// HTTPClient defaults to http.DefaultClient if nil.
 	HTTPClient *http.Client
-	// BaseURL defaults to https://api.github.com. Tests inject an
-	// httptest.NewServer URL.
+	// BaseURL defaults to https://api.github.com.
 	BaseURL string
 	// Token is the GitHub PAT. Empty disables the worker: Enqueue
 	// returns atlas.ErrPromotionDisabled.
 	Token string
-	// Owner / Repo / BaseBranch identify the target. Defaults are
-	// mjrossi / urbanist-atlas / main.
+	// Owner / Repo / BaseBranch default to mjrossi / urbanist-atlas / main.
 	Owner      string
 	Repo       string
 	BaseBranch string
-	// SeedFilePath is the in-repo path the worker rewrites. Defaults
-	// to api/seed/orgs.toml.
+	// SeedFilePath defaults to api/seed/orgs.toml.
 	SeedFilePath string
-	// PersistResult is called after each job to record the PR URL or
-	// error on the submission row. Wired to
-	// atlas.SubmissionStore.AttachPromotionResult by serve.go.
+	// PersistResult records each job's PR URL or error on the submission
+	// row.
 	PersistResult func(ctx context.Context, publicID, prURL, prErr string) error
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
-	// BufferSize overrides the channel capacity. Zero = default.
+	// BufferSize overrides the channel capacity; zero means the default.
 	BufferSize int
 }
 
-// ErrBufferFull is returned by Enqueue when the job channel is full.
-// Practically unreachable at the project's volume but expressed so
-// the handler can persist a clear error rather than block.
+// ErrBufferFull is returned by Enqueue when the job channel is full,
+// rather than blocking the caller.
 var ErrBufferFull = errors.New("githubpr: enqueue buffer full")
 
 // ErrStopped is returned by Enqueue after Stop has begun.
@@ -73,9 +66,8 @@ var ErrStopped = errors.New("githubpr: worker stopped")
 type Worker struct {
 	cfg  Config
 	jobs chan atlas.Submission
-	// done closes when Run returns. Stop blocks on it (or on its
-	// own ctx) so callers know whether the goroutine actually
-	// drained or whether the deadline elapsed first.
+	// done closes when Run returns, so Stop can tell a drain from a
+	// deadline.
 	done chan struct{}
 	// mu guards stopped. Enqueue holds the read lock across its send so
 	// Stop can't close jobs between the check and the send.
@@ -86,7 +78,7 @@ type Worker struct {
 	inflight atomic.Pointer[string]
 }
 
-// New constructs a Worker. Run is what actually starts the goroutine.
+// New constructs a Worker; Run starts it.
 func New(cfg Config) *Worker {
 	if cfg.HTTPClient == nil {
 		cfg.HTTPClient = http.DefaultClient
@@ -119,10 +111,9 @@ func New(cfg Config) *Worker {
 	}
 }
 
-// Enqueue implements httpapi.PromotionEnqueuer. Returns atlas.ErrPromotionDisabled
-// when no token configured, ErrStopped once Stop has begun, and
-// ErrBufferFull when the channel is at capacity. Otherwise the job is
-// queued and processed by Run.
+// Enqueue queues sub for Run. It returns atlas.ErrPromotionDisabled
+// without a token, ErrStopped once Stop has begun, and ErrBufferFull when
+// the channel is at capacity.
 func (w *Worker) Enqueue(_ context.Context, sub atlas.Submission) error {
 	if w.cfg.Token == "" {
 		return atlas.ErrPromotionDisabled
@@ -172,29 +163,15 @@ func (w *Worker) processTracked(ctx context.Context, job atlas.Submission) {
 	w.process(ctx, job)
 }
 
-// shutdownDrainTimeout bounds a single job's process() during the
-// hard-cancel drain. The parent ctx is already canceled on this path,
-// so process() runs against a *detached* context (so the persist write
-// still lands) — but a detached context would otherwise re-derive
-// openPR's fresh 30s deadline, letting one wedged GitHub call pin
-// process exit for up to 30s. This tighter budget caps that: a slow
-// remote trips it, openPR returns ctx.Err(), and the row records the
-// failure for operator retry. Kept under openPRTimeout deliberately.
-//
-// A var, not a const, solely so the shutdown-drain test can shrink it;
-// production never reassigns it.
+// shutdownDrainTimeout bounds each job in the hard-cancel drain. Those
+// jobs run on a detached context so their result still persists, and
+// without this they would get openPR's full 30s each. It is a var only so
+// a test can shrink it.
 var shutdownDrainTimeout = 5 * time.Second
 
-// drainAndExit consumes any remaining jobs in the buffer with the
-// caveat that the parent ctx is already canceled — GitHub I/O will
-// fail fast, but the persist side will still record the error on
-// each affected row. Called only from the ctx-canceled branch of
-// Run; Stop's normal path goes through the channel-close branch.
-//
-// Each job is processed under a fresh, detached context bounded by
-// shutdownDrainTimeout (issue #25) so a wedged GitHub call can't pin
-// process exit past that budget regardless of openPR's own 30s
-// deadline.
+// drainAndExit runs the jobs left in the buffer after ctx is canceled,
+// each on a fresh context bounded by shutdownDrainTimeout, so every row
+// still records its outcome.
 func (w *Worker) drainAndExit() {
 	for {
 		select {
@@ -220,7 +197,7 @@ func (w *Worker) drainAndExit() {
 // buffered, for the operator to re-queue with `urbanist-atlas-server
 // submissions retry-pr`. The list is best-effort, because Run keeps
 // consuming the buffer concurrently. The submission row's
-// promoted_pr_url / promotion_error is the source of truth.
+// promotion_pr_url / promotion_error is the source of truth.
 func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
 	w.mu.Lock()
 	if !w.stopped {
@@ -235,10 +212,8 @@ func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
 		if id := w.inflight.Load(); id != nil {
 			droppedIDs = append(droppedIDs, *id)
 		}
-		// Drain whatever's still in the buffer for the operator log.
-		// Receives on a closed channel never block past the buffered
-		// count, so this terminates either via ok==false or via the
-		// default arm.
+		// Receives on a closed channel stop at the buffered count, so this
+		// terminates.
 		for {
 			select {
 			case job, ok := <-w.jobs:
@@ -255,8 +230,8 @@ func (w *Worker) Stop(ctx context.Context) (droppedIDs []string, err error) {
 
 // ProcessNow runs the PR-creation pipeline synchronously for a single
 // submission and returns the resulting PR URL or the wrapped error.
-// It does not call PersistResult: the caller (the retry-pr CLI) owns
-// persistence. Like Enqueue, it returns atlas.ErrPromotionDisabled when
+// It does not call PersistResult: the caller owns persistence. Like
+// Enqueue, it returns atlas.ErrPromotionDisabled when
 // Config.Token is empty.
 func (w *Worker) ProcessNow(ctx context.Context, sub atlas.Submission) (string, error) {
 	if w.cfg.Token == "" {
@@ -267,11 +242,8 @@ func (w *Worker) ProcessNow(ctx context.Context, sub atlas.Submission) (string, 
 
 func (w *Worker) process(ctx context.Context, sub atlas.Submission) {
 	prURL, err := w.openPR(ctx, sub)
-	// PersistResult runs against a detached context so a shutdown that
-	// cancels ctx mid-flight doesn't also cancel the SQLite write that
-	// records the PR URL or the promotion_error. Without this, an
-	// approval immediately before shutdown can vanish (no PR, no
-	// recorded error — operator sees nothing).
+	// Persist on a detached context: a shutdown that cancels ctx must
+	// not also cancel the write recording the PR URL or error.
 	persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if err != nil {
@@ -295,39 +267,16 @@ func (w *Worker) process(ctx context.Context, sub atlas.Submission) {
 		"submission_id", sub.PublicID, "url", prURL)
 }
 
-// openPRTimeout bounds the whole GitHub call-chain (get-ref →
-// get-contents → create-ref → put-contents → create-PR). Without it a
-// single hung remote call could pin the worker goroutine — and during
-// graceful shutdown, the worker's parent ctx — indefinitely. On expiry
-// the in-flight step's ctx is canceled, openPR returns a wrapped
-// deadline error, and process() persists it as the promotion_error
-// (no retry), matching the existing failure semantics.
+// openPRTimeout bounds the whole GitHub call chain, so one hung remote
+// call can't pin the worker, or shutdown, indefinitely. On expiry the
+// error is persisted like any other failure, with no retry.
 const openPRTimeout = 30 * time.Second
 
-// openPR runs the full pipeline against GitHub and returns the new
-// PR's html_url. Any step that fails returns a wrapped error.
-//
-// The work is bounded by openPRTimeout: a per-call deadline derived
-// from the caller's ctx (so an already-canceled parent still short-
-// circuits immediately). cancel is deferred so the derived ctx is
-// always released.
-//
-// Retry strategy — conservative, idempotency-first:
-//   - The GETs (getBranchSHA, getFile, findOpenPR) go through
-//     doIdempotentRequest, which retries retryable statuses (429, 502,
-//     503, secondary-rate-limit 403) with a bounded ctx-aware backoff.
-//     Retrying a GET has no side effects, so this is always safe.
-//   - createBranch is single-shot. If a prior attempt (retry-pr after a
-//     partial failure) left the deterministic submission branch behind,
-//     it force-resets that branch to the current base, so the put below
-//     sends a blob SHA that matches the branch and the result equals a
-//     fresh run.
-//   - putFile and createPR have no internal retry, because a blind
-//     retry of either could double-apply. A PUT contents with a stale
-//     blob SHA returns 409 and fails the job. createPR answers a 422
-//     with the open PR already on the branch, if there is one, so an
-//     operator retry after a run that opened the PR but never recorded
-//     it reports that PR instead of failing.
+// openPR runs the GitHub pipeline and returns the new PR's html_url.
+// Only the GETs retry (doIdempotentRequest), since a blind retry of a
+// mutation could double-apply. A branch left by an earlier attempt is
+// force-reset to the base, so the result equals a fresh run, and a 422
+// from createPR resolves to the PR already open on the branch.
 func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, openPRTimeout)
 	defer cancel()
@@ -343,12 +292,8 @@ func (w *Worker) openPR(ctx context.Context, sub atlas.Submission) (string, erro
 	}
 
 	slug := DeriveSlug(sub.Payload.Name)
-	// added_at is sourced from the approval clock — sub.ProcessedAt
-	// is stamped by atlas.SubmissionStore.Approve, which is the only
-	// pathway that enqueues a submission to the worker. If a future
-	// caller bypasses Approve and ProcessedAt is nil, fall back to
-	// the worker-local clock so the bundle still parses under the
-	// Phase 4 required-field check.
+	// ProcessedAt is the approval time; fall back to now so added_at is
+	// never empty.
 	addedAt := time.Now().UTC()
 	if sub.ProcessedAt != nil {
 		addedAt = sub.ProcessedAt.UTC()
@@ -393,12 +338,10 @@ func shortID(publicID string) string {
 	return clean[len(clean)-8:]
 }
 
-// branchSuffix returns 16 hex characters of the UUIDv7. The first 12
-// are the millisecond timestamp + the first random bits, so two
-// approvals in the same millisecond still get distinct branch names;
-// the extra 4 keep the suffix long enough that a future jump back to
-// 8-char shortID-style names won't collide with anything already in
-// the remote.
+// branchSuffix returns the first 16 hex characters of the UUIDv7: the
+// millisecond timestamp, the version nibble and the 12-bit rand_a, which
+// google/uuid fills with a per-process sequence, so submissions created
+// in the same millisecond still get distinct branches.
 func branchSuffix(publicID string) string {
 	clean := strings.ReplaceAll(publicID, "-", "")
 	if len(clean) < 16 {
@@ -483,26 +426,18 @@ func (w *Worker) doRequest(ctx context.Context, method, path string, body any) (
 	return w.cfg.HTTPClient.Do(req)
 }
 
-// Retry tuning. GitHub's transient failures (502/503 from the edge,
-// 429/secondary-rate-limit 403 from abuse detection) usually clear in
-// well under a second, so a handful of attempts with a short, growing
-// backoff is plenty. The whole chain is still bounded by openPRTimeout
-// (the ctx deadline), so these numbers are an upper bound on attempts,
-// not on wall-clock — a slow remote just trips the deadline mid-sleep
-// and returns ctx.Err().
+// Retry tuning. GitHub's transient failures usually clear in well under
+// a second. openPRTimeout still bounds the wall clock: a slow remote
+// trips the deadline mid-sleep.
 const (
 	retryMaxAttempts = 4 // 1 initial try + up to 3 retries
 	retryBaseBackoff = 250 * time.Millisecond
 )
 
-// retryableStatus reports whether an HTTP status warrants a retry of an
-// idempotent request. 429 (rate limited), 502 (bad gateway) and 503
-// (service unavailable) are unambiguously transient. 403 is overloaded:
-// GitHub returns it for both hard authorization failures (never retry)
-// and *secondary rate limits* (retry) — the latter is signaled by a
-// Retry-After header or a body that mentions a rate limit, which
-// isSecondaryRateLimit inspects. Plain 4xx (404, 422, 409) are caller
-// state and never retried.
+// retryableStatus reports whether a status is plainly transient (429,
+// 502, 503). A 403 can be a hard authorization failure or a secondary
+// rate limit, so doIdempotentRequest classifies it with
+// isSecondaryRateLimit instead.
 func retryableStatus(status int) bool {
 	switch status {
 	case http.StatusTooManyRequests, // 429
@@ -514,13 +449,10 @@ func retryableStatus(status int) bool {
 	}
 }
 
-// isSecondaryRateLimit distinguishes a retryable GitHub secondary-rate-
-// limit 403 from a terminal authorization 403. GitHub flags the former
-// with a Retry-After header and/or a body containing "secondary rate
-// limit" / "rate limit" (see GitHub REST API "Rate limits" docs). body
-// is the already-read response body (doIdempotentRequest buffers it so it
-// can be classified here and still restored for apiError on the no-retry
-// path).
+// isSecondaryRateLimit reports whether a 403 is a retryable rate limit
+// rather than an authorization failure. GitHub signals one with
+// Retry-After, X-RateLimit-Remaining: 0, or a body mentioning a rate
+// limit. body is the already-buffered response body.
 func isSecondaryRateLimit(resp *http.Response, body []byte) bool {
 	if resp.StatusCode != http.StatusForbidden {
 		return false
@@ -528,27 +460,16 @@ func isSecondaryRateLimit(resp *http.Response, body []byte) bool {
 	if resp.Header.Get("Retry-After") != "" {
 		return true
 	}
-	// x-ratelimit-remaining: 0 is GitHub's primary-rate-limit signal on a
-	// 403. We treat it as retryable but deliberately do NOT consult
-	// x-ratelimit-reset: a primary limit can reset up to an hour out, far
-	// beyond our bounded backoff, so honoring the reset would just mean
-	// failing immediately. Retrying instead is cheap (still capped by
-	// retryMaxAttempts and the openPRTimeout ctx deadline) and costs only a
-	// few hundred ms before the same terminal error the operator would
-	// retry anyway — while transparently recovering the case where
-	// remaining:0 coincides with a short, self-clearing secondary limit
-	// that set no Retry-After header.
+	// A primary limit's reset can be an hour out, so it is not consulted:
+	// retrying costs a few hundred ms and recovers a short secondary limit
+	// that set no Retry-After.
 	if resp.Header.Get("X-RateLimit-Remaining") == "0" {
 		return true
 	}
 	return strings.Contains(strings.ToLower(string(body)), "rate limit")
 }
 
-// backoffSleep waits for d or until ctx is canceled, whichever comes
-// first. Returns ctx.Err() if the context fired so the retry loop can
-// abort instead of sleeping out a doomed request. Uses a timer (not
-// time.Sleep) precisely so cancellation is honored mid-backoff — a
-// wedged GitHub call during graceful shutdown must not pin the worker.
+// backoffSleep waits for d, or returns ctx.Err() as soon as ctx is done.
 func backoffSleep(ctx context.Context, d time.Duration) error {
 	t := time.NewTimer(d)
 	defer t.Stop()
@@ -560,31 +481,21 @@ func backoffSleep(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// doIdempotentRequest issues an idempotent (GET) request via doRequest
-// and retries it on retryable statuses with a bounded, ctx-aware
-// backoff. It is ONLY safe for requests with no side effects: a retried
-// GET is harmless, a retried mutation is not (see openPR's notes on why
-// createBranch/putFile/createPR stay single-shot).
-//
-// On the terminal attempt — success, a non-retryable status, a
-// transport error, or exhausted attempts — it returns the live
-// *http.Response with its Body intact for the caller to decode or pass
-// to apiError. On a retryable status it drains+closes the body before
-// sleeping so the connection can be reused, then tries again.
+// doIdempotentRequest sends a side-effect-free request, retrying
+// retryable statuses with a bounded backoff. The final response comes
+// back with its Body intact for the caller to decode or pass to
+// apiError.
 func (w *Worker) doIdempotentRequest(ctx context.Context, method, path string) (*http.Response, error) {
 	for attempt := 1; ; attempt++ {
 		resp, err := w.doRequest(ctx, method, path, nil)
 		if err != nil {
-			// Transport error: not classifiable as a status. Surface it
-			// immediately — http.Client already retried idempotent
-			// connection failures internally, and ctx cancellation
-			// arrives here too.
+			// http.Client already retried idempotent connection failures, and
+			// ctx cancellation lands here too.
 			return nil, err
 		}
 		retryable := retryableStatus(resp.StatusCode)
 		if resp.StatusCode == http.StatusForbidden {
-			// Buffer the body so we can classify the 403 and still hand a
-			// readable body to apiError on the no-retry path.
+			// Buffer the body so apiError can still read it.
 			buf, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 			_ = resp.Body.Close()
 			resp.Body = io.NopCloser(bytes.NewReader(buf))
@@ -593,8 +504,7 @@ func (w *Worker) doIdempotentRequest(ctx context.Context, method, path string) (
 		if !retryable || attempt >= retryMaxAttempts {
 			return resp, nil
 		}
-		// Drain + close so the keep-alive connection is reusable, then
-		// back off before the next attempt.
+		// Drain so the keep-alive connection is reusable.
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 		_ = resp.Body.Close()
 		backoff := retryBaseBackoff * time.Duration(1<<(attempt-1))
@@ -604,13 +514,8 @@ func (w *Worker) doIdempotentRequest(ctx context.Context, method, path string) (
 	}
 }
 
-// expectStatus closes nothing — the caller owns resp.Body via defer —
-// but it consolidates the "did GitHub return the status I wanted?"
-// check that every plumbing method repeated. On a status mismatch it
-// returns the shared apiError (op + status + truncated body); on a
-// match it returns nil so the caller can proceed to decode. want is
-// the single accepted status; methods that accept two (putFile) keep
-// their own inline check.
+// expectStatus returns apiError unless resp has status want. It leaves
+// resp.Body to the caller.
 func expectStatus(resp *http.Response, want int, op string) error {
 	if resp.StatusCode != want {
 		return apiError(op, resp)
@@ -802,12 +707,8 @@ func (w *Worker) findOpenPR(ctx context.Context, head, base string) (string, err
 }
 
 func apiError(op string, resp *http.Response) error {
-	// Best-effort body read, capped so a pathological response can't
-	// balloon the error string. The status code is the load-bearing
-	// signal; the body is diagnostic context. A read error here is
-	// non-fatal — whatever bytes arrived before it are still included —
-	// but we surface a marker (issue #27) so a truncated/failed read
-	// isn't silently indistinguishable from an empty body.
+	// The status is the signal and the capped body is context; a read
+	// error is marked so it can't pass for an empty body.
 	buf, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	body := strings.TrimSpace(string(buf))
 	if readErr != nil {

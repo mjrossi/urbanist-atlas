@@ -340,22 +340,11 @@ func testListRegionsFiltersNationalInDescendantWalk(t *testing.T, factory Factor
 	}
 }
 
-// testListRegionsDirectOrgCountExcludesDescendantOrgs pins the
-// editorial-totals contract: OrgCount walks the DAG downward and
-// includes descendant attachments, while DirectOrgCount counts only
-// orgs attached to the row itself. A regression that collapses the two
-// would silently double-count any org surfacing under both a metro and
-// one of its child cities — exactly what the SPA's Browse totals avoid
-// by summing DirectOrgCount instead of OrgCount.
-// testStatsCountsOrgsInvisibleToListRegions pins the regression this
-// method exists for. Summing RegionSummary.DirectOrgCount over
-// ListRegions omits every org attached solely to a non-browse-kind
-// region (states, provinces, boroughs, multi-state coalitions) — that
-// is how the production frontend came to report 166 orgs against a
-// 236-org catalog. Stats must count all of them.
-//
-// The fixture also covers the opposite failure mode: an org attached
-// to two browseable regions must count ONCE, not twice.
+// testStatsCountsOrgsInvisibleToListRegions pins why Stats exists:
+// summing RegionSummary.DirectOrgCount over ListRegions omits every org
+// attached only to a non-browse kind (states, provinces, boroughs,
+// multi-state coalitions). It also checks that an org attached to two
+// browseable regions counts once.
 func testStatsCountsOrgsInvisibleToListRegions(t *testing.T, factory Factory) {
 	store, seed, teardown := factory(t)
 	defer teardown()
@@ -385,18 +374,18 @@ func testStatsCountsOrgsInvisibleToListRegions(t *testing.T, factory Factory) {
 		Country: "PT", ScopeTier: atlas.ScopeNational, SortPriority: 90,
 	})
 
-	// Attached to a browseable city — visible to the old sum.
+	// Attached to a browseable city — visible to a ListRegions sum.
 	seed.SeedOrg(t, atlas.Org{
 		ID: 100, Slug: "city-org", Name: "City Org",
 		ShortDesc: "test", WebsiteURL: "https://example.test",
 	}, []int64{2})
-	// Attached ONLY to a state — invisible to the old sum. The bug.
+	// Attached ONLY to a state — invisible to a ListRegions sum.
 	seed.SeedOrg(t, atlas.Org{
 		ID: 101, Slug: "statewide-org", Name: "Statewide Org",
 		ShortDesc: "test", WebsiteURL: "https://example.test",
 	}, []int64{3})
-	// Attached to TWO browseable regions — the old sum double-counted
-	// this shape, which is why the frontend used DirectOrgCount.
+	// Attached to TWO browseable regions — a per-region sum counts it
+	// twice.
 	seed.SeedOrg(t, atlas.Org{
 		ID: 102, Slug: "two-region-org", Name: "Two Region Org",
 		ShortDesc: "test", WebsiteURL: "https://example.test",
@@ -423,10 +412,8 @@ func testStatsCountsOrgsInvisibleToListRegions(t *testing.T, factory Factory) {
 		t.Errorf("TotalOrgCount = %d, want 4 (statewide org counted, national excluded, two-region org counted once)", stats.TotalOrgCount)
 	}
 
-	// Guard the actual regression by org identity, not by arithmetic:
-	// prove statewide-org is unreachable through ListRegions, so a
-	// future refactor can't quietly revert to deriving the total from
-	// that list.
+	// Check by org identity, not arithmetic, that statewide-org is
+	// unreachable through ListRegions.
 	//
 	// Deliberately not asserting sum(DirectOrgCount) < TotalOrgCount —
 	// in this fixture two-region-org's double-count cancels
@@ -483,6 +470,10 @@ func testStatsCountsOrgsInvisibleToListRegions(t *testing.T, factory Factory) {
 	}
 }
 
+// testListRegionsDirectOrgCountExcludesDescendantOrgs pins that OrgCount
+// includes descendant attachments while DirectOrgCount counts only orgs
+// attached to the row itself, so summing DirectOrgCount can't count an
+// org under both a metro and its city.
 func testListRegionsDirectOrgCountExcludesDescendantOrgs(t *testing.T, factory Factory) {
 	store, seed, teardown := factory(t)
 	defer teardown()

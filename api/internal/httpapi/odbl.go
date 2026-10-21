@@ -7,33 +7,19 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/internal/httpapi/oapi"
 )
 
-// dataLicense is the SPDX identifier of the Urbanist Atlas dataset
-// license. The source of truth for the license itself is
-// LICENSE-DATA at the repo root; this constant only echoes the
-// identifier into response headers and the collection-meta envelope.
+// dataLicense is the SPDX identifier of the dataset license; LICENSE-DATA
+// at the repo root is the license itself.
 const dataLicense = "ODbL-1.0"
 
-// dataAttributionURL is the URL downstream consumers should link to
-// when crediting the source. Hardcoded here so the production
-// frontend domain is the canonical attribution target even if a
-// future config field overrides the CORS origins or the serving host.
+// dataAttributionURL is the link consumers credit. It is hardcoded so the
+// production domain stays the attribution target whatever host serves
+// the API.
 const dataAttributionURL = "https://urbanistatlas.com"
 
-// odblHeadersMiddleware sets the two attribution headers on every
-// response that passes through it. Mount inside the /api/v1 route
-// group so /healthz (which is not a data endpoint) stays clean.
-//
-// Ordering note: headers MUST be set BEFORE delegating to
-// next.ServeHTTP. Once a downstream handler calls
-// w.WriteHeader (explicitly or implicitly via the first w.Write),
-// net/http freezes the response header map and flushes it onto the
-// wire — any Set call after that point is a silent no-op. Setting
-// them up-front guarantees the X-Data-License / X-Data-Attribution
-// pair lands on both success responses AND error responses
-// (writeProblem also calls WriteHeader, which would otherwise lock
-// the headers before this middleware got its chance). Decorating the
-// response with attribution on a 4xx/5xx is harmless — see slice #24
-// spec §1 for the rationale.
+// odblHeadersMiddleware sets the attribution headers on every response
+// it wraps, errors included. Headers are set before next runs because net/http
+// ignores header changes after the first WriteHeader. See
+// docs/superpowers/specs/2026-05-18-odbl-response-shape-design.md.
 func odblHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -43,16 +29,9 @@ func odblHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// newMeta returns the meta block for a single response: license,
-// attribution URL, and a fresh UTC timestamp truncated to seconds.
-//
-// `GeneratedAt` is truncated before marshaling. Go's default
-// `time.Time` JSON encoder uses RFC3339Nano, which emits sub-second
-// digits when present; truncating to whole seconds drops the
-// fractional component on the wire — a zero-nanosecond UTC time
-// round-trips through RFC3339Nano as "...Z" with no '.'. The slice
-// #24 spec mandates second precision. There is no caching layer in
-// v1; the timestamp records when this response was produced.
+// newMeta returns the meta block for one response. GeneratedAt is
+// truncated to whole seconds, the precision the ODbL design sets,
+// because time.Time marshals as RFC3339Nano.
 func newMeta() oapi.Meta {
 	return oapi.Meta{
 		License:        dataLicense,
@@ -61,19 +40,8 @@ func newMeta() oapi.Meta {
 	}
 }
 
-// respondCollection writes a JSON `{ meta, data }` envelope for a
-// list response. Use this from any collection handler instead of
-// writeJSON; single-resource handlers continue to use writeJSON.
-//
-// T uses generics so the call site keeps its typed slice (e.g.
-// []oapi.RegionSummary) without an explicit any conversion. The
-// helper encodes whatever T is, so adding a new collection
-// endpoint is one call-site change plus a new *Envelope schema in
-// openapi.yaml.
-//
-// A nil input slice is coerced to an empty slice so the encoded
-// JSON has `"data": []`, never `"data": null`. Downstream clients
-// can rely on `data` always being an array.
+// respondCollection writes the `{ meta, data }` envelope that every
+// collection endpoint uses. A nil slice encodes as `"data": []`.
 func respondCollection[T any](w http.ResponseWriter, items []T) {
 	body := struct {
 		Meta oapi.Meta `json:"meta"`

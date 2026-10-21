@@ -2,45 +2,15 @@ package atlas
 
 import "sort"
 
-// BucketOrgsByScope splits a set of approved orgs into Local, Regional,
-// and Statewide buckets given the set of regions in scope for a query.
-// The rule (shared with /lookup), in precedence order:
+// BucketOrgsByScope splits orgs into Local, Regional, and Statewide by
+// the regions of theirs that are in inScope. An org with any local-tier
+// match is Local; else one with any state-equivalent match (IsStateKind)
+// is Statewide; else it is Regional. Orgs with no match are dropped.
 //
-//   - if any of an org's matched attachment regions has
-//     scope_tier='local', the org is Local;
-//   - else if any matched region is a state-equivalent kind
-//     (IsStateKind: us:state, us:territory, ca:province, ca:territory),
-//     the org is Statewide;
-//   - else (only sub-state regional matches: metro/CMA/regional-
-//     district/transit-federation/multi-state) it's Regional.
-//
-// Orgs whose attachments don't intersect inScope at all are dropped.
-//
-// The Statewide split is derived from region kind, not a new scope_tier
-// value — the closed scope_tier enum (local/regional/national) is
-// unchanged. Local precedence means editorial city-state overrides
-// (Berlin: kind=de:land but scope_tier=local) correctly stay Local and
-// never reach the IsStateKind test. Multi-state coalitions
-// (us:multi-state) are intentionally NOT state-equivalent, so they stay
-// Regional. See state_kinds.go for the editorial set.
-//
-// Each returned Org has its MatchedRegionSlugs populated with the slugs
-// of the in-scope attachment regions that caused it to surface. Useful
-// for "Matched via X" affordances in the SPA.
-//
-// Each bucket is sorted by (min sort_priority of matched regions asc,
-// org.Name asc) — narrower-scope matches surface first within a
-// bucket, alphabetic tiebreak.
-//
-// Callers:
-//   - Lookup: inScope = leaf + ancestors (upward walk from a postal
-//     code's leaf region).
-//   - GetRegion: inScope = focus + descendants + rolled-up metros
-//     (rollup_states). Ancestors are used only for the breadcrumb, never
-//     for org scope.
-//
-// inScope must already have national-tier regions filtered out — the
-// function trusts the caller's editorial gate.
+// Each org's MatchedRegionSlugs is set to its matched regions, and each
+// bucket is sorted by lowest matched sort_priority, then Name. inScope
+// must already exclude national-tier regions. See docs/region-graph.md,
+// "Open vocabulary", for why the tiers fall where they do.
 func BucketOrgsByScope(inScope map[int64]Region, orgs []Org) (local, regional, statewide []Org) {
 	var localBuckets, regionalBuckets, statewideBuckets []scopeBucketed
 	for _, org := range orgs {

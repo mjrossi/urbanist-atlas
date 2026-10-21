@@ -1,52 +1,9 @@
 package atlas
 
-// stateKinds names the region kinds that count as "state-equivalent" —
-// the top administrative tier a postal code rolls up into (state,
-// province). Used by BucketOrgsByScope to split the Regional bucket
-// into a sub-state Regional tier (metro/CMA/regional-district/transit-
-// federation) and a Statewide tier, so /lookup can present "Local",
-// "Regional", and "State / Provincial" sections distinctly.
-//
-// Like metroKinds in metro_kinds.go, this is an explicit editorial set
-// — the map is the source of truth, not a derivation from
-// sort_priority. A band test (sort_priority == 60) would couple the
-// presentational tier to an ordering hint §9 explicitly frames as a
-// hint; a kind set is self-documenting and immune to band reshuffles.
-//
-// In (v1, US + CA only):
-//   - us:state     — the 50 states
-//   - us:territory — Puerto Rico (parent of its own metros; a
-//     territory-wide org sits above any single metro)
-//   - ca:province  — the 10 provinces
-//   - ca:territory — Yukon, NWT, Nunavut (Canada groups these with
-//     provinces: "provinces and territories")
-//
-// Future markets add their top-admin kind here when they ship with
-// data: de:land, uk:nation, pt:nuts-ii, pt:regiao-autonoma, au:state.
-// NOT included by design:
-//   - us:federal-district — DC is a city-state: the district is
-//     coextensive with one city and one metro, and colloquially DC
-//     advocacy is either city-scale ("local") or DMV-scale ("the
-//     DMV" — the regional framing locals use), never "statewide": DC
-//     is emphatically not a state. The seed already splits it across two
-//     nodes: washington-dc (a us:city local leaf, where DC ZIPs
-//     anchor) and dc (the district, parent of washington-dc-metro). A
-//     city-scale DC org tags the local leaf → Local; a DMV org tags
-//     the metro → Regional. Promoting the kind here would yank every
-//     DMV-tagged org (e.g. Greater Greater Washington) into "State /
-//     Provincial", so the district stays Regional and the slug choice
-//     does the local/regional split.
-//   - us:multi-state — multi-state coalitions (NYC Tri-State,
-//     Chicagoland) are broader than a single state but are advocacy
-//     federations, not a top-admin tier; they stay in Regional
-//     (editorial ruling). Excluding the kind here is the entire
-//     mechanism, so the decision is trivially reversible.
-//   - de:land for city-states (Berlin, Hamburg, Bremen) does NOT
-//     misfire even though de:land is state-equivalent: city-states are
-//     editorially scope_tier='local' (sort 15), so their orgs hit the
-//     Local branch in BucketOrgsByScope first and never reach the
-//     statewide test. Local precedence shields them.
-//   - metros, counties, boroughs, transit federations, national tier.
+// stateKinds is the editorial set of state-equivalent (top
+// administrative tier) kinds: BucketOrgsByScope puts an org matched at
+// one of them in the Statewide tier. DC and multi-state coalitions are
+// deliberately out; see docs/region-graph.md, "Presentational kind sets".
 var stateKinds = map[RegionKind]bool{
 	"us:state":     true,
 	"us:territory": true,
@@ -55,15 +12,12 @@ var stateKinds = map[RegionKind]bool{
 }
 
 // IsStateKind reports whether k is one of the state-equivalent (top
-// administrative tier) kinds. The unknown empty string returns false.
+// administrative tier) kinds.
 func IsStateKind(k RegionKind) bool { return stateKinds[k] }
 
 // IsRollupTargetKind reports whether k may be named in a region's
-// rollup_states — the state-equivalent kinds plus us:federal-district.
-// DC (us:federal-district) is deliberately NOT state-equivalent for
-// bucketing (a DMV org stays Regional, see stateKinds), but it IS a
-// valid rollup target so the bi-state Washington metro can surface its
-// own orgs on the /dc detail page. The unknown empty string returns false.
+// rollup_states: the state-equivalent kinds plus us:federal-district, so
+// the multi-state Washington metro can surface its own orgs on /dc.
 func IsRollupTargetKind(k RegionKind) bool {
 	return stateKinds[k] || k == "us:federal-district"
 }

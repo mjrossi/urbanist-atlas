@@ -37,7 +37,7 @@ func newBrowseFixture() *MemStore {
 	s.AddRegion(Region{ID: 21, Kind: "ca:cma", Name: "Toronto CMA", Slug: "toronto-cma", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ontario"}})
 	s.AddRegion(Region{ID: 20, Kind: "ca:city", Name: "Toronto", Slug: "toronto-on", Country: CountryCA, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"toronto-cma"}})
 
-	// National-tier region (modeled after PT's pt-nacional from slice #4.6).
+	// National-tier region (modeled after PT's pt-nacional).
 	s.AddRegion(Region{ID: 99, Kind: "pt:nacional", Name: "Portugal (national)", Slug: "pt-nacional", Country: Country("PT"), ScopeTier: ScopeNational, SortPriority: 100})
 
 	t0 := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)

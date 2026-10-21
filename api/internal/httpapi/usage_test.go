@@ -302,12 +302,8 @@ func (s stubUsageReader) ListUsage(context.Context, atlas.UsageQuery) ([]atlas.U
 }
 
 func TestUsage_UnparseableDayIsSkippedNotFatal(t *testing.T) {
-	// A row whose day won't parse means the table was written by
-	// something other than the recorder — a hand-edited sqlite3 session
-	// or a restored backup. Failing the whole read would 500 the
-	// endpoint until the row is removed, which the digest swallows
-	// behind continue-on-error: two blank sections and a green run. The
-	// good rows must still come back.
+	// A row whose day won't parse (hand edit, restored backup) must be
+	// skipped, not 500 the read; the good rows still come back.
 	srv, _ := newUsageTestServer(t, func(c *Config) {
 		c.UsageCounts = stubUsageReader{rows: []atlas.UsageCount{
 			{Day: "2026-08-01", Kind: usage.KindRegionView, Key: "boston", Count: 9},

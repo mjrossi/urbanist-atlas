@@ -5,25 +5,14 @@ import (
 	"fmt"
 )
 
-// Lookup is the core search operation: given a postal code, return the
-// local + regional organizations advocating in that area.
-//
-// Algorithm (per docs/superpowers/specs/2026-05-16-region-graph-design.md):
-//  1. ResolveLeafRegion(country, code) → leaf Region; 404 if unknown.
-//  2. AncestorRegions(leafID) → []Region (leaf + all transitive parents).
-//  3. OrgsForRegions(ancestorIDs) → []Org with each org's full
-//     attachment list populated.
-//  4. BucketOrgsByScope splits orgs into Local / Regional / Statewide
-//     by the scope_tier and kind of the matched attachment region
-//     (shared with GetRegion, which walks both directions instead of
-//     just up).
+// Lookup returns the organizations advocating at a postal code: the orgs
+// attached to its leaf region or any ancestor, bucketed by
+// BucketOrgsByScope. An unknown code yields an error wrapping
+// ErrPostalCodeNotFound.
 func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, error) {
 	leaf, err := store.ResolveLeafRegion(ctx, query.Country, query.PostalCode)
 	if err != nil {
-		// Wrap so log lines (and any outer errors.Wrap chain) show the
-		// resolve step alongside the underlying message. errors.Is still
-		// finds atlas.ErrPostalCodeNotFound through the wrap, so the
-		// HTTP layer's 404 mapping is preserved.
+		// errors.Is still finds ErrPostalCodeNotFound through the wrap.
 		return LookupResult{}, fmt.Errorf("atlas: resolve postal code: %w", err)
 	}
 
@@ -56,28 +45,10 @@ func Lookup(ctx context.Context, store Store, query LookupQuery) (LookupResult, 
 	}, nil
 }
 
-// placeLabel returns a human-readable header derived from the ancestry.
-// Format: "<leaf>, <inner-ancestor> — <broad-ancestor>".
-// Segments without content are dropped; the SPA can roll its own from
-// ResolvedAncestry if it wants something different.
-//
-// Ancestor picks:
-//
-//   - broad: the most-specific IsMetroKind ancestor (us:metro, ca:cma,
-//     ca:regional-district, pt:area-metropolitana). If no metro-kind
-//     ancestor exists, falls back to the first regional ancestor —
-//     handles transit federations (Berlin's VBB) and other non-metro
-//     regional contexts.
-//   - inner: the first non-leaf ancestor that is *below* state tier
-//     (sort_priority < 60) and distinct from broad. Captures local
-//     civic context — NYC for borough leaves, Berlin for Mitte,
-//     Cook County for a Chicago neighborhood. State, multi-state,
-//     and the broad slot itself are excluded so the label doesn't
-//     repeat itself or pad with administrative geography.
-//
-// Both NYC (regional, kind us:city) and Berlin (local, kind de:land)
-// land in the inner slot via the sort_priority < 60 test — they're
-// sub-state-tier intermediate civic units regardless of scope_tier.
+// placeLabel formats the ancestry as "<leaf>, <inner> — <broad>",
+// dropping empty slots. The inner slot is chosen by sort_priority rather
+// than scope_tier, so NYC (regional) and Berlin (local) both qualify as
+// sub-state civic units.
 func placeLabel(ancestry []Region) string {
 	if len(ancestry) == 0 {
 		return ""
@@ -98,15 +69,9 @@ func placeLabel(ancestry []Region) string {
 	}
 }
 
-// pickBroadAncestor selects placeLabel's "broad" slot: the most-specific
-// metro-kind ancestor, or — when no metro-kind ancestor exists — the
-// first regional-tier ancestor (so transit federations and other
-// non-metro regional contexts still fill the slot). Scans ancestry[1:]
-// (skipping the leaf). Returns nil when neither match exists.
-//
-// r := ancestry[i] inside each loop body is a fresh local each iteration
-// — taking &r is safe and escapes to the heap, so the caller keeps a
-// valid pointer after the return.
+// pickBroadAncestor selects placeLabel's "broad" slot: the closest
+// metro-kind ancestor, else the closest regional-tier one (a transit
+// federation such as Berlin's VBB), else nil.
 func pickBroadAncestor(ancestry []Region) *Region {
 	for i := 1; i < len(ancestry); i++ {
 		r := ancestry[i]
@@ -123,13 +88,9 @@ func pickBroadAncestor(ancestry []Region) *Region {
 	return nil
 }
 
-// pickInnerAncestor selects placeLabel's "inner" slot: the first
-// non-leaf ancestor below state tier (SortPriority < 60) that is
-// distinct from the leaf and the already-chosen broad slot, so the label
-// captures local civic context (NYC for a borough, Cook County for a
-// Chicago neighborhood) without repeating the broad slot or padding with
-// state/multi-state geography. broad may be nil. Returns nil when no
-// such ancestor exists.
+// pickInnerAncestor selects placeLabel's "inner" slot: the closest
+// ancestor below state tier (SortPriority < 60) other than the leaf and
+// broad, e.g. NYC for a borough. broad may be nil.
 func pickInnerAncestor(ancestry []Region, leaf Region, broad *Region) *Region {
 	for i := 1; i < len(ancestry); i++ {
 		r := ancestry[i]
@@ -139,7 +100,7 @@ func pickInnerAncestor(ancestry []Region, leaf Region, broad *Region) *Region {
 		if broad != nil && r.Slug == broad.Slug {
 			continue
 		}
-		if r.SortPriority >= 60 { // state-tier or higher: excludes state/multi-state.
+		if r.SortPriority >= 60 { // state tier and above
 			continue
 		}
 		return &r

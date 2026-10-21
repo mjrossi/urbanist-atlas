@@ -1,21 +1,14 @@
-// Package usage records daily aggregate usage counts — content
-// popularity and lookup outcomes — as the durable record behind the
-// monthly usage digest.
+// Package usage records daily aggregate usage counts (content popularity
+// and lookup outcomes) behind the monthly usage digest.
 //
-// It is the batched sibling of internal/coverage. Where coverage writes
-// each sampled row in its own goroutine (rare events, one row each),
-// usage counts arrive on every read request, so they accumulate in
-// memory and flush on an interval. SQLite then sees one small
-// transaction per interval regardless of traffic, and the usage path
-// can never contend with the submission write path over the shared
-// single connection.
-//
-// Buffering in RAM is safe because fly.toml pins the app to one machine
-// with auto_stop_machines=false — the same assumption the in-process
-// rate limiter and the GitHub PR worker queue already document. Worst
-// case on an ungraceful kill is losing one interval of counts, which is
-// acceptable for usage analytics and is deliberately NOT the tradeoff
-// made for submissions.
+// Unlike internal/coverage, which writes rare sampled events one at a
+// time, usage counts arrive on every read request, so they accumulate in
+// memory and flush on an interval: SQLite sees one small transaction per
+// interval whatever the traffic, and never contends with submissions for
+// the single connection. Buffering in RAM relies on fly.toml running one
+// machine that is never auto-stopped; an ungraceful kill loses at most
+// one interval of counts, acceptable for analytics but not for
+// submissions.
 package usage
 
 import (
@@ -27,8 +20,8 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// Bucket kinds. These are the only values written to usage_daily.kind,
-// and they must match the CHECK constraint in migration 0003.
+// Bucket kinds: the only values written to usage_daily.kind. They must
+// match the CHECK constraint in migration 0003.
 const (
 	KindRegionView    = "region_view"
 	KindOrgView       = "org_view"
@@ -45,30 +38,24 @@ const dayFormat = "2006-01-02"
 // stall process exit.
 const flushTimeout = 5 * time.Second
 
-// maxKeyLen and maxBufferedKeys are defense in depth, not the primary
-// guard. Every caller is supposed to pass a canonical slug or a bounded
-// enum value (see the Kind* docs), so neither bound should ever be
-// reached in normal operation. They exist so that a future caller that
-// forgets and passes raw request input cannot turn the buffer into an
-// unbounded allocation or write oversized rows into a WITHOUT ROWID
-// table on the shared 1 GiB volume. Over-long keys and overflow past the
-// cap are dropped, not truncated: a truncated key would silently merge
-// distinct buckets, which is worse than losing a count.
+// maxKeyLen and maxBufferedKeys are defense in depth: callers pass
+// canonical slugs or enum values, so neither should be reached. They stop
+// a caller that passes raw request input from growing the buffer without
+// bound or writing oversized rows. Excess keys are dropped, not
+// truncated, because a truncated key would silently merge buckets.
 const (
 	maxKeyLen       = 128
 	maxBufferedKeys = 10000
 )
 
-// CountStore is the persistence seam the Recorder writes through —
-// satisfied by *sqlite.Store. Mirrors coverage.GapStore.
+// CountStore is the persistence seam the Recorder writes through.
 type CountStore interface {
 	UpsertUsageCounts(ctx context.Context, counts []atlas.UsageCount) error
 	PruneUsage(ctx context.Context, cutoffDay string) error
 }
 
-// bucketKey identifies one accumulator slot. day is captured at
-// Increment time, not at flush time, so an interval that spans midnight
-// still attributes each event to the day it happened.
+// bucketKey identifies one accumulator slot. day is taken at Increment
+// time, so an interval spanning midnight credits each event to its day.
 type bucketKey struct {
 	day  string
 	kind string
@@ -76,17 +63,15 @@ type bucketKey struct {
 }
 
 // Recorder accumulates usage counts in memory and flushes them on an
-// interval. A nil *Recorder is a valid no-op so handlers can call
-// Increment unconditionally — the same convention as *httpapi.Metrics
-// and *coverage.Recorder.
+// interval. A nil *Recorder is a valid no-op, so handlers can call
+// Increment unconditionally.
 type Recorder struct {
 	store    CountStore
 	interval time.Duration
 	keepDays int
 	logger   *slog.Logger
 
-	// wg tracks the flush goroutine so Wait can join it, matching
-	// coverage.Recorder.Wait's contract — see Wait.
+	// wg tracks the flush goroutine so Wait can join it.
 	wg sync.WaitGroup
 
 	mu      sync.Mutex
@@ -115,9 +100,8 @@ func New(store CountStore, interval time.Duration, keepDays int, logger *slog.Lo
 	}
 }
 
-// SetClock overrides the time source. Tests pin it so day bucketing and
-// prune cutoffs are deterministic; production uses time.Now().UTC().
-// Mirrors coverage.Recorder.SetRNG.
+// SetClock overrides the time source, for deterministic day bucketing
+// and prune cutoffs in tests.
 func (r *Recorder) SetClock(fn func() time.Time) {
 	if r == nil || fn == nil {
 		return
@@ -127,11 +111,9 @@ func (r *Recorder) SetClock(fn func() time.Time) {
 	r.now = fn
 }
 
-// Increment buckets one event. It returns immediately — nothing touches
-// the database until the next flush. Blank kind or key is dropped: a
-// blank slug would create a meaningless bucket that pollutes the
-// digest's top-N sections. An over-long key is dropped too (see
-// maxKeyLen).
+// Increment buckets one event without touching the database. A blank
+// kind or key, or an over-long key, is dropped; a blank slug would only
+// pollute the digest's top-N.
 func (r *Recorder) Increment(kind, key string) {
 	if r == nil || r.store == nil || kind == "" || key == "" || len(key) > maxKeyLen {
 		return
@@ -139,8 +121,8 @@ func (r *Recorder) Increment(kind, key string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	bk := bucketKey{day: r.now().Format(dayFormat), kind: kind, key: key}
-	// Bumping a bucket that already exists costs no new memory, so the
-	// cap applies only to new keys.
+	// Bumping an existing bucket costs no memory, so the cap applies only
+	// to new keys.
 	if _, ok := r.buf[bk]; !ok && len(r.buf) >= maxBufferedKeys {
 		r.dropped++
 		return
@@ -148,11 +130,9 @@ func (r *Recorder) Increment(kind, key string) {
 	r.buf[bk]++
 }
 
-// Start launches the flush goroutine, which flushes on every interval
-// until ctx is canceled and then flushes once more so the last
-// interval's counts survive shutdown. It registers with the WaitGroup
-// before returning, so a Wait that follows immediately is guaranteed to
-// join it. Nil-safe.
+// Start launches the flush goroutine: a flush every interval, then a
+// final one when ctx is canceled. It registers with the WaitGroup before
+// returning, so an immediate Wait still joins it. Nil-safe.
 func (r *Recorder) Start(ctx context.Context) {
 	if r == nil || r.store == nil {
 		return
@@ -164,8 +144,6 @@ func (r *Recorder) Start(ctx context.Context) {
 	}()
 }
 
-// run is the flush loop behind Start. The caller has already
-// registered with r.wg.
 func (r *Recorder) run(ctx context.Context) {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
@@ -176,8 +154,7 @@ func (r *Recorder) run(ctx context.Context) {
 				r.logger.Warn("usage: periodic flush failed", "err", err)
 			}
 		case <-ctx.Done():
-			// Detached context: the caller's ctx is already canceled,
-			// so reusing it would abort the very write we need.
+			// ctx is already canceled; reusing it would abort the final write.
 			flushCtx, cancel := context.WithTimeout(context.Background(), flushTimeout)
 			if err := r.Flush(flushCtx); err != nil {
 				r.logger.Warn("usage: final flush failed", "err", err)
@@ -188,14 +165,11 @@ func (r *Recorder) run(ctx context.Context) {
 	}
 }
 
-// Flush writes the buffered deltas and clears the buffer. The buffer is
-// snapshotted and cleared under the lock, then written outside it, so
-// request goroutines never block on the database.
-//
-// On a write error the batch is dropped rather than restored: the store
-// upsert accumulates, so re-queuing a batch that may have partially
-// committed would double-count. Losing an interval of usage counts is
-// the cheaper failure.
+// Flush writes the buffered deltas and clears the buffer, snapshotting
+// under the lock and writing outside it so requests never wait on the
+// database. A failed batch is dropped rather than re-queued: the upsert
+// accumulates, and a commit error doesn't prove the commit failed, so a
+// re-queue could double-count.
 func (r *Recorder) Flush(ctx context.Context) error {
 	if r == nil || r.store == nil {
 		return nil
@@ -218,8 +192,7 @@ func (r *Recorder) Flush(ctx context.Context) error {
 	}
 	r.mu.Unlock()
 
-	// Reaching maxBufferedKeys means a caller is passing unbounded keys;
-	// that is a bug worth seeing, not a routine condition.
+	// Reaching maxBufferedKeys means a caller passes unbounded keys: a bug.
 	if dropped > 0 {
 		r.logger.Warn("usage: buffer cap reached, counts dropped",
 			"dropped", dropped, "cap", maxBufferedKeys)
@@ -237,17 +210,10 @@ func (r *Recorder) Flush(ctx context.Context) error {
 	return nil
 }
 
-// Wait performs a final flush and then blocks until the flush goroutine
-// has exited, or until ctx is done — whichever comes first. Called
-// during graceful shutdown alongside coverage.Recorder.Wait, and it
-// means the same thing there: when Wait returns nil, no further write
-// will be issued, so the caller may safely close the store.
-//
-// Joining matters because that goroutine does its own final flush on ctx
-// cancellation using a *detached* context. Without the join, Wait could
-// return while that flush is still in flight and the deferred store
-// Close would race it. If Start was never called the WaitGroup is empty
-// and the join returns immediately. Nil-safe.
+// Wait flushes, then blocks until the flush goroutine exits or ctx is
+// done. A nil return means no further write will be issued, so the
+// store can be closed: the join matters because the goroutine's own
+// final flush runs on a detached context. Nil-safe.
 func (r *Recorder) Wait(ctx context.Context) error {
 	if r == nil {
 		return nil
@@ -263,8 +229,7 @@ func (r *Recorder) Wait(ctx context.Context) error {
 	case <-done:
 		return flushErr
 	case <-ctx.Done():
-		// Report the flush error in preference to the deadline: it says
-		// more about what actually went wrong.
+		// The flush error says more than the deadline.
 		if flushErr != nil {
 			return flushErr
 		}

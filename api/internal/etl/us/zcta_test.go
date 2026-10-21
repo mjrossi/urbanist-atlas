@@ -22,9 +22,8 @@ func zctaRow(zcta, geoid, name, area string) string {
 
 // TestParseZCTARelationship_MaxAreaTiebreak pins the happy path: across
 // rows that straddle multiple targets, the scanner keeps the one with
-// the largest AREALAND_PART, and an explicit "0" area still parses (it's
-// the legitimate zero-intersection literal — #17 must reject only
-// *malformed* areas, never the benign zero).
+// the largest AREALAND_PART, and an explicit "0" area still parses: it
+// is the legitimate zero-intersection literal, not a malformed area.
 func TestParseZCTARelationship_MaxAreaTiebreak(t *testing.T) {
 	input := strings.Join([]string{
 		zctaRow("HEADER", "x", "x", "x"), // header line, skipped
@@ -50,11 +49,9 @@ func TestParseZCTARelationship_MaxAreaTiebreak(t *testing.T) {
 	}
 }
 
-// TestParseZCTARelationship_MalformedAreaErrors pins issue #17: a
-// non-numeric AREALAND_PART is surfaced as an error with line context
-// rather than silently coerced to 0 (which would lose the max-area
-// tiebreak and mis-anchor the ZCTA with no signal). The error must wrap
-// strconv's underlying error so callers can inspect it.
+// TestParseZCTARelationship_MalformedAreaErrors pins that a non-numeric
+// AREALAND_PART is an error with line context, wrapping strconv's error,
+// rather than a silent 0 that would mis-anchor the ZCTA.
 func TestParseZCTARelationship_MalformedAreaErrors(t *testing.T) {
 	input := strings.Join([]string{
 		zctaRow("HEADER", "x", "x", "x"),                         // line 1: header

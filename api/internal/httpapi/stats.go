@@ -7,18 +7,9 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// statsHandler answers GET /api/v1/stats — the atlas-wide size summary
-// behind the SPA's masthead and "by the numbers" panel.
-//
-// This endpoint exists so no consumer has to derive a catalog size
-// from /api/v1/regions. That list is the browseable subset (metros and
-// cities), so summing its direct_org_count drops every org attached
-// solely to a state, province, borough, or multi-state region. The
-// counting rules live in pkg/atlas; this handler is a thin adapter.
-//
-// Single-resource response, so writeJSON rather than
-// respondCollection — there is no `{ meta, data }` envelope. ODbL
-// attribution still rides on the headers set by odblHeadersMiddleware.
+// statsHandler answers GET /api/v1/stats, the atlas-wide counts.
+// /api/v1/regions is only the browse subset, so summing it undercounts
+// orgs attached solely to states, boroughs or multi-state regions.
 func statsHandler(store atlas.Store, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())

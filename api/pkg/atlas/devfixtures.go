@@ -1,13 +1,8 @@
 package atlas
 
-// LoadDevFixtures populates a MemStore with a small set of seeded
-// organizations across three urban areas (NYC, SF Bay, Toronto). It
-// exists so `cmd/server serve --store=memory` can render a working
-// /api/v1/lookup without a seed bundle on disk — handy for demos and
-// ad-hoc CLI testing.
-//
-// The fixture data here is illustrative — not authoritative. Real
-// seed data lives in api/seed/orgs.yaml once that pipeline lands.
+// LoadDevFixtures populates a MemStore with a small, illustrative set of
+// organizations across NYC, SF Bay, and Toronto, so the server can run
+// without a seed bundle on disk. The real data lives in api/seed/.
 //
 //nolint:funlen // long but flat; readability beats decomposition for a fixture loader.
 func LoadDevFixtures(s *MemStore) {
@@ -32,7 +27,6 @@ func LoadDevFixtures(s *MemStore) {
 	mustFixture(s.AddRegion(Region{ID: 20, Kind: "ca:city", Name: "Toronto", Slug: "toronto-on", Country: CountryCA, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"toronto-cma"}}))
 
 	// ── Postal codes ───────────────────────────────────────────
-	// Each code maps to the leaf (most-specific) region.
 	mustFixture(s.AddPostalCode(CountryUS, "11217", 1))  // Brooklyn
 	mustFixture(s.AddPostalCode(CountryUS, "11215", 1))  // Brooklyn
 	mustFixture(s.AddPostalCode(CountryUS, "94110", 10)) // San Francisco

@@ -261,7 +261,7 @@ func TestAttachPromotionResult_UnknownID(t *testing.T) {
 	}
 }
 
-// TestListPage_CursorContinuity pins issue #30: the keyset cursor
+// TestListPage_CursorContinuity pins that the keyset cursor
 // (created_at, public_id) must line up exactly with the queries'
 // ORDER BY created_at DESC, public_id DESC. Paging through with the
 // emitted NextCursor must visit every row exactly once, in strict

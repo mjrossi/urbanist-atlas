@@ -1,36 +1,18 @@
 // Package etl wraps the operator-side data pipeline that reshapes
 // upstream postal-code and metro reference data (Census ZCTA + CBSA,
-// Statistics Canada PCCF + CMA, etc.) into the seed file shapes that
-// internal/seedfiles.BuildMemStore loads into the in-memory FileStore
-// at API boot.
+// HUD USPS crosswalks, Statistics Canada FSA + CMA boundaries) into the
+// seed files that internal/seedfiles.BuildMemStore loads at API boot.
 //
-// The pipeline is two-phase:
-//
-//  1. download — fetch upstream files into etl/sources/<country>/,
-//     validate checksums against etl/SOURCES.md.
-//  2. regenerate — parse the staged sources and emit deterministic
-//     TOML/CSV under api/seed/ (e.g., regions_us_msas.toml,
-//     postal_codes_us.csv).
+// The pipeline is two-phase: download fetches upstream files into
+// etl/sources/<country>/ and checks them against the SHA256 pinned in
+// each plan (mirrored in etl/SOURCES.md); regenerate parses the staged
+// sources and writes TOML/CSV under api/seed/.
 //
 // Output must be byte-identical given the same upstream inputs: rows
-// sorted by primary key (postal_code or slug), no embedded timestamps,
-// LF line endings, trailing newline. This keeps git diffs signal-rich
-// on intentional vintage upgrades and lets CI gate on determinism.
-//
-// Layout:
-//
-//   - SourceDescriptor — declares an expected upstream file (path,
-//     URL, sha256, vintage label).
-//   - OutputTarget     — declares a generated seed artifact (path
-//     relative to api/seed/, expected row count band, format hint).
-//   - Country          — bundles a country's descriptors and targets
-//     so the download and regenerate flows can iterate uniformly.
-//
-// This package ships in slice #7.5.1 as a skeleton with no concrete
-// country plans yet. Slice #7.5.3 fills in the US plan (Census CBSA +
-// ZCTA crosswalks → MSAs + ZIPs). Slice #7.5.4 fills in the CA plan
-// (StatsCan CMA + PCCF → CMAs + FSAs). The cli wiring lives at
-// api/cmd/server/etl.go.
+// sorted by primary key, no embedded timestamps, LF line endings,
+// trailing newline. That keeps vintage-bump diffs signal-rich and lets
+// CI gate on determinism. Country plans live in internal/etl/<cc>/; see
+// docs/etl-architecture.md.
 package etl
 
 import (
@@ -41,9 +23,8 @@ import (
 )
 
 // Target selects which seed outputs a regenerate (or download) operates
-// on. The default is TargetAll. TargetRegions exists so CI can refresh
-// the HUD-free region files without touching the HUD-dependent postal
-// CSV (US) or needing the 155 MB CA FSA source.
+// on. TargetRegions exists so CI can refresh the HUD-free region files
+// without the HUD-dependent US postal CSV or the 155 MB CA FSA source.
 type Target string
 
 const (
@@ -69,32 +50,24 @@ func ParseTarget(s string) (Target, error) {
 }
 
 // SourceDescriptor names an upstream file the ETL pipeline expects to
-// find in etl/sources/<country>/. Concrete instances live in per-country
-// plans (added in slices #7.5.3 and #7.5.4).
+// find in etl/sources/<country>/.
 type SourceDescriptor struct {
-	// Filename is the basename the download step writes (and the
-	// regenerate step reads) under etl/sources/<country>/.
+	// Filename is the basename under etl/sources/<country>/.
 	Filename string
-	// URL is the canonical upstream location. Logged in error
-	// messages so a manual re-fetch is one curl away.
+	// URL is the canonical upstream location, logged in errors so a
+	// manual re-fetch is one curl away.
 	URL string
-	// SHA256 is the hex-encoded checksum the downloaded file must
-	// match. The expected value is mirrored in etl/SOURCES.md so
-	// reviewers can confirm vintage without running the pipeline.
+	// SHA256 is the hex checksum the downloaded file must match, mirrored
+	// in etl/SOURCES.md so reviewers can confirm the vintage.
 	SHA256 string
-	// Vintage is a human-readable label for the data release
-	// (e.g., "Census 2020", "StatsCan 2025-Q1"). Logged when the
-	// download step writes the file.
+	// Vintage labels the data release (e.g. "Census 2020").
 	Vintage string
-	// Optional marks a source the download step must NOT fail on — e.g.
-	// HUD, whose canonical URL is an account-gated landing page, not a
-	// direct file. Download skips Optional sources with a notice; the
-	// operator fetches them by hand. Regenerate already tolerates their
-	// absence.
+	// Optional marks a source download skips instead of failing on, e.g.
+	// HUD, whose canonical URL is an account-gated landing page rather
+	// than a file. The operator fetches it by hand.
 	Optional bool
-	// Targets lists which output Targets this source feeds. Empty means
-	// it feeds every target. Download uses this to fetch only what a
-	// given --target needs (e.g. --target=regions skips the CA FSA).
+	// Targets lists which output Targets this source feeds; empty means
+	// every target.
 	Targets []Target
 }
 
@@ -125,31 +98,22 @@ type OutputTarget struct {
 	MaxRows int
 }
 
-// Country bundles a country's expected upstream sources, the targets
-// it generates, and the Regenerate hook that performs the
-// transformation. Concrete plans (US, CA) register via init() blocks
-// in internal/etl/<cc>/ subpackages; the cmd/server etl subcommand
-// dispatches into Plans[code].
+// Country bundles a country's upstream sources, the targets it
+// generates, and the Regenerate hook. Plans self-register in Plans from
+// init() in internal/etl/<cc>/.
 type Country struct {
-	// Code is the canonical upper-case country code (e.g., "US",
-	// "CA").
+	// Code is the upper-case country code (e.g. "US").
 	Code string
-	// SourcesDir is the per-country subdirectory under etl/sources/
-	// where the download step writes (defaults to lowercase Code).
+	// SourcesDir is the subdirectory of etl/sources/ for this country.
 	SourcesDir string
 	// Sources lists every upstream file the plan needs.
 	Sources []SourceDescriptor
 	// Targets lists every seed artifact the regenerate step writes.
 	Targets []OutputTarget
-	// Regenerate parses the staged source files in srcDir and writes
-	// the deterministic seed outputs (TOML + CSV) into outDir. May be
-	// nil for plans whose regenerate flow isn't implemented yet — in
-	// that case the cli stub returns an error indicating which slice
-	// is expected to land it.
+	// Regenerate parses the staged sources in srcDir and writes the seed
+	// outputs into outDir. Nil means the plan has no regenerate step yet.
 	Regenerate func(ctx context.Context, srcDir, outDir string, target Target, logger *slog.Logger) error
 }
 
-// Plans is the registered set of country plans the ETL subcommand
-// dispatches against. Empty at the foundation slice (#7.5.1); slices
-// #7.5.3 and #7.5.4 populate the US and CA entries.
+// Plans is the registered set of country plans, keyed by Country.Code.
 var Plans = map[string]Country{}

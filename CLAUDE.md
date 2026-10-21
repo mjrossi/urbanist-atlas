@@ -27,8 +27,8 @@ Companion to the maintainer's publication, *Urbanist Lexicon*
   seed loader (the default `countries` set in
   `api/internal/seedfiles/build.go`) once the validation had served
   its purpose. The PT seed files (`api/seed/regions_pt.toml`,
-  `postal_codes_pt.csv`) stay in the repo as a reference and for the
-  integration suite (which loads them explicitly), and a future
+  `postal_codes_pt.csv`) stay in the repo, unused, as a reference
+  (the embed glob still bundles them), and a future
   v1.1+ slice can reintroduce PT — or ES, MX, NL, UK — when the
   editorial coverage is ready to ship. See
   [`docs/region-graph.md`](./docs/region-graph.md) for the per-country

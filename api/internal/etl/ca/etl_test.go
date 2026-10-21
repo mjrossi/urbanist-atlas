@@ -48,10 +48,8 @@ func TestAssignCMAs_OverrideAndParents(t *testing.T) {
 		// Defensive: duplicate-province within ProvinceUIDs must dedupe.
 		{UID: "950", Name: "Test Dedupe", ProvinceUIDs: []string{"35", "35"}},
 	}
-	// Overrides now arrive as data (regions_ca_cma_overrides.toml) rather
-	// than the compiled cmaOverrides map; supply the canonical set here so
-	// the assignment logic (slug/name/kind override + per-field fallback)
-	// is exercised the same way the ETL run applies them.
+	// Supply the canonical overrides so the slug/name/kind override and
+	// per-field fallback run the way the ETL applies them.
 	overrides := []CMAOverride{
 		{UID: "535", Slug: "toronto-cma", Name: "Greater Toronto Area"},
 		{UID: "462", Slug: "montreal-cma", Name: "Greater Montréal"},
@@ -188,7 +186,7 @@ func TestLatin1ToUTF8(t *testing.T) {
 	}
 }
 
-// TestDBFReader_RejectsUndersizedRecord pins issue #21's guard: when the
+// TestDBFReader_RejectsUndersizedRecord pins the record-size guard: when the
 // header's record size is smaller than the field layout requires (1
 // deletion flag + every field's fixed width), newDBFReader fails with a
 // clear error instead of letting next() slice past the record buffer and

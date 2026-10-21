@@ -8,10 +8,8 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// listCoverageGapsHandler answers GET /api/v1/admin/coverage-gaps.
-// Bearer-gated. Returns recent sampled empty-result lookups/searches
-// newest-first, capped at ?limit= (default 50, max 200). Thin adapter:
-// parse limit → call the reader → encode.
+// listCoverageGapsHandler answers GET /api/v1/admin/coverage-gaps with
+// the newest sampled empty results.
 func listCoverageGapsHandler(reader atlas.CoverageGapReader, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
@@ -39,7 +37,7 @@ func toOAPICoverageGap(g atlas.CoverageGap) oapi.CoverageGap {
 		Input:     g.Input,
 		CreatedAt: g.CreatedAt,
 	}
-	// country is omitted for search gaps (no country axis).
+	// Search gaps have no country.
 	if g.Country != "" {
 		c := g.Country
 		out.Country = &c

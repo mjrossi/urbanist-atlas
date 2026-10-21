@@ -30,11 +30,8 @@ const (
 	storeKindMemory = "memory"
 )
 
-// serveConfig is the fully-resolved serve configuration, read once from
-// the CLI flags by parseServeConfig. Holding every value in one struct
-// keeps each flag (and its env fallback) read exactly once and lets
-// runServe and its build helpers read as orchestration over a plain
-// value rather than re-querying *cli.Command at every use site.
+// serveConfig is the resolved serve configuration, read once from the
+// flags by parseServeConfig.
 type serveConfig struct {
 	port                   string
 	metricsPort            string
@@ -54,9 +51,8 @@ type serveConfig struct {
 	usageKeepDays          int
 }
 
-// parseServeConfig reads every serve flag exactly once. Flag names,
-// env-var fallbacks, and defaults all live on the cli.Command flag set
-// (serveCommand); this only snapshots the resolved values.
+// parseServeConfig snapshots the resolved flag values; names, env vars
+// and defaults live on serveCommand's flags.
 func parseServeConfig(c *cli.Command) serveConfig {
 	return serveConfig{
 		port:                   c.String("port"),
@@ -213,18 +209,15 @@ func runServe(ctx context.Context, c *cli.Command) error {
 
 	metrics := httpapi.NewMetrics()
 
-	// Coverage-gap recorder shares the SQLite store with submissions, so
-	// it only exists when that store does. Disabled by default
-	// (sample-rate 0) — capturing raw empty-result input is opt-in.
+	// The recorders share the submissions SQLite store. Coverage capture
+	// is opt-in (sample rate 0 by default) because it keeps raw input.
 	var recorder *coverage.Recorder
 	if subs != nil {
 		recorder = coverage.New(subs, cfg.coverageSampleRate, cfg.coverageMaxRows, logger)
 	}
 
-	// Usage rollups share the SQLite store with submissions, so like the
-	// coverage recorder they exist only when that store does. Unlike
-	// coverage, this is on by default: the buckets hold public content
-	// identifiers only, and recording them is the point of the slice.
+	// Usage is on by default: its buckets hold only canonical slugs and
+	// fixed enum values, never raw input.
 	var usageRec *usage.Recorder
 	if subs != nil {
 		usageRec = usage.New(subs, cfg.usageFlushInterval, cfg.usageKeepDays, logger)
@@ -261,12 +254,8 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	// Private Prometheus listener. Binds all interfaces on Fly (see
-	// newMetricsServer) so Fly's managed Prometheus can scrape it; the
-	// port is never internet-routable because it isn't declared in
-	// [http_service]/[[services]]. Off the main mux on purpose; nil when
-	// disabled. ListenAndServe errors on this listener are logged, never
-	// fatal: losing metrics must not take the request path down.
+	// The metrics listener's errors are logged, never fatal: losing
+	// metrics must not take the request path down.
 	metricsSrv := newMetricsServer(cfg.metricsPort, metrics, logger)
 	metricsDone := make(chan struct{}, 1)
 	if metricsSrv != nil {
@@ -311,10 +300,8 @@ func startPromotionWorker(ctx context.Context, cfg githubpr.Config) *githubpr.Wo
 	return w
 }
 
-// logServeConfig emits the single consolidated boot line so an operator
-// can confirm the effective non-secret config from the first lines of
-// the log. Secrets are reported as presence booleans only — never their
-// values.
+// logServeConfig logs the effective config in one boot line. Secrets
+// appear only as presence booleans.
 func logServeConfig(logger *slog.Logger, cfg serveConfig, origins []string, submissionsEnabled bool) {
 	logger.Info("startup config",
 		"port", cfg.port,
@@ -336,9 +323,7 @@ func logServeConfig(logger *slog.Logger, cfg serveConfig, origins []string, subm
 	)
 }
 
-// shutdownDeps groups the running servers and background workers
-// awaitShutdown tears down, so the orchestration in runServe passes one
-// value instead of a long parameter list.
+// shutdownDeps is everything awaitShutdown tears down.
 type shutdownDeps struct {
 	srv         *http.Server
 	serverErr   <-chan error
@@ -360,14 +345,10 @@ const (
 	shutdownTeardownTimeout = 7 * time.Second
 )
 
-// awaitShutdown blocks until either the OS signal (ctx cancellation) or
-// the main HTTP listener errors, then performs the dependency-ordered
-// teardown. The order is load-bearing: stop accepting new HTTP traffic
-// first, then drain GitHub-PR jobs queued by approvals that landed in the
-// last few seconds (reversing it would let a fresh approval squeeze in
-// after the worker stopped), then flush sampled coverage-gap writes
-// before the deferred store Close runs. Every step runs even when an
-// earlier one fails, and the failures are joined.
+// awaitShutdown waits for ctx cancellation or a listener error, then tears
+// down in order: HTTP first, so no approval can enqueue after the PR
+// worker stops; then the worker; then the recorders, before the deferred
+// store Close. Every step runs even if an earlier one fails.
 func awaitShutdown(ctx context.Context, logger *slog.Logger, d shutdownDeps) error {
 	select {
 	case <-ctx.Done():
@@ -419,16 +400,9 @@ func awaitShutdown(ctx context.Context, logger *slog.Logger, d shutdownDeps) err
 	}
 }
 
-// buildStore returns an atlas.Store backed by the file-loaded
-// MemStore (default) or the built-in dev fixtures (--store=memory).
-// The dev-fixture path stays available so the binary can boot and
-// serve a few sample orgs without a seed bundle — useful for demos.
-//
-// When --seed-dir is empty (production default) the loader reads
-// from the seedfs.FS embed baked into the binary; when non-empty
-// it reads from os.DirFS(seedDir). The latter is what mise.development
-// activates (URBANIST_SEED_DIR=api/seed) so dev iterates against
-// the on-disk files without rebuilds.
+// buildStore loads the seed bundle into a MemStore, or the dev fixtures
+// for --store=memory. An empty --seed-dir reads the bundle embedded in
+// the binary; a set one reads that directory, so dev needs no rebuild.
 func buildStore(cfg serveConfig, logger *slog.Logger) (atlas.Store, func(), error) {
 	kind := strings.ToLower(strings.TrimSpace(cfg.store))
 	switch kind {
@@ -461,10 +435,7 @@ func buildStore(cfg serveConfig, logger *slog.Logger) (atlas.Store, func(), erro
 	}
 }
 
-// seedSourceLabel describes where the file store reads its seed bundle
-// from for the startup-config log line: "embed" (the binary-baked
-// seedfs.FS, the production default) when --seed-dir is empty, otherwise
-// the directory path. Mirrors the source resolution in buildStore.
+// seedSourceLabel names buildStore's seed source for the boot log line.
 func seedSourceLabel(seedDir string) string {
 	if strings.TrimSpace(seedDir) == "" {
 		return "embed"
@@ -472,18 +443,15 @@ func seedSourceLabel(seedDir string) string {
 	return seedDir
 }
 
-// buildSubmissionStore opens the SQLite submission database and runs
-// migrations. An empty --db-path is treated as "no submissions" — the
-// returned store is nil and the /submissions endpoints stay
-// unregistered.
+// buildSubmissionStore opens and migrates the SQLite store. An empty
+// --db-path returns nil, which leaves the submission routes unregistered.
 func buildSubmissionStore(ctx context.Context, cfg serveConfig, logger *slog.Logger) (*sqlite.Store, func(), error) {
 	path := strings.TrimSpace(cfg.dbPath)
 	if path == "" {
 		logger.Info("submission store disabled (empty --db-path)")
 		return nil, func() {}, nil
 	}
-	// SQLite won't create missing parent dirs (it'd surface as
-	// SQLITE_CANTOPEN). Skip the mkdir for the in-memory URIs.
+	// SQLite won't create missing parent dirs (SQLITE_CANTOPEN).
 	if !strings.HasPrefix(path, ":memory:") && !strings.HasPrefix(path, "file::memory:") {
 		if dir := filepath.Dir(path); dir != "" && dir != "." {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -503,10 +471,8 @@ func buildSubmissionStore(ctx context.Context, cfg serveConfig, logger *slog.Log
 	return s, func() { _ = s.Close() }, nil
 }
 
-// submissionsOrNil converts the concrete *sqlite.Store into the
-// atlas.SubmissionStore interface, preserving nil-ness so the router
-// can detect the "disabled" case (a typed nil would route to handlers
-// that then segfault on store calls).
+// submissionsOrNil keeps a nil store a nil interface, so the router
+// sees the disabled case rather than a typed nil.
 func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
 	if s == nil {
 		return nil
@@ -514,10 +480,7 @@ func submissionsOrNil(s *sqlite.Store) atlas.SubmissionStore {
 	return s
 }
 
-// usageReaderOrNil converts the concrete *sqlite.Store into the
-// atlas.UsageReader interface, preserving nil-ness (same typed-nil guard
-// as submissionsOrNil) so the router skips registering the admin usage
-// route when there is no store.
+// usageReaderOrNil is submissionsOrNil for atlas.UsageReader.
 func usageReaderOrNil(s *sqlite.Store) atlas.UsageReader {
 	if s == nil {
 		return nil
@@ -525,7 +488,7 @@ func usageReaderOrNil(s *sqlite.Store) atlas.UsageReader {
 	return s
 }
 
-// coverageReaderOrNil mirrors usageReaderOrNil for the coverage-gap seam.
+// coverageReaderOrNil is submissionsOrNil for atlas.CoverageGapReader.
 func coverageReaderOrNil(s *sqlite.Store) atlas.CoverageGapReader {
 	if s == nil {
 		return nil
@@ -546,9 +509,7 @@ func buildLogger(format, level string) *slog.Logger {
 	return slog.New(h)
 }
 
-// parseLevel maps a log-level string to an slog.Level. Matching is
-// case-insensitive and tolerant of surrounding whitespace; empty or
-// unrecognized values fall back to Info.
+// parseLevel maps a log-level name to an slog.Level, defaulting to Info.
 func parseLevel(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "debug":
@@ -557,7 +518,7 @@ func parseLevel(s string) slog.Level {
 		return slog.LevelWarn
 	case "error":
 		return slog.LevelError
-	default: // "info" and anything unrecognized
+	default:
 		return slog.LevelInfo
 	}
 }
@@ -576,18 +537,10 @@ func splitCSV(s string) []string {
 	return out
 }
 
-// newMetricsServer builds the private Prometheus listener for the given
-// port, or returns nil when metrics are disabled (empty port or "0").
-//
-// On Fly it binds ALL interfaces (":port"), NOT FLY_PRIVATE_IP. Fly's
-// managed-Prometheus scraper reaches the instance on a different
-// interface than the 6PN address, so binding only to FLY_PRIVATE_IP
-// leaves /metrics reachable via `fly proxy` (6PN) yet never scraped — no
-// atlas_* series ever land in Fly's Prometheus. The endpoint stays
-// private regardless of bind address: Fly's edge only routes ports
-// declared in [http_service]/[[services]], and the metrics port
-// deliberately isn't one. Locally (no FLY_PRIVATE_IP) it binds loopback
-// so a dev machine doesn't expose it on the LAN.
+// newMetricsServer builds the private Prometheus listener, or nil when
+// the port is empty or "0". It binds loopback locally and all interfaces
+// on Fly, where binding FLY_PRIVATE_IP alone was never scraped; see
+// docs/architecture/http-api.md.
 func newMetricsServer(port string, metrics *httpapi.Metrics, logger *slog.Logger) *http.Server {
 	port = strings.TrimSpace(port)
 	if port == "" || port == "0" {
@@ -596,7 +549,7 @@ func newMetricsServer(port string, metrics *httpapi.Metrics, logger *slog.Logger
 	}
 	host := "127.0.0.1"
 	if os.Getenv("FLY_PRIVATE_IP") != "" {
-		host = "" // all interfaces, so Fly's metrics scraper can reach it
+		host = ""
 	}
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", metrics.Handler())

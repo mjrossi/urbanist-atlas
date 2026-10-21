@@ -11,8 +11,8 @@ import (
 
 // These tests live in the white-box seedfiles package so they can call
 // the unexported buildMemStore core with a tiny synthetic countrySpec
-// set, exercising the global cross-file acyclicity (RGN-02a) and
-// orphan/zero-anchor (RGN-02b) checks without the full US/CA bundle.
+// set, exercising the global acyclicity and orphan-leaf checks without
+// the full US/CA bundle.
 
 // fixtureFS assembles an in-memory seed bundle: one region TOML per
 // suffix, one postal CSV per country code, and orgs.toml. Each value
@@ -45,7 +45,7 @@ added_at = 2026-01-01
 `
 }
 
-// TestDetectCyclesGraph_CrossFileCycle proves RGN-02a at the algorithm
+// TestDetectCyclesGraph_CrossFileCycle proves, at the algorithm
 // level: the generalized detector walks EVERY parent edge in an
 // assembled parents map (no inFile skip), so a cross-file back-edge
 // (A → B → A spanning two files) is caught. The per-file DetectCycles
@@ -84,18 +84,8 @@ func TestDetectCyclesGraph_Acyclic(t *testing.T) {
 // TestDetectCyclesGraph_DiamondCyclePathFidelity pins the human-readable
 // cycle path on a multi-parent (diamond) graph: the reported chain names
 // only the genuine cycle plus its lead-in, never a slug from an unrelated
-// sibling branch.
-//
-// This locks the error-path FORMAT — the contract the defensive path
-// copy in detectCycles3Color protects. It is deliberately NOT a WR-02
-// regression repro: the slice aliasing WR-02 guards against is not
-// observable through this DFS (it formats the error immediately on the
-// gray-revisit and overwrites shared tail indices on descent first), so
-// this test passes with or without the copy — verified by reverting the
-// copy and sweeping 17 diamond+cycle shapes (0 leaks). Its value is
-// catching a FUTURE refactor that genuinely corrupts the reported path
-// (e.g. retaining path slices to collect every cycle rather than
-// returning on the first).
+// sibling branch. It passes with or without detectCycles3Color's path
+// copy; it guards a future refactor that keeps path slices around.
 func TestDetectCyclesGraph_DiamondCyclePathFidelity(t *testing.T) {
 	// metro is the diamond node. One parent leads to an acyclic sibling
 	// branch (sibling-region → sibling-parent); the other (state) closes
@@ -171,7 +161,7 @@ func TestBuildMemStore_DuplicatePostalCodeConflict(t *testing.T) {
 	}
 }
 
-// TestBuildMemStore_OrphanLeaf proves RGN-02b: a leaf region with no
+// TestBuildMemStore_OrphanLeaf proves that a leaf region with no
 // postal anchor, no attached org, and no anchoring descendant fails the
 // build, and the error names the orphan slug.
 func TestBuildMemStore_OrphanLeaf(t *testing.T) {
@@ -195,8 +185,8 @@ func TestBuildMemStore_OrphanLeaf(t *testing.T) {
 }
 
 // TestBuildMemStore_OrphanAnchoredByOrg proves the org-attachment leg
-// of the RGN-02b reachability rule: a leaf with no postal row but with
-// an attached org is NOT an orphan.
+// of the reachability rule: a leaf with no postal row but with an
+// attached org is NOT an orphan.
 func TestBuildMemStore_OrphanAnchoredByOrg(t *testing.T) {
 	regionTOML := map[string]string{
 		"z_top": regionTable("State", "z:state", "regional", nil),
@@ -335,7 +325,7 @@ func TestBuildMemStore_RollupStatesNonStateKind(t *testing.T) {
 	}
 }
 
-// TestBuildMemStore_MetroPortionShape proves the Phase-2 ETL OUTPUT shape
+// TestBuildMemStore_MetroPortionShape proves the ETL's output shape
 // loads through the real loader and behaves: a STATELESS multi-state
 // umbrella (parents=[], rollup_states) plus per-state us:metro-portion
 // leaves (parents=[state, umbrella]) in the same file, with each portion

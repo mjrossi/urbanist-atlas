@@ -1,11 +1,8 @@
-// Package sqlite is the SubmissionStore implementation backed by a
-// SQLite database on disk (or in-memory for tests). It's the only
-// writable store in the project — everything else (regions, orgs,
-// postal codes) stays in the file-backed atlas.MemStore.
-//
-// The driver is modernc.org/sqlite (pure Go, no CGO). Migrations are
-// applied via goose from the embedded api/migrations-sqlite FS, so
-// the binary needs nothing on disk at boot beyond the DB file.
+// Package sqlite is the project's only writable store: the submission
+// queue, coverage gaps and usage counts, in one SQLite database. Regions,
+// orgs and postal codes stay in the file-backed atlas.MemStore. It uses
+// the pure-Go modernc.org/sqlite driver and applies goose migrations from
+// the embedded api/migrations-sqlite FS.
 package sqlite
 
 import (
@@ -29,8 +26,8 @@ import (
 	sqlitegen "github.com/mjrossi/urbanist-atlas/api/internal/store/sqlite/gen"
 )
 
-// SQLite stores timestamps as TEXT in this format so they round-trip
-// cleanly through strftime() defaults from the migration.
+// sqliteTimeFormat matches the strftime() DEFAULTs in the migrations, so
+// timestamps sort and round-trip as TEXT.
 const sqliteTimeFormat = "2006-01-02T15:04:05.000Z"
 
 // Store wraps a *sql.DB with the sqlc-generated Queries and the
@@ -42,39 +39,29 @@ type Store struct {
 	nowFunc func() time.Time
 }
 
-// Open opens (or creates) the SQLite DB at path and returns a Store.
-// path may be a filesystem path, a `:memory:` URI, or
-// `file::memory:?cache=shared`. The PRAGMA query string is appended
-// automatically; callers should pass only the base path.
-//
-// Open does NOT apply migrations — call Migrate after Open so callers
-// can decide when migrations run (typically at boot, never during
-// tests against pre-seeded databases).
+// Open opens (or creates) the SQLite DB at path, which may be a file
+// path, `:memory:` or `file::memory:?cache=shared`; the PRAGMA query
+// string is appended here. Open does not migrate: call Migrate.
 func Open(path string) (*Store, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, errors.New("sqlite.Open: empty path")
 	}
 
-	// modernc's driver name is "sqlite" (not "sqlite3"). PRAGMAs go in
-	// the URI's _pragma query — WAL for write throughput, foreign_keys
-	// because the default is OFF and we want correct CASCADE behavior
-	// if future schemas add FKs, busy_timeout so transient lock
-	// contention waits instead of erroring.
+	// PRAGMAs go in the DSN: WAL for write throughput, foreign_keys because
+	// SQLite defaults it off, busy_timeout so lock contention waits rather
+	// than erroring.
 	dsn := dsnWithPragmas(path)
 
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite.Open: %w", err)
 	}
-	// SQLite is single-writer; cap connections so callers don't
-	// pile up SQLITE_BUSY waits on lock contention.
+	// SQLite is single-writer; one connection avoids SQLITE_BUSY pile-ups.
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
-	// sql.Open is lazy — the first query is what reveals a bad path or
-	// a corrupted file. Ping eagerly so the boot-time error is clean
-	// ("path does not exist") instead of leaking into the first
-	// Migrate or Create call. 2s is generous for a local file open.
+	// sql.Open is lazy; ping now so a bad path fails at boot, not on the
+	// first query.
 	pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
@@ -93,27 +80,22 @@ func Open(path string) (*Store, error) {
 // Close releases the underlying *sql.DB.
 func (s *Store) Close() error { return s.db.Close() }
 
-// Ping verifies the underlying database connection is alive. /readyz
-// uses it to report a degraded write path.
+// Ping verifies the database connection is alive.
 func (s *Store) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
-// DB returns the underlying *sql.DB. Useful for callers that need to
-// run goose programmatically or for tests that want to inspect rows
-// directly.
+// DB returns the underlying *sql.DB.
 func (s *Store) DB() *sql.DB { return s.db }
 
-// SetClock overrides the time source. Tests use this to make
-// processed_at deterministic.
+// SetClock overrides the time source, for deterministic tests.
 func (s *Store) SetClock(now func() time.Time) {
 	if now != nil {
 		s.nowFunc = now
 	}
 }
 
-// SetIDGenerator overrides the public-ID source. Tests use this to
-// inject canned UUIDv7 values.
+// SetIDGenerator overrides the public-ID source, for tests.
 func (s *Store) SetIDGenerator(g idgen.Generator) {
 	if g != nil {
 		s.idgen = g
@@ -170,9 +152,7 @@ func (s *Store) Get(ctx context.Context, publicID string) (atlas.Submission, err
 	return rowToSubmission(row)
 }
 
-// List implements atlas.SubmissionStore. It's a thin wrapper around
-// ListPage that drops the cursor — preserved for callers (tests,
-// internal code) that don't paginate.
+// List implements atlas.SubmissionStore: ListPage without the cursor.
 func (s *Store) List(ctx context.Context, q atlas.ListSubmissionsQuery) ([]atlas.Submission, error) {
 	page, err := s.ListPage(ctx, q)
 	if err != nil {
@@ -244,15 +224,13 @@ func (s *Store) ListPage(ctx context.Context, q atlas.ListSubmissionsQuery) (atl
 }
 
 // encodeCursor packs (created_at, public_id) into an opaque base64url
-// string. The format is deliberately stable but undocumented — callers
-// must treat it as opaque and only pass back what ListPage emitted.
+// cursor; callers pass back only what ListPage emitted.
 func encodeCursor(createdAt, publicID string) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(createdAt + "|" + publicID))
 }
 
-// decodeCursor returns the components of a cursor previously produced
-// by encodeCursor, or atlas.ErrInvalidCursor on malformed input. Empty
-// cursor means "no cursor" — returns hasCursor=false with no error.
+// decodeCursor reverses encodeCursor, returning atlas.ErrInvalidCursor on
+// malformed input and hasCursor=false for an empty cursor.
 func decodeCursor(cursor string) (createdAt, publicID string, hasCursor bool, err error) {
 	if cursor == "" {
 		return "", "", false, nil
@@ -299,26 +277,19 @@ func (s *Store) Reject(ctx context.Context, publicID, reason string) (atlas.Subm
 	return rowToSubmission(row)
 }
 
-// AttachPromotionResult implements atlas.SubmissionStore.
-//
-// The existence check and the UPDATE run inside a single transaction so
-// they're atomic (issue #28): without it, a concurrent delete landing
-// between the two statements could let the UPDATE no-op against a row the
-// check saw, or surface ErrSubmissionNotFound for a row that existed when
-// we looked. Not reachable today (maxconns=1 serializes writers) but
-// correct-by-construction if the connection cap is ever lifted.
+// AttachPromotionResult implements atlas.SubmissionStore. The existence
+// check and the UPDATE share a transaction so a concurrent delete can't
+// land between them; the single connection makes that unreachable today,
+// but it stays correct if the cap is lifted.
 func (s *Store) AttachPromotionResult(ctx context.Context, publicID, prURL, prErr string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("sqlite.AttachPromotionResult: begin: %w", err)
 	}
-	// Rollback is a no-op once Commit succeeds; safe to always defer.
 	defer func() { _ = tx.Rollback() }()
 	qtx := s.q.WithTx(tx)
 
-	// We need to know whether the id exists so the worker can log a
-	// loud error if approvals raced with a delete (not a current code
-	// path, but the contract promises ErrSubmissionNotFound).
+	// The contract promises ErrSubmissionNotFound for an unknown id.
 	if _, err := qtx.SubmissionStatusByPublicID(ctx, publicID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return atlas.ErrSubmissionNotFound
@@ -338,9 +309,9 @@ func (s *Store) AttachPromotionResult(ctx context.Context, publicID, prURL, prEr
 	return nil
 }
 
-// notPendingOrNotFound disambiguates ErrNoRows on an UPDATE … WHERE
-// status='pending'. If the row exists at all, it must have been in a
-// non-pending state, so 409. Otherwise 404.
+// notPendingOrNotFound explains an ErrNoRows from an UPDATE … WHERE
+// status='pending': a row that exists wasn't pending (409); otherwise
+// it is missing (404).
 func (s *Store) notPendingOrNotFound(ctx context.Context, publicID string) error {
 	if _, err := s.q.SubmissionStatusByPublicID(ctx, publicID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -383,9 +354,8 @@ func rowToSubmission(r sqlitegen.Submission) (atlas.Submission, error) {
 	}, nil
 }
 
-// parseSQLiteTime accepts the strftime('%Y-%m-%dT%H:%M:%fZ') format
-// from the migration's DEFAULT as well as plain RFC3339 (what Go's
-// Format produces) so values written by our code round-trip cleanly.
+// parseSQLiteTime accepts sqliteTimeFormat (the migrations' strftime
+// DEFAULT) and RFC3339.
 func parseSQLiteTime(s string) (time.Time, error) {
 	for _, layout := range []string{sqliteTimeFormat, time.RFC3339Nano, time.RFC3339} {
 		if t, err := time.Parse(layout, s); err == nil {
@@ -395,8 +365,8 @@ func parseSQLiteTime(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unrecognized time format %q", s)
 }
 
-// dsnWithPragmas appends WAL/foreign_keys/busy_timeout PRAGMAs to a
-// SQLite DSN. modernc's driver consumes _pragma= multiple times.
+// dsnWithPragmas appends the PRAGMAs to a SQLite DSN; modernc reads
+// repeated _pragma= parameters.
 func dsnWithPragmas(path string) string {
 	pragmas := []string{
 		"_pragma=journal_mode(WAL)",
@@ -414,14 +384,8 @@ func dsnWithPragmas(path string) string {
 func escapePragmas(in []string) []string {
 	out := make([]string, len(in))
 	for i, p := range in {
-		// Pragmas are key=value (e.g. `_pragma=journal_mode(WAL)`) where
-		// the value may contain '(' / ')'. modernc accepts the raw form,
-		// but escape BOTH halves through url.QueryEscape (issue #29) so the
-		// whole pair is well-formed query-string regardless of input —
-		// previously only the value was escaped, leaving the key trusted.
-		// The keys today are a fixed in-package set (_pragma), so this is
-		// defensive completeness rather than a live fix, but it keeps the
-		// function correct for anything it's handed.
+		// Escape key and value both so the pair is a well-formed query
+		// parameter whatever it holds; values contain '(' and ')'.
 		eq := strings.IndexByte(p, '=')
 		if eq < 0 {
 			out[i] = url.QueryEscape(p)

@@ -1,15 +1,11 @@
-// Command server is the urbanist-atlas API binary. It owns the
-// runtime HTTP API and the operator-side ETL tooling that regenerates
-// the bundled seed data:
+// Command server is the urbanist-atlas API binary. It serves the HTTP
+// API and carries the operator tooling:
 //
 //	urbanist-atlas-server serve
 //	urbanist-atlas-server linkcheck
 //	urbanist-atlas-server etl regenerate --country US
-//
-// There is no longer a database-seeding workflow: the TOML/CSV files
-// under api/seed/ are the runtime source of truth (loaded into an
-// in-memory FileStore at boot), so the loaddata / loadregions /
-// loadpostal / seed / migrate subcommands have been retired.
+//	urbanist-atlas-server seed validate
+//	urbanist-atlas-server submissions retry-pr --id <uuid>
 package main
 
 import (
@@ -24,23 +20,18 @@ import (
 )
 
 func main() {
-	// os.Exit is isolated here so run's deferred cleanup (signal stop)
-	// always executes before the process exits.
+	// os.Exit skips defers, so run's cleanup happens inside run.
 	os.Exit(run())
 }
 
 func run() int {
 	cmd := newRootCommand()
 
-	// Cancel the context on SIGINT/SIGTERM so subcommands (especially
-	// `serve`) can shut down gracefully.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	if err := cmd.Run(ctx, os.Args); err != nil {
-		// urfave already prints CLI usage errors; we only handle the
-		// post-Action error case here. Treating context cancellation
-		// as a clean exit (Ctrl-C during `serve`).
+		// A signal-driven cancellation is a clean exit.
 		if errors.Is(err, context.Canceled) {
 			return 0
 		}

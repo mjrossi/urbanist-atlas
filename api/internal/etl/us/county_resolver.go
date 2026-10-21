@@ -1,52 +1,32 @@
 package us
 
 // countyResolver maps a 5-digit county GEOID to the smallest curated
-// region anchor available for it. It encapsulates the 4-tier county
-// fallback chain shared by two callers:
+// region anchor for it, smallest first:
 //
-//   - crosswalk (ZCTA path) consults it AFTER the city-place tier
-//     fails. Place GEOIDs aren't county-keyed, so the place lookup
-//     stays in the caller and the resolver picks up at NYC borough.
-//   - crosswalkHUDBackfill (HUD path) calls it directly. HUD's
-//     quarterly ZIP↔County crosswalk doesn't carry a place GEOID, so
-//     the place tier is skipped entirely — the resolver IS the whole
-//     fallback for the HUD path.
+//  1. NYC borough leaf
+//  2. curated non-NYC county leaf
+//  3. the CBSA's own-state portion for a multi-state MSA, else the MSA
+//  4. state / territory, by 2-digit FIPS prefix
 //
-// Resolution order, smallest curated region first:
-//
-//  1. NYC borough leaf (county ∈ {36005, 36047, 36061, 36081, 36085})
-//  2. Curated non-NYC county leaf (Cook County IL, Lake County IN)
-//  3. MSA region via countyToMSA: for a multi-state MSA, the ZCTA's
-//     own-state portion (portionSlugs); otherwise the bare umbrella slug
-//     (msaSlugs)
-//  4. State / territory region via 2-digit FIPS prefix
-//
-// When no tier matches (rare: APO/FPO 999xx ZIPs whose county FIPS
-// starts with "99", or a malformed sub-2-char county), Resolve returns
-// ("", "", false). Callers translate that into a dropped anchor.
-//
-// Adding a new tier — e.g., a "transit district" region between
-// county-leaf and MSA — is a single insertion in Resolve. Both the
-// ZCTA and HUD callers pick it up automatically.
+// The ZCTA path consults it after the city-place tier fails; HUD's
+// ZIP-County crosswalk carries no place GEOID, so for HUD the resolver
+// is the whole fallback.
 type countyResolver struct {
 	countyToMSA  map[string]string // 5-digit county FIPS → CBSA code
 	msaSlugs     map[string]string // CBSA code → MSA umbrella slug
 	portionSlugs map[string]string // "CBSAcode:stateFIPS" → per-state portion slug
 }
 
-// newCountyResolver builds a resolver from the per-run lookup tables.
-// The borough / county-leaf / state-FIPS maps are package-level
-// constants (see mappings.go) and don't need to be passed in.
-// portionSlugs routes a multi-state-MSA county to its own-state portion;
-// pass nil/empty to disable (single-state-only runs and unit tests).
+// newCountyResolver builds a resolver from the per-run CBSA tables. A
+// nil portionSlugs disables multi-state portion routing.
 func newCountyResolver(countyToMSA, msaSlugs, portionSlugs map[string]string) countyResolver {
 	return countyResolver{countyToMSA: countyToMSA, msaSlugs: msaSlugs, portionSlugs: portionSlugs}
 }
 
-// Resolve walks the 4-tier fallback for a 5-digit county GEOID.
-// Reason is the bare bucket label ("nyc-borough", "county-leaf",
-// "msa", "state"); the HUD caller prefixes "hud:" so a merged
-// reason-count histogram can tell the two sources apart.
+// Resolve walks the fallback for a 5-digit county GEOID. reason is the
+// tier label ("nyc-borough", "county-leaf", "msa-portion", "msa",
+// "state"). ok is false when no tier matches, e.g. APO/FPO ZIPs whose
+// county FIPS starts with "99".
 func (r countyResolver) Resolve(countyGEOID string) (slug, reason string, ok bool) {
 	if s := nycBoroughCounty[countyGEOID]; s != "" {
 		return s, "nyc-borough", true
@@ -55,9 +35,8 @@ func (r countyResolver) Resolve(countyGEOID string) (slug, reason string, ok boo
 		return s, "county-leaf", true
 	}
 	if code := r.countyToMSA[countyGEOID]; code != "" {
-		// Multi-state MSA: route to the ZCTA's own-state portion so the
-		// ancestor walk reaches only its own state (leak-free). Single-state
-		// MSAs have no portion entry and fall through to the bare umbrella.
+		// A portion's ancestor walk reaches only its own state, so a
+		// multi-state metro doesn't leak the other states' orgs.
 		if len(countyGEOID) >= 2 {
 			if p := r.portionSlugs[code+":"+countyGEOID[:2]]; p != "" {
 				return p, "msa-portion", true

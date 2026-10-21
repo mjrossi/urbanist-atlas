@@ -22,7 +22,7 @@ func region(slug, kind, tier string) *fstest.MapFile {
 
 // minimalSeedFS builds the smallest bundle BuildMemStore will accept:
 // one region per file it reads for US + CA, postal CSVs anchoring the
-// local-tier leaves (so the RGN-02b orphan/zero-anchor check passes),
+// local-tier leaves (so the orphan-leaf check passes),
 // and a single org (in regions_us.toml's "testville") carrying the
 // added_at under test.
 func minimalSeedFS(orgsTOML string) fstest.MapFS {

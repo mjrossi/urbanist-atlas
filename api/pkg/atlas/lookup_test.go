@@ -12,9 +12,9 @@ import (
 func nycFixture(t *testing.T) *MemStore {
 	t.Helper()
 	s := NewMemStore()
-	// Post-#7.5.2 shape: `nyc` is a regional intermediate region (only
-	// parent is `nyc-metro`); the borough leaf carries the state edge
-	// (`ny`) directly. Citywide orgs (TransAlt) attach to `nyc` and
+	// `nyc` is a regional intermediate region (only parent is
+	// `nyc-metro`); the borough leaf carries the state edge (`ny`)
+	// directly. Citywide orgs (TransAlt) attach to `nyc` and
 	// surface as Regional results for borough lookups.
 	addRegions(s,
 		Region{ID: 1, Slug: "nyc-tristate", Kind: "us:multi-state", Name: "Tri-State Region", Country: "US", ScopeTier: ScopeRegional, SortPriority: 80},
@@ -55,14 +55,13 @@ func TestLookup_NYC_Brooklyn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
 	}
-	// After the #7.5.2 borough split, citywide NYC orgs (TransAlt)
-	// attach to the regional `nyc` node and bucket as Regional.
-	// Borough-only orgs (Brooklyn Spoke) stay in Local. State-attached
-	// orgs (NY LCV → `ny`, a us:state) bucket as Statewide. The
-	// nyc-tristate coalition (us:multi-state) is NOT state-equivalent,
-	// so tri-state stays Regional. Each bucket is ordered by
-	// best-matched sort_priority asc: nyc(15) → nyc-metro(40) for
-	// Regional; nyc-tristate(80) sorts last in Regional.
+	// Citywide NYC orgs (TransAlt) attach to the regional `nyc` node
+	// and bucket as Regional. Borough-only orgs (Brooklyn Spoke) stay in
+	// Local. State-attached orgs (NY LCV → `ny`, a us:state) bucket as
+	// Statewide. The nyc-tristate coalition (us:multi-state) is NOT
+	// state-equivalent, so tri-state stays Regional. Each bucket is
+	// ordered by best-matched sort_priority asc: nyc(15) → nyc-metro(40)
+	// for Regional; nyc-tristate(80) sorts last in Regional.
 	wantLocal := []string{"brooklyn-spoke"}
 	wantRegional := []string{"transalt", "transitcenter", "tri-state"}
 	wantStatewide := []string{"ny-lcv"}
@@ -179,10 +178,10 @@ func TestLookup_OrgWithNoMatchedRegions(t *testing.T) {
 	}
 }
 
-// TestLookup_Michigan_StateVsMetro is the regression for the reported
-// behavior: a metro ZIP (Detroit) must split metro-attached orgs into
-// Regional and state-attached orgs into Statewide, and a non-metro ZIP
-// that anchors directly on the state must surface only Statewide.
+// TestLookup_Michigan_StateVsMetro pins that a metro ZIP (Detroit)
+// splits metro-attached orgs into Regional and state-attached orgs into
+// Statewide, and that a non-metro ZIP anchored directly on the state
+// surfaces only Statewide.
 func TestLookup_Michigan_StateVsMetro(t *testing.T) {
 	s := NewMemStore()
 	addRegions(s,

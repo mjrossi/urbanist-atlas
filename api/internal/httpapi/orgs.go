@@ -12,11 +12,8 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// getOrgHandler answers GET /api/v1/orgs/{slug}. Returns 404 with a
-// problem+json document for unknown or non-approved slugs. The handler
-// stays thin: parse → call store → encode. Hydration of Org.Regions
-// happens in the Store layer; the wire-shape adapter is the same
-// toOAPIOrg used by /regions/{slug} and /recent.
+// getOrgHandler answers GET /api/v1/orgs/{slug}, with a 404 for an
+// unknown slug.
 func getOrgHandler(store atlas.Store, logger *slog.Logger, m *Metrics, u *usage.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
@@ -25,9 +22,7 @@ func getOrgHandler(store atlas.Store, logger *slog.Logger, m *Metrics, u *usage.
 		if err != nil {
 			if errors.Is(err, atlas.ErrOrgNotFound) {
 				m.incOrgView(false)
-				// Not bucketed into usage_daily — see the matching note
-				// in regions.go: slug is raw path input here, and a miss
-				// is not popularity. Prometheus carries the miss.
+				// Not recorded in usage, as in getRegionHandler.
 				logger.DebugContext(r.Context(), "org view", "slug", slug, "found", false, "rid", rid)
 				writeProblem(w, r, http.StatusNotFound, problemNotFound, "Organization Not Found",
 					"We don't have this organization in the atlas yet. It may not be indexed, or the link you followed may be out of date.", rid)

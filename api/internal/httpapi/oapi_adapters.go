@@ -1,10 +1,7 @@
 package httpapi
 
-// Adapters between atlas domain types and the oapi-codegen wire
-// shapes. Every endpoint-specific adapter that converts from a
-// pkg/atlas struct to its oapi.* counterpart lives here so the
-// handler files stay thin (parse → call atlas → encode) and so the
-// wire-shape surface is reviewed in one file.
+// Adapters from pkg/atlas types to the oapi-codegen wire shapes, kept in
+// one file so the wire surface is reviewed in one place.
 
 import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -13,9 +10,6 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// toOAPIRegion adapts a domain Region onto the oapi wire shape. Used
-// by /lookup (in resolved ancestry + each org's region list), /regions
-// (the region itself), and /regions/{slug} (same).
 func toOAPIRegion(r atlas.Region) oapi.Region {
 	return oapi.Region{
 		Id:          r.ID,
@@ -28,11 +22,6 @@ func toOAPIRegion(r atlas.Region) oapi.Region {
 	}
 }
 
-// toOAPIOrg adapts a domain Org onto the plain oapi.Org wire shape
-// (used by /regions/{slug} and /recent). The /lookup endpoint uses
-// oapi.LookupOrg, which extends this shape with MatchedRegionSlugs;
-// see toOAPILookupOrg below — it calls this helper and then attaches
-// the lookup-specific field.
 func toOAPIOrg(o atlas.Org) oapi.Org {
 	tags := make([]string, 0, len(o.Tags))
 	for _, t := range o.Tags {
@@ -59,9 +48,6 @@ func toOAPIOrg(o atlas.Org) oapi.Org {
 	return out
 }
 
-// toOAPIOrgs lifts toOAPIOrg over a slice. Returns a non-nil
-// zero-length slice when the input is empty so the JSON body is `[]`,
-// not `null`.
 func toOAPIOrgs(in []atlas.Org) []oapi.Org {
 	out := make([]oapi.Org, 0, len(in))
 	for _, o := range in {
@@ -70,11 +56,6 @@ func toOAPIOrgs(in []atlas.Org) []oapi.Org {
 	return out
 }
 
-// toOAPILookupResult adapts the atlas package's native result type
-// onto the oapi-generated wire type. The JSON shapes are identical;
-// this adapter is a typed conversion so the handler signature is
-// "returns oapi.LookupResult", which keeps the wire contract front and
-// center in code review.
 func toOAPILookupResult(in atlas.LookupResult) oapi.LookupResult {
 	ancestry := make([]oapi.Region, 0, len(in.ResolvedAncestry))
 	for _, r := range in.ResolvedAncestry {
@@ -93,9 +74,6 @@ func toOAPILookupResult(in atlas.LookupResult) oapi.LookupResult {
 	}
 }
 
-// toOAPILookupOrgs lifts toOAPILookupOrg over a slice. Returns a
-// non-nil zero-length slice when the input is empty so the JSON body
-// is `[]`, not `null`.
 func toOAPILookupOrgs(orgs []atlas.Org) []oapi.LookupOrg {
 	out := make([]oapi.LookupOrg, 0, len(orgs))
 	for _, o := range orgs {
@@ -104,10 +82,7 @@ func toOAPILookupOrgs(orgs []atlas.Org) []oapi.LookupOrg {
 	return out
 }
 
-// toOAPILookupOrg builds the /lookup-specific wire shape on top of the
-// shared toOAPIOrg adapter. The only lookup-specific field is
-// MatchedRegionSlugs, which the lookup algorithm in pkg/atlas
-// computes per org.
+// toOAPILookupOrg is toOAPIOrg plus MatchedRegionSlugs.
 func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
 	base := toOAPIOrg(o)
 	return oapi.LookupOrg{
@@ -124,13 +99,7 @@ func toOAPILookupOrg(o atlas.Org) oapi.LookupOrg {
 	}
 }
 
-// toOAPIRegionSummaries converts the domain-level region list to the
-// wire-level slice. Returns a non-nil zero-length slice when the
-// input is empty so the JSON body is `[]`, not `null`.
-//
-// Empty BrowseParentSlug maps to JSON null (omitempty pointer); a
-// non-empty value renders as a string. Lets the SPA group cities
-// under their parent metro without a second request.
+// toOAPIRegionSummaries omits an empty BrowseParentSlug from the wire.
 func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 	out := make([]oapi.RegionSummary, 0, len(in))
 	for _, rs := range in {
@@ -148,9 +117,6 @@ func toOAPIRegionSummaries(in []atlas.RegionSummary) []oapi.RegionSummary {
 	return out
 }
 
-// toOAPIStats converts the domain-level atlas summary to the wire
-// shape. ByCountry is forced non-nil so the JSON body carries `[]`
-// rather than `null` on an empty store.
 func toOAPIStats(in atlas.Stats) oapi.Stats {
 	byCountry := make([]oapi.CountryStats, 0, len(in.ByCountry))
 	for _, c := range in.ByCountry {
@@ -168,11 +134,6 @@ func toOAPIStats(in atlas.Stats) oapi.Stats {
 	}
 }
 
-// toOAPIRegionSearchResults converts the domain-level search results to
-// the wire-level slice. Returns a non-nil zero-length slice when the
-// input is empty so the JSON body is `[]`, not `null`. ContextLabel
-// maps to a plain (possibly empty) string — the disambiguation hint is
-// required on the wire, never null.
 func toOAPIRegionSearchResults(in []atlas.RegionSearchResult) []oapi.RegionSearchResult {
 	out := make([]oapi.RegionSearchResult, 0, len(in))
 	for _, rsr := range in {
@@ -184,15 +145,8 @@ func toOAPIRegionSearchResults(in []atlas.RegionSearchResult) []oapi.RegionSearc
 	return out
 }
 
-// toOAPIRegionDetail converts a single domain region to the wire
-// shape. Orgs are bucketed by attachment scope_tier (the shared
-// pkg/atlas helper) and mapped via toOAPILookupOrgs so each row
-// carries its matched_region_slugs — same shape /lookup returns,
-// driving the same SPA components.
-//
-// Ancestry mirrors the closest-first walk pkg/atlas built (direct
-// parent at index 0, root at the end, national-tier rows filtered).
-// The SPA renders it as a breadcrumb in the Region page kicker.
+// toOAPIRegionDetail maps orgs to the same LookupOrg shape /lookup
+// returns, matched_region_slugs included.
 func toOAPIRegionDetail(in atlas.RegionDetail) oapi.RegionDetail {
 	ancestry := make([]oapi.Region, 0, len(in.Ancestry))
 	for _, r := range in.Ancestry {

@@ -8,12 +8,9 @@ import (
 	"strings"
 )
 
-// RegionRow is one emitted [[region]] in a generated regions_*.toml
-// file: a metro/CMA umbrella or an auto-generated per-state/-province
-// portion. Comment, when set, is the full provenance line (including
-// the leading '#', no trailing newline) emitted after the row —
-// umbrellas carry one, portions don't. Both country plans populate this
-// shape and hand it to WriteRegionsTOML.
+// RegionRow is one [[region]] in a generated regions_*.toml: a metro/CMA
+// umbrella or a per-state/-province portion. Comment is a full "# …"
+// provenance line written after the row, or empty.
 type RegionRow struct {
 	Slug         string
 	Name         string
@@ -23,24 +20,16 @@ type RegionRow struct {
 	Comment      string
 }
 
-// PortionParent is one state/province a multi-state/-province umbrella
-// spans, as the portion-row kernel needs it: the region slug of the
-// state or province (e.g. "il", "qc", "nl-province") and the bare
-// abbrev used in portion slugs and names (the slug minus its
-// "-state"/"-province" suffix).
+// PortionParent is one state or province an umbrella spans: its region
+// slug and the bare abbrev used in portion slugs ("ca-state" → "ca").
 type PortionParent struct {
 	Slug   string
 	Abbrev string
 }
 
-// BuildPortionRows builds the per-state/-province portion rows for a
-// stateless multi-state/-province umbrella: one row per spanned parent
-// with slug "<umbrella>-<abbrev>", name "<Umbrella Name> (<ABBREV>)",
-// the country-specific kind (us:metro-portion / ca:cma-portion), and
-// parents [state-or-province slug, umbrella slug]. Rows are returned
-// in spanned order so callers can key their own portion-anchor maps
-// (US "CBSAcode:stateFIPS", CA "umbrellaSlug:PRUID" — deliberately
-// per-country) off the matching input entry.
+// BuildPortionRows returns one portion row per spanned parent, in
+// spanned order, with slug "<umbrella>-<abbrev>", name
+// "<Umbrella Name> (<ABBREV>)" and parents [parent slug, umbrella slug].
 func BuildPortionRows(umbrellaSlug, umbrellaName, kind string, spanned []PortionParent) []RegionRow {
 	rows := make([]RegionRow, 0, len(spanned))
 	for _, p := range spanned {
@@ -54,14 +43,10 @@ func BuildPortionRows(umbrellaSlug, umbrellaName, kind string, spanned []Portion
 	return rows
 }
 
-// WriteRegionsTOML emits a generated regions_*.toml file
-// deterministically: header, then one [[region]] block per row sorted
-// by slug ASC (so a "<umbrella>-<sub>" portion lands right after its
-// umbrella, satisfying the loader's parents-first order), no embedded
-// timestamps, LF line endings, trailing newline. scope_tier and
-// sort_priority are fixed regional/40 — every generated metro/CMA row
-// is regional. Strings are escaped via tomlString so non-ASCII names
-// (Montréal, Mayagüez) round-trip as valid TOML basic strings.
+// WriteRegionsTOML writes header and then the rows sorted by slug, which
+// puts each "<umbrella>-<abbrev>" portion after its umbrella, as the
+// loader's parents-first order needs. Every generated row is
+// scope_tier "regional", sort_priority 40.
 func WriteRegionsTOML(w io.Writer, header string, rows []RegionRow) error {
 	sorted := make([]RegionRow, len(rows))
 	copy(sorted, rows)
@@ -75,11 +60,7 @@ func WriteRegionsTOML(w io.Writer, header string, rows []RegionRow) error {
 		if r.Slug == "" {
 			return fmt.Errorf("write regions: empty slug (name %q)", r.Name)
 		}
-		// kind is country-specific (us:metro, ca:cma, …) and must be set
-		// by the caller's row builder; emitting kind = "" would write an
-		// invalid region the loader rejects. The old per-country US writer
-		// defaulted empty kind to "us:metro", but that default can't live
-		// in this shared cross-country writer — error out instead.
+		// No shared default kind can exist across countries.
 		if r.Kind == "" {
 			return fmt.Errorf("write regions: empty kind (slug %q)", r.Slug)
 		}
@@ -112,10 +93,8 @@ func WriteRegionsTOML(w io.Writer, header string, rows []RegionRow) error {
 	return bw.Flush()
 }
 
-// writeStringList writes a TOML `key = ["a", "b"]` line (plus newline),
-// but ONLY when items is non-empty — an empty list emits nothing, so
-// region rows without the field stay byte-identical. Used for the
-// optional rollup_states field.
+// writeStringList writes a `key = [...]` line, or nothing when items is
+// empty, so rows without the field keep their bytes.
 func writeStringList(w *bufio.Writer, key string, items []string) error {
 	if len(items) == 0 {
 		return nil

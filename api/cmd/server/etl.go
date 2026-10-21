@@ -19,37 +19,22 @@ import (
 
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 
-	// Blank-import per-country plans so their init() blocks register
-	// with etl.Plans. Adding a new country = add a blank import here.
+	// Country plans register with etl.Plans from init().
 	_ "github.com/mjrossi/urbanist-atlas/api/internal/etl/ca"
 	_ "github.com/mjrossi/urbanist-atlas/api/internal/etl/us"
 )
 
-// etlCommand wraps the operator-side data pipeline that reshapes
-// upstream postal-code and metro reference data (Census ZCTA + CBSA,
-// Statistics Canada PCCF + CMA) into the seed file shapes that
-// internal/seedfiles.BuildMemStore loads into the in-memory FileStore
-// at API boot.
-//
-// Two sub-subcommands:
+// etlCommand runs the operator-side pipeline that turns upstream
+// reference data into the seed files:
 //
 //	urbanist-atlas-server etl download   --country US
 //	urbanist-atlas-server etl regenerate --country US
 //
-// download fetches every SourceDescriptor in the country plan via HTTP,
-// streams each file into etl/sources/<country>/, and verifies the
-// SHA256 against the value pinned in the plan (mirrored in
-// etl/SOURCES.md). regenerate parses the staged sources and writes the
-// deterministic seed TOML/CSV files under api/seed/. Country plans
-// live in api/internal/etl/<cc>/ and self-register in etl.Plans via
-// init() blocks.
-//
-// US note: the Census CBSA file ships as xlsx only. download writes
-// list1_2023.xlsx; an out-of-band Python step (etl/scripts/xlsx_to_csv.py)
-// converts it to list1_2023.csv, which regenerate consumes. See
-// etl/SOURCES.md for the recipe.
-//
-// Design rationale at docs/superpowers/specs/2026-05-19-postal-coverage-design.md.
+// download fetches each source of the country plan into etl/sources/<cc>/
+// and checks its pinned SHA256 (mirrored in etl/SOURCES.md); regenerate
+// writes the deterministic files under api/seed/. The US CBSA file ships
+// as xlsx only, so a Python step in etl/SOURCES.md converts it to CSV
+// between the two. Design: docs/superpowers/specs/2026-05-19-postal-coverage-design.md.
 func etlCommand() *cli.Command {
 	commonFlags := []cli.Flag{
 		&cli.StringFlag{
@@ -116,13 +101,8 @@ type resolvedPlan struct {
 	target  etl.Target
 }
 
-// resolvePlan parses the flags common to both etl subcommands: it
-// requires --country, looks up the registered plan, joins the
-// per-country source directory, and parses --target. op is the
-// subcommand label ("etl download" / "etl regenerate") so the error
-// prefixes stay identical to the inlined versions. The download
-// subcommand's mkdir and the regenerate subcommand's Regenerate-nil /
-// out-dir handling remain in their respective callers.
+// resolvePlan parses the flags both etl subcommands share. op prefixes
+// its errors.
 func resolvePlan(c *cli.Command, op string) (resolvedPlan, error) {
 	country := c.String("country")
 	if country == "" {
@@ -191,19 +171,15 @@ func runEtlDownload(ctx context.Context, c *cli.Command) error {
 }
 
 const (
-	// etlDownloadMaxAttempts bounds the retry loop for a single source.
-	// Census/StatsCan serve 200s normally; the retries absorb transient
-	// edge/CDN failures (5xx, 429, dropped connections) that would
-	// otherwise flake the seed-determinism CI job on an isolated blip.
+	// etlDownloadMaxAttempts absorbs transient upstream failures (5xx,
+	// 429, dropped connections) so one blip doesn't fail a download.
 	etlDownloadMaxAttempts = 4
-	// etlDownloadBaseDelay is the first backoff; it doubles on each retry
-	// (1s, 2s, 4s).
+	// etlDownloadBaseDelay doubles on each retry.
 	etlDownloadBaseDelay = 1 * time.Second
 )
 
-// etlSleep waits d or until ctx is canceled, whichever comes first,
-// returning the context error if canceled. It is a package var so the
-// download tests can stub out the real wait and not spend backoff seconds.
+// etlSleep waits d or until ctx is canceled. It is a var so tests can
+// skip the backoff.
 var etlSleep = func(ctx context.Context, d time.Duration) error {
 	select {
 	case <-time.After(d):
@@ -213,18 +189,12 @@ var etlSleep = func(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// downloadSource fetches src.URL into dst, verifying the result against
-// src.SHA256 (if non-empty). It is idempotent: when dst already exists
-// and already matches the pinned checksum, the network fetch is skipped
-// entirely, so re-runs and CI cache hits are offline. Transient failures
-// (transport errors, HTTP 5xx, 429) are retried with exponential backoff;
-// a complete-but-mismatched download is deterministic and is NOT retried —
-// the file is left on disk so the operator can re-review the upstream
-// vintage rather than losing the download.
+// downloadSource fetches src.URL into dst and checks src.SHA256 when set.
+// A dst that already matches is not re-fetched. Transient failures are
+// retried with backoff; a checksum mismatch is not, and the file stays on
+// disk so the operator can review the new upstream vintage.
 func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDescriptor, dst string, logger *slog.Logger) error {
-	// Idempotent skip: a previously downloaded file whose sha256 already
-	// matches the pin needs no fetch. A missing, partial, or corrupt file
-	// fails this check and falls through to a fresh download — self-healing.
+	// A missing, partial or corrupt file fails the checksum and is re-fetched.
 	if src.SHA256 != "" {
 		if got, err := fileSHA256(dst); err == nil && got == src.SHA256 {
 			logger.Info("etl download: cached (sha256 match, skipping fetch)",
@@ -242,10 +212,6 @@ func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDesc
 		"vintage", src.Vintage,
 	)
 
-	// Attempts 1..max-1 may retry; each transient failure backs off and
-	// loops. The final attempt runs after the loop, so its return is the
-	// genuine "every attempt failed" path rather than dead code following
-	// an in-loop return. A non-retryable error short-circuits out directly.
 	for attempt := 1; attempt < etlDownloadMaxAttempts; attempt++ {
 		retryable, err := fetchOnce(ctx, client, src, dst, logger)
 		if err == nil {
@@ -266,16 +232,13 @@ func downloadSource(ctx context.Context, client *http.Client, src etl.SourceDesc
 			return serr
 		}
 	}
-	// Final attempt: no backoff follows it, so its result is terminal —
-	// nil on success, otherwise the error (retryable or not) is returned.
+	// The last attempt is outside the loop because no backoff follows it.
 	_, err := fetchOnce(ctx, client, src, dst, logger)
 	return err
 }
 
-// fetchOnce performs a single GET of src.URL into dst, computing and
-// verifying the sha256. The bool reports whether a non-nil error is worth
-// retrying: transport errors and HTTP 5xx/429 are transient; any other
-// non-200 and a sha256 mismatch are deterministic.
+// fetchOnce GETs src.URL into dst and verifies the sha256. The bool
+// reports whether a non-nil error is transient and worth retrying.
 func fetchOnce(ctx context.Context, client *http.Client, src etl.SourceDescriptor, dst string, logger *slog.Logger) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.URL, nil)
 	if err != nil {
@@ -283,7 +246,7 @@ func fetchOnce(ctx context.Context, client *http.Client, src etl.SourceDescripto
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		// Transport-level failures (DNS, connection reset, timeout) are transient.
+		// Transport errors (DNS, connection reset, timeout) are transient.
 		return true, fmt.Errorf("http get: %w", err)
 	}
 	defer resp.Body.Close()
@@ -349,9 +312,7 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 	country, logger, plan, srcDir, target := r.country, r.logger, r.plan, r.srcDir, r.target
 
 	if plan.Regenerate == nil {
-		// Defensive: a country plan may register itself but defer
-		// implementing Regenerate to a follow-up slice. US and CA both
-		// ship complete plans today.
+		// A plan may register before it implements Regenerate.
 		logger.Info("etl regenerate: plan registered but Regenerate hook is nil (no-op)",
 			"country", country,
 		)
@@ -375,10 +336,8 @@ func runEtlRegenerate(ctx context.Context, c *cli.Command) error {
 	return nil
 }
 
-// planCodes returns the registered country codes in sorted order so the
-// "known: %s" hint in the no-plan error reads identically run-to-run —
-// ranging etl.Plans directly would emit them in Go's randomized map
-// order.
+// planCodes returns the registered country codes sorted, so the error
+// hint is stable across runs.
 func planCodes() []string {
 	out := make([]string, 0, len(etl.Plans))
 	for k := range etl.Plans {

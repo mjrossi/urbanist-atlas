@@ -18,24 +18,17 @@ import (
 //	go test ./internal/seedfiles/ -run TestPublishedSlugs -update
 //
 // in the SAME PR as the slug change, so the diff shows exactly which
-// public slug moved — a reviewable act, not a silent break. Mirrors the
-// stage-regenerate-commit flow used to resolve seed-check drift.
+// public slug moved: a reviewable act, not a silent break.
 var updateSlugs = flag.Bool("update", false, "regenerate published_slugs.golden from the current seed")
 
 const publishedSlugsGolden = "testdata/published_slugs.golden"
 
-// TestPublishedSlugs is the D-01 append-only slug guard. Slugs are
-// permanent public identifiers (the /api/v1/regions/{slug} contract,
-// docs/region-graph.md "Slug permanence — append, never rename"); once
-// published, a slug may be added to but never removed or renamed.
-//
-// The committed golden is a sorted snapshot of every published region
-// slug — states, hand-curated leaves, AND generated MSA/CMA slugs (the
-// FULL set via MemStore.Slugs(), not the browseable-only ListRegions
-// set). The assertion direction is golden ⊆ current (RESEARCH
-// Mechanism #1, Pitfall 3): every previously-published slug must still
-// exist; NEW slugs are allowed (append-only). A removed/renamed slug
-// fails, naming the missing slug and the -update escape hatch.
+// TestPublishedSlugs is the append-only slug guard. Slugs are permanent
+// public identifiers (docs/region-graph.md "Slug permanence — append,
+// never rename"). The committed golden snapshots every published slug,
+// generated MSA/CMA slugs included (MemStore.Slugs(), not the browse
+// subset), and the check is golden ⊆ current: new slugs pass, a removed
+// or renamed one fails, naming the slug and the -update escape hatch.
 func TestPublishedSlugs(t *testing.T) {
 	store, err := seedfiles.BuildMemStore(nil, seedfs.FS)
 	if err != nil {

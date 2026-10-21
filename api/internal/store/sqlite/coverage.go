@@ -8,11 +8,8 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// RecordCoverageGap appends a sampled empty-result lookup/search to the
-// coverage_gaps table. kind is "lookup" or "search"; country is "" for
-// searches; input is the normalized postal code or the search query.
-// Best-effort — the coverage Recorder fires-and-forgets and logs (never
-// surfaces) the error.
+// RecordCoverageGap appends one sampled empty-result lookup or search.
+// kind is "lookup" or "search"; country is "" for searches.
 func (s *Store) RecordCoverageGap(ctx context.Context, kind, country, input string) error {
 	if err := s.q.InsertCoverageGap(ctx, sqlitegen.InsertCoverageGapParams{
 		Kind:      kind,
@@ -25,9 +22,8 @@ func (s *Store) RecordCoverageGap(ctx context.Context, kind, country, input stri
 	return nil
 }
 
-// PruneCoverageGaps keeps only the newest maxRows coverage-gap rows and
-// deletes the rest, keeping the table bounded. maxRows <= 0 is a no-op
-// (unbounded).
+// PruneCoverageGaps deletes all but the newest maxRows rows. maxRows <= 0
+// is a no-op.
 func (s *Store) PruneCoverageGaps(ctx context.Context, maxRows int) error {
 	if maxRows <= 0 {
 		return nil
@@ -38,9 +34,8 @@ func (s *Store) PruneCoverageGaps(ctx context.Context, maxRows int) error {
 	return nil
 }
 
-// ListCoverageGaps returns the newest coverage-gap rows, newest-first,
-// capped at limit (default 50, max 200) — the data behind the admin
-// GET /api/v1/admin/coverage-gaps endpoint.
+// ListCoverageGaps returns the newest coverage-gap rows first, limit
+// defaulting to 50 and capped at 200.
 func (s *Store) ListCoverageGaps(ctx context.Context, limit int) ([]atlas.CoverageGap, error) {
 	if limit <= 0 {
 		limit = 50

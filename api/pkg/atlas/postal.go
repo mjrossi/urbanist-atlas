@@ -5,19 +5,10 @@ import (
 	"strings"
 )
 
-// NormalizePostalCode applies per-country canonicalization rules:
-// uppercase + whitespace stripped for every country, plus country-
-// specific truncation (US ZIP+4 → ZIP, CA → FSA, UK → outward code).
-// Unknown countries get the generic uppercase/strip pass.
-//
-// Call sites:
-//   - internal/httpapi/lookup.go — once at the handler boundary so
-//     logs and error details show the canonical form.
-//   - pkg/atlas/memstore.go (via postalKey) — defense-in-depth
-//     normalization on the in-memory store.
-//   - internal/seedfiles/postal.go — applied to every CSV row before
-//     adding it to the store, so the in-memory map holds the
-//     canonical form.
+// NormalizePostalCode uppercases and strips whitespace for every
+// country, then applies country-specific truncation (US ZIP+4 → ZIP,
+// CA → FSA, UK → outward code). It is idempotent, so normalizing at
+// several layers is safe.
 func NormalizePostalCode(country Country, raw string) string {
 	s := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(raw), " ", ""))
 	switch country {
@@ -43,10 +34,7 @@ func NormalizePostalCode(country Country, raw string) string {
 		}
 		return s
 	case "PT":
-		// PT postal codes are 7-digit NNNN-NNN (e.g. 1100-001 in Lisboa).
-		// Strip the hyphen so storage is 7 raw digits; lookups apply the
-		// same normalization, so "1100-001" and "1100001" resolve
-		// identically.
+		// NNNN-NNN is stored as 7 raw digits.
 		return strings.ReplaceAll(s, "-", "")
 	default:
 		return s
@@ -110,15 +98,10 @@ func ValidatePostalCode(country Country, code string) error {
 	return nil
 }
 
-// IsMilitaryPostalCode reports whether code is a US military (APO/FPO)
-// or diplomatic (DPO) ZIP. These occupy reserved ZIP prefixes that have
-// no residential region in the atlas graph, so a lookup for one always
-// misses; callers use this to swap the generic "not found" reply for a
-// tailored "enter a residential ZIP" message.
-//
-// Only meaningful for CountryUS; false for every other country. code is
-// expected already normalized (5 digits) — anything else returns false.
-// The reserved ranges, none of which overlap a residential ZIP:
+// IsMilitaryPostalCode reports whether code is a normalized US military
+// (APO/FPO) or diplomatic (DPO) ZIP. Those prefixes have no residential
+// region in the atlas, so a lookup for one always misses. The reserved
+// ranges, none of which overlap a residential ZIP:
 //
 //   - 090–098: AE (Armed Forces Europe/Middle East/Africa/Canada).
 //     Residential New England starts at 010; all of 09xxx is military.
@@ -150,8 +133,7 @@ func IsMilitaryPostalCode(country Country, code string) bool {
 	}
 }
 
-// postalKey is the internal cache key used by MemStore. Lowercase
-// helper, not exported.
+// postalKey is MemStore's postal-code map key.
 func postalKey(country Country, code string) string {
 	return string(country) + ":" + NormalizePostalCode(country, code)
 }

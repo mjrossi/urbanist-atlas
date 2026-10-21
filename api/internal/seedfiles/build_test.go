@@ -81,15 +81,12 @@ func TestBuildMemStore_Embed_MetroRollupSurfacesOnState(t *testing.T) {
 }
 
 // TestBuildMemStore_Embed_FlagshipPortionsLeakFree is the end-to-end
-// guard for the unified metro model (GitHub #79): the curated multi-state
-// flagships (nyc-metro, chicago-metro, greater-boston) generate per-state
+// guard for the unified metro model: the curated multi-state flagships
+// (nyc-metro, chicago-metro, greater-boston) generate per-state
 // us:metro-portion leaves like every other multi-state metro, so a ZIP
-// that lacks a curated leaf re-anchors at its OWN state's portion and the
+// that lacks a curated leaf anchors at its OWN state's portion and the
 // ancestor walk reaches that state + the umbrella (+ the advocacy
-// coalition where one exists) but NEVER the sibling state. Before the
-// fix these ZIPs anchored at the bare umbrella — reaching no state at all
-// (NYC/Chicago), or, for greater-boston whose override parent was ["ma"],
-// leaking NH ZIPs up into Massachusetts.
+// coalition where one exists) but NEVER the sibling state.
 func TestBuildMemStore_Embed_FlagshipPortionsLeakFree(t *testing.T) {
 	store, err := seedfiles.BuildMemStore(nil, seedfs.FS)
 	if err != nil {
@@ -141,9 +138,8 @@ func TestBuildMemStore_Embed_FlagshipPortionsLeakFree(t *testing.T) {
 }
 
 // TestBuildMemStore_LogsSeedCounts confirms the boot summary line carries
-// the loaded-data counts an operator relies on at startup — regions,
-// orgs, and the postal-code total (the largest dataset, previously only
-// logged per-country at DEBUG).
+// the loaded-data counts an operator relies on at startup: regions,
+// orgs, and the postal-code total.
 func TestBuildMemStore_LogsSeedCounts(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil)) // default level: INFO

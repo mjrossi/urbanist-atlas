@@ -7,10 +7,8 @@ import (
 	"time"
 )
 
-// healthHandler answers GET /healthz with a 200 and a tiny plaintext
-// body. Used by Fly as a liveness probe — deliberately doesn't touch
-// any dependency (DB, etc.) so a downstream outage doesn't cause Fly
-// to recycle the machine and lose the recovery window. Readiness is
+// healthHandler answers GET /healthz, the liveness probe. It touches no
+// dependency, so a store outage never fails liveness. Readiness is
 // /readyz.
 func healthHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
@@ -28,9 +26,8 @@ type pinger interface {
 
 // readyHandler answers GET /readyz with 200 and `ok`, or `degraded` when
 // the submission store fails a 1-second ping. It never answers 503:
-// reads are served from the in-memory MemStore, so a SQLite problem must
-// not take the only machine out of rotation. With submissions disabled
-// pingable is nil and the probe always reports ok.
+// reads are served from memory, so a SQLite problem must not mark the
+// server unready. With submissions disabled the probe always reports ok.
 func readyHandler(pingable any, logger *slog.Logger, m *Metrics) http.HandlerFunc {
 	p, _ := pingable.(pinger)
 	return func(w http.ResponseWriter, r *http.Request) {

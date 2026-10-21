@@ -61,9 +61,10 @@ URBANIST_SUBMISSIONS_RATE_PER_HOUR = '5'
 # records promotion_error="worker disabled (no token configured)".
 URBANIST_COVERAGE_SAMPLE_RATE = "0.1" # 10% of empty lookups/searches
 
-# Fly's managed Prometheus scrapes this over the private 6PN network. The
-# port is intentionally NOT in [http_service], so it is never
-# internet-routable. Managed-Prometheus retention is ~30 days; longer
+# Fly's managed Prometheus scrapes this port; see
+# docs/architecture/http-api.md for why the listener binds all
+# interfaces. The port is intentionally NOT in [http_service], so it is
+# never internet-routable. Managed-Prometheus retention is ~30 days; longer
 # history would mean remote-write to Grafana Cloud (out of scope for v1).
 [metrics]
 port = 9091
