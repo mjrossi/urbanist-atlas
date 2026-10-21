@@ -1,25 +1,9 @@
 /**
- * Region-kind metadata: one source of truth for the human-readable
- * label AND the two predicates the SPA uses to decide UI affordances.
- *
- * - `label`: shown in prose so taxonomy strings (`us:metro`,
- *   `us:multi-state`, …) never leak into UI copy.
- * - `browseable`: true if `/region/{slug}` resolves the kind, so the
- *   SPA should render the name as a Link. Every kind in this map is
- *   non-national (the server returns 404 for `scope_tier='national'`
- *   slugs); editorial policy keeps national kinds out of the map
- *   entirely.
- * - `metro`: true if the kind is metro-equivalent; {@link primaryRegion}
- *   prefers these.
- *
- * The default browse set (kinds returned by `/api/v1/regions`) is
- * `browseable && (metro || …)` — those are the metros + cities the
- * Browse index ships. The broader `browseable: true` set also
- * includes states, counties, multi-state regions, etc. that are
- * reachable by typing `/region/<slug>` directly.
- *
- * Adding a new country's kinds means editing this one record, not
- * three independent sets across the SPA.
+ * Per-kind UI metadata. `label` keeps taxonomy strings like `us:metro`
+ * out of copy; `browseable` means `/region/{slug}` resolves the kind, so
+ * the name renders as a link (the API 404s national-tier slugs, so
+ * national kinds stay out of this map); `metro` marks the kinds
+ * {@link primaryRegion} prefers.
  */
 interface RegionKindInfo {
   label: string;
@@ -28,7 +12,7 @@ interface RegionKindInfo {
 }
 
 const REGION_KINDS: Record<string, RegionKindInfo> = {
-  // Default browse set: metros + cities, surfaced by /api/v1/regions.
+  // The `/api/v1/regions` browse set (`defaultBrowseKinds` in the API).
   'us:metro': { label: 'Metropolitan area', browseable: true, metro: true },
   'us:city': { label: 'City', browseable: true, metro: false },
   'ca:cma': { label: 'Census Metropolitan Area', browseable: true, metro: true },
@@ -36,9 +20,7 @@ const REGION_KINDS: Record<string, RegionKindInfo> = {
   'ca:city': { label: 'City', browseable: true, metro: false },
   'pt:area-metropolitana': { label: 'Área Metropolitana', browseable: true, metro: true },
 
-  // Surfaced via /regions/{slug} when navigating directly to a graph
-  // node outside the default browse set. All non-national, so all
-  // browseable; none metro-equivalent.
+  // Outside the browse set, but reachable at /region/{slug}.
   'us:state': { label: 'State', browseable: true, metro: false },
   'us:federal-district': { label: 'Federal district', browseable: true, metro: false },
   'us:territory': { label: 'Territory', browseable: true, metro: false },
@@ -62,8 +44,7 @@ const REGION_KINDS: Record<string, RegionKindInfo> = {
 
 const UNKNOWN: RegionKindInfo = { label: 'Region', browseable: false, metro: false };
 
-// Track kinds we've already warned about so dev-mode console spam stays
-// bounded — schema drift only needs to flag once per kind per session.
+// One dev warning per unknown kind per session.
 const warnedKinds = new Set<string>();
 
 function infoFor(kind: string): RegionKindInfo {

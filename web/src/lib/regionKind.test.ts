@@ -7,9 +7,7 @@ import {
   regionKindLabel,
 } from './regionKind.ts';
 
-// The dev-mode unknown-kind console.warn introduced for schema-drift
-// detection fires whenever a kind isn't in REGION_KINDS. Restore the
-// real console.warn after each test so spies don't leak across cases.
+// Restore console.warn so the unknown-kind spies don't leak across cases.
 afterEach(() => {
   vi.restoreAllMocks();
 });

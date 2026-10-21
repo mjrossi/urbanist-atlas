@@ -9,17 +9,10 @@ import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 import { NotFoundWithLayout } from './NotFound.tsx';
 
 /**
- * The root `errorElement`. React Router routes BOTH unmatched URLs (a
- * 404 ErrorResponse) and any unhandled error thrown by a descendant
- * component or loader here. We branch on which it is: a 404 keeps the
- * newspaper "page not in this edition" page; a route chunk that failed
- * to load gets one reload; anything else is an unexpected failure and
- * gets its own "stop press" page rather than masquerading as a 404.
- *
- * There is no error-tracking SaaS by design (see the observability
- * design spec). The boundary's whole job is to fail gracefully, surface
- * the request id so a user can quote it in a report, and log to the
- * console in dev — the maintainer then greps the server logs by that id.
+ * The root `errorElement`, for unmatched URLs and unhandled errors
+ * alike. A 404 gets the not-found page, a failed route chunk one reload,
+ * and anything else a "stop press" page showing the request id, which
+ * is the only trace there is: the app ships no client error tracking.
  */
 export function RouteErrorBoundary() {
   const error = useRouteError();

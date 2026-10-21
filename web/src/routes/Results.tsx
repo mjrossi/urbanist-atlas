@@ -50,18 +50,12 @@ export function Results() {
     };
   }, []);
 
-  // Breadcrumb prefix: "Atlas / Lookup · <ZIP>". The ZIP renders as
-  // a non-clickable span (no `to`) so it shows context without
-  // implying a clickable lookup-only landing page.
   const breadcrumbPrefix: readonly BreadcrumbItem[] = [
     { label: 'Atlas', to: '/' },
     { label: `Lookup · ${postalCode || '—'}` },
   ];
 
-  // Resolved-ancestry walk: API returns leaf-first; the breadcrumb
-  // wants root-first followed by the leaf as `current`. Reverse
-  // the ancestry and drop the (now-last) leaf, which the breadcrumb
-  // renders separately via `currentLabel`.
+  // Drop the leaf: the breadcrumb renders it as `current`.
   const ancestryRootFirst = query.data
     ? reverseAncestry(query.data.resolved_ancestry).slice(0, -1)
     : [];
@@ -98,7 +92,6 @@ function ResultsBody({
   country: SupportedCountry | null;
   rawCountry: string | null;
 }) {
-  // Pre-query gates: URL hasn't reached a state where a lookup makes sense yet.
   if (postalCode.length === 0) {
     return (
       <p className="results-state mt-48">
@@ -120,16 +113,9 @@ function ResultsBody({
       query={query}
       loading={<>Finding organizations for {postalCode}…</>}
       error={(e) =>
-        // Any 404 on /lookup is an unresolved postal code — a not-found
-        // or a military/diplomatic ZIP. The API owns the consumer-facing
-        // sentence (problem.detail); we render it as the card body and add
-        // the navigation links as chrome rather than re-authoring the copy.
-        // The card label is a fixed small-caps eyebrow (the EmptyState
-        // `.label` slot is uppercased and tracked — designed for a terse
-        // eyebrow, not a backend problem title), so the server's title is
-        // not routed there. Genuine errors (401/429/500) return undefined
-        // and fall through to QueryState's default red alert with the
-        // request id.
+        // A 404 is an unresolved code, plain or military. The API's
+        // `detail` is written for readers, so it is the body; its `title`
+        // is too long for the small-caps label.
         e.status === 404 ? (
           <EmptyState
             className="mt-48"
@@ -162,10 +148,6 @@ function ResultsContent({
   const { local, regional, statewide, resolved_ancestry } = data;
   const empty = totalEntries(data) === 0;
 
-  // EntryList needs a slug -> display name map for its "Matched
-  // via X" footer. Build it from the resolved-ancestry walk; this
-  // covers every slug an Org's matched_region_slugs can reference
-  // for this lookup.
   const regionNameBySlug = new Map(resolved_ancestry.map((r) => [r.slug, r.name]));
 
   return (

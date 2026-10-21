@@ -4,29 +4,15 @@ import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 
 interface Options {
-  /** Initial entry stack for the MemoryRouter. Defaults to `['/']`. */
+  /** Defaults to `['/']`. */
   initialEntries?: string[];
-  /**
-   * If set, the rendered tree is wrapped in
-   * `<Routes><Route path={routePath} element={ui} /></Routes>` so
-   * `useParams()` resolves params from `initialEntries`. Leave undefined
-   * for pages that don't read URL params.
-   */
+  /** Mounts `ui` at this route path, so `useParams()` resolves. */
   routePath?: string;
-  /**
-   * Custom QueryClient if a test needs to seed cache or tweak defaults.
-   * The default is `{ defaultOptions: { queries: { retry: false } } }`
-   * so failing-query tests don't retry.
-   */
+  /** Defaults to a client with query retries off. */
   queryClient?: QueryClient;
 }
 
-/**
- * Renders `ui` wrapped in the providers every page test needs:
- * QueryClientProvider + MemoryRouter (+ optional Routes/Route to
- * activate URL params). Replaces six near-identical per-file render
- * helpers with one definition.
- */
+/** Renders `ui` inside a QueryClientProvider and a MemoryRouter. */
 export function renderWithProviders(ui: ReactElement, opts: Options = {}) {
   const client =
     opts.queryClient ??

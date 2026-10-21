@@ -1,13 +1,7 @@
 import { useEffect, useState } from 'react';
 
-// Lives here, not in Submit.tsx, so it can be unit-tested: a component
-// module can't export non-component helpers without tripping
-// react-refresh/only-export-components.
-
 /**
- * A per-second countdown. `seconds` ticks down to zero; the returned
- * setter (re)arms it from a server-provided Retry-After. Backs the 429
- * lockout — the submit button stays disabled until it reaches zero.
+ * A per-second countdown to zero; the returned setter (re)arms it.
  */
 export function useCountdown() {
   const [seconds, setSeconds] = useState(0);

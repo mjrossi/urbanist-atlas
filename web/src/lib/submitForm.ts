@@ -1,13 +1,7 @@
 /**
- * Submit-form helpers — the schema + payload composition for
- * `/submit`. Lives here (not inline in Submit.tsx) so the JSX file
- * stays focused on layout. Exports two payload composers:
- *
- *  - {@link buildNewSubmissionRequest}: the live `POST /api/v1/submissions`
- *    payload (Phase 2 submission queue — slice β).
- *  - {@link buildIssueBody} + {@link buildIssueUrl}: pre-filled GitHub
- *    issue, kept as a fallback when the API is unreachable (5xx) so
- *    a determined submitter still has a path through.
+ * The `/submit` form's shape, validation and payloads: the API request
+ * ({@link buildNewSubmissionRequest}) and a pre-filled GitHub issue
+ * ({@link buildIssueUrl}), the fallback when the API is down.
  */
 import { ApiError, type NewSubmissionRequest } from './api.ts';
 
@@ -18,13 +12,9 @@ export interface SubmitForm {
   type: SubmissionType;
   name: string;
   website: string;
-  /** Canonical region slugs picked from the type-ahead (the wire value). */
+  /** Region slugs picked from the type-ahead. */
   regionSlugs: string[];
-  /**
-   * Free-text fallback: when the type-ahead has no match the submitter
-   * describes the region here and it flows into `submitter_note` as a
-   * new-region request for the editor. Not sent as a slug.
-   */
+  /** Free-text region for when the type-ahead has no match; goes in the note. */
   region: string;
   oneLineDesc: string;
   why: string;
@@ -46,7 +36,7 @@ export const SUBMIT_FORM_DEFAULTS: SubmitForm = {
   contact: '',
 };
 
-/** Title prefix that distinguishes the three submission flavors in the GitHub issue list. */
+/** The GitHub issue title prefix for a submission type. */
 export function titlePrefix(type: SubmissionType): string {
   switch (type) {
     case 'new':
@@ -91,10 +81,8 @@ export function shortSubmissionId(id: string): string {
 }
 
 /**
- * Composes the Markdown body of the pre-filled GitHub issue from a
- * SubmitForm. The shape mirrors
- * `.github/ISSUE_TEMPLATE/org_correction_or_addition.md` so editorial
- * review reads the same on both manual and form-driven submissions.
+ * The pre-filled GitHub issue's Markdown body. Keep it in step with
+ * `.github/ISSUE_TEMPLATE/org_correction_or_addition.md`.
  */
 export function buildIssueBody(form: SubmitForm): string {
   const why = form.why.trim() || '_Not provided._';
@@ -137,11 +125,7 @@ _Submitted via the urbanistatlas.com submit form${submittedSuffix}._
 `;
 }
 
-/**
- * Composes the URL of a pre-filled GitHub issue from a SubmitForm.
- * Same shape as the old direct-to-GitHub flow — retained for the
- * "API unreachable" fallback link the Submit page surfaces on 5xx.
- */
+/** The URL of a pre-filled GitHub issue for the form. */
 export function buildIssueUrl(form: SubmitForm): string {
   const title = `${titlePrefix(form.type)} ${form.name}`;
   const body = buildIssueBody(form);
@@ -150,16 +134,9 @@ export function buildIssueUrl(form: SubmitForm): string {
 }
 
 /**
- * Composes the API payload for `POST /api/v1/submissions`. The wire
- * contract carries only the org fields + three optional submitter
- * fields; the form's extra editorial context (why / sources /
- * affiliation / correction or removal request) is folded into a
- * Markdown-formatted `submitter_note` so moderators see the same
- * structured context they would on the old GitHub-issue path.
- *
- * Region: for a new org, the picked slugs go out as `region_slugs` and
- * the free-text fallback becomes a new-region request in the note. A
- * correction or removal sends neither.
+ * The `POST /api/v1/submissions` body. The wire has no fields for the
+ * form's editorial context (type, why, sources, affiliation), so it goes
+ * in `submitter_note` as Markdown.
  */
 export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionRequest {
   const submitterNote = buildSubmitterNote(form);
@@ -176,13 +153,8 @@ export function buildNewSubmissionRequest(form: SubmitForm): NewSubmissionReques
 }
 
 /**
- * For `new` submissions the form collects a real one-line
- * description. For corrections and removals there is no new
- * description to write — the existing entry's copy is the subject of
- * the request — so we mint a synthetic short_desc that points
- * moderators at submitter_note for the full context. Keeps the wire
- * shape stable (short_desc is a required field) without asking the
- * submitter to invent placeholder copy.
+ * `short_desc` is required, but a correction or removal has no new
+ * description, so those send a placeholder pointing at the note.
  */
 function shortDescForWire(form: SubmitForm): string {
   if (form.type === 'new') return form.oneLineDesc.trim();

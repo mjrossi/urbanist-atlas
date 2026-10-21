@@ -5,12 +5,9 @@ export type ThemeChoice = 'auto' | 'light' | 'dark';
 const STORAGE_KEY = 'theme';
 
 /**
- * The `data-theme` attribute on `<html>` is the single source of truth.
- * `/theme.js` sets it before first paint and re-applies it when another
- * tab changes the stored choice or the page returns from the
- * back/forward cache; clicks here set it too. Observing the attribute
- * keeps the pressed state right in every one of those cases without a
- * second copy of the logic.
+ * `data-theme` on `<html>` is the source of truth. `/theme.js` also
+ * re-applies it, so the toggle observes the attribute rather than
+ * keeping its own copy.
  */
 function readChoice(): ThemeChoice {
   const value = document.documentElement.getAttribute('data-theme');
@@ -43,10 +40,9 @@ function choose(next: ThemeChoice) {
 }
 
 /**
- * Point the browser chrome at the chosen theme's paper colour. index.html
- * carries one theme-color meta per scheme (`data-scheme`), each gated on
- * prefers-color-scheme; an explicit choice forces its own meta on and the
- * other off. Keep in step with the same function in public/theme.js.
+ * Points the browser chrome at the chosen theme: an explicit choice forces
+ * its scheme's theme-color meta on and the other off. Keep in step with
+ * the same function in public/theme.js.
  */
 function syncThemeColor(choice: ThemeChoice) {
   for (const meta of document.querySelectorAll('meta[name="theme-color"][data-scheme]')) {
@@ -115,13 +111,7 @@ function Glyph({ choice }: { choice: ThemeChoice }) {
   }
 }
 
-/**
- * Auto · Light · Dark, as three small glyphs: a half-filled disc
- * (follow the system), a sun, a moon. The Lexicon Family core's
- * ThemeToggle — rendered once, in the masthead folio, the one line of
- * chrome on screen at every width. Icon-only, so each button carries
- * its own aria-label, and a title for the pointer.
- */
+/** The family core's Auto · Light · Dark icon toggle. */
 export function ThemeToggle() {
   const current = useSyncExternalStore(subscribe, readChoice, () => 'auto' as const);
   return (

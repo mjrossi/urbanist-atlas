@@ -13,19 +13,15 @@ import { queryKeys } from '../lib/queryKeys.ts';
 import { useDebouncedValue } from '../lib/useDebouncedValue.ts';
 
 interface RegionComboboxProps {
-  /** Selected region slugs — the controlled form value. */
+  /** Selected region slugs. */
   value: string[];
-  /** Called with the next slug list whenever the selection changes. */
   onChange: (next: string[]) => void;
-  /** id for the text input so an external `<label htmlFor>` binds to it. */
+  /** The text input's id, for an external `<label htmlFor>`. */
   id?: string;
-  /** Forwarded to the input for blur-driven validation (react-hook-form). */
   onBlur?: () => void;
-  /** id of the hint/error element describing the field, for a11y. */
   describedById?: string;
-  /** Marks the control invalid for assistive tech + styling. */
   invalid?: boolean;
-  /** Receives the text input, so react-hook-form can focus it on a failed submit. */
+  /** Receives the text input, so a form can focus it. */
   ref?: Ref<HTMLInputElement>;
 }
 
@@ -34,16 +30,8 @@ const SEARCH_DEBOUNCE_MS = 200;
 const SEARCH_LIMIT = 8;
 
 /**
- * Accessible multi-select type-ahead for region slugs, backing the
- * `/submit` form's "Region served" field. Queries
- * `GET /api/v1/regions/search` (debounced) and lets the user pick one
- * or more regions; selections render as removable chips and the value
- * is the list of canonical slugs the API expects in `region_slugs`.
- *
- * Built on the WAI-ARIA combobox pattern (input `role="combobox"` +
- * `role="listbox"` popup) with plain CSS — no new dependencies. The
- * free-text "can't find it?" fallback lives in the parent form, not
- * here: this control only ever emits real slugs.
+ * A WAI-ARIA multi-select combobox over `GET /api/v1/regions/search`.
+ * It only ever emits slugs the API returned.
  */
 export function RegionCombobox({
   value,
@@ -57,8 +45,7 @@ export function RegionCombobox({
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  // Display labels captured at selection time, so chips read "Queens ·
-  // New York" without a second fetch. Keyed by slug.
+  // Captured at selection time, so chips need no second fetch.
   const [labels, setLabels] = useState<Record<string, { name: string; context: string }>>(
     {},
   );
@@ -87,18 +74,12 @@ export function RegionCombobox({
     staleTime: 60_000,
   });
 
-  // Hide already-picked regions from the option list.
   const options = results.filter((r) => !value.includes(r.region.slug));
   const showList = open && enabled && options.length > 0;
   // keepPreviousData leaves the last query's options on screen through the
   // debounce and the next fetch; they don't answer what is typed now.
   const resultsAreCurrent = query === text.trim() && !isPlaceholderData;
-  // A failed search (5xx / network drop) yields no options, which is
-  // indistinguishable from "no matches" — surface it so the submitter
-  // knows to fall back to the free-text field instead of silently
-  // losing a region they could have picked. Debounce-driven request
-  // cancellations reject as AbortError, which react-query does not flag
-  // as an error, so this stays quiet during normal typing.
+  // A failed search would otherwise look like "no matches".
   const searchFailed = isError && enabled;
 
   function select(result: RegionSearchResult) {
@@ -118,8 +99,6 @@ export function RegionCombobox({
 
   function remove(slug: string) {
     onChange(value.filter((s) => s !== slug));
-    // Drop the cached label too, so the map doesn't accumulate entries
-    // for regions no longer selected. A re-add re-captures it in select().
     setLabels((prev) => {
       if (!(slug in prev)) return prev;
       const { [slug]: _removed, ...next } = prev;
@@ -164,9 +143,8 @@ export function RegionCombobox({
     }
   }
 
-  // Option ids key off the region slug, not the array index, so
-  // aria-activedescendant keeps pointing at the same region even if
-  // keepPreviousData briefly reorders results during a query change.
+  // Keyed by slug, not index, so aria-activedescendant follows the region
+  // when the results change under it.
   const optionId = (slug: string) => `${listboxId}-opt-${slug}`;
   const activeOption = showList && activeIndex >= 0 ? options[activeIndex] : undefined;
   const activeOptionId = activeOption ? optionId(activeOption.region.slug) : undefined;

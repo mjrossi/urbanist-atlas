@@ -12,12 +12,7 @@ import {
   titlePrefix,
 } from './submitForm.ts';
 
-// Per-type wire-shape coverage for the public submissions endpoint.
-// The form's three submission types (`new` / `correction` / `removal`)
-// adapt the visible fields but must always produce a payload the
-// backend's `atlas.ValidateSubmission` accepts. `region_slugs` carries
-// the slugs the submitter picked from the type-ahead; when none are
-// picked the free-text fallback rides along in `submitter_note`.
+// Every submission type must produce a payload the API accepts.
 
 function formFor(type: SubmitForm['type'], over: Partial<SubmitForm> = {}): SubmitForm {
   return {

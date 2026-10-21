@@ -296,9 +296,8 @@ export function About() {
 }
 
 /**
- * A methodology section. On phones its heading is a disclosure button
- * (sections fold to save scrolling); on wider screens it is a plain
- * heading and the text always shows, so nothing announces a toggle.
+ * A methodology section. On phones its heading is a disclosure button;
+ * wider, it is a plain heading, so nothing announces a toggle.
  */
 function MethodSection({
   id,

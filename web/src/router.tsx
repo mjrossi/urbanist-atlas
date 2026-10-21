@@ -8,11 +8,9 @@ import { RouteErrorBoundary } from './routes/ErrorBoundary.tsx';
 import { Home } from './routes/Home.tsx';
 
 /**
- * The site's route tree. The front page ships in the main bundle; every
- * other route is a lazy chunk. `errorElement` on the root catches
- * unmatched URLs (404), errors thrown by a route, and a chunk that
- * fails to load (see `lazyComponent`); it renders instead of `App` and
- * wraps its own chrome.
+ * The route tree. Every route but the front page is a lazy chunk. The
+ * root `errorElement` replaces `App` for an unmatched URL, a thrown
+ * error or a failed chunk load, so it renders its own chrome.
  */
 export const routes: RouteObject[] = [
   {

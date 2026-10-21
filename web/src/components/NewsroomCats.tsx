@@ -1,21 +1,11 @@
 /**
- * The newsroom cats. Every print shop of consequence kept a cat; the
- * Atlas keeps three, and these are their woodcut portraits — flat fills,
- * heavy ink outlines, drawn entirely from the design-token palette via
- * the `.cat-fill-*` / `.cat-stroke-*` classes in global.css (SVG
- * `fill`/`stroke` *attributes* can't carry `var()`, but the CSS
- * properties can).
- *
- * All four are decorative: `aria-hidden`, unfocusable, sized by the
- * container through CSS (no width/height attributes). Pad Thai's tail
- * is grouped as `.cat-tail` so the 404 page can give it a slow sway.
+ * The newsroom cats' portraits. Colours come from the `.cat-fill-*` and
+ * `.cat-stroke-*` classes in global.css, because SVG `fill`/`stroke`
+ * attributes can't carry `var()` but the CSS properties can. Each `<svg>`
+ * is decorative and sized by its container's CSS.
  */
 
-/**
- * Pad Thai, an all-black tom, in his signature pose: flat on his back,
- * belly up, paws in the air — sprawled across the page he was asked
- * to proofread.
- */
+/** Pad Thai, an all-black tom, belly up on the page he was to proofread. */
 export function PadThaiIllustration({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 200 110" aria-hidden="true" focusable="false" className={className}>
@@ -113,14 +103,7 @@ export function PadThaiIllustration({ className }: { className?: string }) {
   );
 }
 
-/**
- * Mrs Peacock, a dilute tortoiseshell, at her post: seated squarely on
- * the keyboard, in front of whatever you were trying to read. A dilute
- * (blue-cream) tortie reads as three softly blended coats, not bold
- * patches: a blue-grey base, muted fawn-brown brindled through it, and
- * cream on the chest and paws. The color zones are clipped to her
- * silhouette so the brindle never spills past the outline.
- */
+/** Mrs Peacock, a dilute tortoiseshell, seated on the keyboard. */
 export function MrsPeacockIllustration({ className }: { className?: string }) {
   const body =
     'M64 106 C63 92 67 80 76 72 C77 68 78 66 80 64 C77 60 76 52 78 46 L72 30 L88 36 C94 32 106 32 112 36 L126 30 L122 46 C124 52 123 60 120 64 C122 66 123 68 124 72 C133 80 137 92 136 106 C120 111 80 111 64 106 Z';
@@ -159,8 +142,7 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
         className="cat-stroke-rule cat-fill-none"
         strokeWidth="1.5"
       />
-      {/* Tail wrapped along the keyboard: ink outline, silver core to
-          match her body, a darker brindle band near the tip. */}
+      {/* Tail wrapped along the keyboard. */}
       <path
         d="M130 100 C150 101 162 107 159 115 C156 121 142 120 130 113"
         className="cat-stroke-ink cat-fill-none"
@@ -179,24 +161,21 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
         strokeWidth="7"
         strokeLinecap="round"
       />
-      {/* Base coat: light silver — her dominant color. */}
+      {/* Base coat. */}
       <path d={body} className="cat-fill-coat" />
       {/* Coat detail, clipped to her silhouette. */}
       <g clipPath="url(#mrs-peacock-body)">
-        {/* A shade deeper over the crown and ears — her head reads a
-            touch darker than her body. */}
+        {/* Crown and ears. */}
         <ellipse cx="100" cy="47" rx="27" ry="19" className="cat-fill-coat-dark" />
         <polygon points="78,46 72,30 88,36" className="cat-fill-coat-dark" />
         <polygon points="112,36 126,30 122,46" className="cat-fill-coat-dark" />
-        {/* Soft darker brindle down the flanks (the dilute-tabby bands);
-            the center band tucks behind the cream blaze below. */}
+        {/* Brindle down the flanks. */}
         <g className="cat-fill-coat-dark" fillOpacity="0.4">
           <ellipse cx="80" cy="88" rx="5" ry="16" transform="rotate(-8 80 88)" />
           <ellipse cx="100" cy="92" rx="5" ry="17" />
           <ellipse cx="120" cy="88" rx="5" ry="16" transform="rotate(8 120 88)" />
         </g>
-        {/* Cream muzzle, chest, belly, and paw fronts — the silvery
-            white in her coat. */}
+        {/* Cream muzzle, chest, belly and paw fronts. */}
         <ellipse cx="100" cy="65" rx="12" ry="6" className="cat-fill-paper-2" />
         <path
           d="M100 66 C111 72 114 88 109 100 C104 108 92 108 88 100 C84 88 90 72 100 66 Z"
@@ -204,8 +183,7 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
         />
         <ellipse cx="93" cy="106" rx="6" ry="5" className="cat-fill-paper-2" />
         <ellipse cx="107" cy="106" rx="6" ry="5" className="cat-fill-paper-2" />
-        {/* A whisper of warm fawn — the tortie in the dilute, kept very
-            faint so the grey stays dominant. */}
+        {/* Faint warm fawn. */}
         <ellipse
           cx="82"
           cy="56"
@@ -260,21 +238,13 @@ export function MrsPeacockIllustration({ className }: { className?: string }) {
 }
 
 /**
- * Cera, a calico, mid-stride across a crosswalk — the one cat who is
- * never once at rest, claiming right of way as she goes. A calico is
- * the easiest of the three to draw from the broadsheet palette: she is
- * simply white + ginger + black, which the tokens already carry, so
- * unlike Mrs Peacock she needs no custom coat colors. Cream base
- * (`paper-2`), ginger patches (`amber-soft`, deepened with `amber`),
- * and black patches (`ink`) — including the classic split face — are
- * clipped to her silhouette so no patch spills past the outline. Her
- * tail reads bottom-up white → ginger → black tip (the bare ink
- * outline showing through where the colored core stops).
+ * Cera, a calico, mid-stride across a crosswalk. Her white, ginger and
+ * black are existing tokens, so unlike Mrs Peacock she needs no coat
+ * tokens.
  */
 export function CeraIllustration({ className }: { className?: string }) {
-  // The two ears are part of this one silhouette (the Mrs Peacock
-  // approach) rather than separate triangles — a continuous outline
-  // keeps them attached to the head instead of floating above it.
+  // The ears are part of the silhouette, so the outline joins them to the
+  // head.
   const body =
     'M42 72 C36 58 50 50 64 51 C92 47 118 47 140 51 C146 47 148 46 150 45 L151 26 L162 41 L165 43 L168 41 L177 25 L181 43 C181 47 181 51 180 55 C181 60 178 63 173 64 C168 66 162 66 158 68 C154 72 152 82 150 90 C148 96 140 98 130 97 C108 99 84 99 68 97 C54 95 46 88 44 80 C43 77 42 74 42 72 Z';
   const tail = 'M50 66 C36 62 26 50 30 39 C32 33 38 30 44 33';
@@ -285,9 +255,7 @@ export function CeraIllustration({ className }: { className?: string }) {
           <path d={body} />
         </clipPath>
       </defs>
-      {/* Crosswalk she is busy claiming: pale zebra bars on the ground
-          rule — her stage prop, the way Pad Thai has his page and Mrs
-          Peacock her keyboard. */}
+      {/* Crosswalk. */}
       <g className="cat-fill-paper-2 cat-stroke-rule" strokeWidth="1">
         <rect x="14" y="101" width="7" height="6" />
         <rect x="32" y="101" width="7" height="6" />
@@ -308,9 +276,7 @@ export function CeraIllustration({ className }: { className?: string }) {
         className="cat-stroke-rule cat-fill-none"
         strokeWidth="1.5"
       />
-      {/* Tail, carried high: ink outline, then a ginger core that stops
-          short of the tip so the bare outline reads as a black tip, then
-          a whisper of white at the base. */}
+      {/* Tail: the ginger core stops short, so the outline is the black tip. */}
       <path
         d={tail}
         className="cat-stroke-ink cat-fill-none"
@@ -329,9 +295,7 @@ export function CeraIllustration({ className }: { className?: string }) {
         strokeWidth="5"
         strokeLinecap="round"
       />
-      {/* Four legs mid-walk — back pair, front pair, the front-near one
-          lifted off the crosswalk into a step. Drawn first so the body
-          covers where they meet it. White, as a calico's legs tend to be. */}
+      {/* Legs, drawn first so the body covers where they meet it. */}
       <g className="cat-fill-paper-2 cat-stroke-ink" strokeWidth="2">
         <rect x="58" y="86" width="9" height="20" rx="4" />
         <rect x="78" y="86" width="9" height="17" rx="4" />
@@ -340,9 +304,7 @@ export function CeraIllustration({ className }: { className?: string }) {
       </g>
       {/* Cream base coat (ears included, since they're part of the path). */}
       <path d={body} className="cat-fill-paper-2" />
-      {/* Calico patches, clipped to her silhouette: ginger over the rump
-          and far ear, black saddle and near-ear/crown (a split face),
-          a deeper-amber touch and a small black hip dot for depth. */}
+      {/* Calico patches, clipped to her silhouette. */}
       <g clipPath="url(#cera-body)">
         <ellipse cx="66" cy="64" rx="22" ry="15" className="cat-fill-amber-soft" />
         <ellipse cx="174" cy="40" rx="12" ry="16" className="cat-fill-amber-soft" />

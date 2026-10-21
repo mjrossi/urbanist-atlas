@@ -41,10 +41,6 @@ export function Region() {
         : 'Loading region — Urbanist Atlas',
   );
 
-  // Breadcrumb wants ancestors broad-first (left-to-right reads
-  // root → leaf), but the API hands them back closest-first.
-  // `reverseAncestry` keeps the API contract leaf-centric and the
-  // SPA owns its display ordering.
   const ancestorsRootFirst = query.data ? reverseAncestry(query.data.ancestry) : [];
   const currentLabel = query.data ? query.data.region.name : 'Region';
   const totalOrgs = query.data ? totalEntries(query.data) : 0;
@@ -73,9 +69,7 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
       className="mt-48"
       error={(e) =>
         e.status === 404 ? (
-          // The API owns the not-found message (problem.title/detail);
-          // we render it and add the Browse/submit links as navigation
-          // chrome rather than re-authoring the copy here.
+          // The API's problem title and detail are the not-found copy.
           <div className="lede mt-48">
             <div className="eyebrow">
               § Region report
@@ -86,10 +80,8 @@ function RegionBody({ query }: { query: UseQueryResult<RegionDetail, ApiError> }
               <span className="accent">.</span>
             </h1>
             <p className="deck">
-              {/* The fallback only renders for a 404 with no problem+json
-                  body (e.g. a proxy-injected error page). Keep it generic
-                  so it doesn't duplicate — and drift from — the API's
-                  authoritative copy. */}
+              {/* For a 404 without a problem body. Generic, so it can't
+                  drift from the API's copy. */}
               {e.problem?.detail ?? 'This page isn’t available.'}
             </p>
             <p className="deck">
@@ -114,11 +106,6 @@ function RegionContent({ data }: { data: RegionDetail }) {
     [local, regional, statewide],
   );
 
-  // Build a slug → display-name map so Entry can render "Matched
-  // via Brooklyn" instead of "Matched via brooklyn-ny". Seeded from
-  // the focus region, its ancestry walk, and the server-provided
-  // descendant_region_names map (which covers any descendant slug
-  // referenced by matched_region_slugs on the bucketed orgs).
   const regionNameBySlug = new Map<string, string>();
   regionNameBySlug.set(region.slug, region.name);
   for (const r of ancestry) {
@@ -128,10 +115,7 @@ function RegionContent({ data }: { data: RegionDetail }) {
     regionNameBySlug.set(slug, name);
   }
 
-  // Parent names for the rail copy. Pulled from ancestry (which
-  // carries resolved display names) by intersecting with the focus
-  // region's direct parents. Falls back to empty when there's no
-  // overlap (top-of-hierarchy regions).
+  // `parent_slugs` carries no names; the ancestry does.
   const parentNames = ancestry
     .filter((r) => region.parent_slugs.includes(r.slug))
     .map((r) => r.name);

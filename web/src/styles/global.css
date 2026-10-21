@@ -1,50 +1,14 @@
-/* Urbanist Atlas — global stylesheet.
- *
- * Newspaper-grade broadsheet identity, ported from the Claude Design
- * handoff (brand.css + site.css + submit.css) and merged into a
- * single file with responsive adaptations. The 1280px sheet is the
- * design grid; this stylesheet collapses to a single column under
- * 900px and shrinks display type to keep mobile legible.
- *
- * Vocabulary the React components rely on:
- *   .sheet           outer page chrome (was App.tsx wrapper)
- *   .masthead        grained amber band: folio, wordmark, tagline
- *   .theme-toggle    Auto · Light · Dark glyphs in the masthead folio
- *   .nav             Roman-numeral primary nav + live status
- *   .kicker          breadcrumb / dateline row beneath nav
- *   .spread          two-column main + rail layout
- *   .lede            eyebrow + h1 + italic deck
- *   .lookup          display-sized search card
- *   .prose           long-form body w/ drop caps + pullquotes
- *   .rail/.rail-block right-rail variants (amber, muted)
- *   .metros          metro list (full + .compact for the rail)
- *   .org-entry       metro page entry
- *   .org-strip       4-up home recently-added cards
- *   .org-feature     organization page lede
- *   .stats           3-up by-the-numbers strip
- *   .tag             hairline-outlined small-caps pill
- *   .topic-filter    filter chip (active = ink-on-paper)
- *   .az-index        Browse alphabet jump strip
- *   .country-section Browse per-country block
- *   .index-letter-row Browse letter + metros row
- *   .editors-note    amber-tinted italic callout
- *   .criteria        ✓/✕ inclusion table
- *   .engage          3-up "how to plug in" row
- *   .slip            Submit form treatment
- *   .site-foot       four-column footer
- *   .colophon-strip  bottom-of-page printer strip
+/* Urbanist Atlas global stylesheet. The Family core (tokens, chrome,
+ * accessibility rules) is owned by the Lexicon Family design system; see
+ * CLAUDE.md, "Design language".
  */
 
 /* ── Tokens ─────────────────────────────────────────── */
 
-/* Family core tokens come from the Lexicon Family design system
-   (https://claude.ai/artifact/MqHpb7fJPnWU7VugYdtd57), which owns their
-   values in both themes; this file keeps Atlas's names for them (the
-   artifact's README holds the map). Change a core value there first.
-
-   Every colour in this file resolves through a token, so Night (below)
-   reaches every rule with no per-component dark override. A literal
-   colour in a rule is the bug. */
+/* Core token values are owned by the design-system artifact
+   (https://claude.ai/artifact/MqHpb7fJPnWU7VugYdtd57); change them there
+   first. Every colour resolves through a token, so a literal colour in a
+   rule is the bug. */
 :root {
   /* ── Family core (Paper) ── */
   --paper: oklch(97.5% 0.008 75);
@@ -80,10 +44,8 @@
      so these are kept slightly warm to stay in the broadsheet family. */
   --cat-coat: #c4beb4;
   --cat-coat-dark: #8b8479;
-  /* Fur and highlights. On Paper they are the ink and paper colours the
-     portraits were drawn in; Night must not invert them (a black cat
-     stays black, a cream coat stays cream) — only the outlines, drawn
-     with --ink, lighten so they read on the dark page. */
+  /* Fur colours. Night must not invert them (a black cat stays black);
+     only the --ink outlines lighten. */
   --cat-black: var(--ink);
   --cat-white: var(--paper);
   --cat-white-2: var(--paper-2);
@@ -101,20 +63,12 @@
 }
 
 /* ── Night ──────────────────────────────────────────────
-   Two triggers, one palette: an explicit choice (`data-theme="dark"`,
-   set by /theme.js before first paint) and the reader's system setting
-   when they have made no choice. `:not([data-theme="light"])` is what
-   lets an explicit Light win over a dark OS. CSS can't share one
-   declaration block between a media query and a selector, so the
-   palette is written twice — keep the two copies identical
-   (nightParity.test.ts fails if they drift).
-
-   Screen only: browsers drop backgrounds when printing, so Night's
-   cream ink would print near-invisible on white paper. Print always
-   gets Paper.
-
-   Warm, not grey: brown-black paper, cream ink, and amber lightened
-   until --amber clears 4.5:1 on --paper, --paper-2 and the band. */
+   Written twice, for an explicit `data-theme="dark"` and for a dark OS
+   without an explicit Light, because CSS can't share one block between a
+   selector and a media query. nightParity.test.ts keeps them identical.
+   Screen only: print drops backgrounds, so Night's cream ink would
+   vanish on paper. --amber clears 4.5:1 on --paper, --paper-2 and the
+   band. */
 @media screen {
   :root[data-theme='dark'] {
     --paper: oklch(19% 0.012 70);
@@ -180,10 +134,7 @@
 }
 
 /* ── Vertical-spacing utilities ─────────────────────────
-   Use these instead of inline style={{ marginTop: N }} on
-   layout elements. The discrete pixel values match the
-   broadsheet design system's vertical rhythm; the long
-   list isn't a smell, it's the codified rhythm. */
+   The design's vertical rhythm; use these, not inline margins. */
 .mt-0 {
   margin-top: 0;
 }
@@ -224,8 +175,6 @@
   gap: 12px;
 }
 
-/* Small-print body-copy size used in colophon/about
-   footnotes (~14px instead of the default ~17px). */
 .text-sm {
   font-size: 14px;
 }
@@ -253,9 +202,7 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* When scrollIntoView lands on an anchored section header, leave a
-   little breathing room so the kicker doesn't sit flush against the
-   top edge of the viewport. */
+/* Room above a scrolled-to anchor. */
 [id] {
   scroll-margin-top: 24px;
 }
@@ -366,8 +313,7 @@ a {
   pointer-events: none;
 }
 
-/* The content paints above the grain, not under it (mjrossi.com gets the
-   same from its positioned .masthead-inner). */
+/* The content paints above the grain, not under it. */
 .masthead > * {
   position: relative;
 }
@@ -401,13 +347,10 @@ a {
 }
 
 /* ── Theme toggle: Auto · Light · Dark ──────────────────
-   Family core (ThemeToggle): three glyphs, once, at the right of the
-   folio — the one line of chrome on screen at every width. Quiet by
-   design: no frame, muted glyphs, the current choice in --amber with
-   a hairline under it. 22×18 buttons keep the row no taller than the
-   folio text. The [hidden] rules are the core's no-shift reveal for
-   server-rendered markup; React only renders the group with JS, so
-   Atlas never sets `hidden`, but the hook stays for parity. */
+   Family core ThemeToggle. 22×18 buttons keep the row no taller than the
+   folio text. The [hidden] rules are the core's no-JS reveal hook, kept
+   for parity: React renders the group only with JS, so it never sets
+   `hidden`. */
 .masthead-folio-right {
   display: inline-flex;
   align-items: center;
@@ -478,8 +421,7 @@ a {
   flex-wrap: wrap;
 }
 
-/* Family core t-masthead: one size on every route — no larger front-page
-   variant, no condensed interior or phone one — so the band and the nav
+/* Family core t-masthead: one size on every route, so the band and nav
    sit at the same height on every page. */
 .masthead-name {
   font-family: var(--serif);
@@ -758,11 +700,7 @@ a {
   color: var(--ink-2);
 }
 
-/* Breadcrumb list reset: keep the visual rendering identical to the
-   pre-a11y inline-span layout while exposing semantic <ol>/<li>
-   structure to assistive tech. The list flows inline; the trailing
-   separator on the last <li> is suppressed since there's nothing
-   to separate from. */
+/* The crumb <ol> flows inline. */
 .kicker .crumb-trail {
   list-style: none;
   margin: 0;
@@ -786,11 +724,9 @@ a {
   align-items: start;
 }
 
-/* Grid items default to min-width: auto, which lets wide content (e.g. the
-   Colophon's <pre class="codeblock"> wire payloads, with long unbreakable
-   URLs) force a track wider than the viewport — producing horizontal page
-   scroll on mobile. min-width: 0 lets the columns shrink so the codeblock's
-   own overflow-x: auto handles the overflow internally. */
+/* Grid items default to min-width: auto, so a wide <pre class="codeblock">
+   would widen its track past the viewport. min-width: 0 leaves the
+   overflow to the codeblock's own scroll. */
 .spread > * {
   min-width: 0;
 }
@@ -854,11 +790,8 @@ a {
   text-wrap: balance;
 }
 
-/* Accent text — italicised amber emphasis. The plain `.accent` rule
-   sets just the color, so the class can be reused outside lede headings
-   (e.g. section-break titles) without dragging headline typography
-   along. The .lede h1 nesting keeps the italic + weight treatment
-   that the broadsheet headlines were designed around. */
+/* `.accent` alone sets only the colour, so it works outside headlines;
+   the italic treatment is scoped to `.lede h1`. */
 .accent {
   color: var(--amber);
 }
@@ -1262,11 +1195,7 @@ a.tag:hover::before {
   margin-bottom: 10px;
 }
 
-/* The front page's headline (a site-layer decision). The masthead is
-   one size on every route (Family core), so the front page's sense of
-   arrival comes from its content instead — and from the thing readers
-   came for. Display size, but kept under the wordmark's 60.8px so the
-   nameplate still leads. */
+/* The front page's headline: a site-layer decision, see CLAUDE.md. */
 .lookup-title {
   font-family: var(--serif);
   font-weight: 600;
@@ -1423,20 +1352,15 @@ a.tag:hover::before {
   border-top-color: var(--rule-strong);
 }
 
-/* "On this page" anchor-TOC blocks. Useful as a sticky sidebar on
-   desktop; pointless when stacked at the bottom of a mobile scroll
-   (you'd scroll up to read sections, not jump from the end). */
+/* An "On this page" TOC is no use stacked below the content. */
 @media (max-width: 899px) {
   .rail-toc {
     display: none;
   }
 }
 
-/* Dual-rendered "At a glance" blocks. The content shows at the top
-   of main on mobile (where it serves as a quick orientation) and in
-   the rail on desktop (where the sticky sidebar carries it). The
-   visibility flips at the same 900px breakpoint where .spread
-   becomes a two-column layout. */
+/* "At a glance" renders twice: atop main on mobile, in the rail on
+   desktop. It flips at .spread's 900px two-column breakpoint. */
 .glance-mobile {
   margin-bottom: 28px;
 }
@@ -1654,17 +1578,12 @@ a.tag:hover::before {
 
 /* ── Org entry (metro page) ────────────────────────── */
 
-/* Counters track classified-style entry numbers — visible only on
-   mobile via the ::before in the phone block, but counted always so
-   the desktop pass can switch them on later without re-plumbing. */
+/* Entry numbers, shown only by the phone block's ::before. */
 .org-section {
   counter-reset: entry;
 }
 
 /* ── Org detail: "Regions served" list ─────────────── */
-/* Mirrors the inline styles that used to live in Org.tsx so the
-   markup stays declarative. Each <li> is a row with the region
-   name + small caps subtitle ("US · us:metro"). */
 
 .org-regions-list {
   list-style: none;
@@ -1835,9 +1754,7 @@ a.tag:hover::before {
   border-bottom: none;
 }
 
-/* Tablet 2-col: right column (2n) sits across a left border + left
-   padding from the left column. Last two cards drop the bottom
-   border so the section terminates cleanly. */
+/* Tablet, 2 columns. */
 @media (min-width: 720px) {
   .org-strip .org-card {
     padding: 22px 24px 22px 0;
@@ -1852,9 +1769,7 @@ a.tag:hover::before {
   }
 }
 
-/* Desktop 4-col: vertical dividers between every column; no
-   horizontal dividers. Reset the 2-col rules that only apply to
-   the right column. */
+/* Desktop, 4 columns: undo the 2-column rules. */
 @media (min-width: 1024px) {
   .org-strip .org-card {
     padding: 22px 24px;
@@ -2028,9 +1943,7 @@ a.tag:hover::before {
   color: var(--amber);
 }
 
-/* Slugs and other identifier-shaped values render compact mono so
-   the serif metric doesn't visually inflate them next to the
-   adjacent .val rows. */
+/* Identifiers in mono, so the serif doesn't inflate them. */
 .org-feature .meta-strip .item .val code {
   font-family: var(--mono);
   font-size: 13px;
@@ -2096,8 +2009,6 @@ a.tag:hover::before {
 }
 
 @media (max-width: 719px) {
-  /* On the 2-col mobile grid the right column has no neighbor;
-     drop the trailing right border. */
   .stats .stat:nth-child(2n) {
     border-right: none;
     padding-right: 0;
@@ -2289,12 +2200,9 @@ a.tag:hover::before {
 }
 
 /* ── Newsroom cats ─────────────────────────────────── */
-/* Palette classes for the inline-SVG cat portraits
-   (NewsroomCats.tsx). SVG fill/stroke *attributes* can't carry
-   var(), so the components reach the tokens through these. Stroke
-   classes set only `stroke`; shapes that are stroke-only add
-   .cat-fill-none rather than baking fill: none into the stroke
-   class (some shapes carry both a fill and a stroke). */
+/* SVG fill/stroke attributes can't carry var(), so the portraits reach
+   the tokens through these classes. Stroke classes set only `stroke`,
+   because some shapes have both a fill and a stroke. */
 
 .cat-fill-ink {
   fill: var(--cat-black);
@@ -2314,10 +2222,7 @@ a.tag:hover::before {
 .cat-fill-rule-strong {
   fill: var(--rule-strong);
 }
-/* Mrs Peacock's coat greys. The broadsheet palette is entirely warm
-   (cream / amber / ink) and has no grey, so her dominant silver coat
-   and its darker shading are defined here — kept slightly warm so they
-   still sit in the broadsheet family rather than reading cold. */
+/* Mrs Peacock's coat (see the --cat-coat tokens). */
 .cat-fill-coat {
   fill: var(--cat-coat);
 }
@@ -2407,9 +2312,8 @@ a.tag:hover::before {
   margin-top: 10px;
 }
 
-/* The slow tail sway is reserved for the dead-end page; the
-   site-wide prefers-reduced-motion clamp (top of file) collapses
-   it automatically. */
+/* The prefers-reduced-motion clamp near the top of the file stops the
+   sway. */
 @keyframes cat-tail-sway {
   from {
     transform: rotate(-3deg);
@@ -2425,9 +2329,7 @@ a.tag:hover::before {
   animation: cat-tail-sway 4s ease-in-out infinite alternate;
 }
 
-/* Empty-state sign-off inside .editors-note. A div, not a p — the
-   .editors-note p rules force italic serif and this is a sans
-   caption line. */
+/* A div, not a p: the .editors-note p rules would make it italic serif. */
 .editors-note-cat {
   display: flex;
   align-items: center;
@@ -2735,9 +2637,8 @@ a.tag:hover::before {
   text-transform: uppercase;
   color: var(--muted);
   margin-top: 4px;
-  /* Wraps within the 56px gutter on mobile so the uppercase caption
-     ("6 REGIONS") can't overflow the fixed first column and collide
-     with the entries; restored to a single line at >=900px below. */
+  /* Wraps so the caption can't overflow the 56px gutter; one line again
+     from 900px. */
 }
 
 @media (min-width: 900px) {
@@ -2817,11 +2718,8 @@ a.tag:hover::before {
   font-weight: 600;
 }
 
-/* Child rows nest beneath their anchor (a city under its parent
-   metro, e.g. "Chicago" under "Chicago Metro"). The corner glyph
-   is a thin amber rule + arm rendered with a single ::before, so
-   the markup stays a flat list and the indent renders even when
-   wrapped to mobile widths. */
+/* A child row nests under its anchor. The corner glyph is one ::before,
+   so the markup stays a flat list. */
 .index-row.child {
   padding-left: 28px;
   position: relative;
@@ -2848,8 +2746,6 @@ a.tag:hover::before {
   color: var(--amber);
 }
 
-/* Anchor group keeps an anchor and its children visually connected
-   when the print-style border-bottom hits an anchor with kids. */
 .index-anchor-group {
   break-inside: avoid;
 }
@@ -2916,13 +2812,8 @@ a.tag:hover::before {
   letter-spacing: -0.01em;
 }
 
-/* Each field keeps its inset margin + padding so the labels, radios, and
-   inputs sit where they do. On mobile it draws no border of its own — the
-   only frame is the outer .slip box, which reads cleaner on a narrow
-   screen. On desktop (≥720px) each field gets its own framed card (see the
-   media query), where the extra width makes the boxes look intentional.
-   The masthead (.slip-head) and footer (.slip-foot) keep their full-bleed
-   double rules at every width. */
+/* On mobile a field has no border of its own, only the outer .slip
+   frame; from 720px each field is its own framed card. */
 .field {
   display: grid;
   grid-template-columns: 1fr;
@@ -2949,12 +2840,9 @@ a.tag:hover::before {
   gap: 14px;
 }
 
-/* The Type-of-submission and Disclosure sections are real <fieldset>s, so
-   they carry the browser's default 2px groove border and a min-content
-   intrinsic width. Cancel the min-width and drop the native border so they
-   match the borderless text-field layout on mobile; the desktop card
-   border is re-applied below (a plain `.field` rule can't win against this
-   selector's higher specificity, so it must be restated here). */
+/* Cancels a fieldset's native border and min-content width. The desktop
+   card border is restated below, because a plain `.field` rule loses to
+   this selector's specificity. */
 fieldset.field {
   min-inline-size: 0;
   border: none;
@@ -2996,9 +2884,7 @@ fieldset.field > legend {
   text-transform: none;
   color: var(--muted);
   line-height: 1.4;
-  /* On mobile the label sits above the input — let the hint use the
-     full row width. The 26ch cap is desirable only in the 2-column
-     desktop layout where the label gets a 180px column. */
+  /* The 26ch cap only suits the desktop 180px label column. */
   max-width: none;
 }
 
@@ -3043,10 +2929,7 @@ fieldset.field > legend {
   margin-top: 4px;
 }
 
-/* ── Region type-ahead (RegionCombobox) ──────────────────────────────
-   A multi-select combobox over the .input underline style. The popup
-   is a paper-colored listbox positioned under the input; selections
-   render as removable chips above it. */
+/* ── Region type-ahead (RegionCombobox) ────────────────────────────── */
 .combobox {
   position: relative;
 }
@@ -3199,9 +3082,6 @@ fieldset.field > legend {
 .textarea {
   resize: vertical;
   min-height: 96px;
-  /* Tightened on desktop where the input-row column gives plenty of
-     room; on mobile the textarea spans edge-to-edge so we need
-     comfortable left/right breathing room. */
   padding: 8px 12px;
 }
 
@@ -3283,9 +3163,7 @@ fieldset.field > legend {
 }
 
 .choices.inline {
-  /* On mobile, "I'm a member, volunteer, or staff" is too wide for an
-     inline row alongside two other options — give the disclosure
-     radios their own lines so each is comfortably tappable. */
+  /* The longest disclosure option doesn't fit a phone row. */
   flex-direction: column;
   flex-wrap: wrap;
   gap: 4px;
@@ -3332,9 +3210,6 @@ fieldset.field > legend {
 }
 
 .slip-foot .btn-primary {
-  /* Submit button is the slip's most important touch target — on
-     mobile let it span the row so a thumb-stretched user can hit it
-     without precision. */
   width: 100%;
   text-align: center;
   justify-content: center;
@@ -3731,9 +3606,6 @@ fieldset.field > legend {
   line-height: 1.5;
 }
 
-/* Standalone code-block treatment for API examples and other
-   verbatim wire payloads rendered inside <pre>. Mono face, paper-2
-   ground, rule border, comfortable padding. */
 .codeblock {
   font-family: var(--mono);
   font-size: 13px;
@@ -3794,9 +3666,7 @@ h1[tabindex='-1']:focus {
   outline: none;
 }
 
-/* Universal visibility utilities. .mobile-only is hidden everywhere by
-   default and only revealed in the phone media block below. .desktop-only
-   has no default rule — it stays visible except where overridden. */
+/* Flipped in the phone block; .desktop-only needs no default rule. */
 .mobile-only {
   display: none;
 }
@@ -3938,13 +3808,7 @@ h1[tabindex='-1']:focus {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   Phone overrides (≤ 768px). Mobile-first cascade sets the baseline;
-   this block actively redesigns for phones — collapsing the broadsheet
-   masthead to a single wordmark, swapping the nav strip for a hamburger
-   drawer, tightening type, fixing the 2-col stats grid, and replacing
-   the 4-column footer with a single compact card. The visual identity
-   (paper, ink, amber, serifs) is preserved; the page architecture
-   (Masthead → Nav → Outlet → Footer) is unchanged.
+   Phone overrides (≤ 768px).
    ───────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* ── Sheet padding tightened so the wordmark hugs the edge ─── */
@@ -3952,10 +3816,7 @@ h1[tabindex='-1']:focus {
     padding: 16px 20px 48px;
   }
 
-  /* ── Page-grain overlay: a barely-there procedural noise texture
-     so the phone surface reads more like a held sheet of paper than
-     a backlit slab. Inline SVG feTurbulence — no asset request. Opt
-     out under prefers-reduced-transparency. ─────────────────────── */
+  /* ── Page grain: a Local variation, see CLAUDE.md. ─────────────── */
   body::after {
     content: '';
     position: fixed;
@@ -3973,13 +3834,9 @@ h1[tabindex='-1']:focus {
     }
   }
 
-  /* ── Masthead: the band, one folio line, the wordmark. The tagline
-     and the place meta are desktop theater; on mobile they cost
-     vertical space before the user can do anything (a Local variation
-     — see CLAUDE.md). The folio stays: it carries the theme toggle,
-     which the Family core puts on screen at every width. Its section
-     label is dropped here because the nav drawer button already names
-     the current section. */
+  /* ── Masthead: drops the tagline, place meta and folio section label,
+     a Local variation (see CLAUDE.md). The folio stays for the theme
+     toggle. ─────────────────────────────────────────────────────── */
   .masthead {
     padding: 10px 16px 14px;
   }
@@ -4006,9 +3863,7 @@ h1[tabindex='-1']:focus {
     border: none;
   }
 
-  /* ── Nav: hamburger drawer. The button shows the current page
-     name when collapsed and "Close" when expanded. The list slides
-     down below the button as a vertical menu. ────────────────────── */
+  /* ── Nav: drawer, a Local variation (see CLAUDE.md). ───────────── */
   .nav {
     display: block;
     overflow: visible;
@@ -4044,8 +3899,7 @@ h1[tabindex='-1']:focus {
     padding: 0 20px;
     border-right: none;
     justify-content: flex-start;
-    /* Match the .nav-toggle label exactly so the menu reads as one
-       continuous control whether collapsed or expanded. */
+    /* Matches the .nav-toggle label. */
     font-size: 11px;
     letter-spacing: 0.18em;
   }
@@ -4053,16 +3907,13 @@ h1[tabindex='-1']:focus {
     display: none;
   }
   .nav-item .roman {
-    /* Romans are a broadsheet conceit; they read as visual noise in a
-       phone drawer next to four short labels. Drop on mobile. */
     display: none;
   }
   .nav-right {
     display: none;
   }
 
-  /* ── Kicker breadcrumb: keep the left side, hide the right meta
-     (it duplicates the masthead-meta that we just hid anyway). ─── */
+  /* ── Kicker breadcrumb: no right meta. ─────────────────────────── */
   .kicker {
     padding: 12px 0 0;
     font-size: 10px;
@@ -4073,8 +3924,7 @@ h1[tabindex='-1']:focus {
     display: none;
   }
 
-  /* ── Spread: rail drops below main, generous gap so the rail
-     content reads as "appendix" rather than "second column". ───── */
+  /* ── Spread: the rail drops below main. ───────────────────────── */
   .spread {
     gap: 32px;
     margin-top: 24px;
@@ -4086,7 +3936,7 @@ h1[tabindex='-1']:focus {
     order: 1;
   }
 
-  /* ── Display type — 38/22/17 spec ────────────────────────────── */
+  /* ── Display type ─────────────────────────────────────────────── */
   .lede {
     margin-bottom: 24px;
   }
@@ -4103,8 +3953,6 @@ h1[tabindex='-1']:focus {
     margin-bottom: 12px;
   }
 
-  /* Drop the Roman numerals on mobile — they're a broadsheet conceit
-     and read as decorative noise next to the section title. */
   .section-break {
     margin: 32px 0 16px;
     padding-top: 16px;
@@ -4122,9 +3970,8 @@ h1[tabindex='-1']:focus {
     font-size: 10px;
   }
 
-  /* ── Prose body: bump to 17px for readable mobile body text.
-     Cap the measure at 36rem so landscape phones don't render
-     edge-to-edge type — newspapers don't, neither do we. */
+  /* ── Prose body: the 36rem measure stops edge-to-edge type on a
+     landscape phone. ───────────────────────────────────────────── */
   .prose > p {
     font-size: 17px;
     line-height: 1.55;
@@ -4136,8 +3983,7 @@ h1[tabindex='-1']:focus {
     max-width: 36rem;
   }
 
-  /* ── Lookup card: phone hero. Stronger border, generous padding,
-     and a stacked input → CTA layout. ────────────────────────────── */
+  /* ── Lookup card ──────────────────────────────────────────────── */
   .lookup {
     padding: 24px 20px 22px;
     border: 1.5px solid var(--ink);
@@ -4147,9 +3993,7 @@ h1[tabindex='-1']:focus {
     /* The desktop inset frame would look fussy at this size. */
     display: none;
   }
-  /* Small amber fleuron at the top-right of the lookup hero — a
-     printer's ornament that says "this is a curated edition, not a
-     search box." Pseudo-element so no JSX touched. */
+  /* A printer's fleuron at the top right of the lookup card. */
   .lookup::after {
     content: '❦';
     position: absolute;
@@ -4201,7 +4045,7 @@ h1[tabindex='-1']:focus {
     align-items: center;
   }
 
-  /* ── Tag pills: 32px tall, comfortable thumb target ──────────── */
+  /* ── Tag pills ────────────────────────────────────────────────── */
   .tag {
     height: 32px;
     padding: 0 14px;
@@ -4211,10 +4055,8 @@ h1[tabindex='-1']:focus {
     gap: 8px;
   }
 
-  /* ── Topic filter chips: stack horizontally as a scroll rail.
-     Wrap mode piles up to 2-3 lines on a phone and fights the page
-     rhythm; a snap-scroll strip reads as a classifieds row, costs
-     one line of height, and telegraphs "more →" with the edge mask. */
+  /* ── Topic filter chips: a one-line snap-scroll strip, since wrapped
+     chips pile up two or three lines on a phone. ──────────────────── */
   .topic-filters {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -4222,9 +4064,8 @@ h1[tabindex='-1']:focus {
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    /* Bleed into the sheet padding so the strip looks page-edge to
-       page-edge; counter the bleed with matching scroll-padding so
-       the first chip lands flush with the body type. */
+    /* Bleeds to the page edge; the matching scroll-padding keeps the
+       first chip flush with the body type. */
     margin: 8px -20px 24px;
     padding: 0 20px;
     scroll-padding-inline-start: 20px;
@@ -4244,8 +4085,7 @@ h1[tabindex='-1']:focus {
     scroll-snap-align: start;
   }
 
-  /* ── Recently filed strip: stack as borderless cards with a top
-     rule between each. Tighter padding than desktop. ─────────────── */
+  /* ── Recently filed strip ─────────────────────────────────────── */
   .org-strip {
     border-top: 1px solid var(--rule);
   }
@@ -4266,8 +4106,7 @@ h1[tabindex='-1']:focus {
   }
 
   /* ── Stats grid: two columns, an odd last stat spanning both. The
-     desktop rules leave a stray right border at the column gridline
-     and padding-left that shifts content off-axis; reset and redo. ── */
+     desktop borders and padding are reset first. ───────────────────── */
   .stats {
     grid-template-columns: 1fr 1fr;
     gap: 0;
@@ -4279,8 +4118,6 @@ h1[tabindex='-1']:focus {
     border-right: none;
     border-bottom: none;
   }
-  /* Left column (odd children): no left padding, right border drawn
-     at the inter-column line. */
   .stats .stat:nth-child(odd) {
     padding-left: 0;
     border-right: 1px solid var(--rule);
@@ -4288,7 +4125,6 @@ h1[tabindex='-1']:focus {
   .stats .stat:nth-child(even) {
     padding-right: 0;
   }
-  /* First row (children 1 and 2): bottom border separates rows. */
   .stats .stat:nth-child(1),
   .stats .stat:nth-child(2) {
     border-bottom: 1px solid var(--rule);
@@ -4311,9 +4147,7 @@ h1[tabindex='-1']:focus {
     font-size: 12.5px;
   }
 
-  /* ── Rail blocks: tighter padding, smaller heading. The rail is
-     now content-below-main rather than a sidebar, so we don't want
-     it consuming as much vertical space as the main column. ──────── */
+  /* ── Rail blocks ──────────────────────────────────────────────── */
   .rail-block {
     padding: 18px 18px;
   }
@@ -4329,7 +4163,7 @@ h1[tabindex='-1']:focus {
     line-height: 1.4;
   }
 
-  /* ── Metros list inside the rail: tighter rows, bigger names. */
+  /* ── Metros list inside the rail. */
   .metros .metro {
     padding: 14px 0;
     min-height: 56px;
@@ -4345,7 +4179,7 @@ h1[tabindex='-1']:focus {
     font-size: 22px;
   }
 
-  /* ── A-Z jump strip: wider tap cells. ────────────────────────── */
+  /* ── A-Z jump strip ───────────────────────────────────────────── */
   .az-index a,
   .az-index span.dim {
     min-width: 32px;
@@ -4354,7 +4188,7 @@ h1[tabindex='-1']:focus {
     padding: 4px 0;
   }
 
-  /* ── Browse index: 44px letter gutter, smaller letter type. ── */
+  /* ── Browse index ── */
   .index-letter-row {
     grid-template-columns: 44px minmax(0, 1fr);
     gap: 12px;
@@ -4374,7 +4208,7 @@ h1[tabindex='-1']:focus {
     font-size: 28px;
   }
 
-  /* ── Org page: hero name, meta-strip flattened to dt/dd rows. */
+  /* ── Org page */
   .org-feature {
     margin-top: 20px;
   }
@@ -4385,17 +4219,15 @@ h1[tabindex='-1']:focus {
   .org-feature .url-line {
     font-size: 13.5px;
   }
-  /* Italic Fraunces at 18px reads thin on phone DPI. Bump and let
-     the browser pick break points instead of the box edge. */
+  /* Italic Fraunces at 18px reads thin on a phone. */
   .org-feature .deck {
     font-size: 20px;
     line-height: 1.4;
     max-width: none;
     text-wrap: pretty;
   }
-  /* Dateline wraps on narrow phones; tighten the gap, allow long
-     labels to break, and keep separators visually attached to the
-     preceding word instead of stranding them at line ends. */
+  /* The dateline wraps on narrow phones; keep separators with the word
+     before them. */
   .org-feature .dateline {
     gap: 2px 10px;
     overflow-wrap: anywhere;
@@ -4428,9 +4260,7 @@ h1[tabindex='-1']:focus {
     font-size: 15.5px;
   }
 
-  /* ── Org-entry on Metro pages: stacked, tighter, with a small
-     italic folio prefix ("no. 1", "no. 2") that resets per section.
-     Reads as a curated classifieds listing. ────────────────────── */
+  /* ── Org entries, numbered per section. ──────────────────────── */
   .org-entry {
     padding: 18px 0;
   }
@@ -4454,7 +4284,7 @@ h1[tabindex='-1']:focus {
     font-size: 15px;
   }
 
-  /* ── Criteria table: verdict on its own line, justified left. */
+  /* ── Criteria table */
   .criteria .row {
     padding: 14px 0;
     gap: 6px;
@@ -4470,8 +4300,7 @@ h1[tabindex='-1']:focus {
     margin-top: 6px;
   }
 
-  /* ── Form fields: 16px font already set globally; tighten field
-     padding and put the hint on its own line below the input. ─── */
+  /* ── Form fields ─────────────────────────────────────────────── */
   .field {
     padding: 14px 0;
   }
@@ -4530,15 +4359,13 @@ h1[tabindex='-1']:focus {
     content: '−' / '';
   }
 
-  /* ── Editor's notes: tighter padding. */
+  /* ── Editor's notes */
   .editors-note {
     margin: 20px 0;
     padding: 16px 18px;
   }
 
   /* ── Footer + colophon ───────────────────────────────────────── */
-  /* .site-foot (full 4-col layout) is hidden by .desktop-only.
-     .site-foot-compact is revealed by .mobile-only. */
   .colophon-strip {
     flex-direction: column;
     gap: 6px;
@@ -4548,7 +4375,7 @@ h1[tabindex='-1']:focus {
     font-size: 9.5px;
   }
 
-  /* ── Newsroom cats: snugger portraits ───────────────────────── */
+  /* ── Newsroom cats ──────────────────────────────────────────── */
   .newsroom-cats {
     gap: 20px;
   }
@@ -4559,7 +4386,6 @@ h1[tabindex='-1']:focus {
     max-width: 200px;
   }
 
-  /* Visibility utilities are flipped inside the phone block. */
   .desktop-only {
     display: none !important;
   }
@@ -4569,8 +4395,8 @@ h1[tabindex='-1']:focus {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   Narrow Android (≤ 360px). One more notch tighter on the display
-   scale so 320px-class devices don't horizontally clip headlines.
+   Narrow phones (≤ 360px): one notch smaller, so 320px screens don't
+   clip headlines.
    ───────────────────────────────────────────────────────────────────── */
 @media (max-width: 360px) {
   .lede h1 {
@@ -4588,11 +4414,7 @@ h1[tabindex='-1']:focus {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   Touch-device tap feedback. The codebase already gates hover effects
-   behind `@media (hover: hover)`; this is the inverse half — short,
-   tactile press affordances on the elements that on desktop respond to
-   hover. Scoped to coarse pointers so trackpads and mice don't trigger
-   it on mis-clicks. ──────────────────────────────────────────────────
+   Touch press feedback, the counterpart of the hover-only effects.
    ───────────────────────────────────────────────────────────────────── */
 @media (hover: none) and (pointer: coarse) {
   .btn-primary,

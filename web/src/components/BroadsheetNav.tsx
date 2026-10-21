@@ -62,15 +62,6 @@ export function BroadsheetNav() {
     };
   }, [menuOpen]);
 
-  // The masthead tally reads `/api/v1/stats` rather than summing over
-  // `/api/v1/regions`. That list is the browseable subset (metros and
-  // cities), so the old reduce here silently omitted every org attached
-  // solely to a state, province, borough, or multi-state region — the
-  // masthead under-reported the catalog by 30% on every page.
-  //
-  // Dropping the regions query also means routes that never render a
-  // region list (/about, /colophon, /submit) no longer pull the whole
-  // browse set just to print two numbers.
   const stats = useQuery<Stats, ApiError>({
     queryKey: queryKeys.stats(),
     queryFn: ({ signal }) => getStats({ signal }),

@@ -76,10 +76,6 @@ export function Footer() {
           </ul>
         </div>
       </footer>
-      {/* Phones get a single compact block: wordmark, tagline, three
-          essential links, and the colophon strip below. Everything else
-          (full link lists, methodology, contact handles) lives one tap
-          away on /about and /colophon. */}
       <footer className="site-foot-compact mobile-only">
         <h3 className="colophon-title">
           Urbanist <span className="em">Atlas</span>
