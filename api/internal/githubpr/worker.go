@@ -340,8 +340,8 @@ func shortID(publicID string) string {
 
 // branchSuffix returns the first 16 hex characters of the UUIDv7: the
 // millisecond timestamp, the version nibble and the 12-bit rand_a, which
-// google/uuid fills with a per-process sequence, so same-millisecond
-// approvals still get distinct branches.
+// google/uuid fills with a per-process sequence, so submissions created
+// in the same millisecond still get distinct branches.
 func branchSuffix(publicID string) string {
 	clean := strings.ReplaceAll(publicID, "-", "")
 	if len(clean) < 16 {

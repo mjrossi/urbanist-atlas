@@ -8,7 +8,7 @@ import (
 
 // Stdlib-only planar geometry for the FSA → CMA spatial join, on
 // polyclip's types. The numerical traps it avoids are written up in
-// docs/architecture/etl-and-stores.md.
+// docs/architecture/ca-spatial-join.md.
 
 // polygonArea returns p's net area under the even-odd rule: a contour
 // nested in an odd number of others is a hole. Signed-area sign can't be

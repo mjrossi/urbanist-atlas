@@ -10,8 +10,8 @@ import (
 )
 
 // timeoutMiddleware gives each request a context deadline. It is not
-// http.TimeoutHandler because that answers with a plain-text 503, not
-// problem+json.
+// http.TimeoutHandler because that writes its own 503 body (HTML by
+// default), not problem+json.
 func timeoutMiddleware(d time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

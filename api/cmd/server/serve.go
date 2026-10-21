@@ -216,7 +216,8 @@ func runServe(ctx context.Context, c *cli.Command) error {
 		recorder = coverage.New(subs, cfg.coverageSampleRate, cfg.coverageMaxRows, logger)
 	}
 
-	// Usage is on by default: its buckets hold only public slugs.
+	// Usage is on by default: its buckets hold only canonical slugs and
+	// fixed enum values, never raw input.
 	var usageRec *usage.Recorder
 	if subs != nil {
 		usageRec = usage.New(subs, cfg.usageFlushInterval, cfg.usageKeepDays, logger)

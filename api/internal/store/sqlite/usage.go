@@ -9,9 +9,9 @@ import (
 )
 
 // UpsertUsageCounts adds a batch of daily usage deltas, in one
-// transaction, to any existing (day, kind, key) rows. All or nothing,
-// because a partial flush would double-count on retry. An empty batch
-// is a no-op.
+// transaction, to any existing (day, kind, key) rows. The transaction
+// makes a failed flush commit nothing rather than half a batch. An empty
+// batch is a no-op.
 func (s *Store) UpsertUsageCounts(ctx context.Context, counts []atlas.UsageCount) error {
 	if len(counts) == 0 {
 		return nil

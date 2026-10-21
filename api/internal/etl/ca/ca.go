@@ -99,12 +99,12 @@ func Regenerate(ctx context.Context, srcDir, outDir string, target etl.Target, l
 	}
 	logger.Info("etl ca: parsed FSA boundary", "fsas", len(fsas), "path", fsaZipPath)
 
-	// Keep only CMAs this run generated, so an unmapped UID falls through
-	// to province.
 	cmaUIDByFSA, err := spatialJoinFSAToCMA(fsaZipPath, cmaZipPath)
 	if err != nil {
 		return err
 	}
+	// Keep only CMAs this run generated, so an unmapped UID falls through
+	// to province.
 	cmaSlugByFSA := make(map[string]string, len(cmaUIDByFSA))
 	for fsa, uid := range cmaUIDByFSA {
 		if slug := slugByCMAUID[uid]; slug != "" && knownCMASlugs[slug] {

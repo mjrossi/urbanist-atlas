@@ -39,8 +39,8 @@ const (
 type RegionKind string
 
 // Tag is an open-ended label on an organization. It is a string so
-// seed data can introduce a label without a code change; the canonical
-// set is listed on Org.tags in openapi.yaml.
+// seed data can introduce a label without a code change; the most
+// common tags are listed on Org.tags in openapi.yaml.
 type Tag string
 
 // Region is a geographic unit an organization can serve. Regions form a
@@ -49,9 +49,9 @@ type Tag string
 // more specific = earlier).
 //
 // RollupStates names the rollup targets (IsRollupTargetKind) on whose
-// detail pages this region's own orgs also surface. It is not a graph edge, so it
-// can't leak orgs into a /lookup; see docs/architecture/atlas-library.md,
-// "rollup_states".
+// detail pages this region's own orgs also surface. It is not a graph
+// edge, so it can't leak orgs into a /lookup; see
+// docs/architecture/atlas-library.md, "rollup_states".
 //
 // The TOML tags name the seed-file shape (regions_<cc>.toml); ID and
 // Country are stamped by the loader, hence `toml:"-"`.
@@ -77,8 +77,11 @@ func (r Region) IsNational() bool { return r.ScopeTier == ScopeNational }
 // subset that made it surface for a query.
 //
 // AddedAt is the date the org joined the atlas, at midnight UTC; it
-// orders ListRecent. The TOML tags name the orgs.toml shape; fields
-// marked `toml:"-"` are filled in by the loader or at query time.
+// orders ListRecent. It is `json:"-"` because the wire date comes from
+// toOAPIOrg, not from serializing this struct. The TOML tags name the
+// orgs.toml shape; fields marked `toml:"-"` are filled in by the loader
+// or at query time. orgs.toml's region_slugs and added_at decode onto
+// the seedfiles OrgEntry wrapper, not onto Org.
 type Org struct {
 	ID                 int64     `json:"id" toml:"-"`
 	Slug               string    `json:"slug" toml:"slug"`

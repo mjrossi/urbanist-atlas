@@ -121,7 +121,8 @@ func (s *MemStore) regionLabel(id int64) string {
 
 // Slugs returns every registered region slug, national tier included,
 // in unspecified order. Unlike ListRegions it is not limited to the
-// browse subset.
+// browse subset, because the published-slug guard
+// (seedfiles/published_slugs_test.go) must see every addressable slug.
 func (s *MemStore) Slugs() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -169,8 +170,7 @@ func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 // listRegionsLocked is the body of ListRegions, shared with Stats so the
 // browse predicate exists once. Must be called with s.mu held.
 func (s *MemStore) listRegionsLocked() []RegionSummary {
-	// Both indexes are built once per call rather than per region, which
-	// keeps the call linear in regions, edges, and attachments.
+	// Both indexes are built once per call rather than once per region.
 	childrenOf := s.buildChildrenOf()
 	// orgsByRegion turns each region's counts into a set union.
 	orgsByRegion := s.buildOrgsByRegion()

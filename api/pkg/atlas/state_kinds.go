@@ -17,7 +17,7 @@ func IsStateKind(k RegionKind) bool { return stateKinds[k] }
 
 // IsRollupTargetKind reports whether k may be named in a region's
 // rollup_states: the state-equivalent kinds plus us:federal-district, so
-// the bi-state Washington metro can surface its own orgs on /dc.
+// the multi-state Washington metro can surface its own orgs on /dc.
 func IsRollupTargetKind(k RegionKind) bool {
 	return stateKinds[k] || k == "us:federal-district"
 }

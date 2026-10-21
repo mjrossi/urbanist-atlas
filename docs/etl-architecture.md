@@ -247,27 +247,14 @@ CMAs now resolve; ~768 FSAs re-anchor province → CMA versus the old
 table, while `regions_ca_cmas.toml` is unchanged — only the postal
 routing improved.
 
-Three numerical details the join has to get right (each pinned by a
-unit test in `spatial_test.go`, and detailed in the design spec's
-[Open Question §4](./superpowers/specs/2026-05-19-postal-coverage-design.md)):
-
-- **Even-odd hole handling.** `polyclip`'s boolean output gives
-  result holes no guaranteed winding, so the area of an intersection
-  is measured by contour *nesting* (a contour inside an odd number of
-  others is a hole, subtracted), not by signed-area sign.
-- **Large-coordinate precision.** EPSG:3347 coordinates sit ~9e6 m
-  from the false origin, where the sweep-line / shoelace products
-  (~1e13–1e14) lose precision and a genuine overlap can compute as
-  ~0. Both polygons are **translated to a local origin before
-  intersecting** — mandatory; preserve this on any vintage bump or
-  reuse of `spatial.go`. Area is translation-invariant, so only the
-  numerics change.
-- **Noise floor.** Separately-digitized FSA and CMA boundaries leave
-  sub-square-metre slivers along shared edges. An FSA anchors to a
-  CMA only when its max overlap clears `minOverlapFraction` (0.1 %)
-  of the FSA's own area; below that it falls through to province.
-  0.1 % is calibrated to the empty gap between the ≤1e-4 % noise
-  cluster and the ≥0.1 % genuine-overlap cluster in the 2021 vintage.
+Why the join uses max-overlap area rather than point-in-polygon, and
+the numerical traps it has to avoid (even-odd hole handling,
+translating both polygons to a local origin before clipping, and the
+sliver noise floor), are in
+[`architecture/ca-spatial-join.md`](./architecture/ca-spatial-join.md).
+Each trap is pinned by a unit test in `spatial_test.go`; the design
+spec's [Open Question §4](./superpowers/specs/2026-05-19-postal-coverage-design.md)
+has the original analysis.
 
 Ties break to the smallest CMA UID deterministically (CMAs are
 UID-sorted and only a strictly larger overlap displaces the

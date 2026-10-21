@@ -1,7 +1,8 @@
-# ETL and stores: design notes
+# CA FSA → CMA spatial join: design notes
 
-The reasoning behind specific choices in `api/internal/etl/` that is
-too long for a code comment. The pipeline overview lives in
+The reasoning behind `api/internal/etl/ca/spatial.go` and `geom.go`
+that is too long for a code comment. The pipeline overview, including
+where the join sits in the CA pipeline, lives in
 [`docs/etl-architecture.md`](../etl-architecture.md).
 
 ## CA FSA → CMA: why max-overlap area, not point-in-polygon
@@ -74,7 +75,7 @@ helper exists to avoid a specific failure:
   containment tests.
 
 The noise floor (`minOverlapFraction = 0.001`) exists because StatsCan
-digitizes FSA and CMA boundaries separately, leaving sub-square-metre
+digitizes FSA and CMA boundaries separately, leaving sub-square-meter
 slivers along shared edges. In the 2021 vintage every sliver is at or
 below 1e-6 of FSA area, and genuine partial overlaps start at 1e-3. The
 floor sits in that empty gap. It removes noise only and does not impose

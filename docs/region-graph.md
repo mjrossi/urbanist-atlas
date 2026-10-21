@@ -403,7 +403,7 @@ with fuzzy boundaries. Deferred until org density warrants.
 
 ### 9. Sort priority is a hint, not a contract
 
-`sort_priority` orders orgs within the Regional bucket. Lower = more
+`sort_priority` orders orgs within each result bucket. Lower = more
 specific = sorts earlier. Recommended ranges:
 
 | Range | Tier |
@@ -769,16 +769,22 @@ that qualify also share no stable slug or kind suffix. A kind set
 documents itself and survives band reshuffles. Adding a country's kind
 to one is a one-line append, and the predicate doesn't change.
 
+The one deliberate band test is `pickInnerAncestor` in `lookup.go`,
+which picks the place label's inner slot from ancestors below the
+state band (`sort_priority < 60`). It only chooses a display string,
+so a band reshuffle can mislabel a place but can never move an org
+between tiers.
+
 **`stateKinds` (`state_kinds.go`, `IsStateKind`).** These are the
 state-equivalent kinds behind the State / Provincial tier. The in/out
-list and its reasons are under "Open vocabulary" above. Three notes
-belong with the code:
+list and its reasons are under "Open vocabulary" above. Three notes on
+the set:
 
 - `us:federal-district` is out because promoting it would move every
   DMV-tagged org (Greater Greater Washington, for one) into State /
   Provincial. The seed's two DC nodes already let the slug choice
   split DC orgs between Local and Regional. DC is still a valid
-  `rollup_states` target (`IsRollupTargetKind`), so the bi-state
+  `rollup_states` target (`IsRollupTargetKind`), so the multi-state
   Washington metro can surface its own orgs on `/dc`.
 - `us:multi-state` is out by editorial ruling. Leaving the kind out of
   the map is the whole mechanism, so the decision is a one-line

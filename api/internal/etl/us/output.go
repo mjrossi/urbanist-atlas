@@ -45,7 +45,8 @@ func assignMSASlugs(msas []msa, overrides []MSAOverride) map[string]MSAOverride 
 			Slug:     autoSlug(m),
 			Name:     autoName(m),
 		}
-		// Constituent counties, not the title's state list, decide multi-state.
+		// Constituent counties, not the title's state list, decide
+		// multi-state, because the CBSA title can name different states.
 		// A multi-state MSA becomes a stateless umbrella with rollup_states so
 		// its orgs surface on each state's page without leaking state-tier orgs
 		// across the line in postal lookups (docs/region-graph.md §1).
@@ -74,7 +75,8 @@ type stateEntry struct {
 
 // spannedStates returns the distinct states an MSA's counties fall in,
 // sorted by slug. Counties whose FIPS prefix isn't a known state are
-// skipped.
+// skipped. A ZCTA always routes to a county inside its MSA, so every
+// state a ZCTA can route to gets a portion.
 func spannedStates(m msa) []stateEntry {
 	seen := map[string]bool{}
 	var out []stateEntry

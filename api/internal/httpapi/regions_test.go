@@ -293,10 +293,9 @@ func TestGetRegion_HappyPath_Metro(t *testing.T) {
 	}
 }
 
-// TestGetRegion_NonBrowseableKindResolves pins the broadened-detail
-// contract: a state slug (us:state — outside defaultBrowseKinds) now
-// resolves, returning the descendant orgs. This replaces the old
-// "non-place slug → 404" behavior.
+// TestGetRegion_NonBrowseableKindResolves pins that region detail is not
+// limited to the browse set: a state slug (us:state, outside
+// defaultBrowseKinds) resolves and returns its descendant orgs.
 func TestGetRegion_NonBrowseableKindResolves(t *testing.T) {
 	srv := newTestServer(t)
 

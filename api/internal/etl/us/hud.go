@@ -28,7 +28,8 @@ type hudZipCounty struct {
 // parseHUDZipCounty reads HUD's ZIP-County crosswalk CSV into one entry
 // per ZIP-county pair. Columns are found by header name so a reordered
 // or trimmed HUD layout can't silently mis-anchor ZIPs. ZIP and COUNTY
-// are zero-padded to 5 characters: HUD quotes them to keep the leading
+// are whitespace-trimmed, because HUD occasionally pads them, then
+// zero-padded to 5 characters: HUD quotes them to keep the leading
 // zero, but a round trip through Excel turns "00601" into "601". A
 // malformed ratio is an error, since dropping the row would leave a
 // silent coverage hole.

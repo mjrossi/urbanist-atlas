@@ -168,7 +168,8 @@ func (r *Recorder) run(ctx context.Context) {
 // Flush writes the buffered deltas and clears the buffer, snapshotting
 // under the lock and writing outside it so requests never wait on the
 // database. A failed batch is dropped rather than re-queued: the upsert
-// accumulates, so retrying a partial commit would double-count.
+// accumulates, and a commit error doesn't prove the commit failed, so a
+// re-queue could double-count.
 func (r *Recorder) Flush(ctx context.Context) error {
 	if r == nil || r.store == nil {
 		return nil

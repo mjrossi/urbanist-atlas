@@ -610,10 +610,9 @@ func TestEnqueue_FullBuffer(t *testing.T) {
 }
 
 // TestWorker_Stop_IsIdempotent pins that a second Stop call is a
-// no-op rather than a panic (close-of-closed-channel). serve.go
-// currently calls Stop exactly once, but a future shutdown path
-// that fires twice (e.g., double SIGTERM) shouldn't crash the
-// process before the deferred cleanup runs.
+// no-op rather than a panic (close-of-closed-channel), so a shutdown
+// path that fires twice can't crash the process before the deferred
+// cleanup runs.
 func TestWorker_Stop_IsIdempotent(t *testing.T) {
 	gh := newFakeGitHub(t, "# orgs.toml\n")
 	server := httptest.NewServer(gh.handler())

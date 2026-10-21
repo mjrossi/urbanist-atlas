@@ -11,13 +11,15 @@ const rateLimitWindow = time.Hour
 const submissionsGlobalPerWindow = 30
 
 // maxPendingSubmissions must not exceed the store's List cap (200), or the
-// queue can never look full. Full, it is ~12.5 MiB of the 1 GiB volume.
+// queue can never look full. Full, it is at most 200 × submissionBodyLimit
+// (~12.5 MiB) of the 1 GiB volume.
 const maxPendingSubmissions = 200
 
 // pendingQueueCheckInterval bounds overshoot to one interval of global limit.
 const pendingQueueCheckInterval = time.Minute
 
-// The pending-queue query holds the cache lock: bound it, retry soon.
+// The pending-queue query runs under the cache lock, so it gets a short
+// timeout, and a failed query is retried sooner than the normal interval.
 const (
 	pendingQueueRetryInterval = 5 * time.Second
 	pendingQueueQueryTimeout  = 2 * time.Second
@@ -44,5 +46,7 @@ const (
 	maxCountryLen    = 4
 )
 
-// requestTimeout is under the 15s server write timeout, so ctx cancels first.
+// requestTimeout must stay under the http.Server WriteTimeout set in
+// cmd/server/serve.go (15s), so the context cancels before the write
+// deadline cuts the connection.
 const requestTimeout = 10 * time.Second

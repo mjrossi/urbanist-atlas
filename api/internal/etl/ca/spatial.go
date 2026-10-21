@@ -12,7 +12,7 @@ import (
 // The FSA → CMA spatial join assigns each FSA to the CMA it overlaps most
 // by area. Both StatsCan boundary files are EPSG:3347 (Lambert, meters),
 // so planar areas compare directly with no reprojection. Why max-overlap
-// and not point-in-polygon: docs/architecture/etl-and-stores.md.
+// and not point-in-polygon: docs/architecture/ca-spatial-join.md.
 
 // cmaGeometry is one CMA's boundary, dissolved across every type-'B'
 // record sharing its CMAUID (Ottawa-Gatineau has one per province).

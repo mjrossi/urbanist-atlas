@@ -20,9 +20,9 @@ import (
 )
 
 // countrySpec names one country's seed files: RegionFiles are the
-// regions_<suffix>.toml suffixes in load order (a file may only parent
-// under regions from earlier files), Postal the postal_codes_<suffix>.csv
-// suffix.
+// regions_<suffix>.toml suffixes in load order (a region may only parent
+// under regions loaded before it, from earlier files or earlier rows of
+// the same file), Postal the postal_codes_<suffix>.csv suffix.
 type countrySpec struct {
 	Code        string
 	RegionFiles []string
@@ -34,8 +34,8 @@ type countrySpec struct {
 var countries = []countrySpec{
 	{"US", []string{"us_states", "us_multistate", "us_msas", "us"}, "us"},
 	{"CA", []string{"ca_provinces", "ca_cmas", "ca"}, "ca"},
-	// PT's seed files stay in api/seed/ as a region-graph validation
-	// fixture for tests that load them explicitly; it is not shipped.
+	// PT's seed files stay in api/seed/ as an unused reference for a
+	// future reactivation; nothing loads them.
 }
 
 // Countries returns the country codes BuildMemStore loads, in
@@ -65,8 +65,9 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 	parentSlugs := map[string][]string{}
 	childCount := map[string]int{}
 	localTier := map[string]bool{}
-	// rollup_states are directional metro→state page edges, not graph
-	// edges, so they resolve after Stage 1.
+	// rollup_states resolve after Stage 1 because a metro may name a
+	// state from any loaded file, and they are not graph edges, so they
+	// stay out of the load-order parent check.
 	kindBySlug := map[string]atlas.RegionKind{}
 	var rollupSources []atlas.Region
 	var nextRegionID int64 = 1
@@ -113,9 +114,10 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 	}
 
 	// Redundant: the unknown-parent check above forces every edge to point
-	// backward in load order, which is acyclic by construction. This is the
-	// backstop if that check is ever loosened to allow forward references,
-	// so don't weaken it on the assumption this catches cycles.
+	// backward in load order, which is acyclic by construction. This cycle
+	// check is the backstop if the unknown-parent check is ever loosened to
+	// allow forward references, so don't remove the cycle check on the
+	// assumption that the parent check already catches cycles.
 	if err := DetectCyclesGraph(parentSlugs); err != nil {
 		return nil, fmt.Errorf("seedfiles: global region graph: %w", err)
 	}

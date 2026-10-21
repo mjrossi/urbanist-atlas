@@ -16,8 +16,8 @@ const dataLicense = "ODbL-1.0"
 // the API.
 const dataAttributionURL = "https://urbanistatlas.com"
 
-// odblHeadersMiddleware sets the attribution headers on every response,
-// errors included. Headers are set before next runs because net/http
+// odblHeadersMiddleware sets the attribution headers on every response
+// it wraps, errors included. Headers are set before next runs because net/http
 // ignores header changes after the first WriteHeader. See
 // docs/superpowers/specs/2026-05-18-odbl-response-shape-design.md.
 func odblHeadersMiddleware(next http.Handler) http.Handler {

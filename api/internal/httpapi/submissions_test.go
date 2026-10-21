@@ -165,11 +165,10 @@ func TestCreateSubmission_HappyPath(t *testing.T) {
 	}
 }
 
-// TestCreateSubmission_RejectsTagsField pins the wire-compat behavior
-// after `tags` was dropped from SubmissionPayload: the create handler
-// decodes with DisallowUnknownFields, so a client still sending a `tags`
-// key in the payload now gets a 400 rather than having it silently
-// accepted. Editors assign tags during PR review instead.
+// TestCreateSubmission_RejectsTagsField pins that SubmissionPayload has
+// no `tags` field: the create handler decodes with DisallowUnknownFields,
+// so a `tags` key gets a 400 rather than being silently accepted. Editors
+// assign tags during PR review instead.
 func TestCreateSubmission_RejectsTagsField(t *testing.T) {
 	rig := newSubmissionsTestServer(t)
 	body := goodSubmissionBody()
@@ -262,9 +261,8 @@ func TestCreateSubmission_UnknownRegionSlug_Returns400(t *testing.T) {
 	}
 	var problem map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&problem)
-	// Bad region slugs now surface via the per-field `errors` map
-	// rather than the top-level `detail`. Mirrors the wire shape the
-	// SPA's Submit page consumes for per-input validator dispatch.
+	// Bad region slugs surface in the per-field `errors` map, not the
+	// top-level `detail`.
 	errs, _ := problem["errors"].(map[string]any)
 	if got, _ := errs["region_slugs"].(string); !strings.Contains(got, "no-such-region") {
 		t.Fatalf("errors.region_slugs does not mention bad slug: %v", problem)

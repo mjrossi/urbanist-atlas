@@ -6,8 +6,9 @@ package seedfs
 import "embed"
 
 // FS embeds every region TOML, postal-code CSV and orgs file. The PT
-// validation fixtures are embedded too but never opened: seedfiles only
-// loads the countries it lists.
+// files are embedded too but never opened, because seedfiles only loads
+// the countries it lists; keeping them in the glob means reactivating PT
+// needs no embed change.
 //
 //go:embed regions_*.toml postal_codes_*.csv orgs*.toml
 var FS embed.FS

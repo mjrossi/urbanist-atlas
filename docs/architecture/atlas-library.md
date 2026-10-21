@@ -24,15 +24,18 @@ graph in opposite directions.
   only to build the breadcrumb (`RegionDetail.Ancestry`). It never uses
   the result for org scope.
 
-Both orchestrators pass their in-scope set to `BucketOrgsByScope`, so
-an org lands in the same Local, Regional or Statewide tier on either
-surface.
+Both orchestrators pass their own in-scope set to `BucketOrgsByScope`,
+so they apply the same bucketing rule. The sets differ, though, so the
+same org can land in different tiers on the two surfaces.
+`street-trust` is attached to `portland-or-metro` and `or`. A Portland
+ZIP's ancestors include both, so `/lookup` buckets it Statewide. On
+`/regions/portland-or-metro`, `or` is not a descendant, so it buckets
+Regional.
 
 The downward in-scope set matches the subtree that `ListRegions` counts
 for `OrgCount`. The count on a browse card is therefore the count on
 that region's detail page. Rollups (below) don't break this, because
-rollup targets are state-equivalent kinds, and browse doesn't list
-those.
+rollup targets (`IsRollupTargetKind`) are never browse kinds.
 
 `GetRegion` returns `(nil, nil)` for an unknown or national-tier slug,
 and the HTTP layer turns that into a 404. The wire contract does not
@@ -50,7 +53,8 @@ orgs would never appear on the Illinois page.
 `Region.RollupStates` supplies that link. It names the rollup targets
 (`IsRollupTargetKind`, which covers the state-equivalent kinds plus
 `us:federal-district`) on whose detail pages the region's **own** orgs
-also appear, in the Regional bucket.
+also appear. They bucket by the normal rule, so usually Regional, but
+an org also attached to the state itself buckets Statewide there.
 
 - **It is not a graph edge.** It is never added to the parent map,
   cycle detection, or the ancestor walk. The seed loader turns it into
@@ -68,7 +72,7 @@ also appear, in the Regional bucket.
   and the SPA needs their names to label "matched via …".
 
 DC is a rollup target but not a state-equivalent kind. A DMV org still
-buckets Regional, and the bi-state Washington metro can still surface
+buckets Regional, and the multi-state Washington metro can still surface
 its own orgs on `/dc`.
 
 ## Stats
@@ -114,7 +118,7 @@ The per-country rows are attributions, not a partition:
   fixtures should do the same.
 - **Indexes are built per call.** `ListRegions` builds the
   parent → children map and the region → orgs index once per call,
-  not once per region. That keeps the call linear in regions, parent
-  edges and attachments, rather than quadratic. The indexes are
+  not once per region, so each browse region's subtree walk reuses
+  them instead of rebuilding them. The indexes are
   allocated fresh instead of being cached on the struct, so they are
   safe to build under a read lock.

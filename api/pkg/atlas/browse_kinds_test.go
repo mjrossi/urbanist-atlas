@@ -19,9 +19,7 @@ func TestIsDefaultBrowseKind(t *testing.T) {
 		"ca:city",
 		"pt:area-metropolitana",
 	}
-	// Out of the default set — these don't appear in /regions today.
-	// A future filter slice (taxonomy- or DAG-based) could surface
-	// them; the editorial default stays metros + cities until then.
+	// Out of the default set, so these never appear in /regions.
 	out := []RegionKind{
 		"us:state",
 		"us:federal-district",

@@ -6,8 +6,9 @@ import (
 )
 
 // CoverageGap is one sampled empty-result lookup or search: where the
-// directory has no coverage yet. It is the one place raw user input is
-// persisted; see docs/superpowers/specs/2026-06-08-observability-design.md D4.
+// directory has no coverage yet. It is the one place raw lookup or
+// search input is persisted; see
+// docs/superpowers/specs/2026-06-08-observability-design.md D4.
 //
 //   - Kind is "lookup" or "search".
 //   - Country is the lookup country ("" for searches).

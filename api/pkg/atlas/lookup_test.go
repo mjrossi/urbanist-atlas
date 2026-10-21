@@ -56,12 +56,12 @@ func TestLookup_NYC_Brooklyn(t *testing.T) {
 		t.Fatalf("Lookup: %v", err)
 	}
 	// Citywide NYC orgs (TransAlt) attach to the regional `nyc` node
-	// and bucket as Regional. Borough-only orgs (Brooklyn Spoke) stay in Local. State-attached
-	// orgs (NY LCV → `ny`, a us:state) bucket as Statewide. The
-	// nyc-tristate coalition (us:multi-state) is NOT state-equivalent,
-	// so tri-state stays Regional. Each bucket is ordered by
-	// best-matched sort_priority asc: nyc(15) → nyc-metro(40) for
-	// Regional; nyc-tristate(80) sorts last in Regional.
+	// and bucket as Regional. Borough-only orgs (Brooklyn Spoke) stay in
+	// Local. State-attached orgs (NY LCV → `ny`, a us:state) bucket as
+	// Statewide. The nyc-tristate coalition (us:multi-state) is NOT
+	// state-equivalent, so tri-state stays Regional. Each bucket is
+	// ordered by best-matched sort_priority asc: nyc(15) → nyc-metro(40)
+	// for Regional; nyc-tristate(80) sorts last in Regional.
 	wantLocal := []string{"brooklyn-spoke"}
 	wantRegional := []string{"transalt", "transitcenter", "tri-state"}
 	wantStatewide := []string{"ny-lcv"}
