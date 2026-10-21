@@ -1,10 +1,6 @@
-// HUD ZIP-County crosswalk reader — the additive backfill source for
-// operational USPS ZIPs Census ZCTA omits (P.O. Box-only, single-
-// building, APO/FPO). See the package doc on us.go for how this
-// source plugs into the two-source pipeline, and
-// docs/superpowers/specs/2026-05-19-postal-coverage-design.md
-// §"Two-source pipeline" for the design rationale + the worked
-// 20811 → washington-dc-metro example.
+// HUD's ZIP-County crosswalk is the backfill source for operational ZIPs
+// Census ZCTA omits; see docs/superpowers/specs/2026-05-19-postal-coverage-design.md
+// "Two-source pipeline".
 
 package us
 
@@ -17,19 +13,9 @@ import (
 	"strings"
 )
 
-// hudZipCounty is one row of HUD's quarterly USPS ZIP-County
-// crosswalk. HUD publishes one row per (ZIP, COUNTY) combination —
-// multi-county ZIPs span multiple rows. The four ratio columns
-// (residential / business / other / total) share the implicit
-// constraint that summing across all rows for a given ZIP yields ~1.0
-// per ratio kind.
-//
-// We anchor a ZIP by the row with max(TOT_RATIO) — the total-
-// deliveries share — rather than max(RES_RATIO). P.O. Box-only ZIPs
-// (e.g., 20811) have RES_RATIO == 0 across every row, so a
-// residential-share pick would mis-anchor them; TOT_RATIO weights
-// residential + business + other together and always sums to a
-// meaningful primary county.
+// hudZipCounty is one row of HUD's quarterly USPS ZIP-County crosswalk,
+// which has a row per (ZIP, county) pair. For each ZIP, each ratio
+// column sums to about 1.0 across its rows.
 type hudZipCounty struct {
 	ZIP      string
 	County   string
@@ -39,25 +25,13 @@ type hudZipCounty struct {
 	TotRatio float64
 }
 
-// parseHUDZipCounty reads HUD's USPS ZIP-to-County crosswalk CSV
-// (downloaded from https://www.huduser.gov/portal/dataset/uspszip-api.html)
-// and returns one entry per ZIP-County pair. HUD ships the file with a
-// header row, quoted fields, and ratio columns as decimal strings. The
-// real-world layout is ZIP, COUNTY, USPS_ZIP_PREF_CITY,
-// USPS_ZIP_PREF_STATE, RES_RATIO, BUS_RATIO, OTH_RATIO, TOT_RATIO, but
-// we resolve every column by header name so HUD reordering columns or
-// dropping the city/state pair won't silently mis-anchor ZIPs.
-//
-// Blank lines are skipped silently. Trailing whitespace in ZIP and
-// COUNTY columns is trimmed (HUD occasionally pads). ZIP and COUNTY
-// are left-padded to 5 characters with leading zeros — HUD ships them
-// quoted to preserve the leading zero, but an operator round-tripping
-// the CSV through Excel can inadvertently coerce them to integers,
-// which strips leading zeros ("00601" → "601"). Padding defensively
-// here keeps Puerto Rico and New England ZIPs / county FIPS from
-// silently mis-anchoring downstream. A malformed ratio column returns
-// an error wrapping the offending line number — silently dropping a
-// row would mean a silent coverage hole.
+// parseHUDZipCounty reads HUD's ZIP-County crosswalk CSV into one entry
+// per ZIP-county pair. Columns are found by header name so a reordered
+// or trimmed HUD layout can't silently mis-anchor ZIPs. ZIP and COUNTY
+// are zero-padded to 5 characters: HUD quotes them to keep the leading
+// zero, but a round trip through Excel turns "00601" into "601". A
+// malformed ratio is an error, since dropping the row would leave a
+// silent coverage hole.
 func parseHUDZipCounty(r io.Reader) ([]hudZipCounty, error) {
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = -1
@@ -149,9 +123,7 @@ func parseHUDZipCounty(r io.Reader) ([]hudZipCounty, error) {
 	return out, nil
 }
 
-// padLeadingZeros left-pads s with '0' until it reaches width n. If s
-// is already >= n characters it is returned unchanged. See
-// parseHUDZipCounty doc for why this matters for ZIP / county FIPS.
+// padLeadingZeros left-pads s with '0' to width n.
 func padLeadingZeros(s string, n int) string {
 	if len(s) >= n {
 		return s

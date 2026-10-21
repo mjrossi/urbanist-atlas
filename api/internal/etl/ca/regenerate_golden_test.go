@@ -46,10 +46,8 @@ func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 
 	// Each CMA is a well-separated 100×100 box; Ottawa-Gatineau is two
 	// boxes (one per province row) sharing UID 505. Each FSA is a small
-	// box placed inside its target CMA so the max-overlap spatial join is
-	// unambiguous (X0A sits outside every CMA → province fallback). The
-	// FSA→CMA results match the prior prefix-table fixtures, so the golden
-	// outputs are unchanged.
+	// box inside its target CMA so the max-overlap join is unambiguous
+	// (X0A sits outside every CMA → province fallback).
 	cmaFields := []dbfFieldDef{{"CMAUID", 3}, {"CMATYPE", 1}, {"CMANAME", 30}, {"PRUID", 2}}
 	cmaRows := [][]string{
 		{"535", "B", "Toronto", "35"},
@@ -92,12 +90,8 @@ func TestRegenerate_CAGoldenDeterminism(t *testing.T) {
 	writeShapefileZip(t, filepath.Join(srcDir, "lcma000b21a_e.zip"), "lcma000b21a_e", cmaFields, cmaRows, cmaRings)
 	writeShapefileZip(t, filepath.Join(srcDir, "lfsa000b21a_e.zip"), "lfsa000b21a_e", fsaFields, fsaRows, fsaRings)
 
-	// Overrides are read from outDir (regions_ca_cma_overrides.toml), now
-	// data rather than the compiled cmaOverrides map. Stage the canonical
-	// overrides the fixture exercises so the golden output is unchanged:
-	// CMA 535 → toronto-cma override slug+name; 933 → metro-vancouver
-	// override slug+kind. CMA 421 (Sherbrooke) has no override and
-	// auto-generates, exercising the no-override region writer path.
+	// Stage the overrides the fixture exercises. CMA 421 (Sherbrooke) has
+	// none and auto-generates, covering the no-override writer path.
 	overridesTOML := `[[override]]
 cma_uid = "535"
 slug = "toronto-cma"

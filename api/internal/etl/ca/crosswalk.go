@@ -11,20 +11,10 @@ import (
 // "city-leaf", "cma", "cma-portion", "province", "unknown".
 type PostalAnchor = etl.PostalAnchor
 
-// crosswalk runs the smallest-anchor algorithm over the FSA rows:
-//
-//  1. Exact FSA → curated city leaf (fsaToLeaf) — e.g., M5V → toronto.
-//  2. FSA → curated CMA slug via the max-overlap spatial join
-//     (cmaSlugByFSA, built in ca.go from spatialJoinFSAToCMA) — e.g.,
-//     V8W → victoria-cma. Multi-province CMAs route to the FSA's own
-//     province portion.
-//  3. Province via PRUID (provinceUIDToSlug) — e.g., A0A → nl-province.
-//  4. Otherwise "unknown" (FSA is dropped from the output and counted
-//     in the unknown bucket).
-//
-// cmaSlugByFSA contains only slugs the caller verified are in the
-// generated CMA list, so an FSA whose max-overlap CMA was somehow not
-// emitted falls through to province rather than dangling.
+// crosswalk anchors each FSA at its curated city leaf (fsaToLeaf), else
+// its max-overlap CMA (or that CMA's own-province portion), else its
+// province. FSAs none of these resolve are dropped and counted as
+// "unknown".
 func crosswalk(fsas []fsaRow, cmaSlugByFSA, portionByCMA map[string]string) ([]PostalAnchor, map[string]int) {
 	sort.Slice(fsas, func(i, j int) bool { return fsas[i].CFSAUID < fsas[j].CFSAUID })
 
@@ -39,10 +29,7 @@ func crosswalk(fsas []fsaRow, cmaSlugByFSA, portionByCMA map[string]string) ([]P
 			anchor.Reason = "city-leaf"
 		default:
 			if slug := cmaSlugByFSA[f.CFSAUID]; slug != "" {
-				// Multi-province CMA: route to the FSA's own-province
-				// portion so the ancestor walk reaches only its own
-				// province (leak-free). Single-province CMAs have no portion
-				// entry and keep the bare umbrella slug.
+				// A portion's ancestor walk reaches only its own province.
 				if p := portionByCMA[slug+":"+f.PRUID]; p != "" {
 					anchor.AnchorSlug = p
 					anchor.Reason = "cma-portion"

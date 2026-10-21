@@ -1,15 +1,11 @@
-// Package seedfiles parses the bundled seed data
-// (regions_*.toml, postal_codes_*.csv, orgs.toml) and builds an
-// in-memory atlas.MemStore. It operates over an fs.FS so the same
-// loader works against the production embed (api/seed/embed.go) and
-// against a directory on disk (os.DirFS(seedDir)).
+// Package seedfiles parses the bundled seed data (regions_*.toml,
+// postal_codes_*.csv, orgs.toml) into an in-memory atlas.MemStore. It
+// reads an fs.FS, so the same loader serves the production embed and a
+// directory on disk.
 //
-// Adding a new country: drop seed/regions_<cc>.toml and
-// seed/postal_codes_<cc>.csv into api/seed/, then append a
-// {code, regionFiles, postal} entry to countries below. If the new
-// country has a state-tier file (e.g., regions_<cc>_states.toml),
-// list it before the main file in regionFiles so the main file's
-// leaves can parent under the states.
+// A new country needs its regions_<cc>*.toml and postal_codes_<cc>.csv
+// in api/seed/ and an entry in countries, with any state-tier file
+// listed first so the main file's leaves can parent under it.
 package seedfiles
 
 import (
@@ -23,13 +19,10 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// countrySpec describes one country's bundled seed files.
-//
-//   - Code:        canonical upper-case country code stamped on every region.
-//   - RegionFiles: file suffixes for regions_<suffix>.toml, in load
-//     order. Earlier files load first; later files may reference
-//     earlier-loaded regions as parents.
-//   - Postal:      file suffix for postal_codes_<suffix>.csv.
+// countrySpec names one country's seed files: RegionFiles are the
+// regions_<suffix>.toml suffixes in load order (a file may only parent
+// under regions from earlier files), Postal the postal_codes_<suffix>.csv
+// suffix.
 type countrySpec struct {
 	Code        string
 	RegionFiles []string
@@ -41,12 +34,8 @@ type countrySpec struct {
 var countries = []countrySpec{
 	{"US", []string{"us_states", "us_multistate", "us_msas", "us"}, "us"},
 	{"CA", []string{"ca_provinces", "ca_cmas", "ca"}, "ca"},
-	// PT was loaded through slice #4.6 as a region-graph validation
-	// fixture and dropped from the user-facing pipeline by slice #25.
-	// The seed files (regions_pt.toml, postal_codes_pt.csv) stay in
-	// api/seed/ for tests that load them explicitly via ParseRegions/
-	// ParsePostal; a future v1.1+ slice can reintroduce PT here when
-	// the editorial coverage is ready to ship.
+	// PT's seed files stay in api/seed/ as a region-graph validation
+	// fixture for tests that load them explicitly; it is not shipped.
 }
 
 // Countries returns the country codes BuildMemStore loads, in
@@ -59,32 +48,25 @@ func Countries() []string {
 	return out
 }
 
-// BuildMemStore parses every bundled seed file from seedFS and
-// returns a populated atlas.MemStore. Synthetic int64 IDs are
-// assigned to regions and orgs in load order; the wire contract
-// identifies both by slug, so the IDs are stable-within-process and
-// process-only.
+// BuildMemStore parses every bundled seed file from seedFS into a
+// MemStore. Region and org IDs are assigned in load order and are only
+// stable within a process; the wire contract identifies both by slug.
 func BuildMemStore(logger *slog.Logger, seedFS fs.FS) (*atlas.MemStore, error) {
 	return buildMemStore(logger, seedFS, countries)
 }
 
-// buildMemStore is the BuildMemStore core, parameterized on the
-// country set so tests can drive the loader (and its global invariant
-// checks) over a tiny synthetic bundle. Production callers go through
-// BuildMemStore, which passes the package-level countries.
+// buildMemStore takes the country set as a parameter so tests can run
+// the loader and its global invariant checks over a tiny bundle.
 func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) (*atlas.MemStore, error) {
 	store := atlas.NewMemStore()
 	regionIDBySlug := map[string]int64{}
-	// parentSlugs is the assembled cross-file parent graph (slug ->
-	// parent slugs across ALL files); childCount counts direct children
-	// per slug so the orphan check can tell leaves from interior nodes;
-	// localTier marks the local-tier (city/neighborhood) leaves the
-	// RGN-02b coverage check applies to (see assertReachableLeaves).
+	// childCount lets the orphan check tell leaves from interior nodes;
+	// localTier marks the leaves it applies to.
 	parentSlugs := map[string][]string{}
 	childCount := map[string]int{}
 	localTier := map[string]bool{}
-	// kindBySlug + rollupSources back the post-Stage-1 rollup_states
-	// resolution (a directional metro->state page edge, NOT a graph edge).
+	// rollup_states are directional metro→state page edges, not graph
+	// edges, so they resolve after Stage 1.
 	kindBySlug := map[string]atlas.RegionKind{}
 	var rollupSources []atlas.Region
 	var nextRegionID int64 = 1
@@ -97,9 +79,7 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 			if err != nil {
 				return nil, fmt.Errorf("seedfiles: regions %s/%s: %w", c.Code, suffix, err)
 			}
-			// Fast early signal: a cycle wholly inside this file fails
-			// now, before the rest of the bundle loads. The global
-			// cross-file check runs after the loop (RGN-02a).
+			// Catch a cycle inside one file before the rest of the bundle loads.
 			if err := DetectCycles(regions); err != nil {
 				return nil, fmt.Errorf("seedfiles: regions %s/%s: %w", c.Code, suffix, err)
 			}
@@ -132,34 +112,17 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 		}
 	}
 
-	// RGN-02a: redundant global acyclicity proof over the
-	// FULLY-ASSEMBLED parent graph. NOTE: the load-order guard above
-	// (every parent slug must already be registered before a region's
-	// own slug — build.go :107) is what actually guarantees acyclicity.
-	// It forces every parent edge to point backward in registration
-	// order, and a graph whose edges all respect a single total order is
-	// acyclic by construction — so this DFS cannot fire on any input
-	// BuildMemStore accepts (a cross-file back-edge is rejected earlier
-	// at :107 with "references unknown parent slug"). It is retained as
-	// defense-in-depth, NOT as the primary proof: if the unknown-parent
-	// guard is ever loosened to permit forward references / out-of-order
-	// files, this DFS becomes the real backstop against an infinite
-	// ancestor/descendant walk at runtime. Do not weaken :107 on the
-	// assumption that this check is the cycle backstop — it only fires
-	// once :107 stops forcing backward edges.
+	// Redundant: the unknown-parent check above forces every edge to point
+	// backward in load order, which is acyclic by construction. This is the
+	// backstop if that check is ever loosened to allow forward references,
+	// so don't weaken it on the assumption this catches cycles.
 	if err := DetectCyclesGraph(parentSlugs); err != nil {
 		return nil, fmt.Errorf("seedfiles: global region graph: %w", err)
 	}
 
-	// rollup_states resolution: a directional metro->state edge that
-	// surfaces a (stateless) multi-state metro's OWN orgs on its
-	// constituent states' detail pages, in the browse/descendant direction
-	// ONLY. Resolved here, after every region is registered, so a metro may
-	// name a state defined in any already-loaded file. These are NOT graph
-	// edges — they never enter parentSlugs, DetectCyclesGraph, or the
-	// ancestor walk, which is what keeps the relation leak-free
-	// (docs/region-graph.md §1). Each target must exist and be a
-	// state-equivalent or us:federal-district kind (IsRollupTargetKind).
+	// rollup_states never enter parentSlugs or the ancestor walk, which
+	// keeps them leak-free (docs/region-graph.md §1). Each target must be a
+	// state-equivalent or us:federal-district region.
 	for _, r := range rollupSources {
 		for _, target := range r.RollupStates {
 			if _, ok := regionIDBySlug[target]; !ok {
@@ -172,9 +135,7 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 		}
 	}
 
-	// Stage 2: postal codes, country-by-country. anchoredSlugs records
-	// every slug a postal row points at (its leaf anchor) for the
-	// RGN-02b reachability check.
+	// Stage 2: postal codes. anchoredSlugs feeds the orphan-leaf check.
 	anchoredSlugs := map[string]bool{}
 	var postalTotal int
 	for _, c := range countrySet {
@@ -199,8 +160,7 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 		}
 	}
 
-	// Stage 3: orgs. orgSlugs records every slug an org attaches to for
-	// the RGN-02b reachability check — but ONLY slugs that resolved.
+	// Stage 3: orgs.
 	orgs, err := readOrgs(seedFS, "orgs.toml")
 	if err != nil {
 		return nil, fmt.Errorf("seedfiles: orgs: %w", err)
@@ -212,42 +172,27 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 		if err != nil {
 			return nil, fmt.Errorf("seedfiles: orgs: %w", err)
 		}
-		// added_at is required; a missing TOML key parses as the zero
-		// toml.LocalDate (Year == 0). Reject loudly with the offending
-		// slug so an operator can fix the seed file without grep.
+		// A missing added_at parses as the zero toml.LocalDate.
 		if entry.AddedAt.Year == 0 {
 			return nil, fmt.Errorf("seedfiles: org %q: missing required added_at", entry.Slug)
 		}
-		// INVARIANT: only an org slug that resolved to a region ID may
-		// anchor a leaf for the RGN-02b reachability check. resolveOrgRegions
-		// above hard-errors on any slug missing from regionIDBySlug, so by
-		// the time we reach here every slug in entry.RegionSlugs is known to
-		// resolve. Keep this loop AFTER the resolve check (do not hoist it):
-		// recording an unresolved slug would let a typo'd org slug mark a
-		// real, differently-owned leaf as "anchoring" and suppress a genuine
-		// orphan-leaf error for it.
+		// Record org slugs only after resolveOrgRegions has proved they all
+		// resolve: an unresolved slug here could suppress a real orphan-leaf
+		// error.
 		for _, slug := range entry.RegionSlugs {
 			orgSlugs[slug] = true
 		}
 		o := entry.Org
 		o.ID = nextOrgID
-		// added_at parses as a date-only toml.LocalDate on the entry
-		// wrapper (atlas.Org.AddedAt is toml:"-"); pin it to midnight
-		// UTC.
+		// added_at is date-only; pin it to midnight UTC.
 		o.AddedAt = time.Date(entry.AddedAt.Year, time.Month(entry.AddedAt.Month), entry.AddedAt.Day, 0, 0, 0, 0, time.UTC)
 		store.AddOrg(o, ids)
 		nextOrgID++
 	}
 
-	// RGN-02b: prove region->postal reachability. Stage 2 already
-	// proved postal->region (every postal row's leaf slug resolves);
-	// this asserts the inverse — every LOCAL-tier LEAF region (no
-	// children) is reachable via a postal anchor, an attached org, or
-	// an anchoring descendant. A local leaf is the coverage-bearing
-	// city/neighborhood node; if an ETL change drops its postal rows it
-	// orphans silently — invisible in browse, unreachable by /lookup —
-	// hiding a coverage regression behind a clean boot. Fail closed so
-	// the gap surfaces here.
+	// Every local-tier leaf must be reachable from a postal row or an org.
+	// An ETL change that drops a city's postal rows would otherwise leave it
+	// invisible in browse and unreachable by /lookup behind a clean boot.
 	if err := assertReachableLeaves(localTier, childCount, anchoredSlugs, orgSlugs); err != nil {
 		return nil, err
 	}
@@ -262,24 +207,11 @@ func buildMemStore(logger *slog.Logger, seedFS fs.FS, countrySet []countrySpec) 
 	return store, nil
 }
 
-// assertReachableLeaves enforces the RGN-02b invariant over the
-// LOCAL-tier leaves: every local-tier region with no children in the
-// assembled graph must have ≥1 postal anchor, ≥1 attached org, or an
-// anchoring descendant. A leaf by definition has no descendants, so
-// the descendant leg is vacuous for it and the check reduces to
-// "anchored by a postal row or an org". Interior (non-leaf) regions
-// are anchored transitively by their descendants and are not checked.
-//
-// Scope = local tier deliberately. The finding (RGN-02b) targets the
-// coverage-bearing city/neighborhood leaves whose silent loss of
-// postal rows would hide a coverage regression. Regional-tier leaves
-// with no postal anchor are the editorially-known coarse-coverage
-// condition (e.g. the CA CMAs whose finer postal data is PCCF-pending,
-// deferred under ETL-03) — a deliberate fallback to the province, not
-// an orphan, so they are out of scope here. The slug list is sorted and
-// the full count is reported (with a capped sample) so a bulk ETL change
-// that orphans many leaves at once surfaces all of them in one run,
-// deterministically across runs.
+// assertReachableLeaves fails when a local-tier region with no children
+// has neither a postal anchor nor an attached org. Regional-tier leaves
+// are exempt: falling back to a coarser anchor is an editorial choice
+// there, not a lost city. The error lists every orphan, sorted and
+// capped, so a bulk regression shows up in one run.
 func assertReachableLeaves(localTier map[string]bool, childCount map[string]int, anchoredSlugs, orgSlugs map[string]bool) error {
 	candidates := make([]string, 0, len(localTier))
 	for slug := range localTier {
@@ -295,9 +227,6 @@ func assertReachableLeaves(localTier map[string]bool, childCount map[string]int,
 		return nil
 	}
 	slices.Sort(candidates)
-	// Report all orphans (capped sample) so a bulk regression that
-	// orphans N leaves surfaces in one build instead of forcing N
-	// fix-rerun cycles. cap is a builtin, so the limit is maxShown.
 	const maxShown = 20
 	shown := candidates
 	if len(shown) > maxShown {
@@ -309,9 +238,8 @@ func assertReachableLeaves(localTier map[string]bool, childCount map[string]int,
 		len(candidates), shown)
 }
 
-// resolveOrgRegions returns the int64 region IDs for an org's
-// region_slugs, sorted ascending so the wire shape matches the
-// pre-rewrite contract. Unknown slugs are a hard error.
+// resolveOrgRegions returns an org's region IDs, deduplicated and sorted.
+// An unknown slug is an error.
 func resolveOrgRegions(o OrgEntry, regionIDBySlug map[string]int64) ([]int64, error) {
 	out := make([]int64, 0, len(o.RegionSlugs))
 	seenIDs := map[int64]struct{}{}
@@ -335,8 +263,7 @@ func resolveOrgRegions(o OrgEntry, regionIDBySlug map[string]int64) ([]int64, er
 	return out, nil
 }
 
-// openFile is a small wrapper that turns fs.ErrNotExist into a
-// pointable "seed file missing: <path>" error for the operator.
+// openFile names the missing path when seedFS has no such file.
 func openFile(seedFS fs.FS, path string) (fs.File, error) {
 	f, err := seedFS.Open(path)
 	if err != nil {

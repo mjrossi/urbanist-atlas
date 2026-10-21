@@ -8,26 +8,11 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/internal/etl"
 )
 
-// CMAOverride is one editorial override read from
-// api/seed/regions_ca_cma_overrides.toml. It pins the slug, display
-// name, and kind for a specific StatsCan CMA (keyed by its 3-digit
-// UID) so the auto-generated values can be replaced with the curated
-// form (e.g., "metro-vancouver" / "ca:regional-district").
-//
-// Parent edges are deliberately NOT override-able: every CA CMA's
-// parents are derived from its StatsCan ProvinceUIDs (see assignCMAs).
-// The US side carries a parents override because multi-state metros
-// reroute into intermediate colloquial regions (nyc-metro →
-// nyc-tristate); Canada has no such multi-province intermediate-region
-// layer in v1, so province derivation is always correct
-// (Ottawa-Gatineau → [on, qc]). Rather than ship an unused knob, we
-// omit the field — a future country (or CA itself) can add it the day
-// a concrete editorial need appears.
-//
-// It mirrors the US MSAOverride struct (api/internal/etl/us/output.go)
-// for slug/name/kind — both countries drive those editorial overrides
-// from data, not compiled Go — with an added Kind field (Metro
-// Vancouver overrides the "ca:cma" default to "ca:regional-district").
+// CMAOverride is one editorial override from
+// api/seed/regions_ca_cma_overrides.toml, pinning a CMA's slug, name and
+// kind (e.g. Metro Vancouver as "ca:regional-district"). There is no
+// parents override: CA has no multi-province intermediate regions, so
+// parents always derive from the CMA's provinces.
 type CMAOverride struct {
 	UID  string `toml:"cma_uid"`
 	Slug string `toml:"slug"`
@@ -35,31 +20,23 @@ type CMAOverride struct {
 	Kind string `toml:"kind"`
 }
 
-// cmaAssignment captures the per-CMA slug + kind + parents that the
-// output writer emits to regions_ca_cmas.toml. Overrides take effect
-// during assignment (see assignCMAs).
+// cmaAssignment is the slug, kind, name and parents emitted for one CMA.
 type cmaAssignment struct {
 	UID     string
 	Slug    string
 	Kind    string
 	Name    string
 	Parents []string
-	// RollupStates is the directional rollup_states list emitted onto the
-	// region row (atlas.Region.RollupStates): the province slugs on whose
-	// detail pages this CMA's OWN orgs should surface (browse direction
-	// only). Set on multi-province umbrellas (Ottawa-Gatineau → on, qc);
-	// empty for single-province CMAs and for portion rows.
+	// RollupStates lists the province slugs on whose detail pages this
+	// CMA's own orgs surface (browse direction only); set only on
+	// multi-province umbrellas.
 	RollupStates []string
 }
 
-// assignCMAs produces one assignment per CMA in canonical order
-// (sorted by slug). Override entries (keyed by CMA UID, read from
-// api/seed/regions_ca_cma_overrides.toml) supply slug/name/kind
-// overrides; missing fields fall back to auto-generated values
-// (slug = "<slugified-name>-cma", kind = "ca:cma", name = StatsCan
-// name). Parents are derived from ProvinceUIDs (single-province →
-// [province slug]; multi-province like Ottawa-Gatineau → [primary,
-// secondary]).
+// assignCMAs returns one assignment per CMA, sorted by slug. Overrides
+// supply slug, name and kind, defaulting to "<slugified-name>-cma",
+// the StatsCan name and "ca:cma". A single-province CMA parents under
+// its province; a multi-province one gets no parents and rollup_states.
 func assignCMAs(cmas []cma, overrides []CMAOverride) []cmaAssignment {
 	overrideByUID := make(map[string]CMAOverride, len(overrides))
 	for _, o := range overrides {
@@ -80,10 +57,8 @@ func assignCMAs(cmas []cma, overrides []CMAOverride) []cmaAssignment {
 		if kind == "" {
 			kind = "ca:cma"
 		}
-		// Multi-province CMA (Ottawa-Gatineau): STATELESS umbrella +
-		// rollup_states, with per-province FSA routing via portions
-		// (buildCMAPortions). Single-province CMAs keep their province
-		// parent edge. Mirrors the US multi-state metro handling.
+		// Same stateless-umbrella model as US multi-state metros: FSAs route
+		// through per-province portions (buildCMAPortions).
 		provs := spannedProvinces(c)
 		parents := []string{}
 		var rollup []string
@@ -110,18 +85,16 @@ func assignCMAs(cmas []cma, overrides []CMAOverride) []cmaAssignment {
 	return out
 }
 
-// provinceEntry is one province a CMA spans: the StatsCan PRUID, the
-// province region slug (e.g. "on", "qc", "nl-province"), and the bare
-// abbrev used in portion slugs/names (the slug minus "-province").
+// provinceEntry is one province a CMA spans: its PRUID, region slug, and
+// the bare abbrev used in portion slugs (the slug minus "-province").
 type provinceEntry struct {
 	PRUID  string
 	Slug   string
 	Abbrev string
 }
 
-// spannedProvinces returns the distinct provinces a CMA spans, derived
-// from its StatsCan ProvinceUIDs, sorted by slug for deterministic
-// output. Unknown PRUIDs are skipped.
+// spannedProvinces returns the distinct known provinces a CMA spans,
+// sorted by slug.
 func spannedProvinces(c cma) []provinceEntry {
 	seen := map[string]bool{}
 	var out []provinceEntry
@@ -137,12 +110,9 @@ func spannedProvinces(c cma) []provinceEntry {
 	return out
 }
 
-// buildCMAPortions returns the per-province portion rows for multi-
-// province CMAs (only Ottawa-Gatineau in v1) plus the portion anchor
-// lookup ("umbrellaSlug:PRUID" → portion slug) the FSA crosswalk routes
-// through. The rows come from the shared etl.BuildPortionRows kernel
-// (same one the US metro portions use); the anchor-map keying stays
-// CA-specific.
+// buildCMAPortions returns the portion rows for multi-province CMAs plus
+// the "umbrellaSlug:PRUID" → portion slug lookup the FSA crosswalk
+// routes through.
 func buildCMAPortions(cmas []cma, assignments []cmaAssignment) ([]etl.RegionRow, map[string]string) {
 	byUID := make(map[string]cmaAssignment, len(assignments))
 	for _, a := range assignments {
@@ -169,11 +139,8 @@ func buildCMAPortions(cmas []cma, assignments []cmaAssignment) ([]etl.RegionRow,
 	return portions, portionByCMA
 }
 
-// cmaRowsToRegionRows adapts the CA umbrella-assignment shape to the
-// shared etl.RegionRow the common TOML writer consumes, attaching the
-// provenance comment (# StatsCan CMA <UID> — <Name>). Portion rows
-// never pass through here — buildCMAPortions builds them directly as
-// etl.RegionRow (comment-free).
+// cmaRowsToRegionRows converts umbrella assignments to etl.RegionRow,
+// adding the "# StatsCan CMA <UID> — <Name>" provenance comment.
 func cmaRowsToRegionRows(assignments []cmaAssignment) []etl.RegionRow {
 	rows := make([]etl.RegionRow, len(assignments))
 	for i, a := range assignments {

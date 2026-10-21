@@ -8,27 +8,22 @@ import (
 	"strings"
 )
 
-// zctaPlace is the primary place assignment for one ZCTA. A ZCTA may
-// straddle multiple Census places; we keep only the place with the
-// largest land area within the ZCTA (the AREALAND_PART column).
+// zctaPlace is a ZCTA's primary place: of the places it straddles, the
+// one with the largest AREALAND_PART.
 type zctaPlace struct {
 	PlaceGEOID string
 	PlaceName  string
 }
 
-// zctaCounty is the primary county assignment for one ZCTA. ZCTAs can
-// straddle counties too, but it's rare for the primary county to be
-// ambiguous — same largest-AREALAND_PART tiebreak applies.
+// zctaCounty is a ZCTA's primary county, by the same AREALAND_PART rule.
 type zctaCounty struct {
 	CountyGEOID string
 	CountyName  string
 }
 
 // parseZCTAPlace reads the Census ZCTA-to-place relationship file
-// (tab20_zcta520_place20_natl.txt, pipe-delimited with a BOM) and
-// returns one entry per ZCTA: the primary place assignment.
-//
-// File format (pipe-delimited):
+// (tab20_zcta520_place20_natl.txt) into one primary place per ZCTA. The
+// column indexes are fixed by Census's pipe-delimited layout:
 //
 //	OID_ZCTA5_20|GEOID_ZCTA5_20|NAMELSAD_ZCTA5_20|AREALAND_ZCTA5_20|
 //	AREAWATER_ZCTA5_20|MTFCC_ZCTA5_20|CLASSFP_ZCTA5_20|FUNCSTAT_ZCTA5_20|
@@ -36,9 +31,7 @@ type zctaCounty struct {
 //	AREAWATER_PLACE_20|MTFCC_PLACE_20|CLASSFP_PLACE_20|FUNCSTAT_PLACE_20|
 //	AREALAND_PART|AREAWATER_PART
 //
-// Rows where GEOID_ZCTA5_20 or GEOID_PLACE_20 is blank are skipped (no
-// ZCTA-place mapping to record). ZCTAs that straddle multiple places
-// keep only the row with the largest AREALAND_PART.
+// Rows with a blank ZCTA or place GEOID are skipped.
 func parseZCTAPlace(r io.Reader) (map[string]zctaPlace, error) {
 	raw, err := parseZCTARelationship(r, 1, 9, 10, 16)
 	if err != nil {
@@ -51,10 +44,9 @@ func parseZCTAPlace(r io.Reader) (map[string]zctaPlace, error) {
 	return out, nil
 }
 
-// parseZCTACounty reads the Census ZCTA-to-county relationship file
-// (tab20_zcta520_county20_natl.txt). Same pipe-delimited shape as the
-// place file, with COUNTY columns substituted for PLACE columns.
-// Returns one entry per ZCTA: the primary county assignment.
+// parseZCTACounty reads the Census ZCTA-to-county relationship file,
+// which has the place file's layout with COUNTY columns in place of
+// PLACE ones.
 func parseZCTACounty(r io.Reader) (map[string]zctaCounty, error) {
 	raw, err := parseZCTARelationship(r, 1, 9, 10, 16)
 	if err != nil {
@@ -73,9 +65,8 @@ type zctaAttachment struct {
 	AreaLandPart int64
 }
 
-// parseZCTARelationship is the shared scanner for both place and
-// county crosswalks. zctaCol / geoidCol / nameCol / areaCol are the
-// column indexes inside the pipe-delimited row.
+// parseZCTARelationship keeps, per ZCTA, the row with the largest
+// AREALAND_PART. The column arguments are indexes into the pipe-split row.
 func parseZCTARelationship(r io.Reader, zctaCol, geoidCol, nameCol, areaCol int) (map[string]zctaAttachment, error) {
 	out := map[string]zctaAttachment{}
 	scanner := bufio.NewScanner(r)
@@ -86,8 +77,7 @@ func parseZCTARelationship(r io.Reader, zctaCol, geoidCol, nameCol, areaCol int)
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		// Strip UTF-8 BOM on the first line. Census ships these files
-		// with a leading EF BB BF marker that bufio doesn't peel off.
+		// Census ships these files with a UTF-8 BOM that bufio doesn't strip.
 		if lineNum == 1 {
 			line = strings.TrimPrefix(line, utf8BOM)
 		}
@@ -104,17 +94,13 @@ func parseZCTARelationship(r io.Reader, zctaCol, geoidCol, nameCol, areaCol int)
 		name := strings.TrimSpace(fields[nameCol])
 		areaStr := strings.TrimSpace(fields[areaCol])
 		if zcta == "" || geoid == "" {
-			// Rows where the ZCTA or the target geometry is null
-			// (e.g., a county that no ZCTA falls inside, or a ZCTA
-			// entirely outside any place).
+			// A county no ZCTA falls in, or a ZCTA outside every place.
 			continue
 		}
 		area, err := strconv.ParseInt(areaStr, 10, 64)
 		if err != nil {
-			// A malformed AREALAND_PART can't be silently coerced to 0:
-			// 0 would lose the max-area tiebreak and mis-anchor the ZCTA
-			// with no signal. Error with line context, mirroring the HUD
-			// reader's bad-ratio handling (hud.go).
+			// Coercing a malformed AREALAND_PART to 0 would silently lose the
+			// max-area pick and mis-anchor the ZCTA.
 			return nil, fmt.Errorf("parse zcta relationship: line %d: AREALAND_PART %q: %w", lineNum, areaStr, err)
 		}
 		existing, ok := out[zcta]

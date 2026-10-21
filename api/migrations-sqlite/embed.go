@@ -1,6 +1,5 @@
-// Package migrations bundles the SQLite migration files as an
-// embedded filesystem so callers (cmd/server, tests) can apply them
-// without needing the on-disk files at runtime.
+// Package migrations embeds the SQLite migration files so they need not
+// exist on disk at runtime.
 package migrations
 
 import "embed"

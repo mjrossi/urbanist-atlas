@@ -710,26 +710,21 @@ func TestRenderOrgBlock_Deterministic(t *testing.T) {
 }
 
 // TestRenderOrgBlock_AddedAt asserts the rendered block carries a
-// date-only added_at line matching the approval date passed in. This
-// is the single line that lets a moderator's "approve" click flow
-// through to the homepage "Recently indexed" strip with the right
-// date — without it, the next deploy of the merged PR would fail
-// the Phase 4 required-field check at boot and the whole bundle
-// would refuse to load.
+// date-only added_at matching the approval date passed in. Without it
+// the merged PR's bundle would fail the loader's required-field check
+// at boot.
 func TestRenderOrgBlock_AddedAt(t *testing.T) {
 	sub := sampleSubmission()
 	// CreatedAt is May 28 (submission time); approval is later.
-	// The plan explicitly forbids reusing sub.CreatedAt, so pick a
-	// distinct date and assert THAT one — proves the field is sourced
-	// from the caller's clock, not the submission row.
+	// Pick a date distinct from CreatedAt and assert THAT one: the field
+	// comes from the caller's clock, not the submission row.
 	addedAt := time.Date(2026, 6, 1, 9, 15, 0, 0, time.UTC)
 	out, err := RenderOrgBlock(sub, "brooklyn-greenways", addedAt)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	// Unquoted ISO date — matches the seed convention (see Phase 3
-	// backfill diff) and parses as toml.LocalDate, which is what the
-	// loader's required-field check expects.
+	// Unquoted ISO date, the seed convention; it parses as the
+	// toml.LocalDate the loader's required-field check expects.
 	const want = "added_at = 2026-06-01"
 	if !strings.Contains(out, want) {
 		t.Fatalf("rendered block missing %q line; got:\n%s", want, out)
@@ -742,11 +737,9 @@ func TestRenderOrgBlock_AddedAt(t *testing.T) {
 }
 
 // TestRenderOrgBlock_EmptyTagsRendersPlaceholder pins the editor
-// affordance: public submissions no longer carry tags (the `tags` field
-// was dropped from SubmissionPayload), so sub.Payload.Tags is nil. The
-// rendered block must still emit a `tags = []` line — an explicit empty
-// array the editor fills in during PR review — rather than omitting the
-// key. region_slugs, when present, is rendered as-is.
+// affordance: public submissions carry no tags, so sub.Payload.Tags is
+// nil, yet the block must still emit an explicit `tags = []` for the
+// editor to fill in during PR review. region_slugs renders as-is.
 func TestRenderOrgBlock_EmptyTagsRendersPlaceholder(t *testing.T) {
 	sub := atlas.Submission{
 		PublicID: "01928200-3344-7000-9abc-000000000099",
@@ -803,7 +796,7 @@ func TestApiError_IncludesStatusAndBody(t *testing.T) {
 }
 
 // errReader returns some bytes then a non-EOF error, exercising the
-// issue #27 truncated-read marker path in apiError.
+// truncated-read marker path in apiError.
 type errReader struct {
 	data []byte
 	pos  int
@@ -838,7 +831,7 @@ func TestApiError_MarksTruncatedRead(t *testing.T) {
 	}
 }
 
-// TestWorker_RetriesTransientGET pins the issue #24 idempotent-GET
+// TestWorker_RetriesTransientGET pins the idempotent-GET
 // retry: the first two get-ref calls return 503, the third succeeds,
 // and the pipeline opens the PR without the moderator seeing an error.
 // Proves doIdempotentRequest retries a retryable status on a GET.
@@ -998,7 +991,7 @@ func TestWorker_CreateBranch_AlreadyExistsIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestWorker_ShutdownDrain_BoundsWedgedCall pins issue #25: a job
+// TestWorker_ShutdownDrain_BoundsWedgedCall pins that a job
 // drained on the hard-cancel path (drainAndExit) runs under
 // shutdownDrainTimeout, so a wedged GitHub call can't pin process exit
 // for the full openPRTimeout (30s). The fake's get-ref hangs forever;
@@ -1026,7 +1019,7 @@ func TestWorker_ShutdownDrain_BoundsWedgedCall(t *testing.T) {
 
 	// Job A will be picked up by Run and wedge in getBranchSHA. Job B
 	// sits in the buffer so it's still there when ctx cancels, forcing
-	// it through drainAndExit (the issue #25 code path).
+	// it through drainAndExit.
 	if err := w.Enqueue(ctx, sampleSubmission()); err != nil {
 		t.Fatalf("Enqueue A: %v", err)
 	}

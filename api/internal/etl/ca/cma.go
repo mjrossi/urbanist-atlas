@@ -8,36 +8,23 @@ import (
 	"strings"
 )
 
-// cma is one Census Metropolitan Area row, derived from the StatsCan
-// CMA boundary file's DBF attribute table. We keep only the fields the
-// region-generation logic uses; the much-larger shapefile geometry is
-// ignored.
-//
-// Note that the StatsCan CMA file includes both Census Metropolitan
-// Areas (CMATYPE='B', population ≥100,000) and Census Agglomerations
-// (CMATYPE='D', smaller). Only type 'B' is treated as a CMA for the
-// purpose of building regions_ca_cmas.toml.
+// cma is one Census Metropolitan Area from the CMA boundary file's DBF
+// table. The file also lists Census Agglomerations (CMATYPE 'D'); only
+// type 'B' rows are CMAs.
 type cma struct {
-	// UID is the 3-digit Census CMA code (e.g., "535" for Toronto).
-	// Multi-province CMAs (Ottawa-Gatineau, code 505) appear once per
-	// province in the source file but collapse to a single CMA here.
+	// UID is the 3-digit CMA code (e.g. "535", Toronto). Ottawa-Gatineau
+	// (505) has a source row per province but is one cma.
 	UID string
-	// Name is the canonical CMA name with French/English variants and
-	// parenthetical qualifiers stripped (e.g.,
-	// "Greater Sudbury / Grand Sudbury" → "Greater Sudbury";
-	// "Ottawa - Gatineau (Ontario part / ...)" → "Ottawa - Gatineau").
+	// Name is CMANAME with qualifiers and the French half stripped; see
+	// cleanCMAName.
 	Name string
 	// ProvinceUIDs are the 2-digit province codes the CMA spans, in
-	// the order encountered in the source. Single-province CMAs have
-	// one entry; Ottawa-Gatineau has two.
+	// source order.
 	ProvinceUIDs []string
 }
 
-// parseCMAs reads the StatsCan CMA boundary file zip (downloaded from
-// https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcma000b21a_e.zip)
-// and returns one CMA per unique UID. Only CMATYPE='B' rows (true
-// CMAs, pop ≥100k) are kept; every other CMATYPE (e.g. 'D', Census
-// Agglomerations) is filtered out.
+// parseCMAs reads the CMA boundary zip's DBF table into one cma per
+// type-'B' CMAUID, sorted by UID.
 func parseCMAs(zipPath string) ([]cma, error) {
 	dbf, closer, err := openDBFFromZip(zipPath, ".dbf")
 	if err != nil {
@@ -83,10 +70,9 @@ func parseCMAs(zipPath string) ([]cma, error) {
 	return out, nil
 }
 
-// cleanCMAName trims the parenthetical "(Ontario part / partie de
-// l'Ontario)" sort of qualifiers and keeps the first half of an
-// English / French split (e.g., "Greater Sudbury / Grand Sudbury"
-// → "Greater Sudbury").
+// cleanCMAName drops a parenthetical qualifier ("(Ontario part / partie
+// de l'Ontario)") and the French half of a bilingual name
+// ("Greater Sudbury / Grand Sudbury" → "Greater Sudbury").
 func cleanCMAName(raw string) string {
 	if i := strings.Index(raw, "("); i >= 0 {
 		raw = raw[:i]

@@ -7,15 +7,9 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// ReadOverrides parses an optional editorial-overrides TOML file whose
-// top-level table is an array of [[override]] blocks, returning the
-// decoded slice. A missing file is not an error — overrides are
-// optional and every country plan auto-generates a sensible default
-// for every region — so it returns (nil, nil) in that case.
-//
-// T is the per-country override schema (us.MSAOverride, ca.CMAOverride,
-// …); the `toml:"override"` array name is shared across countries, so
-// only the element type varies.
+// ReadOverrides decodes the [[override]] array of an editorial-overrides
+// TOML file into the per-country schema T. A missing file returns
+// (nil, nil), since every plan has auto-generated defaults.
 func ReadOverrides[T any](path string) ([]T, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

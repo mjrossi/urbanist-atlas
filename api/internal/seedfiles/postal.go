@@ -10,10 +10,8 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// PostalRow is one parsed CSV record from postal_codes_<cc>.csv.
-// Three columns: postal_code,country,leaf_region_slug. Country is
-// redundant with the caller-supplied country code but kept in the
-// CSV so cross-country rows are caught at parse time.
+// PostalRow is one record from postal_codes_<cc>.csv. The country column
+// is redundant with the file but catches a row filed under the wrong one.
 type PostalRow struct {
 	PostalCode     string
 	Country        atlas.Country

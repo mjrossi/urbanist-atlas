@@ -135,10 +135,10 @@ func TestCheck(t *testing.T) {
 	t.Run("context cancellation short-circuits dispatch", func(t *testing.T) {
 		// A server that blocks until its request ctx fires, so with
 		// Concurrency=1 the first probe pins the only slot and the
-		// dispatch loop blocks trying to enqueue the second org. Issue
-		// #31: canceling the parent ctx must unblock the dispatch loop's
-		// semaphore send (not hang past cancellation) and mark every
-		// not-yet-dispatched org with the cancellation cause.
+		// dispatch loop blocks trying to enqueue the second org. Canceling
+		// the parent ctx must unblock the dispatch loop's semaphore send
+		// (not hang past cancellation) and mark every not-yet-dispatched
+		// org with the cancellation cause.
 		started := make(chan struct{}, 1)
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			select {

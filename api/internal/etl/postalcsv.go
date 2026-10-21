@@ -7,23 +7,17 @@ import (
 	"sort"
 )
 
-// PostalAnchor is the smallest-anchor decision for one postal code
-// after a country's crosswalk runs. PostalCode is the unit the country
-// keys postal lookups on (US ZIP/ZCTA, CA FSA, …); AnchorSlug is the
-// region slug the postal_codes row points at; Reason is a
-// debug-friendly label of which fallback won.
+// PostalAnchor is the smallest-anchor decision for one postal code (US
+// ZIP, CA FSA). Reason labels which fallback tier won, for the summary
+// log.
 type PostalAnchor struct {
 	PostalCode string
 	AnchorSlug string
 	Reason     string
 }
 
-// WritePostalCSV emits a postal_codes_<cc>.csv file deterministically:
-// header postal_code,country,leaf_region_slug, then one row per anchor
-// sorted by postal code ASC, LF line endings, trailing newline. The
-// input slice is cloned before sorting so callers can keep using their
-// copy. Per-country merge logic (e.g. the US ZCTA+HUD dedup) happens in
-// the country plan, which hands the merged slice here.
+// WritePostalCSV writes a postal_codes_<cc>.csv: header, then one row per
+// anchor sorted by postal code. It sorts a copy, leaving anchors as is.
 func WritePostalCSV(w io.Writer, country string, anchors []PostalAnchor) error {
 	sorted := slices.Clone(anchors)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].PostalCode < sorted[j].PostalCode })

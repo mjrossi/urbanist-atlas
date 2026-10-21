@@ -12,20 +12,10 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// OrgEntry is one [[org]] in orgs.toml. It embeds atlas.Org for the
-// shared wire-shape fields and adds the two load-time fields that
-// don't unmarshal directly onto the runtime Org type:
-//
-//   - RegionSlugs: Org.Regions carries hydrated Region structs, not
-//     slugs, so the slug list has no home on atlas.Org.
-//   - AddedAt: atlas.Org.AddedAt is a time.Time tagged toml:"-", so
-//     the raw date-only value is parsed here as a toml.LocalDate and
-//     converted to a midnight-UTC time.Time in BuildMemStore. This
-//     direct field shadows the embedded Org.AddedAt during decode.
-//
-// go-toml/v2 walks anonymous embedded fields the same way it walks
-// inline ones, so the toml tags on atlas.Org's exported fields are
-// honored at the outer-table level.
+// OrgEntry is one [[org]] in orgs.toml: atlas.Org plus the load-time
+// fields atlas.Org can't hold. RegionSlugs has no home there (Org.Regions
+// holds hydrated regions), and AddedAt shadows Org.AddedAt, which is
+// toml:"-", to read the date-only value.
 type OrgEntry struct {
 	atlas.Org
 	RegionSlugs []string       `toml:"region_slugs"`
@@ -36,9 +26,7 @@ type orgsFile struct {
 	Orgs []OrgEntry `toml:"org"`
 }
 
-// ParseOrgs decodes orgs.toml and runs structural validation. The
-// returned slice has each entry's atlas.Org fields populated from
-// TOML plus the load-only RegionSlugs list.
+// ParseOrgs decodes orgs.toml and runs structural validation.
 func ParseOrgs(r io.Reader) ([]OrgEntry, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -84,13 +72,8 @@ func validateOrgs(os []OrgEntry) error {
 	return nil
 }
 
-// ValidateOrgFields runs the per-entry field checks for one orgs.toml
-// record: presence, the atlas length caps, URL shape and per-element
-// tag/slug bounds. Public submissions apply the same caps and URL rule
-// through atlas.ValidateSubmission.
-//
-// The slug/uniqueness checks live in validateOrgs because they're
-// only meaningful in a multi-row context.
+// ValidateOrgFields runs the per-record field checks for one orgs.toml
+// entry. Slug uniqueness needs every row, so validateOrgs checks it.
 func ValidateOrgFields(name, shortDesc, websiteURL, contactURL string, tags, regionSlugs []string) error {
 	if name == "" {
 		return errors.New("name required")
@@ -143,8 +126,7 @@ func ValidateOrgFields(name, shortDesc, websiteURL, contactURL string, tags, reg
 	return nil
 }
 
-// validateHTTPURL accepts only absolute http(s) URLs with a host. Used
-// for website_url.
+// validateHTTPURL accepts only absolute http(s) URLs with a host.
 func validateHTTPURL(field, raw string) error {
 	reason, perr := atlas.ClassifyURL(raw, false)
 	switch reason {
@@ -163,10 +145,8 @@ func validateHTTPURL(field, raw string) error {
 	}
 }
 
-// validateContactURL is contact_url's looser cousin: http(s) for
-// online contact forms, mailto: for direct email (a few seed orgs
-// expose only a mailbox). mailto must include an address; opaque
-// schemes without one ("mailto:" alone) are rejected.
+// validateContactURL also accepts mailto: with an address, since some
+// orgs publish only a mailbox.
 func validateContactURL(raw string) error {
 	reason, perr := atlas.ClassifyURL(raw, true)
 	switch reason {

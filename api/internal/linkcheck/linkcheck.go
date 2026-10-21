@@ -37,24 +37,18 @@ const (
 	userAgent          = "urbanist-atlas-linkcheck/0.1 (+https://urbanistatlas.com)"
 )
 
-// sharedTransport is reused across every probe so connections (and TLS
-// sessions) are pooled instead of rebuilt per request (issue #32). A
-// fresh http.Client per do() call is fine — the client is a thin handle
-// — as long as they all share this one Transport, which owns the
-// connection pool. Cloned from DefaultTransport so we get the stdlib
-// proxy/dialer defaults, then sized for a small concurrent crawl.
+// sharedTransport pools connections and TLS sessions across every probe.
+// Each do() builds its own cheap http.Client, but they all share this
+// Transport, which owns the pool.
 var sharedTransport = func() *http.Transport {
-	// DefaultTransport is always *http.Transport in the stdlib; the
-	// comma-ok guards the assertion so a non-default runtime override
-	// degrades to a plain transport instead of panicking.
+	// The comma-ok keeps a replaced DefaultTransport from panicking.
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		return &http.Transport{}
 	}
 	t := base.Clone()
-	// Probes hit many distinct hosts; keep a modest idle pool so
-	// back-to-back checks against the same host reuse a connection
-	// without holding sockets open indefinitely.
+	// Many distinct hosts: a modest idle pool still reuses a connection
+	// for back-to-back checks of one host.
 	t.MaxIdleConns = 64
 	t.MaxIdleConnsPerHost = 4
 	t.IdleConnTimeout = 30 * time.Second
@@ -77,13 +71,8 @@ func Check(ctx context.Context, orgs []seedfiles.OrgEntry, opts Options) []Resul
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, o := range orgs {
-		// Acquire a slot, but bail out promptly if the caller cancels
-		// while every worker is busy (issue #31): without the ctx arm,
-		// a full semaphore would block the dispatch loop indefinitely
-		// past cancellation. On cancel, mark this and every remaining
-		// org with the cancellation cause so each input still has a
-		// non-misleading result row (input-order contract preserved),
-		// then stop dispatching.
+		// Bail out on cancel even when every worker is busy, marking this and
+		// every remaining org with the cause so each input keeps a result row.
 		select {
 		case sem <- struct{}{}:
 		case <-ctx.Done():
@@ -140,15 +129,10 @@ func do(ctx context.Context, method, url string, timeout time.Duration) (int, st
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("User-Agent", userAgent)
 
-	// finalURL is captured progressively during redirects so it stays
-	// populated even if Do() ultimately errors mid-chain. The successful
-	// path overwrites it with resp.Request.URL below — that value is the
-	// authoritative post-redirect URL (or the original when no redirects
-	// happened), and was previously left empty for direct 200 hits.
+	// CheckRedirect records each hop, so finalURL survives an error
+	// mid-chain.
 	var finalURL string
-	// A per-call client is still needed because CheckRedirect closes over
-	// this call's finalURL, but it reuses the package-level sharedTransport
-	// so the connection pool is not rebuilt each call (issue #32).
+	// A per-call client, because CheckRedirect closes over finalURL.
 	client := &http.Client{
 		Transport: sharedTransport,
 		Timeout:   timeout,

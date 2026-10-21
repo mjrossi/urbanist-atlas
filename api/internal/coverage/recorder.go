@@ -1,9 +1,7 @@
-// Package coverage records sampled empty-result lookups and searches —
-// the editorial "which input returns nothing?" signal. It is the seam
-// between the HTTP handlers (which know when a result came back empty)
-// and the SQLite store (which persists the sampled rows), owning the
-// sampling gate and the fire-and-forget write so handlers stay thin and
-// the request path never blocks on, or fails for, a coverage write.
+// Package coverage records sampled empty-result lookups and searches,
+// the editorial "which input returns nothing?" signal. It owns the
+// sampling gate and the fire-and-forget write, so the request path never
+// blocks on, or fails for, a coverage write.
 package coverage
 
 import (
@@ -15,51 +13,43 @@ import (
 	"time"
 )
 
-// writeTimeout bounds each background coverage write so a wedged DB
-// can't leak goroutines. Generous for a local SQLite write.
+// writeTimeout bounds each background write so a wedged DB can't leak
+// goroutines.
 const writeTimeout = 2 * time.Second
 
-// maxConcurrentWrites caps in-flight background coverage writes. The SQLite
-// store serializes writes through a single connection shared with the
-// submission path, so an unbounded fan-out of sampled empties — easy to
-// provoke at a high sample rate — could pile up goroutines and starve that
-// connection. Samples over the cap are dropped (capture is best-effort),
-// which also keeps the shutdown drain bounded.
+// maxConcurrentWrites caps in-flight background writes. The SQLite store
+// has one connection, shared with submissions, so an unbounded fan-out at
+// a high sample rate could starve it. Samples over the cap are dropped,
+// which also bounds the shutdown drain.
 const maxConcurrentWrites = 4
 
-// maxInputLen caps, in bytes, the input persisted per row. The table is
-// row-capped, not byte-capped, and shares its volume with submissions,
-// so the recorder bounds row size itself rather than trusting every
-// caller to. 400 is the region-search q limit of 100 characters at
-// UTF-8's 4-byte maximum, so a q the handler accepts is stored whole;
-// postal codes are far shorter.
+// maxInputLen caps the bytes stored per row: the table is row-capped, not
+// byte-capped, and shares its volume with submissions. 400 bytes holds
+// the spec's 100-character search q at UTF-8's 4-byte maximum.
 const maxInputLen = 400
 
-// GapStore is the persistence seam the Recorder writes through —
-// satisfied by *sqlite.Store.
+// GapStore is the persistence seam the Recorder writes through.
 type GapStore interface {
 	RecordCoverageGap(ctx context.Context, kind, country, input string) error
 	PruneCoverageGaps(ctx context.Context, maxRows int) error
 }
 
 // Recorder samples empty-result events and persists them off the request
-// path. A nil *Recorder is a valid no-op (capture disabled), so handlers
-// can call RecordEmpty unconditionally — mirroring the *Metrics
-// nil-guard convention.
+// path. A nil *Recorder is a valid no-op, so handlers can call
+// RecordEmpty unconditionally.
 type Recorder struct {
 	store      GapStore
 	sampleRate float64
 	maxRows    int
 	logger     *slog.Logger
 	rng        func() float64
-	sem        chan struct{} // bounds concurrent background writes; see maxConcurrentWrites
+	sem        chan struct{} // see maxConcurrentWrites
 	wg         sync.WaitGroup
 }
 
-// New builds a Recorder. sampleRate is the probability (0..1) that a
-// given empty-result event is persisted; <= 0 disables capture entirely.
-// maxRows caps the table (pruned opportunistically after each write);
-// <= 0 leaves it unbounded.
+// New builds a Recorder. sampleRate is the probability (0..1) that an
+// event is persisted; <= 0 disables capture. maxRows caps the table,
+// pruned after each write; <= 0 leaves it unbounded.
 func New(store GapStore, sampleRate float64, maxRows int, logger *slog.Logger) *Recorder {
 	if logger == nil {
 		logger = slog.Default()
@@ -74,22 +64,17 @@ func New(store GapStore, sampleRate float64, maxRows int, logger *slog.Logger) *
 	}
 }
 
-// SetRNG overrides the sampling source. Tests inject a deterministic
-// function; production uses math/rand/v2's concurrency-safe Float64.
+// SetRNG overrides the sampling source, for deterministic tests.
 func (r *Recorder) SetRNG(fn func() float64) {
 	if r != nil && fn != nil {
 		r.rng = fn
 	}
 }
 
-// RecordEmpty samples and (if selected) persists an empty-result event
-// off the request path. kind is "lookup" or "search"; country is "" for
-// searches; input is the normalized postal code or the search query.
-//
-// It returns immediately — the write runs in a background goroutine with
-// a detached, bounded context so request cancellation can't abort it. A
-// nil Recorder, a disabled sample rate, or an unsampled event are all
-// no-ops.
+// RecordEmpty samples and, if selected, persists an empty-result event.
+// kind is "lookup" or "search"; country is "" for searches; input is the
+// normalized postal code or query. The write runs in the background on a
+// detached, bounded context, so request cancellation can't abort it.
 func (r *Recorder) RecordEmpty(kind, country, input string) {
 	if r == nil || r.store == nil || r.sampleRate <= 0 {
 		return
@@ -98,9 +83,7 @@ func (r *Recorder) RecordEmpty(kind, country, input string) {
 		return
 	}
 	input = truncate(input, maxInputLen)
-	// Acquire a write slot without blocking the caller. When the writer is
-	// saturated, drop the sample: the request path must never wait on a
-	// coverage write, and capture is best-effort (sampled + row-capped).
+	// Never block the caller: drop the sample when the writer is saturated.
 	select {
 	case r.sem <- struct{}{}:
 	default:
@@ -135,12 +118,8 @@ func truncate(s string, n int) string {
 	return strings.ToValidUTF8(s[:n], "")
 }
 
-// Wait blocks until all in-flight coverage writes have finished, or until
-// ctx is done — whichever comes first. Called during graceful shutdown
-// (with the shutdown context) so sampled rows aren't lost, while the
-// shared deadline keeps a wedged write from overrunning the shutdown
-// budget. Returns ctx.Err() if the deadline wins; in-flight writes are
-// detached and best-effort, so abandoned stragglers are acceptable.
+// Wait blocks until in-flight writes finish or ctx is done, returning
+// ctx.Err() in the latter case; abandoned writes are best-effort.
 // Nil-safe.
 func (r *Recorder) Wait(ctx context.Context) error {
 	if r == nil {
