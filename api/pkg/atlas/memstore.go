@@ -9,11 +9,8 @@ import (
 	"sync"
 )
 
-// MemStore is an in-memory Store implementation for tests, fixtures,
-// and offline CLI use. It models the region graph as adjacency lists:
-// a region->parents map and a postal_code->leaf-region-id map.
-//
-// MemStore is safe for concurrent use.
+// MemStore is the in-memory Store. It backs the runtime read path as
+// well as tests, fixtures, and CLI use, and is safe for concurrent use.
 type MemStore struct {
 	mu            sync.RWMutex
 	regionsByID   map[int64]Region
@@ -22,11 +19,8 @@ type MemStore struct {
 	orgs          []Org
 	orgRegions    map[int64][]int64 // org id -> region ids it serves
 	postalToLeaf  map[string]int64  // postalKey -> leaf region id
-	// rollupByState maps a state-equivalent (or us:federal-district)
-	// region id to the metro region ids whose OWN orgs surface on that
-	// region's detail page (the rollup_states relation). Browse/descendant
-	// direction ONLY — never read by AncestorRegions/Lookup, so it cannot
-	// leak orgs across a postal-code lookup.
+	// rollupByState maps a rollup-target region id to the metro ids that
+	// name it in rollup_states. The ancestor walk never reads it.
 	rollupByState map[int64][]int64
 }
 
@@ -66,14 +60,9 @@ func (s *MemStore) AddRegion(r Region) error {
 	return nil
 }
 
-// AddRollupState records that metroSlug's OWN orgs should additionally
-// surface on stateSlug's detail page (the rollup_states relation). This
-// is the descendant/browse direction ONLY: it is never an ancestor edge,
-// so a leaf under metroSlug can never reach stateSlug via the ancestor
-// walk. Both slugs must already be registered (the seedfiles loader calls
-// this in a post-pass, after every region is added). Idempotent per
-// (state, metro) pair; an unregistered slug is silently ignored (the
-// loader validates existence and kind before calling).
+// AddRollupState records that metroSlug's own orgs also surface on
+// stateSlug's detail page. It is not an ancestor edge. Idempotent; an
+// unregistered slug is silently ignored, so callers validate first.
 func (s *MemStore) AddRollupState(metroSlug, stateSlug string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -94,9 +83,8 @@ func (s *MemStore) AddRollupState(metroSlug, stateSlug string) {
 }
 
 // AddOrg registers an organization with the IDs of the regions it
-// serves. The org's Regions field is overwritten on read; AddedAt is
-// preserved (it powers newest-first ordering in ListRecent and
-// OrgsForRegions). Callers that don't care about ordering may leave it zero.
+// serves. Regions is rebuilt on read; AddedAt is kept and orders
+// ListRecent.
 func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -131,13 +119,9 @@ func (s *MemStore) regionLabel(id int64) string {
 	return "id " + strconv.FormatInt(id, 10)
 }
 
-// Slugs returns every registered region slug — the FULL set across all
-// tiers and kinds (states/provinces, hand-curated leaves, generated
-// MSA/CMA, and national umbrellas), unlike ListRegions which returns
-// only the browseable, org-bearing subset. The order is unspecified;
-// callers that need determinism should sort. Backs the published-slug
-// append-only guard (the slug→consumer permanence contract), which
-// must see every slug a /regions/{slug} consumer could address.
+// Slugs returns every registered region slug, national tier included,
+// in unspecified order. Unlike ListRegions it is not limited to the
+// browse subset.
 func (s *MemStore) Slugs() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -163,11 +147,7 @@ func (s *MemStore) ResolveLeafRegion(_ context.Context, country Country, postalC
 	return r, nil
 }
 
-// AncestorRegions implements Store. Returns the leaf followed by all
-// transitive ancestors via BFS (bfsCollectIDs over the parents map),
-// dedupes via a visited set. Excludes scope_tier='national' rows from
-// both the seed and the recursion (the storetest harness pins this
-// contract).
+// AncestorRegions implements Store.
 func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -179,46 +159,20 @@ func (s *MemStore) AncestorRegions(_ context.Context, leafRegionID int64) ([]Reg
 	return out, nil
 }
 
-// ListRegions implements Store. Walks every registered region,
-// filters by membership in defaultBrowseKinds (metros + cities),
-// and counts the orgs whose region attachments are in each
-// region's downward DAG closure (so an org tagged only to Brooklyn
-// counts toward NYC metro, and an org tagged to Chicago counts
-// toward both Chicago and Chicago Metro). Excludes national-tier
-// regions and regions with zero approved orgs. Orders by org count
-// DESC, then name ASC.
-//
-// Each summary's BrowseParentSlug is the slug of the nearest
-// ancestor whose kind is also in defaultBrowseKinds — the SPA's
-// grouping hook for nesting cities under their parent metro. Empty
-// string when no such ancestor exists.
+// ListRegions implements Store.
 func (s *MemStore) ListRegions(_ context.Context) ([]RegionSummary, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.listRegionsLocked(), nil
 }
 
-// listRegionsLocked is the body of ListRegions, split out so Stats can
-// reuse the identical result rather than re-deriving the "browseable
-// kind AND non-national AND >=1 org in subtree" predicate. A second
-// copy of that predicate would be free to drift from this one, and a
-// drifting duplicate of exactly this logic is what made the frontend
-// under-report the org total in the first place.
-//
-// Must be called with s.mu held (read or write).
+// listRegionsLocked is the body of ListRegions, shared with Stats so the
+// browse predicate exists once. Must be called with s.mu held.
 func (s *MemStore) listRegionsLocked() []RegionSummary {
-	// Build the reverse-adjacency map once for the whole call instead
-	// of inside each descendantRegionIDs invocation. Without this hoist
-	// the cost was O(R · P) per ListRegions (R browseable regions, P
-	// parent edges) — at v1 scale (~5k of each) that's noticeable in
-	// tests that hammer the endpoint. Hoisted, the whole call is O(R + P).
+	// Both indexes are built once per call rather than per region, which
+	// keeps the call linear in regions, edges, and attachments.
 	childrenOf := s.buildChildrenOf()
-	// Build the region->orgs inverted index once for the whole call too.
-	// The old code counted orgs by scanning every org (and each org's
-	// attachments) once per browseable region for OrgCount AND a second
-	// time for DirectOrgCount — O(R · O · A). With the inverted index,
-	// each region's counts are a set-union over its descendant ids and a
-	// single map lookup, so the whole call is O(O · A + R + P) instead.
+	// orgsByRegion turns each region's counts into a set union.
 	orgsByRegion := s.buildOrgsByRegion()
 	out := []RegionSummary{}
 	for id, r := range s.regionsByID {
@@ -246,16 +200,10 @@ func (s *MemStore) listRegionsLocked() []RegionSummary {
 	return out
 }
 
-// nearestBrowseableAncestorSlug walks upward from rootID via the
-// parents map and returns the slug of the nearest ancestor whose kind
-// is in defaultBrowseKinds (and is non-national). Returns "" when no
-// browseable ancestor exists. Caller must hold s.mu.RLock().
-//
-// Walks depth-by-depth past non-browseable intermediates (counties,
-// multi-state regions) so a city like Chicago (parent: cook-county)
-// still finds chicago-metro as its grouping anchor. When multiple
-// browseable parents share the minimum depth, ties are broken by
-// slug ASC (depth ASC, then slug ASC) so the choice is deterministic.
+// nearestBrowseableAncestorSlug returns the slug of the nearest
+// non-national browse-kind ancestor, or "". It walks past non-browse
+// intermediates, so a city under a county still finds its metro.
+// Caller must hold s.mu.
 func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
 	if r, ok := s.bfsUpwardFirstMatch(rootID, func(r Region) bool {
 		return defaultBrowseKinds[r.Kind]
@@ -265,16 +213,10 @@ func (s *MemStore) nearestBrowseableAncestorSlug(rootID int64) string {
 	return ""
 }
 
-// bfsUpwardFirstMatch walks the parents map upward from rootID
-// depth-by-depth and returns the first Region satisfying match. "First"
-// is the shallowest level that contains any match; ties within that
-// level are broken by slug ASC so the choice is deterministic. National-
-// tier rows are skipped entirely — never matched and never expanded —
-// mirroring the ancestor-walk exclusion, so they can neither be returned
-// nor act as a transit hop to a deeper match. rootID itself is excluded
-// (seeded into the visited set), matching the "ancestor, not self"
-// semantics both callers want. Returns (zero Region, false) when no
-// ancestor matches. Caller must hold s.mu.RLock().
+// bfsUpwardFirstMatch returns the shallowest ancestor of rootID (not
+// rootID itself) satisfying match, breaking ties within a level by slug
+// ASC. National-tier rows are neither matched nor expanded. Caller must
+// hold s.mu.
 func (s *MemStore) bfsUpwardFirstMatch(rootID int64, match func(Region) bool) (Region, bool) {
 	visited := map[int64]bool{rootID: true}
 	current := append([]int64{}, s.parents[rootID]...)
@@ -305,11 +247,7 @@ func (s *MemStore) bfsUpwardFirstMatch(rootID int64, match func(Region) bool) (R
 	return Region{}, false
 }
 
-// SearchRegions implements Store. Case-insensitive name/slug match over
-// the full non-national region graph, ranked for type-ahead relevance,
-// each result carrying a state-ancestor disambiguation label. The
-// ranking lives in regionsearch.go; this method owns query
-// normalization, limit clamping and the read lock.
+// SearchRegions implements Store. The ranking lives in regionsearch.go.
 func (s *MemStore) SearchRegions(_ context.Context, query string, limit int) ([]RegionSearchResult, error) {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
@@ -328,8 +266,7 @@ func (s *MemStore) SearchRegions(_ context.Context, query string, limit int) ([]
 	return s.searchRegionsLocked(q, limit), nil
 }
 
-// ResolveRegionBySlug implements Store. Returns ErrRegionNotFound for
-// unknown slugs and for national-tier rows.
+// ResolveRegionBySlug implements Store.
 func (s *MemStore) ResolveRegionBySlug(_ context.Context, slug string) (Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -347,10 +284,7 @@ func (s *MemStore) ResolveRegionBySlug(_ context.Context, slug string) (Region, 
 	return r, nil
 }
 
-// DescendantRegions implements Store. Walks the parent->child relation
-// via the parents map and returns the focus at index 0 followed by
-// every reachable descendant. Excludes national-tier rows from both
-// the seed and the recursion (pinned by the storetest contract).
+// DescendantRegions implements Store.
 func (s *MemStore) DescendantRegions(_ context.Context, focusRegionID int64) ([]Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -370,14 +304,7 @@ func (s *MemStore) DescendantRegions(_ context.Context, focusRegionID int64) ([]
 	return out, nil
 }
 
-// RollupMetrosFor implements Store. Returns the metro NODES (not their
-// descendants) whose OWN orgs should additionally surface on the given
-// state-equivalent region's detail page — the rollup_states relation,
-// resolved at load. Empty slice for any region that is not a rollup
-// target. National-tier metros are excluded. This relation is
-// browse/descendant direction ONLY; AncestorRegions never consults it,
-// so a leaf under the metro cannot leak the state via the ancestor walk.
-// Sorted by ID for a deterministic order.
+// RollupMetrosFor implements Store, sorting by ID.
 func (s *MemStore) RollupMetrosFor(_ context.Context, stateRegionID int64) ([]Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -394,15 +321,8 @@ func (s *MemStore) RollupMetrosFor(_ context.Context, stateRegionID int64) ([]Re
 	return out, nil
 }
 
-// GetOrgBySlug implements Store. Scans the in-memory orgs by slug,
-// hydrates Regions like the wire contract expects, returns
-// ErrOrgNotFound when no row matches.
-//
-// Behavioral note: MemStore has no approval gate — atlas.Org has no
-// Status field, so the store cannot filter on it. Callers are
-// responsible for only loading approved orgs into MemStore (the seed
-// bundle carries only approved orgs; LoadDevFixtures does too, and
-// hand-built fixtures should).
+// GetOrgBySlug implements Store. Org has no status field, so MemStore
+// can't filter on approval: load only approved orgs into it.
 func (s *MemStore) GetOrgBySlug(_ context.Context, slug string) (*Org, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -413,23 +333,20 @@ func (s *MemStore) GetOrgBySlug(_ context.Context, slug string) (*Org, error) {
 		out := org
 		out.Regions = s.regionsForOrg(org.ID)
 		out.MatchedRegionSlugs = nil
-		// Clone Tags so the returned copy doesn't alias the stored
-		// backing array under RLock (see OrgsForRegions). nil stays nil.
+		// Clone Tags; see OrgsForRegions.
 		out.Tags = append([]Tag(nil), out.Tags...)
 		return &out, nil
 	}
 	return nil, ErrOrgNotFound
 }
 
-// ListRecent implements Store. Excludes orgs whose ONLY region
-// attachments are scope_tier='national', orders newest-first, caps at
-// 10.
+// ListRecent implements Store.
 func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	candidates := make([]Org, 0, len(s.orgs))
 	for _, org := range s.orgs {
-		// Filter: at least one non-national region attachment.
+		// Skip orgs whose only attachments are national-tier.
 		hasNonNational := false
 		for _, rid := range s.orgRegions[org.ID] {
 			r, ok := s.regionsByID[rid]
@@ -444,18 +361,16 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 		if !hasNonNational {
 			continue
 		}
-		// Hydrate Regions like the wire contract expects.
+		// out is a copy; the stored org stays unhydrated.
 		out := org
 		out.Regions = s.regionsForOrg(org.ID)
 		out.MatchedRegionSlugs = nil
-		// Clone Tags so the returned copy doesn't alias the stored
-		// backing array under RLock (see OrgsForRegions). nil stays nil.
+		// Clone Tags; see OrgsForRegions.
 		out.Tags = append([]Tag(nil), out.Tags...)
 		candidates = append(candidates, out)
 	}
-	// Sort newest-first; ID DESC breaks ties so same-day orgs order
-	// deterministically. Backfill yields only a handful of distinct
-	// AddedAt dates, so the ID tiebreak does real work.
+	// The seed backfill shares a handful of AddedAt dates, so the ID DESC
+	// tiebreak decides much of the order.
 	sort.Slice(candidates, func(i, j int) bool {
 		a, b := candidates[i], candidates[j]
 		if !a.AddedAt.Equal(b.AddedAt) {
@@ -469,10 +384,8 @@ func (s *MemStore) ListRecent(_ context.Context) ([]Org, error) {
 	return candidates, nil
 }
 
-// Stats implements Store. Counts distinct orgs over s.orgs directly —
-// never by summing per-region counts, which is what makes the total
-// immune to both the browse-subset undercount and the multi-region
-// double-count. See atlas.Stats for why that matters.
+// Stats implements Store. It counts over s.orgs directly, never by
+// summing per-region counts; see atlas.Stats.
 func (s *MemStore) Stats(_ context.Context) (Stats, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -480,10 +393,7 @@ func (s *MemStore) Stats(_ context.Context) (Stats, error) {
 	orgsByCountry := map[Country]int{}
 	totalOrgs := 0
 	for _, org := range s.orgs {
-		// Same "at least one non-national attachment" filter ListRecent
-		// applies, so the two surfaces agree on what counts as a live org.
-		// An org is credited to every country it touches; see CountryStats
-		// on why that column need not sum to totalOrgs.
+		// The same live-org filter as ListRecent.
 		hasNonNational := false
 		countries := map[Country]struct{}{}
 		for _, rid := range s.orgRegions[org.ID] {
@@ -492,9 +402,8 @@ func (s *MemStore) Stats(_ context.Context) (Stats, error) {
 				continue
 			}
 			hasNonNational = true
-			// Country is stamped by the seedfiles loader; hand-built
-			// fixtures may leave it blank. Such an org still counts toward
-			// the total, it just can't be attributed to a country row.
+			// Hand-built fixtures may leave Country blank; such an org
+			// counts toward the total but no country row.
 			if r.Country != "" {
 				countries[r.Country] = struct{}{}
 			}
@@ -508,16 +417,10 @@ func (s *MemStore) Stats(_ context.Context) (Stats, error) {
 		}
 	}
 
-	// Derive the browse counts from ListRegions' own output rather than
-	// re-implementing its predicate, so BrowseRegionCount cannot drift
-	// from the list the SPA actually renders.
 	browse := s.listRegionsLocked()
 	regionsByCountry := map[Country]int{}
 	for _, summary := range browse {
-		// Mirrors the org-side rule above: a blank Country (possible only
-		// in hand-built fixtures) still counts toward BrowseRegionCount
-		// but has no country row to be attributed to, so the by_country
-		// region_count columns may sum to less than BrowseRegionCount.
+		// As above, a blank Country counts toward the total only.
 		if summary.Region.Country != "" {
 			regionsByCountry[summary.Region.Country]++
 		}
@@ -560,9 +463,8 @@ func (s *MemStore) Stats(_ context.Context) (Stats, error) {
 	}, nil
 }
 
-// regionsForOrg gathers the Region rows for an org's attachments,
-// sorted ascending by region ID so the wire shape is deterministic
-// (ordered by region ID). Must be called with s.mu held.
+// regionsForOrg returns an org's attached regions sorted by ID. Must be
+// called with s.mu held.
 func (s *MemStore) regionsForOrg(orgID int64) []Region {
 	ids := s.orgRegions[orgID]
 	regions := make([]Region, 0, len(ids))
@@ -575,8 +477,7 @@ func (s *MemStore) regionsForOrg(orgID int64) []Region {
 	return regions
 }
 
-// OrgsForRegions implements Store. Each org's Regions slice is
-// hydrated sorted ascending by region ID (deterministic wire order).
+// OrgsForRegions implements Store.
 func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -601,11 +502,8 @@ func (s *MemStore) OrgsForRegions(_ context.Context, regionIDs []int64) ([]Org, 
 			continue
 		}
 		org.Regions = s.regionsForOrg(org.ID)
-		// Clone Tags so the returned copy's slice header does not alias
-		// the stored backing array — a caller mutating the result must
-		// not reach into the store (which is read under RLock here, with
-		// no write coordination). Mirrors the defensive copy AddOrg makes
-		// of the attachment ids. A nil Tags stays nil.
+		// Clone Tags so a caller mutating the result can't write into the
+		// store, which is only read-locked here. nil stays nil.
 		org.Tags = append([]Tag(nil), org.Tags...)
 		out = append(out, org)
 	}

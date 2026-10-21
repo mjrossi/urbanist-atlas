@@ -1,21 +1,15 @@
 // Package idgen produces the public IDs used for submission rows. The
-// wrapper exists so callers depend on a test seam rather than on
-// google/uuid directly, which keeps the import surface narrow and
-// lets tests inject deterministic IDs.
+// wrapper is a test seam: callers depend on Generator rather than on
+// google/uuid, so tests can inject deterministic IDs.
 package idgen
 
 import "github.com/google/uuid"
 
-// Generator returns a new public ID string on each call. The
-// production implementation returns a UUIDv7 (time-ordered, so DB
-// indexes stay tight). A test can inject a fake Generator that
-// returns canned values.
+// Generator returns a new public ID string on each call.
 type Generator func() (string, error)
 
-// NewUUIDv7 returns a production Generator that produces UUIDv7
-// strings via google/uuid. UUIDv7 has a millisecond-precision
-// timestamp prefix, so rows insert in approximately created-at order
-// and the public IDs sort naturally newest-last.
+// NewUUIDv7 returns a Generator of UUIDv7 strings, whose millisecond
+// timestamp prefix makes IDs sort roughly by creation time.
 func NewUUIDv7() Generator {
 	return func() (string, error) {
 		id, err := uuid.NewV7()

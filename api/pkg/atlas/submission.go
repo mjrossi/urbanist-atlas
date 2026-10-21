@@ -7,17 +7,15 @@ import (
 )
 
 // ErrSubmissionNotFound is returned by SubmissionStore methods when no
-// row matches the supplied public ID. The HTTP layer maps this to a
-// 404 problem document.
+// row matches the supplied public ID.
 var ErrSubmissionNotFound = errors.New("atlas: submission not found")
 
-// ErrSubmissionNotPending is returned by ApproveSubmission and
-// RejectSubmission when the target row is not in pending state.
-// The HTTP layer maps this to a 409 problem document.
+// ErrSubmissionNotPending is returned by SubmissionStore.Approve and
+// Reject when the target row is not pending.
 var ErrSubmissionNotPending = errors.New("atlas: submission not pending")
 
 // ErrInvalidCursor is returned by SubmissionStore.ListPage when the
-// cursor is not one ListPage emitted. The HTTP layer maps it to a 400.
+// cursor is not one ListPage emitted.
 var ErrInvalidCursor = errors.New("atlas: invalid submission cursor")
 
 // ErrPromotionDisabled is returned when an approved submission cannot be
@@ -35,19 +33,15 @@ const (
 )
 
 // SubmissionPayload is the proposed organization data, mirroring the
-// `[[org]]` TOML shape (slug intentionally omitted — moderators
-// finalize it when approving and the PR worker reuses the form
-// payload's website-derived default).
+// `[[org]]` TOML shape minus the slug, which is assigned when the org is
+// promoted into orgs.toml.
 type SubmissionPayload struct {
 	Name       string `json:"name"`
 	ShortDesc  string `json:"short_desc"`
 	WebsiteURL string `json:"website_url"`
 	ContactURL string `json:"contact_url,omitempty"`
-	// Tags is no longer wire-sourced: the public form doesn't collect
-	// tags and `tags` was dropped from the SubmissionPayload schema, so
-	// this is always nil for public submissions. It's retained so the PR
-	// worker can render an empty `tags = []` placeholder in the generated
-	// org block for the editor to fill during review.
+	// Tags is not on the wire, so it is nil for public submissions; an
+	// editor assigns tags during PR review.
 	Tags        []string `json:"tags"`
 	RegionSlugs []string `json:"region_slugs"`
 }
@@ -69,9 +63,8 @@ type Submission struct {
 	RejectionReason string
 }
 
-// NewSubmissionInput is what callers pass to SubmissionStore.Create.
-// The store generates PublicID + CreatedAt; callers supply only the
-// user-provided fields.
+// NewSubmissionInput is the user-provided part of a Submission, passed
+// to SubmissionStore.Create.
 type NewSubmissionInput struct {
 	Payload        SubmissionPayload
 	SubmitterName  string
@@ -80,22 +73,17 @@ type NewSubmissionInput struct {
 }
 
 // ListSubmissionsQuery filters and paginates SubmissionStore.List.
-// Status="" means "all". Limit<=0 falls back to a sensible default
-// (50); the store caps it at 200.
-//
-// Cursor is opaque to callers — pass the previous page's NextCursor
-// to fetch the next page. Empty means "start at the newest row".
-// The encoding is keyset on (created_at, public_id) so pagination is
-// stable even when multiple rows share a millisecond timestamp.
+// Status="" means all; Limit<=0 selects a default, and implementations
+// cap it. Cursor is the previous page's NextCursor, or "" to start at
+// the newest row.
 type ListSubmissionsQuery struct {
 	Status SubmissionStatus
 	Limit  int
 	Cursor string
 }
 
-// ListSubmissionsPage is a paginated slice of submissions plus the
-// cursor a caller should pass to fetch the next page. NextCursor is
-// empty when there are no more rows.
+// ListSubmissionsPage is one page of submissions. NextCursor is empty
+// when there are no more rows.
 type ListSubmissionsPage struct {
 	Items      []Submission
 	NextCursor string
@@ -104,37 +92,31 @@ type ListSubmissionsPage struct {
 // SubmissionStore is the persistence seam for the public submission
 // queue. Implementations must be safe for concurrent use.
 type SubmissionStore interface {
-	// Create inserts a new submission with status=pending, stamps the
-	// server-generated UUIDv7 PublicID + CreatedAt, and returns the
-	// hydrated row.
+	// Create inserts a pending submission, stamping PublicID and
+	// CreatedAt, and returns the stored row.
 	Create(ctx context.Context, in NewSubmissionInput) (Submission, error)
 
 	// Get returns the submission with the given public ID, or
 	// ErrSubmissionNotFound.
 	Get(ctx context.Context, publicID string) (Submission, error)
 
-	// List returns submissions newest-first matching q. The bare slice
-	// shape is preserved for callers that don't need pagination; use
-	// ListPage when you need a follow-up cursor.
+	// List returns submissions matching q, newest-first, without a
+	// follow-up cursor.
 	List(ctx context.Context, q ListSubmissionsQuery) ([]Submission, error)
 
-	// ListPage is List + the keyset cursor for the next page. Empty
-	// NextCursor means no more rows.
+	// ListPage is List plus the cursor for the next page.
 	ListPage(ctx context.Context, q ListSubmissionsQuery) (ListSubmissionsPage, error)
 
-	// Approve flips status pending→approved and stamps ProcessedAt.
-	// Returns ErrSubmissionNotPending if the row has already been
-	// processed; ErrSubmissionNotFound if the id is unknown.
+	// Approve moves a pending submission to approved and stamps
+	// ProcessedAt, or returns ErrSubmissionNotPending or
+	// ErrSubmissionNotFound.
 	Approve(ctx context.Context, publicID string) (Submission, error)
 
-	// Reject flips status pending→rejected, persists reason, and
-	// stamps ProcessedAt. Same error contract as Approve.
+	// Reject moves a pending submission to rejected and persists reason,
+	// with the same errors as Approve.
 	Reject(ctx context.Context, publicID, reason string) (Submission, error)
 
-	// AttachPromotionResult records the GitHub PR worker's outcome on
-	// an approved submission. prURL and prErr are mutually exclusive
-	// in practice but the store does not enforce that — it writes
-	// whatever the worker reports. Returns ErrSubmissionNotFound for
-	// unknown IDs.
+	// AttachPromotionResult records the promotion PR's URL or error on a
+	// submission, writing both as given, or returns ErrSubmissionNotFound.
 	AttachPromotionResult(ctx context.Context, publicID, prURL, prErr string) error
 }

@@ -5,15 +5,12 @@ import (
 	"time"
 )
 
-// CoverageGap is one sampled empty-result lookup or search — the
-// editorial "which input returned nothing?" signal that tells us where
-// the directory has no coverage yet. It is the single place raw
-// user-typed input is persisted (the privacy bar's "sampled empties"
-// exception); non-empty traffic stays aggregate-only in Prometheus.
+// CoverageGap is one sampled empty-result lookup or search: where the
+// directory has no coverage yet. It is the one place raw user input is
+// persisted; see docs/superpowers/specs/2026-06-08-observability-design.md D4.
 //
 //   - Kind is "lookup" or "search".
-//   - Country is the lookup country ("" for searches, which have no
-//     country axis).
+//   - Country is the lookup country ("" for searches).
 //   - Input is the normalized postal code (lookups) or the search query.
 type CoverageGap struct {
 	Kind      string
@@ -23,8 +20,8 @@ type CoverageGap struct {
 }
 
 // CoverageGapReader is the read seam behind GET
-// /api/v1/admin/coverage-gaps. limit <= 0 falls back to a default; the
-// implementation caps it. Satisfied by the SQLite store.
+// /api/v1/admin/coverage-gaps. limit <= 0 selects a default, and
+// implementations cap it.
 type CoverageGapReader interface {
 	ListCoverageGaps(ctx context.Context, limit int) ([]CoverageGap, error)
 }

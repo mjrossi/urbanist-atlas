@@ -756,3 +756,54 @@ The full validation report for the PT model probe (which exercised
 each of these conventions against a non-US/CA admin geography) lives
 at
 [`docs/superpowers/specs/2026-05-17-region-graph-pt-validation-design.md`](./superpowers/specs/2026-05-17-region-graph-pt-validation-design.md).
+
+---
+
+## Presentational kind sets
+
+Three kind sets in `api/pkg/atlas` decide how a region is presented.
+Each is an explicit editorial map, not a derivation. A
+`sort_priority` band test (say, `== 60` for states) would tie a
+presentational tier to what §9 calls an ordering hint. The geographies
+that qualify also share no stable slug or kind suffix. A kind set
+documents itself and survives band reshuffles. Adding a country's kind
+to one is a one-line append, and the predicate doesn't change.
+
+**`stateKinds` (`state_kinds.go`, `IsStateKind`).** These are the
+state-equivalent kinds behind the State / Provincial tier. The in/out
+list and its reasons are under "Open vocabulary" above. Three notes
+belong with the code:
+
+- `us:federal-district` is out because promoting it would move every
+  DMV-tagged org (Greater Greater Washington, for one) into State /
+  Provincial. The seed's two DC nodes already let the slug choice
+  split DC orgs between Local and Regional. DC is still a valid
+  `rollup_states` target (`IsRollupTargetKind`), so the bi-state
+  Washington metro can surface its own orgs on `/dc`.
+- `us:multi-state` is out by editorial ruling. Leaving the kind out of
+  the map is the whole mechanism, so the decision is a one-line
+  reversal.
+- `de:land` city-states (Berlin, Hamburg, Bremen) are safe even once
+  `de:land` joins the set. They are editorially `scope_tier='local'`,
+  so `BucketOrgsByScope` files their orgs as Local before it ever
+  checks the state kind.
+
+**`metroKinds` (`metro_kinds.go`, `IsMetroKind`).** These are the
+metro-equivalent kinds: `us:metro`, `ca:cma`, `ca:regional-district`
+(BC's multi-municipal layer, e.g. Metro Vancouver) and
+`pt:area-metropolitana`. `/lookup`'s place label fills its "broad"
+slot from this set. Cities are left out on purpose, so a Brooklyn ZIP
+reads "Brooklyn, New York City — New York Metro" rather than ending in
+the city.
+
+**`defaultBrowseKinds` (`browse_kinds.go`, `IsDefaultBrowseKind`).**
+These are the kinds `GET /api/v1/regions` returns: `metroKinds` plus
+`us:city` and `ca:city`, which are the granularities a reader browsing
+the directory expects. It is a superset of `metroKinds`, and the two
+predicates are kept separate on purpose. The endpoint has no kind
+filter, so states, provinces, multi-state regions, counties, boroughs
+and the national tier never appear in browse. Readers reach them
+through `/regions/{slug}` and `/regions/search`. A browse-kind region
+is listed only once at least one approved org is attached to it or to
+a descendant, so a region with no orgs stays off Browse until someone
+tags an org to it.
