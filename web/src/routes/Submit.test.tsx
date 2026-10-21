@@ -595,6 +595,29 @@ describe('Submit', () => {
     expect(url.searchParams.get('body') ?? '').toContain('Fallback Org');
   });
 
+  it('shows the GitHub-issue fallback link on 401', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: 'https://urbanistatlas.com/problems/unauthorized',
+          title: 'Unauthorized',
+          status: 401,
+        },
+        { status: 401, problem: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderSubmit();
+    await fillRequired(user, { name: 'Stale Bundle Org' });
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /send to editorial queue/i }));
+
+    const fallback = await screen.findByRole('link', {
+      name: /open this as a github issue instead/i,
+    });
+    expect(fallback.getAttribute('href') ?? '').toContain('Stale+Bundle+Org');
+  });
+
   it('sets the browser tab title', async () => {
     renderSubmit();
     await waitFor(() => {

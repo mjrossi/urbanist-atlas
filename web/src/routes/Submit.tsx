@@ -16,8 +16,8 @@ import {
   buildIssueUrl,
   buildNewSubmissionRequest,
   contactError,
-  isServerOrUnreachable,
   nameError,
+  needsIssueFallback,
   type NoteField,
   noteFieldError,
   shortDescError,
@@ -136,11 +136,11 @@ function deriveSubmitError(
     unmappedFieldErrors: [],
   };
   if (!err) return view;
-  if (!(err instanceof ApiError) || isServerOrUnreachable(err)) {
+  if (!(err instanceof ApiError) || needsIssueFallback(err)) {
     return { ...view, isServerErr: true };
   }
 
-  const isValidationErr = err.status === 400 || err.status === 422;
+  const isValidationErr = err.status === 400;
   const unmappedFieldErrors = err.fieldErrors
     ? Object.entries(err.fieldErrors)
         .filter(([apiField]) => {

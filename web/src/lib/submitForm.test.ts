@@ -5,7 +5,7 @@ import {
   buildIssueBody,
   buildIssueUrl,
   buildNewSubmissionRequest,
-  isServerOrUnreachable,
+  needsIssueFallback,
   shortSubmissionId,
   SUBMIT_FORM_DEFAULTS,
   type SubmitForm,
@@ -171,20 +171,28 @@ describe('buildIssueBody / buildIssueUrl (5xx fallback path)', () => {
   });
 });
 
-describe('isServerOrUnreachable', () => {
+describe('needsIssueFallback', () => {
   it('is true for a 5xx, a status-0 ApiError, and a non-ApiError failure', () => {
-    expect(isServerOrUnreachable(new ApiError(503, 'down', undefined, undefined))).toBe(
+    expect(needsIssueFallback(new ApiError(503, 'down', undefined, undefined))).toBe(
       true,
     );
-    expect(isServerOrUnreachable(new ApiError(0, 'offline', undefined, undefined))).toBe(
+    expect(needsIssueFallback(new ApiError(0, 'offline', undefined, undefined))).toBe(
       true,
     );
-    expect(isServerOrUnreachable(new TypeError('Failed to fetch'))).toBe(true);
+    expect(needsIssueFallback(new TypeError('Failed to fetch'))).toBe(true);
   });
 
-  it('is false for 4xx responses, which have their own banners', () => {
-    for (const status of [400, 422, 429]) {
-      expect(isServerOrUnreachable(new ApiError(status, 'x', undefined, undefined))).toBe(
+  it('is true for a 4xx with no banner of its own, such as 401', () => {
+    for (const status of [401, 403, 404, 413]) {
+      expect(needsIssueFallback(new ApiError(status, 'x', undefined, undefined))).toBe(
+        true,
+      );
+    }
+  });
+
+  it('is false for 400 and 429, which have their own banners', () => {
+    for (const status of [400, 429]) {
+      expect(needsIssueFallback(new ApiError(status, 'x', undefined, undefined))).toBe(
         false,
       );
     }

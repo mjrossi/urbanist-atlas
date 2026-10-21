@@ -11,6 +11,7 @@ import {
   listRecent,
   listRegions,
   lookup,
+  type ProblemDetails,
   shouldRetry,
 } from './api.ts';
 
@@ -24,9 +25,11 @@ function jsonResponse(
   });
 }
 
+// Typed so an error fixture fails typecheck when it drifts from the spec's
+// ProblemDetails. Tests of malformed bodies build a raw Response instead.
 function problemResponse(
   status: number,
-  body: unknown,
+  body: ProblemDetails,
   init?: { headers?: Record<string, string> },
 ): Response {
   return new Response(JSON.stringify(body), {
@@ -564,10 +567,13 @@ describe('ApiError — rich shape from problem+json', () => {
 
   it('falls back to `HTTP <status>` when title and detail are both absent', async () => {
     fetchMock.mockResolvedValueOnce(
-      problemResponse(418, {
-        type: 'https://urbanistatlas.com/problems/teapot',
-        status: 418,
-      }),
+      new Response(
+        JSON.stringify({
+          type: 'https://urbanistatlas.com/problems/teapot',
+          status: 418,
+        }),
+        { status: 418, headers: { 'Content-Type': 'application/problem+json' } },
+      ),
     );
     let caught: unknown;
     try {
@@ -579,21 +585,15 @@ describe('ApiError — rich shape from problem+json', () => {
     expect((caught as ApiError).message).toBe('HTTP 418');
   });
 
-  it('preserves the exact unauthorized problem URI on a 401 (slice #23)', async () => {
-    // Pins the wire shape the backend's X-Atlas-Client middleware
-    // emits when the shared-secret header is missing/wrong. The exact
-    // string must stay in lockstep with `problemUnauthorized` in
-    // api/internal/httpapi/problem.go.
+  it('passes a 401 problem through unchanged', async () => {
+    // A placeholder detail tests the passthrough without copying server
+    // prose that could drift.
     fetchMock.mockResolvedValueOnce(
       problemResponse(401, {
         type: 'https://urbanistatlas.com/problems/unauthorized',
         title: 'Unauthorized',
         status: 401,
-        // Exact server-emitted string — matches the `writeProblem`
-        // call in api/internal/httpapi/clientsecret.go:31-33
-        // (lowercase, no trailing period). A future reader copying
-        // this fixture should see what the wire actually carries.
-        detail: 'missing or invalid X-Atlas-Client header',
+        detail: 'detail from the server',
       }),
     );
     let caught: unknown;
@@ -607,9 +607,7 @@ describe('ApiError — rich shape from problem+json', () => {
     expect(apiErr.status).toBe(401);
     expect(apiErr.problem?.type).toBe('https://urbanistatlas.com/problems/unauthorized');
     expect(apiErr.problem?.title).toBe('Unauthorized');
-    // Pin the detail too so the fixture is actually load-bearing —
-    // a future drift in the server-emitted string will fail here.
-    expect(apiErr.problem?.detail).toBe('missing or invalid X-Atlas-Client header');
+    expect(apiErr.problem?.detail).toBe('detail from the server');
   });
 
   it('non-2xx with non-problem body: problem is undefined, message is `HTTP <status>`', async () => {
@@ -635,7 +633,7 @@ describe('ApiError — rich shape from problem+json', () => {
   it('4xx with malformed problem+json body still throws ApiError with HTTP fallback', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response('not { valid json ::', {
-        status: 422,
+        status: 400,
         headers: { 'Content-Type': 'application/problem+json' },
       }),
     );
@@ -647,27 +645,22 @@ describe('ApiError — rich shape from problem+json', () => {
     }
     expect(caught).toBeInstanceOf(ApiError);
     const apiErr = caught as ApiError;
-    expect(apiErr.status).toBe(422);
+    expect(apiErr.status).toBe(400);
     expect(apiErr.problem).toBeUndefined();
-    expect(apiErr.message).toBe('HTTP 422');
+    expect(apiErr.message).toBe('HTTP 400');
   });
 
   it('parses Retry-After (delta-seconds) on 429 into ApiError.retryAfterSeconds', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
+      problemResponse(
+        429,
+        {
           type: 'https://urbanistatlas.com/problems/rate-limited',
           title: 'Too Many Requests',
           status: 429,
           detail: 'rate limited',
-        }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/problem+json',
-            'Retry-After': '42',
-          },
         },
+        { headers: { 'Retry-After': '42' } },
       ),
     );
     let caught: unknown;
@@ -684,9 +677,10 @@ describe('ApiError — rich shape from problem+json', () => {
 
   it('leaves retryAfterSeconds undefined when Retry-After is missing on a 429', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ title: 'Too Many Requests', status: 429 }), {
+      problemResponse(429, {
+        type: 'https://urbanistatlas.com/problems/rate-limited',
+        title: 'Too Many Requests',
         status: 429,
-        headers: { 'Content-Type': 'application/problem+json' },
       }),
     );
     let caught: unknown;
@@ -701,22 +695,16 @@ describe('ApiError — rich shape from problem+json', () => {
 
   it('extracts a per-field errors map from the problem+json envelope', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          type: 'https://urbanistatlas.com/problems/validation',
-          title: 'Bad Request',
-          status: 400,
-          detail: 'one or more fields are invalid',
-          errors: {
-            name: 'required',
-            website_url: 'must be a valid URL',
-          },
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/problem+json' },
+      problemResponse(400, {
+        type: 'https://urbanistatlas.com/problems/validation',
+        title: 'Bad Request',
+        status: 400,
+        detail: 'one or more fields are invalid',
+        errors: {
+          name: 'required',
+          website_url: 'must be a valid URL',
         },
-      ),
+      }),
     );
     let caught: unknown;
     try {
@@ -733,9 +721,11 @@ describe('ApiError — rich shape from problem+json', () => {
 
   it('leaves fieldErrors undefined when the envelope has no errors extension', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ title: 'Bad Request', status: 400, detail: 'bad' }), {
+      problemResponse(400, {
+        type: 'https://urbanistatlas.com/problems/validation',
+        title: 'Bad Request',
         status: 400,
-        headers: { 'Content-Type': 'application/problem+json' },
+        detail: 'bad',
       }),
     );
     let caught: unknown;

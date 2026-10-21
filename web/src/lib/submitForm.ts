@@ -64,11 +64,13 @@ function regionFieldsFor(form: SubmitForm): { slugs: string[]; freeText: string 
 
 /**
  * True when the submission failed for a reason the submitter can't fix
- * from the form (a 5xx or no response at all), so the GitHub-issue
- * fallback should be offered.
+ * from the form, so the GitHub-issue fallback should be offered: anything
+ * but a 400 (validation) or a 429 (rate limit), which have their own
+ * banners. That includes no response at all, a 5xx, and a 401 from a
+ * stale client secret.
  */
-export function isServerOrUnreachable(err: Error): boolean {
-  return !(err instanceof ApiError) || err.status === 0 || err.status >= 500;
+export function needsIssueFallback(err: Error): boolean {
+  return !(err instanceof ApiError) || (err.status !== 400 && err.status !== 429);
 }
 
 /**
