@@ -238,7 +238,9 @@ export interface paths {
          *     result carries a `context_label`: the nearest state/province
          *     ancestor's name (e.g. "New York" for `queens`), so the client
          *     can tell same-named leaves apart ("Springfield" in IL vs MA).
-         *     The label is an empty string when no state ancestor resolves.
+         *     With no state ancestor it falls back to the first direct
+         *     parent's name (by slug), and is an empty string only for a
+         *     region with no parents.
          *
          *     `scope_tier='national'` regions are always excluded (the same v1
          *     editorial gate as `/lookup` and the other browse endpoints). A
@@ -777,10 +779,10 @@ export interface components {
              */
             contact_url?: string;
             /**
-             * @description Open-ended labels. The canonical set is documented in
-             *     `CLAUDE.md` (transit, safe-streets, cycling, walking,
-             *     vision-zero, policy, grassroots, political, neighborhood);
-             *     new labels may be introduced via seed data.
+             * @description Open-ended lowercase labels, not a closed enum; new labels
+             *     may be introduced via seed data. The most common are
+             *     advocacy, safe-streets, cycling, transit, walking and
+             *     policy.
              */
             tags: string[];
             /**
@@ -1010,9 +1012,10 @@ export interface components {
             /**
              * @description The nearest state/province-equivalent ancestor's name (e.g.
              *     "New York" for the `queens` borough), to disambiguate
-             *     same-named regions in a type-ahead. Empty string when the
-             *     region has no resolvable state ancestor (a state itself, or
-             *     a top-level region).
+             *     same-named regions in a type-ahead. With no state ancestor,
+             *     the name of the first direct parent (by slug). Empty string
+             *     only when the region has no parents (a state itself, or a
+             *     top-level region).
              * @example New York
              */
             context_label: string;
@@ -1331,6 +1334,9 @@ export interface components {
          *     (multi-state region), `ny` (state), `toronto-cma`
          *     (Canadian CMA), `metro-vancouver` (regional district).
          *
+         *     Matched case-insensitively: published slugs are lowercase, so
+         *     `NYC-Metro` resolves to `nyc-metro`.
+         *
          *     Slugs are stable public identifiers. Once a slug is published
          *     it is appended-to, never renamed — a published slug will not
          *     change out from under a bookmark or an external consumer.
@@ -1503,6 +1509,9 @@ export interface operations {
                  *     (multi-state region), `ny` (state), `toronto-cma`
                  *     (Canadian CMA), `metro-vancouver` (regional district).
                  *
+                 *     Matched case-insensitively: published slugs are lowercase, so
+                 *     `NYC-Metro` resolves to `nyc-metro`.
+                 *
                  *     Slugs are stable public identifiers. Once a slug is published
                  *     it is appended-to, never renamed — a published slug will not
                  *     change out from under a bookmark or an external consumer.
@@ -1579,7 +1588,11 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @example transportation-alternatives */
+                /**
+                 * @description The organization's slug. Matched case-insensitively:
+                 *     published slugs are lowercase.
+                 * @example transportation-alternatives
+                 */
                 slug: string;
             };
             cookie?: never;
@@ -1676,6 +1689,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
