@@ -585,9 +585,9 @@ describe('ApiError — rich shape from problem+json', () => {
     expect((caught as ApiError).message).toBe('HTTP 418');
   });
 
-  it('preserves the exact unauthorized problem URI on a 401', async () => {
-    // The UI renders detail as received, so a placeholder string tests the
-    // passthrough without copying server prose that could drift.
+  it('passes a 401 problem through unchanged', async () => {
+    // A placeholder detail tests the passthrough without copying server
+    // prose that could drift.
     fetchMock.mockResolvedValueOnce(
       problemResponse(401, {
         type: 'https://urbanistatlas.com/problems/unauthorized',

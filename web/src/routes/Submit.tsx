@@ -16,8 +16,8 @@ import {
   buildIssueUrl,
   buildNewSubmissionRequest,
   contactError,
-  isServerOrUnreachable,
   nameError,
+  needsIssueFallback,
   type NoteField,
   noteFieldError,
   shortDescError,
@@ -136,7 +136,7 @@ function deriveSubmitError(
     unmappedFieldErrors: [],
   };
   if (!err) return view;
-  if (!(err instanceof ApiError) || isServerOrUnreachable(err)) {
+  if (!(err instanceof ApiError) || needsIssueFallback(err)) {
     return { ...view, isServerErr: true };
   }
 
