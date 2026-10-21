@@ -15,9 +15,9 @@ type RegionSummary struct {
 // RegionSearchResult is one Store.SearchRegions match. ContextLabel is
 // the name of the region's nearest state/province-equivalent ancestor
 // (e.g. "New York" for the `queens` borough), so a type-ahead can tell
-// same-named leaves apart ("Springfield" in IL vs MA). Empty string when
-// the region has no resolvable state ancestor (a state itself, or a
-// top-level region).
+// same-named leaves apart ("Springfield" in IL vs MA). With no state
+// ancestor it is the slug-first direct non-national parent's name, and
+// empty only when there is no such parent.
 type RegionSearchResult struct {
 	Region       Region
 	ContextLabel string

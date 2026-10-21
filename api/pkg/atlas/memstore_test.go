@@ -157,6 +157,17 @@ func BenchmarkMemStore_ListRegions(b *testing.B) {
 	}
 }
 
+func TestMemStore_AddRegionRejectsUppercaseSlug(t *testing.T) {
+	s := NewMemStore()
+	err := s.AddRegion(Region{ID: 1, Kind: "us:state", Name: "New York", Slug: "NY", ScopeTier: ScopeRegional})
+	if err == nil {
+		t.Fatal("AddRegion with uppercase slug: want error, got nil")
+	}
+	if _, err := s.ResolveRegionBySlug(context.Background(), "ny"); !errors.Is(err, ErrRegionNotFound) {
+		t.Errorf("rejected region was registered anyway: ResolveRegionBySlug err = %v", err)
+	}
+}
+
 func TestMemStore_AddRegionUnknownParentErrors(t *testing.T) {
 	s := NewMemStore()
 	if err := s.AddRegion(Region{ID: 1, Kind: "us:state", Name: "New York", Slug: "ny", ScopeTier: ScopeRegional}); err != nil {

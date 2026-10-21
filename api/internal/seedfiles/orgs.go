@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2"
@@ -56,6 +57,9 @@ func validateOrgs(os []OrgEntry) error {
 		ctx := fmt.Sprintf("orgs[%d] (slug=%q)", i, o.Slug)
 		if o.Slug == "" {
 			return fmt.Errorf("%s: slug required", ctx)
+		}
+		if o.Slug != strings.ToLower(o.Slug) {
+			return fmt.Errorf("%s: slug must be lowercase", ctx)
 		}
 		if seen[o.Slug] {
 			return fmt.Errorf("%s: duplicate slug", ctx)

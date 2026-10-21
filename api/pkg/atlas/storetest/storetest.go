@@ -88,6 +88,9 @@ func RunContractSuite(t *testing.T, factory Factory) {
 	t.Run("SearchRegions_RanksAndFiltersNational", func(t *testing.T) {
 		testSearchRegionsRanksAndFiltersNational(t, factory)
 	})
+	t.Run("SlugLookups_CaseInsensitive", func(t *testing.T) {
+		testSlugLookupsCaseInsensitive(t, factory)
+	})
 	t.Run("ReadPaths_CloneTagsNoAlias", func(t *testing.T) {
 		testReadPathsCloneTagsNoAlias(t, factory)
 	})
@@ -798,6 +801,44 @@ func testSearchRegionsRanksAndFiltersNational(t *testing.T, factory Factory) {
 	}
 	if labels["springfield-ma"] != "Massachusetts" {
 		t.Errorf("springfield-ma context label: want %q, got %q", "Massachusetts", labels["springfield-ma"])
+	}
+}
+
+// testSlugLookupsCaseInsensitive pins that region and org slug lookups
+// fold case, as the spec's slug path parameters promise.
+func testSlugLookupsCaseInsensitive(t *testing.T, factory Factory) {
+	store, seed, teardown := factory(t)
+	defer teardown()
+
+	seed.SeedRegion(t, atlas.Region{
+		ID: 1, Kind: "us:city", Name: "Cityville", Slug: "cityville",
+		Country: "US", ScopeTier: atlas.ScopeLocal, SortPriority: 15,
+	})
+	seed.SeedOrg(t, atlas.Org{
+		ID: 100, Slug: "city-bikes", Name: "City Bikes", ShortDesc: "test",
+		WebsiteURL: "https://example.test",
+		AddedAt:    time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC),
+	}, []int64{1})
+
+	for _, slug := range []string{"cityville", "CityVille", "CITYVILLE"} {
+		r, err := store.ResolveRegionBySlug(context.Background(), slug)
+		if err != nil {
+			t.Errorf("ResolveRegionBySlug(%q): %v", slug, err)
+			continue
+		}
+		if r.Slug != "cityville" {
+			t.Errorf("ResolveRegionBySlug(%q).Slug = %q, want %q", slug, r.Slug, "cityville")
+		}
+	}
+	for _, slug := range []string{"city-bikes", "City-Bikes", "CITY-BIKES"} {
+		o, err := store.GetOrgBySlug(context.Background(), slug)
+		if err != nil {
+			t.Errorf("GetOrgBySlug(%q): %v", slug, err)
+			continue
+		}
+		if o.Slug != "city-bikes" {
+			t.Errorf("GetOrgBySlug(%q).Slug = %q, want %q", slug, o.Slug, "city-bikes")
+		}
 	}
 }
 

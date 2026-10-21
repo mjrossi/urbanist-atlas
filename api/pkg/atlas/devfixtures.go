@@ -23,7 +23,7 @@ func LoadDevFixtures(s *MemStore) {
 
 	// Toronto (chain: Toronto → Toronto CMA → Ontario)
 	mustFixture(s.AddRegion(Region{ID: 22, Kind: "ca:province", Name: "Ontario", Slug: "ontario", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 70}))
-	mustFixture(s.AddRegion(Region{ID: 21, Kind: "ca:metro", Name: "Toronto CMA", Slug: "toronto-cma", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ontario"}}))
+	mustFixture(s.AddRegion(Region{ID: 21, Kind: "ca:cma", Name: "Toronto CMA", Slug: "toronto-cma", Country: CountryCA, ScopeTier: ScopeRegional, SortPriority: 50, ParentSlugs: []string{"ontario"}}))
 	mustFixture(s.AddRegion(Region{ID: 20, Kind: "ca:city", Name: "Toronto", Slug: "toronto-on", Country: CountryCA, ScopeTier: ScopeLocal, SortPriority: 10, ParentSlugs: []string{"toronto-cma"}}))
 
 	// ── Postal codes ───────────────────────────────────────────

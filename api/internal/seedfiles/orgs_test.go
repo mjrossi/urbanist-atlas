@@ -76,6 +76,16 @@ func TestValidateOrgFields_LengthCaps(t *testing.T) {
 	}
 }
 
+func TestValidateOrgs_RejectsUppercaseSlug(t *testing.T) {
+	err := validateOrgs([]OrgEntry{{
+		Slug: "Brooklyn-Greenways", Name: "Brooklyn Greenways", ShortDesc: "desc",
+		WebsiteURL: "https://example.org", RegionSlugs: []string{"brooklyn-ny"},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "lowercase") {
+		t.Fatalf("validateOrgs with uppercase slug: err = %v, want a lowercase error", err)
+	}
+}
+
 func TestValidateOrgFields_HappyPath(t *testing.T) {
 	if err := ValidateOrgFields(
 		"Brooklyn Greenways", "desc",

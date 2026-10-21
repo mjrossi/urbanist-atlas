@@ -41,7 +41,12 @@ func NewMemStore() *MemStore {
 // AddRegion registers a region. Later calls with the same ID overwrite.
 // Every slug in r.ParentSlugs must already be registered, so add parents
 // before children; an unknown parent is an error and r is not added.
+// A slug with uppercase letters is an error, because slug lookups fold
+// case and two slugs differing only in case would be ambiguous.
 func (s *MemStore) AddRegion(r Region) error {
+	if r.Slug != strings.ToLower(r.Slug) {
+		return fmt.Errorf("atlas: region slug %q must be lowercase", r.Slug)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	parentIDs := make([]int64, 0, len(r.ParentSlugs))
@@ -270,7 +275,7 @@ func (s *MemStore) SearchRegions(_ context.Context, query string, limit int) ([]
 func (s *MemStore) ResolveRegionBySlug(_ context.Context, slug string) (Region, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	id, ok := s.regionsBySlug[slug]
+	id, ok := s.regionsBySlug[strings.ToLower(slug)]
 	if !ok {
 		return Region{}, ErrRegionNotFound
 	}
@@ -326,6 +331,7 @@ func (s *MemStore) RollupMetrosFor(_ context.Context, stateRegionID int64) ([]Re
 func (s *MemStore) GetOrgBySlug(_ context.Context, slug string) (*Org, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	slug = strings.ToLower(slug)
 	for _, org := range s.orgs {
 		if org.Slug != slug {
 			continue

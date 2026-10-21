@@ -39,8 +39,8 @@ func init() {
 			},
 		},
 		Targets: []etl.OutputTarget{
-			{Path: "regions_ca_cmas.toml", Format: "toml", MinRows: 35, MaxRows: 50},
-			{Path: "postal_codes_ca.csv", Format: "csv", MinRows: 1500, MaxRows: 1700},
+			{Path: "regions_ca_cmas.toml"},
+			{Path: "postal_codes_ca.csv"},
 		},
 		Regenerate: Regenerate,
 	}

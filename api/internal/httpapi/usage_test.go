@@ -141,6 +141,32 @@ func TestUsage_RegionViewRecordedAndListed(t *testing.T) {
 	}
 }
 
+// Slug lookup folds case, so differently-cased requests for one region
+// collapse into a single bucket under the canonical slug.
+func TestUsage_RegionViewCasingVariantsShareOneBucket(t *testing.T) {
+	srv, rec := newUsageTestServer(t, nil)
+	today := time.Now().UTC().Format("2006-01-02")
+
+	for _, slug := range []string{"brooklyn-ny", "Brooklyn-NY", "BROOKLYN-NY"} {
+		resp, err := http.Get(srv.URL + "/api/v1/regions/" + slug)
+		if err != nil {
+			t.Fatalf("region fetch %q: %v", slug, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("region fetch %q status = %d, want 200", slug, resp.StatusCode)
+		}
+	}
+	if err := rec.Flush(context.Background()); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+
+	got := getUsage(t, srv, "from="+today+"&to="+today+"&kind=region_view")
+	if len(got) != 1 || got[0].Key != "brooklyn-ny" || got[0].Count != 3 {
+		t.Errorf("buckets = %+v, want one brooklyn-ny/3", got)
+	}
+}
+
 func TestUsage_LookupRecordsResolvedRegionNotPostalCode(t *testing.T) {
 	// The privacy contract: the bucket key is the resolved region slug.
 	// A raw postal code must never appear in the rollup table.
