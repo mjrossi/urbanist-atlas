@@ -38,8 +38,9 @@ type Store interface {
 	// at, normalizing it with NormalizePostalCode, or ErrPostalCodeNotFound.
 	ResolveLeafRegion(ctx context.Context, country Country, postalCode string) (Region, error)
 
-	// ResolveRegionBySlug returns the region identified by slug, or
-	// ErrRegionNotFound for unknown slugs and national-tier rows.
+	// ResolveRegionBySlug returns the region identified by slug, matched
+	// case-insensitively, or ErrRegionNotFound for unknown slugs and
+	// national-tier rows.
 	ResolveRegionBySlug(ctx context.Context, slug string) (Region, error)
 
 	// AncestorRegions returns the leaf followed by its transitive
@@ -72,11 +73,13 @@ type Store interface {
 	// blank query returns an empty slice.
 	//
 	// Each result's ContextLabel carries the nearest state/province
-	// ancestor's name for disambiguation; empty when none resolves.
+	// ancestor's name for disambiguation, falling back to the slug-first
+	// direct non-national parent's name, and is empty when there is no
+	// such parent.
 	SearchRegions(ctx context.Context, query string, limit int) ([]RegionSearchResult, error)
 
-	// GetOrgBySlug returns the approved org identified by slug, with
-	// Regions sorted by ID, or ErrOrgNotFound.
+	// GetOrgBySlug returns the approved org identified by slug, matched
+	// case-insensitively, with Regions sorted by ID, or ErrOrgNotFound.
 	GetOrgBySlug(ctx context.Context, slug string) (*Org, error)
 
 	// ListRecent returns the 10 newest orgs, excluding orgs whose only

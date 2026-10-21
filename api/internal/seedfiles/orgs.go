@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2"
@@ -57,6 +58,9 @@ func validateOrgs(os []OrgEntry) error {
 		if o.Slug == "" {
 			return fmt.Errorf("%s: slug required", ctx)
 		}
+		if o.Slug != strings.ToLower(o.Slug) {
+			return fmt.Errorf("%s: slug must be lowercase", ctx)
+		}
 		if seen[o.Slug] {
 			return fmt.Errorf("%s: duplicate slug", ctx)
 		}
@@ -107,6 +111,9 @@ func ValidateOrgFields(name, shortDesc, websiteURL, contactURL string, tags, reg
 		}
 		if utf8.RuneCountInString(tag) > atlas.MaxTagLen {
 			return fmt.Errorf("tags[%d] must be at most %d characters", i, atlas.MaxTagLen)
+		}
+		if tag != strings.ToLower(tag) {
+			return fmt.Errorf("tags[%d] must be lowercase", i)
 		}
 	}
 	if len(regionSlugs) == 0 {

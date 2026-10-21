@@ -61,16 +61,19 @@ func CreateSubmission(ctx context.Context, regions Store, subs SubmissionStore, 
 // ValidateSubmission trims in, checks every field's shape, and checks
 // each region slug resolves in regions. It returns the normalized input,
 // or a *SubmissionValidationError naming every offending field.
-// SubmitterNote is kept verbatim, and blank region slugs are dropped.
+// SubmitterNote is kept verbatim, blank region slugs are dropped, and
+// each region slug is replaced by the resolved region's canonical slug.
 func ValidateSubmission(ctx context.Context, regions Store, in NewSubmissionInput) (NewSubmissionInput, error) {
 	in = normalizeSubmission(in)
 	errs := submissionShapeErrors(in)
 	// Existence is checked only once the slugs are well-formed, so the
 	// client gets one message per field.
 	if _, bad := errs["region_slugs"]; !bad {
-		if msg := checkRegionSlugsExist(ctx, regions, in.Payload.RegionSlugs); msg != "" {
+		canonical, msg := canonicalRegionSlugs(ctx, regions, in.Payload.RegionSlugs)
+		if msg != "" {
 			errs["region_slugs"] = msg
 		}
+		in.Payload.RegionSlugs = canonical
 	}
 	if len(errs) > 0 {
 		return NewSubmissionInput{}, &SubmissionValidationError{Fields: errs}
@@ -171,26 +174,32 @@ func looksLikeEmail(addr string) bool {
 	return strings.ContainsRune(addr[at+1:], '.')
 }
 
-// checkRegionSlugsExist returns a message naming the first duplicate or
-// unresolvable slug, or "" when every slug resolves.
-func checkRegionSlugsExist(ctx context.Context, regions Store, slugs []string) string {
+// canonicalRegionSlugs resolves each slug and returns the regions'
+// canonical slugs, or a message naming the first duplicate or
+// unresolvable slug. Resolution folds case, but the slugs end up in an
+// orgs.toml block whose loader matches exactly, so the canonical form is
+// what gets stored and what duplicates are judged by.
+func canonicalRegionSlugs(ctx context.Context, regions Store, slugs []string) ([]string, string) {
 	if regions == nil {
-		return "Region resolver is unavailable; cannot verify region slugs."
+		return slugs, "Region resolver is unavailable; cannot verify region slugs."
 	}
+	out := make([]string, 0, len(slugs))
 	seen := map[string]bool{}
 	for _, slug := range slugs {
-		if seen[slug] {
-			return fmt.Sprintf("Region slug %q appears more than once.", slug)
-		}
-		seen[slug] = true
-		if _, err := regions.ResolveRegionBySlug(ctx, slug); err != nil {
+		r, err := regions.ResolveRegionBySlug(ctx, slug)
+		if err != nil {
 			if errors.Is(err, ErrRegionNotFound) {
-				return fmt.Sprintf("Region slug %q does not match any known region.", slug)
+				return slugs, fmt.Sprintf("Region slug %q does not match any known region.", slug)
 			}
-			return fmt.Sprintf("Region lookup failed for %q.", slug)
+			return slugs, fmt.Sprintf("Region lookup failed for %q.", slug)
 		}
+		if seen[r.Slug] {
+			return slugs, fmt.Sprintf("Region slug %q appears more than once.", slug)
+		}
+		seen[r.Slug] = true
+		out = append(out, r.Slug)
 	}
-	return ""
+	return out, ""
 }
 
 // URLReason is the outcome of ClassifyURL.

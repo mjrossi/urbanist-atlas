@@ -80,22 +80,11 @@ func (s SourceDescriptor) FeedsTarget(target Target) bool {
 }
 
 // OutputTarget names a file the regenerate step writes under
-// api/seed/. The expected row count band is purely informational —
-// it surfaces in the regenerate step's summary log so an order-of-
-// magnitude mismatch (e.g., 33k US ZCTAs collapses to 100 rows)
-// is obvious even without diff inspection.
+// api/seed/.
 type OutputTarget struct {
 	// Path is relative to api/seed/ (e.g., "regions_us_msas.toml",
 	// "postal_codes_us.csv").
 	Path string
-	// Format is "toml" or "csv". Determines the writer used by the
-	// regenerate step and the deterministic-ordering convention
-	// (slug for TOML, postal_code for CSV).
-	Format string
-	// MinRows / MaxRows bracket the expected output cardinality.
-	// Zero means unbounded.
-	MinRows int
-	MaxRows int
 }
 
 // Country bundles a country's upstream sources, the targets it
