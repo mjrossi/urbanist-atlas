@@ -89,7 +89,9 @@ func (s *MemStore) AddRollupState(metroSlug, stateSlug string) {
 
 // AddOrg registers an organization with the IDs of the regions it
 // serves. Regions is rebuilt on read; AddedAt is kept and orders
-// ListRecent.
+// ListRecent. org.Slug must be lowercase: GetOrgBySlug folds the
+// requested slug to lowercase, so a slug with uppercase letters is never
+// found.
 func (s *MemStore) AddOrg(org Org, regionIDs []int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

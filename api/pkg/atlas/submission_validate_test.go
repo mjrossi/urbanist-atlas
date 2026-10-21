@@ -72,6 +72,21 @@ func TestValidateSubmission_TrimsAndDropsBlankSlugs(t *testing.T) {
 	}
 }
 
+// The stored slugs feed the generated orgs.toml block, whose loader
+// matches slugs exactly, so a differently-cased slug must be stored in
+// its canonical form.
+func TestValidateSubmission_CanonicalizesRegionSlugCase(t *testing.T) {
+	in := goodSubmissionInput()
+	in.Payload.RegionSlugs = []string{"Brooklyn-NY", "NY"}
+	got, err := ValidateSubmission(context.Background(), submissionRegions(t), in)
+	if err != nil {
+		t.Fatalf("ValidateSubmission: %v", err)
+	}
+	if diff := cmp.Diff([]string{"brooklyn-ny", "ny"}, got.Payload.RegionSlugs); diff != "" {
+		t.Errorf("RegionSlugs (-want +got):\n%s", diff)
+	}
+}
+
 func TestValidateSubmission_NoRegionSlugsIsValid(t *testing.T) {
 	in := goodSubmissionInput()
 	in.Payload.RegionSlugs = nil
@@ -146,6 +161,11 @@ func TestValidateSubmission_FieldErrors(t *testing.T) {
 			name:   "duplicate slug",
 			mutate: func(in *NewSubmissionInput) { in.Payload.RegionSlugs = []string{"brooklyn-ny", " brooklyn-ny"} },
 			want:   map[string]string{"region_slugs": `Region slug "brooklyn-ny" appears more than once.`},
+		},
+		{
+			name:   "duplicate slug differing only in case",
+			mutate: func(in *NewSubmissionInput) { in.Payload.RegionSlugs = []string{"brooklyn-ny", "Brooklyn-NY"} },
+			want:   map[string]string{"region_slugs": `Region slug "Brooklyn-NY" appears more than once.`},
 		},
 		{
 			name:   "submitter name too long",

@@ -112,6 +112,9 @@ func ValidateOrgFields(name, shortDesc, websiteURL, contactURL string, tags, reg
 		if utf8.RuneCountInString(tag) > atlas.MaxTagLen {
 			return fmt.Errorf("tags[%d] must be at most %d characters", i, atlas.MaxTagLen)
 		}
+		if tag != strings.ToLower(tag) {
+			return fmt.Errorf("tags[%d] must be lowercase", i)
+		}
 	}
 	if len(regionSlugs) == 0 {
 		return errors.New("region_slugs must have at least one entry")

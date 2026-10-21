@@ -74,7 +74,8 @@ type Store interface {
 	//
 	// Each result's ContextLabel carries the nearest state/province
 	// ancestor's name for disambiguation, falling back to the slug-first
-	// direct parent's name.
+	// direct non-national parent's name, and is empty when there is no
+	// such parent.
 	SearchRegions(ctx context.Context, query string, limit int) ([]RegionSearchResult, error)
 
 	// GetOrgBySlug returns the approved org identified by slug, matched

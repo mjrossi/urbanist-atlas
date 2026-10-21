@@ -86,6 +86,13 @@ func TestValidateOrgs_RejectsUppercaseSlug(t *testing.T) {
 	}
 }
 
+func TestValidateOrgFields_RejectsUppercaseTag(t *testing.T) {
+	err := ValidateOrgFields("n", "d", "https://x.org", "", []string{"cycling", "Transit"}, []string{"brooklyn"})
+	if err == nil || !strings.Contains(err.Error(), "tags[1] must be lowercase") {
+		t.Fatalf("err = %v, want a tags[1] lowercase error", err)
+	}
+}
+
 func TestValidateOrgFields_HappyPath(t *testing.T) {
 	if err := ValidateOrgFields(
 		"Brooklyn Greenways", "desc",

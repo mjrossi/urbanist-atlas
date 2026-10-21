@@ -88,8 +88,8 @@ etl.Plans["US"] = etl.Country{
         ...
     },
     Targets: []etl.OutputTarget{
-        {Path: "regions_us_msas.toml", Format: "toml", MinRows: 380, MaxRows: 400},
-        {Path: "postal_codes_us.csv",  Format: "csv",  MinRows: 30000, MaxRows: 45000},
+        {Path: "regions_us_msas.toml"},
+        {Path: "postal_codes_us.csv"},
     },
     Regenerate: Regenerate,
 }
@@ -106,11 +106,6 @@ Two sources of truth for source pinning, kept in lockstep:
   vintage labels, license notes, and the manual refresh recipe.
 
 If you bump a vintage, update both files in the same commit.
-
-The `Targets` row bands are sanity rails: `etl regenerate` fails
-loudly if the output row count falls outside the band, catching
-parser bugs and upstream-format drift before the bad output is
-committed to the seed bundle.
 
 ## US pipeline
 
