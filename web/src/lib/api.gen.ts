@@ -238,9 +238,9 @@ export interface paths {
          *     result carries a `context_label`: the nearest state/province
          *     ancestor's name (e.g. "New York" for `queens`), so the client
          *     can tell same-named leaves apart ("Springfield" in IL vs MA).
-         *     With no state ancestor it falls back to the first direct
-         *     parent's name (by slug), and is an empty string only for a
-         *     region with no parents.
+         *     With no state ancestor it falls back to the name of the first
+         *     direct non-national parent (by slug), and is an empty string
+         *     only for a region with no such parent.
          *
          *     `scope_tier='national'` regions are always excluded (the same v1
          *     editorial gate as `/lookup` and the other browse endpoints). A
@@ -1013,9 +1013,9 @@ export interface components {
              * @description The nearest state/province-equivalent ancestor's name (e.g.
              *     "New York" for the `queens` borough), to disambiguate
              *     same-named regions in a type-ahead. With no state ancestor,
-             *     the name of the first direct parent (by slug). Empty string
-             *     only when the region has no parents (a state itself, or a
-             *     top-level region).
+             *     the name of the first direct non-national parent (by slug).
+             *     Empty string only when the region has no such parent (a
+             *     state itself, or a top-level region).
              * @example New York
              */
             context_label: string;

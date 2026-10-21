@@ -605,9 +605,9 @@ type RegionSearchResult struct {
 	// ContextLabel The nearest state/province-equivalent ancestor's name (e.g.
 	// "New York" for the `queens` borough), to disambiguate
 	// same-named regions in a type-ahead. With no state ancestor,
-	// the name of the first direct parent (by slug). Empty string
-	// only when the region has no parents (a state itself, or a
-	// top-level region).
+	// the name of the first direct non-national parent (by slug).
+	// Empty string only when the region has no such parent (a
+	// state itself, or a top-level region).
 	ContextLabel string `json:"context_label"`
 
 	// Region A geographic unit an organization can serve. Regions form a
