@@ -579,21 +579,16 @@ describe('ApiError — rich shape from problem+json', () => {
     expect((caught as ApiError).message).toBe('HTTP 418');
   });
 
-  it('preserves the exact unauthorized problem URI on a 401 (slice #23)', async () => {
-    // Pins the wire shape the backend's X-Atlas-Client middleware
-    // emits when the shared-secret header is missing/wrong. The exact
-    // string must stay in lockstep with `problemUnauthorized` in
-    // api/internal/httpapi/problem.go.
+  it('preserves the exact unauthorized problem URI on a 401', async () => {
+    // Mirrors what clientsecret.go's writeProblem sends for a missing or
+    // wrong X-Atlas-Client header. This is a mock, so it cannot catch the
+    // server drifting from it; keep it in step by hand.
     fetchMock.mockResolvedValueOnce(
       problemResponse(401, {
         type: 'https://urbanistatlas.com/problems/unauthorized',
         title: 'Unauthorized',
         status: 401,
-        // Exact server-emitted string — matches the `writeProblem`
-        // call in api/internal/httpapi/clientsecret.go:31-33
-        // (lowercase, no trailing period). A future reader copying
-        // this fixture should see what the wire actually carries.
-        detail: 'missing or invalid X-Atlas-Client header',
+        detail: 'Authentication is required for this endpoint.',
       }),
     );
     let caught: unknown;
@@ -607,9 +602,7 @@ describe('ApiError — rich shape from problem+json', () => {
     expect(apiErr.status).toBe(401);
     expect(apiErr.problem?.type).toBe('https://urbanistatlas.com/problems/unauthorized');
     expect(apiErr.problem?.title).toBe('Unauthorized');
-    // Pin the detail too so the fixture is actually load-bearing —
-    // a future drift in the server-emitted string will fail here.
-    expect(apiErr.problem?.detail).toBe('missing or invalid X-Atlas-Client header');
+    expect(apiErr.problem?.detail).toBe('Authentication is required for this endpoint.');
   });
 
   it('non-2xx with non-problem body: problem is undefined, message is `HTTP <status>`', async () => {

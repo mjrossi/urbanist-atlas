@@ -140,7 +140,7 @@ function deriveSubmitError(
     return { ...view, isServerErr: true };
   }
 
-  const isValidationErr = err.status === 400 || err.status === 422;
+  const isValidationErr = err.status === 400;
   const unmappedFieldErrors = err.fieldErrors
     ? Object.entries(err.fieldErrors)
         .filter(([apiField]) => {
