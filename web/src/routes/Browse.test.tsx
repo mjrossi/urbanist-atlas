@@ -20,7 +20,7 @@ vi.mock('../lib/api.ts', async () => {
 });
 
 // Per-country org totals are deliberately larger than what the rendered
-// rows sum to: statewide orgs have no browseable region to appear under.
+// rows sum to: some orgs attach to no browseable region.
 function makeStats(overrides: Partial<Stats> = {}): Stats {
   return {
     total_org_count: 236,

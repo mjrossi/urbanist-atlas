@@ -328,6 +328,11 @@ departure.
   motion beyond the core's "almost none". Both are kept because "live
   directory" is the claim the status makes. Its 1024px breakpoint is
   the core's.
+- **Phone site-foot is a compact block** (≤768px), not the core's
+  one-column stack of every link column. It keeps the wordmark,
+  tagline, three links (About, Submit a tip, Contact) and the colophon
+  strip; the full lists live on /about and /colophon. Stacked, the
+  columns are a long scroll of links on a phone.
 - **Page grain on phones** (`body::after`). The core grains only the
   masthead band. On phones the whole sheet gets it so the screen reads
   as paper.

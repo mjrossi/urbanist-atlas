@@ -211,7 +211,7 @@ function CountrySection({
   orgCount: number | null;
 }) {
   // The org count is country-wide, so it exceeds what the rows sum to:
-  // statewide orgs have no browseable row. Hence "countrywide".
+  // some orgs attach to no browseable region. Hence "countrywide".
   const total = country.total.length;
   const name = COUNTRY_TITLES[country.country] ?? country.country;
   const letters = new Set(country.letters.map((l) => l.letter));

@@ -8,7 +8,8 @@ import { normalizePostal } from '../lib/postal.ts';
 type DetectedCountry = Country | null;
 
 // TODO(third-country): digit → US, letter → CA only holds while US and CA
-// are the shipping countries; a third needs a per-country pattern.
+// are the shipping countries; a third needs a per-country pattern here,
+// in lockstep with SUPPORTED_COUNTRIES in lib/api.ts.
 function detectCountry(raw: string): DetectedCountry {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;

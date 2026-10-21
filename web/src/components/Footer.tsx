@@ -76,6 +76,7 @@ export function Footer() {
           </ul>
         </div>
       </footer>
+      {/* Phones get a compact block: see CLAUDE.md "Local variations". */}
       <footer className="site-foot-compact mobile-only">
         <h3 className="colophon-title">
           Urbanist <span className="em">Atlas</span>

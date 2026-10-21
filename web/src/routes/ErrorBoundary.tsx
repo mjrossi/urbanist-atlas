@@ -11,8 +11,9 @@ import { NotFoundWithLayout } from './NotFound.tsx';
 /**
  * The root `errorElement`, for unmatched URLs and unhandled errors
  * alike. A 404 gets the not-found page, a failed route chunk one reload,
- * and anything else a "stop press" page showing the request id, which
- * is the only trace there is: the app ships no client error tracking.
+ * and anything else a "stop press" page showing the request id: the app
+ * ships no client error tracking, so the id a reader quotes is how the
+ * server logs get searched.
  */
 export function RouteErrorBoundary() {
   const error = useRouteError();

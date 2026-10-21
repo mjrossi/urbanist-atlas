@@ -40,7 +40,7 @@
   };
 
   apply(read());
-  // Reveals the toggle: `:root[data-js] .theme-toggle[hidden]`.
+  // The family core's JS hook (`:root[data-js]`), kept for parity.
   root.setAttribute('data-js', '');
 
   // Another tab changed the choice, or the page came back from the

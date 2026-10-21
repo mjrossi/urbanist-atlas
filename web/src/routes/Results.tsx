@@ -113,7 +113,7 @@ function ResultsBody({
       query={query}
       loading={<>Finding organizations for {postalCode}…</>}
       error={(e) =>
-        // A 404 is an unresolved code, plain or military. The API's
+        // A 404 is an unresolved code, plain or military/diplomatic. The API's
         // `detail` is written for readers, so it is the body; its `title`
         // is too long for the small-caps label.
         e.status === 404 ? (

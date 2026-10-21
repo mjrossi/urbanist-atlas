@@ -348,9 +348,9 @@ a {
 
 /* ── Theme toggle: Auto · Light · Dark ──────────────────
    Family core ThemeToggle. 22×18 buttons keep the row no taller than the
-   folio text. The [hidden] rules are the core's no-JS reveal hook, kept
-   for parity: React renders the group only with JS, so it never sets
-   `hidden`. */
+   folio text. The [hidden] rules are the core's reveal-when-JS hook,
+   kept for parity: React renders the group only with JS, so it never
+   sets `hidden`. */
 .masthead-folio-right {
   display: inline-flex;
   align-items: center;
