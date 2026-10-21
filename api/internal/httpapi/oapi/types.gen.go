@@ -233,10 +233,10 @@ type LookupOrg struct {
 	ShortDesc string   `json:"short_desc"`
 	Slug      string   `json:"slug"`
 
-	// Tags Open-ended labels. The canonical set is documented in
-	// `CLAUDE.md` (transit, safe-streets, cycling, walking,
-	// vision-zero, policy, grassroots, political, neighborhood);
-	// new labels may be introduced via seed data.
+	// Tags Open-ended lowercase labels, not a closed enum; new labels
+	// may be introduced via seed data. The most common are
+	// advocacy, safe-streets, cycling, transit, walking and
+	// policy.
 	Tags       []string `json:"tags"`
 	WebsiteUrl string   `json:"website_url"`
 }
@@ -356,10 +356,10 @@ type Org struct {
 	ShortDesc string   `json:"short_desc"`
 	Slug      string   `json:"slug"`
 
-	// Tags Open-ended labels. The canonical set is documented in
-	// `CLAUDE.md` (transit, safe-streets, cycling, walking,
-	// vision-zero, policy, grassroots, political, neighborhood);
-	// new labels may be introduced via seed data.
+	// Tags Open-ended lowercase labels, not a closed enum; new labels
+	// may be introduced via seed data. The most common are
+	// advocacy, safe-streets, cycling, transit, walking and
+	// policy.
 	Tags       []string `json:"tags"`
 	WebsiteUrl string   `json:"website_url"`
 }
@@ -604,9 +604,10 @@ type RegionKind = string
 type RegionSearchResult struct {
 	// ContextLabel The nearest state/province-equivalent ancestor's name (e.g.
 	// "New York" for the `queens` borough), to disambiguate
-	// same-named regions in a type-ahead. Empty string when the
-	// region has no resolvable state ancestor (a state itself, or
-	// a top-level region).
+	// same-named regions in a type-ahead. With no state ancestor,
+	// the name of the first direct non-national parent (by slug).
+	// Empty string only when the region has no such parent (a
+	// state itself, or a top-level region).
 	ContextLabel string `json:"context_label"`
 
 	// Region A geographic unit an organization can serve. Regions form a
