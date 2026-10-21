@@ -77,12 +77,9 @@ type submissionParseError struct {
 
 func (e *submissionParseError) Error() string { return e.title + ": " + e.detail }
 
-// decodeOneJSONObject decodes the request body into v under the
-// submission body-size limit, rejecting unknown fields and requiring
-// the body to be exactly one JSON object. typeName names the expected
-// wire type in the returned problem title+detail. It writes nothing to
-// w (needed only for http.MaxBytesReader's oversize accounting) — the
-// caller maps a non-nil result onto a response.
+// decodeOneJSONObject decodes exactly one JSON object with no unknown
+// fields into v, under submissionBodyLimit. It writes nothing to w, which
+// http.MaxBytesReader needs only for its oversize accounting.
 func decodeOneJSONObject(w http.ResponseWriter, r *http.Request, v any, typeName string) *submissionParseError {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, submissionBodyLimit))
 	dec.DisallowUnknownFields()
@@ -93,10 +90,8 @@ func decodeOneJSONObject(w http.ResponseWriter, r *http.Request, v any, typeName
 			title = "Empty Request Body"
 			detail = fmt.Sprintf("The request body is empty; expected a %s JSON object.", typeName)
 		}
-		// http.MaxBytesReader surfaces an oversize body as a
-		// MaxBytesError; surface that with the 413-shape title even
-		// though we keep the 400 status (oversize submissions are a
-		// validation failure from the client's perspective).
+		// An oversize body keeps the 400 status: to the client it is a
+		// validation failure.
 		var mbErr *http.MaxBytesError
 		if errors.As(err, &mbErr) {
 			title = "Request Body Too Large"
@@ -104,10 +99,8 @@ func decodeOneJSONObject(w http.ResponseWriter, r *http.Request, v any, typeName
 		}
 		return &submissionParseError{title: title, detail: detail}
 	}
-	// DisallowUnknownFields rejects unknown keys inside the object but
-	// not trailing content after it; dec.More() catches a second JSON
-	// value (e.g. `{...}{...}` or `{...} garbage`) so the body must be
-	// exactly one object.
+	// Decode stops after the first value, so trailing content needs its
+	// own check.
 	if dec.More() {
 		return &submissionParseError{
 			title:  "Invalid Request Body",
@@ -117,11 +110,8 @@ func decodeOneJSONObject(w http.ResponseWriter, r *http.Request, v any, typeName
 	return nil
 }
 
-// listSubmissionsHandler answers GET /api/v1/admin/submissions.
-// Bearer-gated. Defaults to status=pending. Returns at most ?limit=
-// rows (default 50, max 200) ordered newest-first. When more rows
-// exist, an `X-Next-Cursor` response header carries an opaque token
-// the client passes back as `?cursor=` for the next page.
+// listSubmissionsHandler answers GET /api/v1/admin/submissions, pending
+// by default. `X-Next-Cursor` carries the token for the next page.
 func listSubmissionsHandler(subs atlas.SubmissionStore, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
@@ -183,24 +173,18 @@ func approveSubmissionHandler(subs atlas.SubmissionStore, enq PromotionEnqueuer,
 
 		sub = enqueuePromotion(r.Context(), subs, enq, logger, sub, rid)
 
-		// The approval itself succeeded even when the best-effort enqueue
-		// inside enqueuePromotion failed (the failure is captured in
-		// promotion_error on the re-read row).
+		// The approval succeeded even if the enqueue failed; that failure
+		// is in promotion_error.
 		m.incAdminAction("approve", "ok")
 		logger.InfoContext(r.Context(), "submission approved", "public_id", sub.PublicID, "rid", rid)
 		writeJSON(w, http.StatusOK, toOAPISubmission(sub))
 	}
 }
 
-// enqueuePromotion hands an already-approved submission off to the
-// GitHub PR worker, best-effort. The row is already approved by the
-// time this runs, so the worker is free to fail without un-doing the
-// moderator's decision: on enqueue failure it records the reason in
-// promotion_error (a compensating write) and re-reads the row so the
-// returned submission reflects the persisted error. Both the attach
-// and the re-read are themselves best-effort — an attach failure is
-// logged and a failed re-read leaves the in-memory sub untouched.
-// Returns the submission the caller should encode.
+// enqueuePromotion hands an approved submission to the PR worker,
+// best-effort: an enqueue failure never undoes the approval. It is
+// recorded in promotion_error and the row re-read so the response shows
+// it; a failed attach is logged and a failed re-read returns sub as is.
 func enqueuePromotion(ctx context.Context, subs atlas.SubmissionStore, enq PromotionEnqueuer, logger *slog.Logger, sub atlas.Submission, rid string) atlas.Submission {
 	enqErr := enqueueOrDisabled(ctx, enq, sub)
 	if enqErr == nil {
@@ -353,9 +337,7 @@ func toOAPISubmission(s atlas.Submission) oapi.Submission {
 	return out
 }
 
-// strPtrIfSet returns a pointer to s when s is non-empty, and nil
-// otherwise — the idiom for mapping a Go zero-value-elides-the-field
-// string onto an optional wire field that should be omitted when empty.
+// strPtrIfSet maps an empty string to an omitted optional wire field.
 func strPtrIfSet(s string) *string {
 	if s == "" {
 		return nil
@@ -364,9 +346,8 @@ func strPtrIfSet(s string) *string {
 }
 
 func toOAPISubmissionPayload(p atlas.SubmissionPayload) oapi.SubmissionPayload {
-	// region_slugs is optional on the schema since slice α; always
-	// emit a non-nil pointer (possibly to an empty array) so the
-	// admin response shape stays predictable for downstream consumers.
+	// region_slugs is optional in the schema but always emitted, as `[]`
+	// when empty, so the admin response shape is stable.
 	regions := nonNilSlice(append([]string(nil), p.RegionSlugs...))
 	out := oapi.SubmissionPayload{
 		Name:        p.Name,

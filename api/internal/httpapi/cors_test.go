@@ -101,13 +101,10 @@ func TestCORS_VaryOriginAlwaysSetWhenOriginPresent(t *testing.T) {
 	}
 }
 
-// TestCORS_WildcardSuffixEnforcesHTTPSScheme pins HOST-03b: the
-// `*.`-suffix allowlist form must require the `https://` scheme, so a
-// credentialed cross-origin request from a spoofed `http://…` origin
-// is rejected while the genuine `https://…` preview origin is allowed.
-// The middleware is configured exactly as production fly.toml does
-// (`https://urbanistatlas.com,*.link00seven.workers.dev`) plus the dev
-// localhost exact entry, so this also locks in that the scheme-pinned
+// TestCORS_WildcardSuffixEnforcesHTTPSScheme pins that the `*.`-suffix
+// form requires `https://`, so a spoofed `http://…` origin is rejected
+// while the real `https://…` preview origin is allowed. The allowlist
+// matches fly.toml's plus the dev localhost entry, so it also pins that
 // exact entries stay scheme-sensitive.
 func TestCORS_WildcardSuffixEnforcesHTTPSScheme(t *testing.T) {
 	mw := corsMiddleware([]string{

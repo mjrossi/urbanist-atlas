@@ -14,11 +14,9 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// ipRateLimiter is an in-process sliding-window limiter for the public
-// submission endpoint: a per-client budget (see rateLimitKey) plus one
-// budget shared by every client. Nothing in front of the API throttles
-// submissions, so this is the only rate limit they meet. State is
-// per-process and resets on restart.
+// ipRateLimiter is an in-process sliding-window limiter for submissions:
+// a per-client budget (see rateLimitKey) plus one shared by every
+// client. State resets on restart.
 type ipRateLimiter struct {
 	mu         sync.Mutex
 	hits       map[string][]time.Time
@@ -59,7 +57,7 @@ func (l *ipRateLimiter) allow(ip string) (ok bool, retryAfter int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Periodic sweep so the map doesn't leak under churning IPs.
+	// Sweep so the map doesn't grow without bound under churning IPs.
 	if now.Sub(l.lastSwept) > l.sweepEvery {
 		for k, ts := range l.hits {
 			kept := keepRecent(ts, cutoff)
@@ -122,14 +120,11 @@ func rateLimitKey(ip string) string {
 	return netip.PrefixFrom(addr, 64).Masked().String()
 }
 
-// clientIP picks the source IP the limiter keys on.
-//
-// It trusts Fly-Client-IP, on the assumption that the only route to the
-// app is Fly's proxy and that the proxy overwrites any client-supplied
-// value. If the API is ever served any other way, that header becomes
-// client-controlled and this must change. X-Forwarded-For is never
-// trusted: without a proxy that rewrites it, a client could choose its
-// own bucket on every request.
+// clientIP picks the source IP the limiter keys on. Trusting
+// Fly-Client-IP assumes the app is reachable only through Fly's proxy and
+// that the proxy overwrites the header; served any other way, the header
+// is client-controlled and this must change. X-Forwarded-For is never
+// trusted, or a client could choose its own bucket.
 func clientIP(r *http.Request) string {
 	if v := r.Header.Get("Fly-Client-IP"); v != "" {
 		return strings.TrimSpace(v)
@@ -185,12 +180,10 @@ func newPendingQueue(subs atlas.SubmissionStore, maxPending int, logger *slog.Lo
 	return &pendingQueue{subs: subs, maxPending: maxPending, logger: logger, nowFunc: time.Now}
 }
 
-// full fails open on a store error until the first successful check:
-// the create that follows would hit the same store, and refusing every
-// submission over a transient read error is the worse failure. After
-// that, a failed refresh keeps the last known answer and retries
-// sooner. The query runs detached from the caller's context so one
-// client disconnecting cannot poison the cache for everyone else.
+// full fails open on a store error until the first successful check,
+// since the create would hit the same store anyway; after that a failed
+// refresh keeps the last answer and retries sooner. The query is detached
+// from the caller's context so one disconnect can't poison the cache.
 func (q *pendingQueue) full(ctx context.Context) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()

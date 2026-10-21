@@ -7,12 +7,9 @@ import (
 	"strings"
 )
 
-// parseLimitParam reads the optional ?limit= query parameter shared by
-// the capped list endpoints (admin submissions, region search, coverage
-// gaps). An absent parameter returns 0 — callers pass that through so
-// the store applies its own default; the cap is endpoint-specific. On a
-// non-integer or out-of-range value it writes the 400 problem document
-// and returns ok=false, so the caller just returns.
+// parseLimitParam reads the optional ?limit=. Absent is 0, which the
+// store treats as its default. An invalid value gets a 400 written here
+// and ok=false.
 func parseLimitParam(w http.ResponseWriter, r *http.Request, maxLimit int, rid string) (limit int, ok bool) {
 	raw := strings.TrimSpace(r.URL.Query().Get("limit"))
 	if raw == "" {

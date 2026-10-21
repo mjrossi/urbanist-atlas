@@ -11,13 +11,8 @@ import (
 	"testing"
 )
 
-// TestEmbeddedOpenAPISpecMatchesCanonical guards against drift between
-// the canonical `api/openapi.yaml` (the wire contract consumed by
-// web/ via openapi-typescript) and the copy embedded into this
-// package via `//go:embed openapi.yaml`. Go's embed directive can't
-// reach across package boundaries (`..` is disallowed) and can't
-// follow symlinks, so we maintain a sibling copy here — this test
-// fails fast if someone updates one and forgets the other.
+// TestEmbeddedOpenAPISpecMatchesCanonical fails when the embedded copy
+// of the spec drifts from `api/openapi.yaml`.
 func TestEmbeddedOpenAPISpecMatchesCanonical(t *testing.T) {
 	t.Helper()
 	_, here, _, ok := runtime.Caller(0)

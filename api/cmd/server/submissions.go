@@ -12,11 +12,8 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// submissionsCommand groups operator-facing actions on the submission
-// queue. `serve` already exposes the same functionality via the admin
-// HTTP endpoints; the CLI mirrors are for cases where shell access is
-// faster — most importantly, retrying a PR whose worker run failed
-// during a GitHub outage.
+// submissionsCommand groups operator actions on the submission queue,
+// chiefly retrying a PR whose worker run failed.
 func submissionsCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "submissions",
@@ -55,9 +52,7 @@ func runRetryPR(ctx context.Context, c *cli.Command) error {
 		return errors.New("submissions retry-pr: --github-token (or URBANIST_GITHUB_TOKEN) required")
 	}
 
-	// db-path may live on either the top-level submissions command
-	// or be left at its default. urfave looks up the nearest
-	// definition.
+	// db-path is the parent command's flag; urfave resolves it from here.
 	dbPath := c.String("db-path")
 	if dbPath == "" {
 		dbPath = "/data/atlas.db"

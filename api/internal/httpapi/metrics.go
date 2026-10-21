@@ -14,9 +14,8 @@ import (
 	"github.com/mjrossi/urbanist-atlas/api/pkg/atlas"
 )
 
-// Metrics owns the Prometheus registry and the application counters/histograms
-// exposed on the private /metrics endpoint. It deliberately holds its own
-// registry rather than the global default so multiple New()/test routers can
+// Metrics owns the Prometheus registry and application metrics. It holds
+// its own registry, not the global default, so several routers (tests) can
 // coexist without duplicate-registration panics.
 type Metrics struct {
 	reg *prometheus.Registry
@@ -24,9 +23,8 @@ type Metrics struct {
 	httpRequests *prometheus.CounterVec
 	httpDuration *prometheus.HistogramVec
 	lookupTotal  *prometheus.CounterVec
-	// lookupResults partitions resolved (hit) lookups by the most-specific
-	// result tier so we can see, e.g., the empty-result rate — the editorial
-	// coverage-gap signal. See incLookupTier / lookupTier.
+	// lookupResults splits hits by most-specific tier; "empty" is the
+	// coverage-gap signal.
 	lookupResults        *prometheus.CounterVec
 	regionViews          *prometheus.CounterVec
 	orgViews             *prometheus.CounterVec
@@ -130,15 +128,8 @@ func NewMetrics() *Metrics {
 	}
 }
 
-// incLookup records a lookup outcome. result is "hit", "miss", or
-// "military" (a US APO/FPO/DPO ZIP, which has no residential region and
-// so is tracked separately from genuine coverage misses).
-//
-// country is caller-supplied query input (the handler does not gate on a
-// known-country list), so it is bucketed to a bounded set here — only the
-// shipping countries get their own series; everything else collapses to
-// "other". Without this, a client looping unknown country codes would
-// create an unbounded number of label series in the registry.
+// incLookup records a lookup outcome: "hit", "miss", or "military" (an
+// APO/FPO/DPO ZIP, kept apart from real coverage misses).
 func (m *Metrics) incLookup(country, result string) {
 	if m == nil {
 		return
@@ -146,8 +137,8 @@ func (m *Metrics) incLookup(country, result string) {
 	m.lookupTotal.WithLabelValues(metricCountry(country), result).Inc()
 }
 
-// metricCountry clamps a raw country string to a bounded label set so the
-// lookup_total cardinality can't be inflated by arbitrary input.
+// metricCountry clamps the caller-supplied country to the shipping
+// countries plus "other", bounding label cardinality.
 func metricCountry(country string) string {
 	switch atlas.Country(country) {
 	case atlas.CountryUS, atlas.CountryCA:
@@ -173,10 +164,8 @@ func (m *Metrics) incRateLimit(endpoint string) {
 	m.rateLimit.WithLabelValues(endpoint).Inc()
 }
 
-// incLookupTier records the result tier of a resolved (hit) lookup.
-// Pair with incLookup(country, "hit") — there is exactly one tier
-// increment per hit, so lookup_results_total sums to
-// lookup_total{result="hit"}.
+// incLookupTier records the tier of a hit. Call it once per
+// incLookup(country, "hit") so lookup_results_total sums to the hits.
 func (m *Metrics) incLookupTier(country, tier string) {
 	if m == nil {
 		return
@@ -184,10 +173,8 @@ func (m *Metrics) incLookupTier(country, tier string) {
 	m.lookupResults.WithLabelValues(metricCountry(country), tier).Inc()
 }
 
-// lookupTier picks the most-specific bucket that carried at least one
-// org (local ≻ regional ≻ statewide), or "empty" when a resolved region
-// surfaced no orgs in any tier. The "empty" bucket is the high-value
-// coverage-gap signal that also drives the sampled-empty capture.
+// lookupTier picks the most-specific non-empty tier, or "empty" when a
+// resolved region has no orgs at all.
 func lookupTier(local, regional, statewide int) string {
 	switch {
 	case local > 0:
@@ -219,9 +206,8 @@ func (m *Metrics) incOrgView(found bool) {
 	m.orgViews.WithLabelValues(strconv.FormatBool(found)).Inc()
 }
 
-// incRegionSearch records a region type-ahead query: the empty/nonempty
-// counter, the result-count histogram, and the query-length histogram.
-// The query text is never recorded — only its length.
+// incRegionSearch records a type-ahead query. Only its length is kept,
+// never its text.
 func (m *Metrics) incRegionSearch(queryLen, resultCount int) {
 	if m == nil {
 		return
@@ -244,9 +230,8 @@ func (m *Metrics) incSubmissionValidationFailure(field string) {
 	m.submissionValidationFailures.WithLabelValues(metricSubmissionField(field)).Inc()
 }
 
-// metricSubmissionField clamps an arbitrary field-error key to the known
-// SubmissionPayload field set so the validation-failures cardinality
-// can't be inflated by unexpected keys. Mirrors metricCountry.
+// metricSubmissionField clamps a field-error key to the known fields
+// plus "other", bounding label cardinality.
 func metricSubmissionField(field string) string {
 	switch field {
 	case "name", "short_desc", "website_url", "contact_url",

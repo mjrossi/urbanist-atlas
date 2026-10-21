@@ -12,22 +12,13 @@ import (
 )
 
 // lookupHandler answers GET /api/v1/lookup?postal_code=…&country=….
-//
-// The response body is the generated oapi.LookupResult (so the wire
-// types stay in lockstep with `api/openapi.yaml`). Business logic and
-// the source-of-truth Go types live in pkg/atlas; this handler only
-// parses, calls into atlas.Lookup, and adapts the result onto the
-// OpenAPI shape.
-//
-// Error responses are RFC 9457 problem documents (see problem.go).
 func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *coverage.Recorder, u *usage.Recorder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
 		rawPostalIn := r.URL.Query().Get("postal_code")
 		rawCountryIn := r.URL.Query().Get("country")
 
-		// Length-cap the raw input before TrimSpace so a multi-megabyte
-		// blob doesn't even reach the normalization pass.
+		// Capped before TrimSpace so an oversized value is never processed.
 		if len(rawPostalIn) > maxPostalCodeLen {
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Postal Code",
 				"The postal_code query parameter is longer than the maximum allowed length.", rid)
@@ -52,15 +43,9 @@ func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *cove
 				"The country query parameter is required.", rid)
 			return
 		}
-		// Country is an opaque string per pkg/atlas/atlas.go; the handler
-		// doesn't gate on a known-country list. Unknown countries fall
-		// through to atlas.Lookup which returns ErrPostalCodeNotFound
-		// (→ 404) when no matching postal code exists.
-
-		// Canonicalize once at the boundary so logs, error details, and
-		// downstream Store calls all see the same form. Both Store
-		// implementations re-normalize internally; that second call is
-		// idempotent.
+		// No known-country gate: an unknown country is simply a 404 from
+		// atlas.Lookup. Normalizing here gives logs and the military check
+		// the canonical form; the store's own re-normalization is idempotent.
 		postal := atlas.NormalizePostalCode(country, rawPostal)
 
 		result, err := atlas.Lookup(r.Context(), store, atlas.LookupQuery{
@@ -103,18 +88,14 @@ func lookupHandler(store atlas.Store, logger *slog.Logger, m *Metrics, rec *cove
 		u.Increment(usage.KindLookupResult, "hit")
 		u.Increment(usage.KindLookupTier, tier)
 		u.Increment(usage.KindLookupCountry, metricCountry(string(country)))
-		// ResolvedAncestry is BFS-ordered from the matched leaf outward
-		// (see MemStore.bfsCollectIDs), so element 0 is the smallest
-		// curated anchor — the region this postal code resolved to.
-		// Recording the slug rather than the postal code is the privacy
-		// bar: a slug is a public content identifier, a full ZIP is
-		// semi-identifying at low volume. See the usage-digest spec D3.
+		// ResolvedAncestry[0] is the region the postal code resolved to.
+		// Usage records its slug, never the postal code, which is
+		// semi-identifying at low volume (usage-digest spec D3).
 		if len(result.ResolvedAncestry) > 0 {
 			u.Increment(usage.KindLookup, result.ResolvedAncestry[0].Slug)
 		}
-		// A resolved region with zero orgs in every tier is the coverage
-		// gap worth capturing (sampled). The raw normalized postal is the
-		// privacy bar's sanctioned "sampled empties" input.
+		// A resolved region with no orgs in any tier is a coverage gap.
+		// The recorder samples, which is what lets it take the postal code.
 		if tier == "empty" {
 			rec.RecordEmpty("lookup", string(country), postal)
 		}

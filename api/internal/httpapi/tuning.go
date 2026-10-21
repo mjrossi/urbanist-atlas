@@ -2,94 +2,47 @@ package httpapi
 
 import "time"
 
-// Tuning constants for the HTTP layer. Centralized here so an ops
-// adjustment lands in one place and so review of "what numbers are we
-// running with?" is a one-file read. Each constant carries a comment
-// explaining the rationale — change the rationale when you change the
-// number.
+// Tuning constants for the HTTP layer. Change the reason with the number.
 
-// rateLimitWindow is the sliding window for the public submission
-// endpoint's limits. Combined with --submissions-rate-per-hour, a
-// client gets at most N requests in this window before being told to
-// back off. One hour matches the flag name.
+// rateLimitWindow matches the --submissions-rate-per-hour flag.
 const rateLimitWindow = time.Hour
 
-// submissionsGlobalPerWindow caps submission attempts across all clients
-// per rateLimitWindow. The per-client limit alone is beaten by anyone
-// holding many addresses, and the limiter is the only throttle the
-// endpoint has. 30 an hour is far above organic volume for a directory
-// of advocacy groups while bounding how fast the shared volume can fill.
+// submissionsGlobalPerWindow caps many-IP clients, far above organic volume.
 const submissionsGlobalPerWindow = 30
 
-// maxPendingSubmissions stops new submissions while this many await
-// moderation. It must not exceed the store's List page cap (200), or
-// the guard could never observe the queue as full. At the 64 KiB body
-// limit, a full queue is at most ~12.5 MiB of the 1 GiB volume.
+// maxPendingSubmissions must not exceed the store's List cap (200), or the
+// queue can never look full. Full, it is ~12.5 MiB of the 1 GiB volume.
 const maxPendingSubmissions = 200
 
-// pendingQueueCheckInterval is how long the pending-queue answer is
-// cached, so the guard costs one store query per interval however many
-// POSTs arrive. The queue can overshoot the cap by at most what the
-// global limit admits in one interval.
+// pendingQueueCheckInterval bounds overshoot to one interval of global limit.
 const pendingQueueCheckInterval = time.Minute
 
-// pendingQueueRetryInterval is how soon a failed pending-queue check is
-// retried, and pendingQueueQueryTimeout bounds the query itself since it
-// runs under the cache lock.
+// The pending-queue query holds the cache lock: bound it, retry soon.
 const (
 	pendingQueueRetryInterval = 5 * time.Second
 	pendingQueueQueryTimeout  = 2 * time.Second
 )
 
-// rateLimitSweepInterval is how often the limiter walks its in-memory
-// hit map and discards entries whose hits have all aged out of the
-// window. Keeps the map from leaking memory under churning IPs without
-// paying a sweep cost on every request. Five minutes is long enough
-// that the work amortizes cheaply, short enough that idle-IP entries
-// don't linger across multiple windows.
+// rateLimitSweepInterval is cheap to amortize yet short next to the window.
 const rateLimitSweepInterval = 5 * time.Minute
 
-// submissionBodyLimit is the maximum bytes we read from
-// POST /api/v1/submissions (and the admin reject endpoint's reason
-// body, which uses the same cap). The form's typical payload is ~1
-// KiB; 64 KiB is generous headroom and small enough that a malicious
-// client can't pin a worker on JSON parsing or commit a multi-MB blob
-// to disk via http.MaxBytesReader.
+// submissionBodyLimit is generous next to the form's ~1 KiB payload.
 const submissionBodyLimit = 64 * 1024
 
-// maxAdminListLimit caps ?limit= on GET /api/v1/admin/submissions.
-// Matches the store's internal page cap. Keeps the admin UI responsive
-// and pushes deep history through pagination instead of one giant
-// response.
+// maxAdminListLimit matches the store's page cap.
 const maxAdminListLimit = 200
 
-// maxRegionSearchLimit caps ?limit= on GET /api/v1/regions/search.
-// Matches the `maximum: 20` in the OpenAPI spec and the store's own
-// hard cap — the type-ahead never needs more than a screenful.
+// maxRegionSearchLimit matches the spec's `maximum: 20` and the store's cap.
 const maxRegionSearchLimit = 20
 
-// maxRegionSearchQueryLen caps the raw `q` on GET /api/v1/regions/search,
-// in characters (runes), matching the spec's `maxLength: 100`. Empty
-// results persist q into coverage_gaps on the shared volume; the
-// coverage recorder bounds that row in bytes on its own.
+// maxRegionSearchQueryLen is in runes, matching the spec's `maxLength: 100`.
 const maxRegionSearchQueryLen = 100
 
-// Upper bounds on the raw `postal_code` and `country` query parameters
-// for GET /api/v1/lookup. Generous relative to the longest validators
-// in pkg/atlas/postal.go (a US ZIP+4 is 10 chars raw, 9 after the
-// hyphen is stripped; every other supported country is shorter) —
-// they exist to reject pathological
-// inputs (multi-MB strings the net/http header cap still allows)
-// before NormalizePostalCode allocates.
+// Lookup input caps, generous next to a 10-char ZIP+4, reject junk early.
 const (
 	maxPostalCodeLen = 16
 	maxCountryLen    = 4
 )
 
-// requestTimeout bounds a single request's total processing time.
-// Applied by timeoutMiddleware so handlers (and the pkg/atlas /
-// SQLite calls they forward into) see a cancellable context with
-// this deadline. Coarser ReadTimeout/WriteTimeout on http.Server
-// still apply; per-request lets a slow downstream cancel cleanly
-// instead of waiting for the broader transport budget to expire.
+// requestTimeout is under the 15s server write timeout, so ctx cancels first.
 const requestTimeout = 10 * time.Second

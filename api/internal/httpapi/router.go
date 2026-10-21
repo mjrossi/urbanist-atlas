@@ -1,7 +1,6 @@
 // Package httpapi wires the chi router and HTTP handlers for the
-// Urbanist Atlas JSON API. Handlers are deliberately thin — they parse
-// the request, call into pkg/atlas, and encode the result. Business
-// logic lives in pkg/atlas.
+// Urbanist Atlas JSON API. Handlers parse the request, call into
+// pkg/atlas, and encode the result; business logic lives in pkg/atlas.
 package httpapi
 
 import (
@@ -23,11 +22,9 @@ type Config struct {
 	Logger      *slog.Logger
 	CORSOrigins []string
 	APIVersion  string // typically "v1"
-	// ClientSecret enables the X-Atlas-Client shared-secret gate
-	// (Phase 1 launch lockdown — slice #23 / CLAUDE.md § Launch
-	// strategy). Empty disables the gate; non-empty requires the
-	// matching header on every /api/v1/* data endpoint. /healthz and
-	// /api/v1/openapi.yaml stay exempt either way.
+	// ClientSecret enables the X-Atlas-Client gate on the /api/v1 data
+	// endpoints. Empty disables it. /healthz, /readyz, the spec and
+	// the admin subtree are never gated.
 	ClientSecret string
 
 	// Submissions is the SubmissionStore behind POST /api/v1/submissions
@@ -88,12 +85,9 @@ func New(cfg Config) http.Handler {
 	r := chi.NewRouter()
 
 	// Order matters. securityHeaders is outermost so every response,
-	// errors and probes included, carries the hardening headers, and
-	// requestID precedes everything that logs. The recoverer is innermost
-	// so a panic becomes a 500 that logging and metrics still record
-	// (TestNew_PanicIsLoggedAndCounted). Metrics sits inside CORS so the
-	// preflight 204s CORS answers itself aren't counted as "unmatched",
-	// and inside logging so it can reuse logging's *statusRecorder.
+	// probes and errors included, carries it (secheaders_test.go). The
+	// recoverer is innermost so a panic becomes a 500 that logging and
+	// metrics still record (TestNew_PanicIsLoggedAndCounted).
 	r.Use(securityHeadersMiddleware)
 	r.Use(requestIDMiddleware)
 	r.Use(timeoutMiddleware(requestTimeout))
@@ -106,19 +100,10 @@ func New(cfg Config) http.Handler {
 	}
 	r.Use(recovererMiddleware(logger))
 
-	// chi's defaults answer an unmatched route with a stdlib text/plain
-	// 404 and an unmatched method with an empty 405 — both violate the
-	// spec's "all error responses use application/problem+json" contract
-	// (openapi.yaml ProblemDetails / RFC 9457). Route them through the
-	// same writeProblem emitter every handled error uses. The handlers
-	// stay thin (pull rid from ctx → writeProblem); writeProblem owns the
-	// RFC-9457 body, so there is no second encoder.
-	//
-	// Both reuse an EXISTING catalog type URI (problemNotFound) — no new
-	// problemMethodNotAllowed const, which would force an openapi.yaml
-	// mirror edit (D-09 keeps the spec exclusive to plan 03-01). The 405's
-	// status code + title carry the method-not-allowed semantics; the type
-	// URI is a stable, already-published catalog entry.
+	// chi's default 404 is text/plain and its 405 is empty, but the spec
+	// requires problem+json for every error. The 405 reuses the not-found
+	// type URI so the spec's problem catalog needs no new entry; its
+	// status and title carry the meaning.
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, r, http.StatusNotFound, problemNotFound,
 			"Not Found", "The requested resource does not exist.",
@@ -135,20 +120,12 @@ func New(cfg Config) http.Handler {
 
 	r.Route("/api/"+apiVersion, func(r chi.Router) {
 		r.Use(odblHeadersMiddleware)
-		// /openapi.yaml stays public so consumers can discover the
-		// wire contract before any auth. Registered BEFORE the
-		// gated group so the client-secret middleware doesn't reach it.
+		// The spec is public so consumers can discover the contract
+		// before any auth.
 		getHead(r, "/openapi.yaml", openapiHandler())
-		// Admin sits OUTSIDE the client-secret group, gated by the
-		// bearer token alone. X-Atlas-Client is a scraper deterrent for
-		// the browser — it ships inside the public SPA bundle via
-		// VITE_API_CLIENT_SECRET and is explicitly not a security
-		// boundary (see clientsecret.go). The admin bearer token is the
-		// strictly stronger credential, so requiring both buys no
-		// security while forcing every server-to-server caller (the
-		// usage-digest workflow, an operator's curl) to carry a secret
-		// that exists only for the frontend. Phase 2 removes the client
-		// gate entirely; admin auth is unaffected by that.
+		// Admin sits outside the client-secret group. The bearer token is
+		// the stronger credential, and requiring the browser secret too
+		// would only burden server-to-server callers.
 		if cfg.Submissions != nil {
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(bearerAuthMiddleware(cfg.AdminToken))
@@ -168,18 +145,15 @@ func New(cfg Config) http.Handler {
 			r.Use(clientSecretMiddleware(cfg.ClientSecret))
 			getHead(r, "/lookup", lookupHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage, cfg.Usage))
 			getHead(r, "/regions", listRegionsHandler(cfg.Store, logger))
-			// Static "/regions/search" before the "/regions/{slug}"
-			// param route. chi prefers static segments over params, so
-			// order here is for readers, not the matcher — but a router
-			// test pins that "search" never resolves as a slug.
+			// chi prefers static segments over params, so "search" never
+			// resolves as a slug (TestSearchRegions_DoesNotShadowGetRegionSlug).
 			getHead(r, "/regions/search", searchRegionsHandler(cfg.Store, logger, cfg.Metrics, cfg.Coverage))
 			getHead(r, "/regions/{slug}", getRegionHandler(cfg.Store, logger, cfg.Metrics, cfg.Usage))
 			getHead(r, "/orgs/{slug}", getOrgHandler(cfg.Store, logger, cfg.Metrics, cfg.Usage))
 			getHead(r, "/recent", recentHandler(cfg.Store, logger))
 			getHead(r, "/stats", statsHandler(cfg.Store, logger))
 
-			// The public submission POST stays inside the client-secret
-			// group: it is browser-facing, so the deterrent applies.
+			// The submission POST is browser-facing, so the deterrent applies.
 			if cfg.Submissions != nil {
 				limiter := newIPRateLimiter(cfg.SubmissionsRatePerHour, rateLimitWindow)
 				r.With(
@@ -193,17 +167,9 @@ func New(cfg Config) http.Handler {
 	return r
 }
 
-// getHead registers `h` to handle both GET and HEAD for `pattern`.
-// chi.Get alone returns 405 to HEAD requests, which breaks
-// link-preview tools (Slack, Discord, etc.) that HEAD a URL before
-// unfurling, and uptime probes that prefer HEAD.
-//
-// Per RFC 9110 §9.3.2, a HEAD response must be identical to the GET
-// response except for the absence of a body. Go's net/http already
-// honors that: when the request method is HEAD, the server's response
-// writer suppresses body bytes automatically. So reusing the GET
-// handler is correct and produces a compliant Content-Length without
-// any per-handler bookkeeping.
+// getHead registers h for both GET and HEAD, since chi.Get alone
+// answers HEAD with 405. net/http drops the body on HEAD, so reusing the
+// GET handler meets RFC 9110 §9.3.2.
 func getHead(r chi.Router, pattern string, h http.HandlerFunc) {
 	r.Get(pattern, h)
 	r.Head(pattern, h)

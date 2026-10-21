@@ -107,11 +107,8 @@ func startsWith(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }
 
-// TestNotFound_ReturnsProblemJSON pins API-04-a: an unmatched route must
-// return 404 as application/problem+json (RFC 9457), not chi's stdlib
-// text/plain "404 page not found". Once external consumers depend on
-// "every non-2xx is problem+json," a bare text/plain 404 is a contract
-// violation they'd have to code around.
+// TestNotFound_ReturnsProblemJSON pins that an unmatched route gets a
+// problem+json 404, not chi's text/plain default.
 func TestNotFound_ReturnsProblemJSON(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -176,13 +173,9 @@ func TestNotFound_ReturnsProblemJSON(t *testing.T) {
 	}
 }
 
-// TestMethodNotAllowed_ReturnsProblemJSON pins API-04-a's 405 half: a
-// wrong-method request to a known route must return 405 as
-// application/problem+json, not chi's stdlib empty 405. The 405 reuses an
-// existing catalog type URI (no new problemMethodNotAllowed const — that
-// would force an openapi.yaml mirror edit, which D-09 keeps exclusive to
-// cluster (a) / plan 03-01); the status code + title carry the
-// method-not-allowed semantics.
+// TestMethodNotAllowed_ReturnsProblemJSON pins that a wrong method on a
+// known route gets a problem+json 405, not chi's empty default. It reuses
+// the not-found type URI; the status and title carry the meaning.
 func TestMethodNotAllowed_ReturnsProblemJSON(t *testing.T) {
 	srv := newTestServer(t)
 

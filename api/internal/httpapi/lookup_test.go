@@ -275,10 +275,8 @@ func TestLookup_MilitaryZIP_ReturnsTailoredProblem(t *testing.T) {
 }
 
 func TestLookup_UnknownCountry_ReturnsNotFound(t *testing.T) {
-	// Per the slice #4.6 loader-engineering work, the handler no longer
-	// gates on a known-country whitelist (Country is opaque per
-	// pkg/atlas/atlas.go). An unknown country with an unknown postal
-	// code falls through to atlas.Lookup → ErrPostalCodeNotFound → 404.
+	// The handler has no known-country gate, so an unknown country is a
+	// 404 from atlas.Lookup, not a 400.
 	srv := newTestServer(t)
 
 	resp, err := http.Get(srv.URL + "/api/v1/lookup?postal_code=11217&country=ZZ")
@@ -335,14 +333,8 @@ func TestLookup_NormalizesPostalCodeAtBoundary(t *testing.T) {
 // NOT an ancestor of the leaf chain (as MUBi sat relative to
 // lisboa-municipio in the PT validation fixture), its orgs must
 // not leak into either /lookup bucket.
-//
-// This is the API-level pin. The structural national-tier filter
-// itself lives in MemStore.AncestorRegions / DescendantRegions
-// (see pkg/atlas/store.go); the per-store contract is exercised
-// generically by pkg/atlas/storetest. This test pins the wire
-// behavior so a future change to the lookup pipeline (e.g. a
-// "popular nearby regions" pass) can't silently start including
-// non-ancestor national orgs.
+// The store-level filter is covered by pkg/atlas/storetest; this pins the
+// wire behavior.
 func TestLookup_NationalTierOrg_ExcludedFromDefaultLookup(t *testing.T) {
 	s := atlas.NewMemStore()
 

@@ -7,17 +7,11 @@ import (
 	"testing"
 )
 
-// TestBearerAuthMiddleware_ConstantTimeCompare pins issue #7: the admin
-// token compare hashes both sides to a fixed-width SHA-256 digest before
-// subtle.ConstantTimeCompare, so a wrong token is rejected the same way
-// regardless of its length (a raw byte compare short-circuits on a
-// length mismatch, leaking the secret's length through timing). We can't
-// assert timing here, but we CAN pin the observable behavior the hashing
-// exists to make safe: wrong tokens of every length — including ones far
-// shorter and far longer than the real token — are all rejected with
-// 401, and only the exact token passes. A regression to a raw
-// variable-length compare would still pass these, but a regression that
-// (say) compared lengths first and bailed early would not.
+// TestBearerAuthMiddleware_ConstantTimeCompare can't assert timing, so it
+// pins what the fixed-width hashing protects: wrong tokens of every
+// length, far shorter and far longer than the real one, all get 401, and
+// only the exact token passes. A compare that checked lengths first and
+// bailed early would fail it.
 func TestBearerAuthMiddleware_ConstantTimeCompare(t *testing.T) {
 	const adminToken = "the-real-admin-token"
 	mw := bearerAuthMiddleware(adminToken)
@@ -59,8 +53,8 @@ func TestBearerAuthMiddleware_ConstantTimeCompare(t *testing.T) {
 
 // TestBearerAuthMiddleware_EmptyTokenFailsClosed pins the fail-closed
 // guarantee: an unconfigured admin token disables the endpoints entirely
-// (503), never silently allowing access. The hashing change (#7) sits
-// AFTER this guard, so it can't turn a missing token into an auth bypass.
+// (503), never silently allowing access. The hashed compare sits after
+// this guard, so it can't turn a missing token into an auth bypass.
 func TestBearerAuthMiddleware_EmptyTokenFailsClosed(t *testing.T) {
 	mw := bearerAuthMiddleware("")
 	nextCalled := false

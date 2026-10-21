@@ -16,9 +16,8 @@ import (
 // of usage_daily.day.
 const dayParamFormat = "2006-01-02"
 
-// usageKinds is the accepted set of the kind query param, in spec order.
-// Kept for the 400 message; membership itself is decided by the
-// generated enum's Valid so the spec stays the single source of truth.
+// usageKinds lists the kind values for the 400 message only; membership
+// is checked by the generated enum's Valid.
 var usageKinds = []string{
 	string(oapi.ListUsageParamsKindRegionView),
 	string(oapi.ListUsageParamsKindOrgView),
@@ -28,12 +27,8 @@ var usageKinds = []string{
 	string(oapi.ListUsageParamsKindLookupCountry),
 }
 
-// listUsageHandler answers GET /api/v1/admin/usage. Bearer-gated.
-// Returns accumulated usage buckets, highest-count first.
-//
-// from and to are required: an unbounded range would scan the entire
-// rollup table, and every real caller (the digest workflow) knows the
-// month it wants.
+// listUsageHandler answers GET /api/v1/admin/usage, highest count first.
+// from and to are required so no read scans the whole rollup table.
 func listUsageHandler(reader atlas.UsageReader, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rid := requestIDFromContext(r.Context())
@@ -47,8 +42,7 @@ func listUsageHandler(reader atlas.UsageReader, logger *slog.Logger) http.Handle
 		if !ok {
 			return
 		}
-		// Zero-padded YYYY-MM-DD sorts chronologically as a string, which
-		// is also why the SQL BETWEEN works on the stored TEXT column.
+		// Zero-padded YYYY-MM-DD sorts chronologically as a string.
 		if from > to {
 			writeProblem(w, r, http.StatusBadRequest, problemValidation, "Invalid Range",
 				"The from query parameter must not be later than to.", rid)
@@ -83,13 +77,9 @@ func listUsageHandler(reader atlas.UsageReader, logger *slog.Logger) http.Handle
 		for _, c := range rows {
 			converted, convErr := toOAPIUsageCount(c)
 			if convErr != nil {
-				// A stored day that won't parse means the table was
-				// written by something other than the recorder. Log at
-				// ERROR — but skip the row rather than failing the whole
-				// read: one bad row (a hand-edited sqlite3 session, a
-				// restored backup) would otherwise 500 the endpoint
-				// permanently, taking out both digest sections behind
-				// continue-on-error and the operator's own curl with it.
+				// Only something other than the recorder writes a bad day.
+				// Skip it, since failing the read would 500 the endpoint
+				// until someone fixed the row by hand.
 				logger.ErrorContext(r.Context(), "usage row has unparseable day, skipping",
 					"err", convErr, "day", c.Day, "kind", c.Kind, "rid", rid)
 				continue
@@ -101,8 +91,7 @@ func listUsageHandler(reader atlas.UsageReader, logger *slog.Logger) http.Handle
 }
 
 // parseDayParam validates a required YYYY-MM-DD query param, writing a
-// 400 problem document and returning ok=false when it is missing or
-// malformed.
+// 400 and returning ok=false when it is missing or malformed.
 func parseDayParam(w http.ResponseWriter, r *http.Request, raw, name, rid string) (string, bool) {
 	if raw == "" {
 		writeProblem(w, r, http.StatusBadRequest, problemValidation, "Missing Parameter",

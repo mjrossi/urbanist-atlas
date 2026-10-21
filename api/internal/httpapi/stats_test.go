@@ -57,13 +57,11 @@ func TestStats_HappyPath_ReturnsOAPIShape(t *testing.T) {
 	}
 }
 
-// TestStats_TotalExceedsBrowseSubsetSum is the regression guard at the
-// HTTP layer. The production frontend computed its org total by summing
-// direct_org_count over /api/v1/regions, which silently omits every org
-// attached solely to a non-browseable region (state, province, borough,
-// multi-state). /stats must not agree with that sum on a dataset that
-// contains such an org — if it ever does, the endpoint has been
-// reimplemented in terms of the browse subset and the bug is back.
+// TestStats_TotalExceedsBrowseSubsetSum pins that /stats counts orgs
+// attached only to non-browseable regions (state, province, borough,
+// multi-state), which a sum of direct_org_count over /api/v1/regions
+// omits. If the two agree here, /stats has been rebuilt on the browse
+// subset.
 func TestStats_TotalExceedsBrowseSubsetSum(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -144,9 +142,8 @@ func TestStats_EmptyStore_ByCountryIsEmptyArray(t *testing.T) {
 	}
 }
 
-// TestStats_401_MissingClientSecret pins that /stats sits INSIDE the
-// Phase 1 client-secret gate. Only /healthz and /api/v1/openapi.yaml
-// are exempt; a dataset-size endpoint is not a discovery endpoint.
+// TestStats_401_MissingClientSecret pins that /stats sits inside the
+// client-secret gate; a dataset-size endpoint is not a discovery endpoint.
 func TestStats_401_MissingClientSecret(t *testing.T) {
 	store := atlas.NewMemStore()
 	atlas.LoadDevFixtures(store)

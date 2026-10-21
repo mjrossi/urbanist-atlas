@@ -9,22 +9,9 @@ import (
 	"time"
 )
 
-// timeoutMiddleware bounds a single request's total processing time
-// by attaching a context deadline. Handlers (and the pkg/atlas /
-// SQLite calls they forward into) receive a cancellable ctx; when the
-// deadline expires the downstream sees ctx.Done() and can abort
-// cleanly. Coarser ReadTimeout/WriteTimeout on http.Server still
-// apply at the transport layer; this is the per-request budget the
-// application code can react to.
-//
-// We do NOT use http.TimeoutHandler. That helper races the handler
-// against a timer and writes a 503 from a separate goroutine, which
-// (a) doesn't propagate cancellation to the original handler — it
-// keeps running until it notices — and (b) interferes with the
-// problem+json response shape this API standardizes on. Canceling
-// the request context is the cleaner contract: handlers that already
-// forward ctx into pkg/atlas naturally inherit the deadline, and
-// nothing has to know the timeout exists.
+// timeoutMiddleware gives each request a context deadline. It is not
+// http.TimeoutHandler because that answers with a plain-text 503, not
+// problem+json.
 func timeoutMiddleware(d time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,19 +26,10 @@ type ctxKey string
 
 const requestIDKey ctxKey = "rid"
 
-// requestIDMiddleware attaches a request ID to every request: the
-// incoming X-Request-ID header if present AND well-formed, otherwise a
-// fresh random hex string. The ID is echoed back in the response header
-// and stuffed into the request context for downstream use.
-//
-// An inbound header is only trusted when validRequestID accepts it.
-// The value is reflected verbatim into the response header AND into
-// every structured log line ("rid"), so an unbounded/arbitrary inbound
-// value is a log-injection and header-reflection vector — a client
-// could smuggle CRLFs, ANSI escapes, or megabytes of text into the
-// access log. Constraining it to a short, conservative charset closes
-// that without breaking the legitimate cross-hop-correlation use case
-// (clients setting their own short request ids).
+// requestIDMiddleware puts a request ID in the context and the
+// X-Request-ID response header: the inbound header when validRequestID
+// accepts it, else a fresh random one. The value is echoed and logged
+// verbatim, so arbitrary input would allow log and header injection.
 func requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rid := r.Header.Get("X-Request-ID")
@@ -64,16 +42,11 @@ func requestIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// maxRequestIDLen caps an accepted inbound X-Request-ID. 64 chars
-// comfortably fits a UUID, a hex token, or our own 16-char hex ids
-// while bounding what can land in a log line or response header.
+// maxRequestIDLen fits a UUID or hex token while bounding what is logged.
 const maxRequestIDLen = 64
 
-// validRequestID reports whether an inbound request-id is safe to echo
-// and log: non-empty, at most maxRequestIDLen characters, and drawn
-// only from the unreserved set [A-Za-z0-9._-]. The charset deliberately
-// excludes whitespace and control characters (CR/LF in particular) so
-// the value can't forge log lines or inject response headers.
+// validRequestID reports whether an inbound request ID is safe to echo
+// and log: 1 to maxRequestIDLen characters from [A-Za-z0-9._-].
 func validRequestID(s string) bool {
 	if s == "" || len(s) > maxRequestIDLen {
 		return false
@@ -111,18 +84,14 @@ func newRequestID() string {
 	return hex.EncodeToString(b[:])
 }
 
-// recovererMiddleware turns panics into 500s without taking the
-// process down. The panic is logged with the request ID and path,
-// and the client receives an RFC 9457 problem document so error
-// responses are uniformly machine-readable.
+// recovererMiddleware turns a panic into a logged 500 problem document.
 func recovererMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if rec := recover(); rec != nil {
-					// http.ErrAbortHandler is the documented "I handled
-					// this, drop the connection" signal; re-panic so
-					// net/http does its thing.
+					// http.ErrAbortHandler asks net/http to drop the
+					// connection, so it must propagate.
 					//nolint:errorlint // rec is a recovered panic value (any), not a wrapped error chain — an identity comparison to the sentinel is what we want.
 					if rec == http.ErrAbortHandler {
 						panic(rec)
@@ -142,27 +111,19 @@ func recovererMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// Health-check endpoint paths. Defined here (not just as string
-// literals in router.go) so the access-log filter below can't drift
-// from the routes actually registered.
+// Health-check paths, shared by the router and the access-log filter.
 const (
 	healthzPath = "/healthz"
 	readyzPath  = "/readyz"
 )
 
-// isHealthCheckPath reports whether p is an orchestrator probe endpoint
-// whose successful access logs are demoted to DEBUG to keep the
-// steady-state access log readable (Fly hits these every 15-30s).
 func isHealthCheckPath(p string) bool {
 	return p == healthzPath || p == readyzPath
 }
 
-// loggingMiddleware emits one structured access-log line per request.
-// Successful (2xx/3xx) liveness/readiness probes are logged at DEBUG so
-// they don't drown the access log at the default INFO level; a failing
-// probe (>=400) stays at INFO so outages are visible without raising
-// the log level. A degraded /readyz is a 200 and is logged by
-// readyHandler itself.
+// loggingMiddleware emits one access-log line per request. Successful
+// probes log at DEBUG so frequent polling doesn't drown the log; a failing
+// probe stays at INFO. A degraded /readyz is a 200, so readyHandler logs it.
 func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -185,9 +146,7 @@ func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// statusRecorder wraps http.ResponseWriter so the access-log
-// middleware can report the response status and byte count without
-// peeking at internal fields.
+// statusRecorder captures the response status and byte count.
 type statusRecorder struct {
 	http.ResponseWriter
 	status  int
@@ -212,10 +171,8 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// Flush implements http.Flusher when the underlying writer does. The
-// recorder stays transparent to streaming handlers (SSE, chunked
-// responses); status capture is unaffected because Flush goes through
-// Write/WriteHeader first.
+// Flush passes through when the underlying writer supports it. A flush
+// before WriteHeader sends 200, which is already the recorded default.
 func (s *statusRecorder) Flush() {
 	if f, ok := s.ResponseWriter.(http.Flusher); ok {
 		f.Flush()

@@ -23,9 +23,8 @@ import (
 
 const testAdminToken = "test-admin-token"
 
-// recordingEnqueuer captures what Enqueue was called with and lets the
-// test choose what to return. Mirrors how the GitHub PR worker will be
-// injected once Phase 3 lands.
+// recordingEnqueuer records Enqueue calls and returns failErr, standing in
+// for the GitHub PR worker.
 type recordingEnqueuer struct {
 	mu      sync.Mutex
 	calls   []atlas.Submission
