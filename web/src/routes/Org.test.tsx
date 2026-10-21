@@ -125,12 +125,7 @@ describe('Org', () => {
     }
   });
 
-  // The isBrowseableKind helper in web/src/lib/regionKind.ts is the
-  // single source of truth for which kinds render as /region/<slug>
-  // links. The server resolves any non-national region by slug, so
-  // every kind in the labels map qualifies (metros, cities, states,
-  // counties, boroughs, multi-state coalitions, provinces, …).
-  // These tests pin the set so a one-sided edit fails CI loudly.
+  // These pin which kinds `isBrowseableKind` links to /region/<slug>.
   it('links ca:regional-district regions to /region/:slug', async () => {
     getOrgMock.mockResolvedValueOnce(
       makeOrg({

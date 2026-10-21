@@ -21,10 +21,8 @@ vi.mock('../lib/api.ts', async () => {
   };
 });
 
-// Mirrors the real seed bundle. The gap between total_org_count (236)
-// and what the region rows sum to is the point: 70 orgs attach only to
-// states, provinces, boroughs, or multi-state coalitions and appear in
-// no browseable region.
+// The gap between total_org_count and what the region rows sum to is the
+// point: some orgs attach to no browseable region.
 function makeStats(overrides: Partial<Stats> = {}): Stats {
   return {
     total_org_count: 236,
@@ -248,10 +246,7 @@ describe('Home', () => {
     }
 
     it('reports the server org total, not the sum of the region rows', async () => {
-      // Three regions summing to 20 direct orgs. The old code printed
-      // that sum as "Organizations on file"; the catalog actually holds
-      // 236. This is the exact shape of the production bug: 166 shown
-      // against a 236-org bundle.
+      // Three regions summing to 20 direct orgs, against a 236 total.
       listRegionsMock.mockResolvedValueOnce([
         makeRegion('nyc-metro', 'New York Metro', 12),
         makeRegion('sf-bay', 'SF Bay Area', 5),

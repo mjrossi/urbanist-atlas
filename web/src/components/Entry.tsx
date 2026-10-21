@@ -4,21 +4,9 @@ import type { Org } from '../lib/api.ts';
 import { domainOf, prettyTag } from '../lib/format.ts';
 
 /**
- * One row in the classified-section list. Renders the broadsheet
- * `.org-entry` treatment: org name (linked to its `/orgs/:slug`
- * detail page), the website domain as a secondary external link,
- * a short description, the org's tags as small pills, and — when
- * the caller passed `matchedRegionSlugs` — a "Matched via X · Y"
- * footer naming the regions that surfaced this org for the
- * current lookup. The footer is only rendered by the postal-code
- * Results page; Region pages omit it entirely.
- *
- * Why the props split: Results consumes `LookupOrg` (which carries
- * `matched_region_slugs`) and a hydrated slug → display-name map
- * built from the resolved-ancestry walk; Region consumes plain
- * `Org` and has no lookup context. Keeping the via-rendering bits
- * optional lets both pages share one component without lying
- * about each one's data shape.
+ * One `.org-entry` row in a classified-section list. A non-empty
+ * `matchedRegionSlugs` adds a "Matched via X · Y" footer; a slug missing
+ * from `regionNameBySlug` renders raw.
  */
 export function Entry({
   org,
@@ -26,17 +14,7 @@ export function Entry({
   regionNameBySlug,
 }: {
   org: Org;
-  /**
-   * Slugs whose membership caused `org` to surface for the current
-   * lookup. Omit on pages that aren't a postal-code lookup; the
-   * "Matched via X" footer is suppressed when this is undefined or
-   * empty.
-   */
   matchedRegionSlugs?: readonly string[];
-  /**
-   * Slug → display-name map for the matched-via footer. When a slug
-   * is missing from the map, the raw slug renders.
-   */
   regionNameBySlug?: Map<string, string>;
 }) {
   const domain = domainOf(org.website_url);

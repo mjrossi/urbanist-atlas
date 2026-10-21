@@ -2,24 +2,13 @@ import type { LookupOrg } from '../lib/api.ts';
 import { pluralize } from '../lib/format.ts';
 import { Entry } from './Entry.tsx';
 
-/**
- * Classified-section list grouped into Local (city / county),
- * Regional (metro / CMA / regional-district / transit-federation /
- * multi-state), and State / Provincial (state / province) blocks.
- * Each section renders the broadsheet `.section-break` header (roman
- * numeral + title + entry count) and an inline org-entry list driven
- * by the shared `Entry` component.
- *
- * Empty sections render nothing — the section label only appears
- * when there's at least one entry. Roman numerals track the *visible*
- * sections in order (a results page with only Regional + Statewide
- * reads "I. Regional", "II. State / Provincial"), not a fixed
- * tier-to-numeral mapping. The Results page's empty-state copy lives
- * outside this component (the page renders an editors-note card when
- * ALL THREE buckets are empty).
- */
 const ROMAN = ['I.', 'II.', 'III.'];
 
+/**
+ * The Local, Regional and State / Provincial sections. An empty section
+ * renders nothing, and the numerals count the visible sections, so
+ * Regional alone is "I.".
+ */
 export function EntryList({
   local,
   regional,

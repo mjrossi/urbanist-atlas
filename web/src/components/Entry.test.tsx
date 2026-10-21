@@ -19,10 +19,6 @@ function makeOrg(overrides: Partial<Org> = {}): Org {
   };
 }
 
-/**
- * `<Entry>` uses `<Link>` for the org name, so every test renders
- * inside a `MemoryRouter` so the router context resolves.
- */
 function renderEntry(node: React.ReactNode) {
   return render(<MemoryRouter>{node}</MemoryRouter>);
 }

@@ -7,10 +7,9 @@ import { normalizePostal } from '../lib/postal.ts';
 
 type DetectedCountry = Country | null;
 
-// TODO(third-country): the digit→US, letter→CA heuristic is fine for
-// the v1 US/CA shipping decision. When PT/ES/UK go user-facing, swap
-// this for a per-country regex map (or reintroduce an explicit country
-// pick); lib/api.ts' SUPPORTED_COUNTRIES needs updating in lockstep.
+// TODO(third-country): digit → US, letter → CA only holds while US and CA
+// are the shipping countries; a third needs a per-country pattern here,
+// in lockstep with SUPPORTED_COUNTRIES in lib/api.ts.
 function detectCountry(raw: string): DetectedCountry {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;

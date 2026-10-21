@@ -54,17 +54,9 @@ function groupBy<T>(
 }
 
 /**
- * Groups the flat /regions response into the broadsheet's
- * country → letter → anchor → children shape. Cities whose
- * `browse_parent_slug` points to a visible anchor (metro, CMA,
- * etc.) render nested beneath that anchor; cities with no
- * browseable ancestor render as their own anchor rows.
- *
- * The anchor letter wins for grouping — Hoboken (parent: NYC
- * Metro) nests under New York Metro in the "N" section, not under
- * its own "H" section. For the v1 seed every parent/child pair
- * shares a first letter so this is moot in practice, but the
- * convention reads cleaner than splitting children across letters.
+ * Groups the flat /regions list by country, then letter, then anchor. A
+ * region whose `browse_parent_slug` is in the list nests under that
+ * anchor, filed under the anchor's letter rather than its own.
  */
 function groupForBrowse(all: readonly RegionSummary[]): ByCountry[] {
   const slugSet = new Set<string>(all.map((r) => r.region.slug));
@@ -73,8 +65,6 @@ function groupForBrowse(all: readonly RegionSummary[]): ByCountry[] {
   return Object.entries(byCountry)
     .sort(([a], [b]) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)))
     .map(([country, regions]) => {
-      // Children: regions whose browse_parent_slug points at a
-      // sibling in the visible set. Anchors: everything else.
       const childrenByAnchor = new Map<string, RegionSummary[]>();
       const anchors: RegionSummary[] = [];
       for (const r of regions) {
@@ -87,11 +77,9 @@ function groupForBrowse(all: readonly RegionSummary[]): ByCountry[] {
           anchors.push(r);
         }
       }
-      // Sort children alphabetically within each anchor.
       for (const arr of childrenByAnchor.values()) {
         arr.sort((a, b) => a.region.name.localeCompare(b.region.name));
       }
-      // Sort anchors alphabetically (within-letter rule); letter-group.
       anchors.sort((a, b) => a.region.name.localeCompare(b.region.name));
       const grouped = groupBy(
         anchors.map((a) => ({
@@ -113,11 +101,7 @@ export function Browse() {
     queryKey: queryKeys.regions(),
     queryFn: ({ signal }) => listRegions({ signal }),
   });
-  // Per-country org totals come from `/api/v1/stats`. Summing
-  // direct_org_count over `query.data` would only count orgs attached
-  // to the browseable regions listed on this page, omitting every
-  // statewide, provincial, borough, and multi-state org — 63 US and 7
-  // Canadian ones at time of writing.
+  // Per-country org totals come from `/api/v1/stats`; see `getStats`.
   const stats = useQuery<Stats, ApiError>({
     queryKey: queryKeys.stats(),
     queryFn: ({ signal }) => getStats({ signal }),
@@ -196,7 +180,6 @@ function BrowseBody({
       query={query}
       loading="Loading the index…"
       empty={{
-        // grouped is derived from query.data — empty data also means empty grouped.
         when: () => grouped.length === 0,
         render: (
           <EmptyState
@@ -227,12 +210,8 @@ function CountrySection({
   country: ByCountry;
   orgCount: number | null;
 }) {
-  // Region count is the length of the list actually rendered below, so
-  // the header can never disagree with the rows. The org count is the
-  // country-wide total from `/api/v1/stats` and is deliberately larger
-  // than what these rows sum to — statewide and provincial groups have
-  // no browseable region of their own to appear under — so the label
-  // says "countrywide" to make the mixed provenance explicit.
+  // The org count is country-wide, so it exceeds what the rows sum to:
+  // some orgs attach to no browseable region. Hence "countrywide".
   const total = country.total.length;
   const name = COUNTRY_TITLES[country.country] ?? country.country;
   const letters = new Set(country.letters.map((l) => l.letter));
@@ -315,9 +294,7 @@ function LetterRow({
 
 function IndexRow({ region: r, isChild }: { region: RegionSummary; isChild?: boolean }) {
   const { region, org_count } = r;
-  // Subtitle reads "<Country> · <Kind label>" so adjacent rows like
-  // "Chicago Metro" and "Chicago" — when a city is nested beneath
-  // its parent metro — still read distinctly via the kind label.
+  // The kind label tells a nested "Chicago" from its "Chicago Metro".
   const subtitle = regionKindLabel(region.kind);
   const className = isChild ? 'index-row child' : 'index-row';
   return (

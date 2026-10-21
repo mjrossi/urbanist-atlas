@@ -1,34 +1,19 @@
 /**
- * Shared formatting helpers for user-facing strings. Keep these
- * trivial — when a function grows beyond a one-liner, it usually
- * belongs in a component-local helper or a domain-specific module
- * (postal.ts, etc.) instead.
- */
-
-/**
- * Picks the singular or plural form for a count — the single home for
- * the `n === 1` check behind the count labels scattered through the
- * listing UI ("3 groups", "1 entry", …). The number itself is the
- * caller's to render, since several surfaces style it separately.
+ * Picks the singular or plural noun for a count. The number itself is
+ * the caller's to render, since several surfaces style it separately.
  */
 export function pluralize(n: number, singular: string, plural: string): string {
   return n === 1 ? singular : plural;
 }
 
-/**
- * Renders an org count with its matching noun ("1 group" / "42
- * groups") as one string — used in the Region report deck where the
- * count is inline in a sentence.
- */
+/** Renders an org count with its noun, e.g. "1 group" or "42 groups". */
 export function groupCountLabel(n: number): string {
   return `${n} ${pluralize(n, 'group', 'groups')}`;
 }
 
 /**
- * Extracts the bare host of a URL, stripping any leading `www.`.
- * Returns null for malformed input so callers can fall back to the
- * raw URL string. Used by org entries on both the Results list and
- * the Org detail page to render compact "by their site" links.
+ * The bare host of a URL without a leading `www.`, or null for a
+ * malformed URL.
  */
 export function domainOf(url: string): string | null {
   try {
@@ -39,34 +24,18 @@ export function domainOf(url: string): string | null {
 }
 
 /**
- * Renders an editorial tag slug for display. Seed data stores tags
- * as hyphen-lowercase ('vision-zero', 'rider-union', 'safe-streets')
- * and the API ships them unchanged; this helper swaps hyphens for
- * spaces so the chip reads naturally.
- *
- * Hyphens are the only separator the seed file uses today — the
- * loader (`api/internal/seedfiles/orgs.go`) bounds tag length and
- * non-emptiness but doesn't constrain charset, so this stays a
- * one-line replace rather than a full slug-to-Title-Case routine.
- * Bump the regex if underscores or other separators ever start
- * appearing in `api/seed/orgs.toml`.
+ * Renders a tag slug ('vision-zero') for display ('vision zero').
+ * Hyphens are the only separator the seed data uses, though the loader
+ * doesn't enforce it.
  */
 export function prettyTag(tag: string): string {
   return tag.replace(/-/g, ' ');
 }
 
 /**
- * Formats an `added_at` date-only string (YYYY-MM-DD, per the wire
- * contract — see `openapi.yaml`'s Org schema) as an editorial
- * dateline. Returns the natural broadsheet form, e.g.
- *
- *   "May 21, 2026"
- *
- * Parsing is intentionally manual (not `new Date(s)`) because the
- * Date constructor reads bare-date inputs as UTC midnight and then
- * renders them in the local timezone — so for a viewer west of UTC,
- * "2026-05-21" would print as "May 20". Splitting on `-` keeps the
- * displayed day calendar-correct everywhere.
+ * Formats an `added_at` date (YYYY-MM-DD) as "May 21, 2026". It parses
+ * by hand because `new Date('2026-05-21')` is UTC midnight, which prints
+ * as May 20 west of UTC.
  */
 export function formatAddedAt(addedAt: string): string {
   const [yStr, mStr, dStr] = addedAt.split('-');
@@ -74,9 +43,7 @@ export function formatAddedAt(addedAt: string): string {
   const m = Number(mStr);
   const d = Number(dStr);
   if (!y || !m || !d) return addedAt;
-  // Local-noon construction sidesteps the same UTC drift on the
-  // Intl.DateTimeFormat side: noon in every IANA zone is the same
-  // calendar day regardless of how the timezone offset rounds.
+  // Local noon, so no DST shift can move it to another calendar day.
   const dt = new Date(y, m - 1, d, 12, 0, 0);
   return dt.toLocaleDateString('en-US', {
     year: 'numeric',

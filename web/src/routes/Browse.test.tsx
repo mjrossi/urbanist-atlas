@@ -19,10 +19,8 @@ vi.mock('../lib/api.ts', async () => {
   };
 });
 
-// Per-country org totals are deliberately LARGER than what the rendered
-// rows sum to: statewide and provincial orgs have no browseable region
-// to appear under, so they exist only in this payload. That gap is the
-// whole point of /api/v1/stats — see makeStats' use below.
+// Per-country org totals are deliberately larger than what the rendered
+// rows sum to: some orgs attach to no browseable region.
 function makeStats(overrides: Partial<Stats> = {}): Stats {
   return {
     total_org_count: 236,
@@ -114,11 +112,7 @@ describe('Browse', () => {
   });
 
   it('shows each country the server-side org total, not the sum of its rendered rows', async () => {
-    // Two US rows summing to 19 direct orgs, one CA row with 3. The old
-    // code derived the header totals from exactly this sum and so
-    // printed "19 orgs" / "3 orgs". The correct totals (196 / 40)
-    // include statewide and provincial groups that have no browseable
-    // region to render under, and can only come from /api/v1/stats.
+    // The rows sum to 19 US and 3 CA orgs; the stats totals are 196 / 40.
     listRegionsMock.mockResolvedValueOnce([
       makeRegion({ id: 1, slug: 'nyc-metro', name: 'New York Metro' }, 12),
       makeRegion({ id: 2, slug: 'sf-bay-area', name: 'San Francisco Bay Area' }, 7),
@@ -170,10 +164,8 @@ describe('Browse', () => {
     );
   });
 
-  // Cities whose `browse_parent_slug` points at a visible anchor in
-  // the response nest under that anchor with the `.child` modifier
-  // on the row. Pins the nested-layout fix for the duplicate-feeling
-  // "Toronto" + "Toronto CMA" pairs.
+  // Cities whose `browse_parent_slug` points at a visible anchor nest
+  // under it with the `.child` modifier.
   it('nests cities under their parent metro via browse_parent_slug', async () => {
     listRegionsMock.mockResolvedValueOnce([
       makeRegion(
@@ -266,10 +258,7 @@ describe('Browse', () => {
     expect(link.classList.contains('child')).toBe(false);
   });
 
-  // Legacy "duplicate" scenario: cities WITHOUT browse_parent_slug
-  // (e.g. metros, or cities where the API didn't compute a parent)
-  // continue to render flat next to their metros — pre-nesting
-  // behavior preserved for the unchanged-data case.
+  // Cities without a browse_parent_slug render flat beside their metros.
   it('renders city-kind entries (us:city, ca:city) alongside metros', async () => {
     listRegionsMock.mockResolvedValueOnce([
       makeRegion(

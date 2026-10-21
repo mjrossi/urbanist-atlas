@@ -12,17 +12,9 @@ export interface BreadcrumbItem {
 }
 
 /**
- * The shared broadsheet `.kicker` breadcrumb: a `<nav aria-label=
- * "Breadcrumb">` wrapping an `<ol className="crumb-trail">`, an optional
- * right-side metadata slot, and a trailing non-link leaf marked
- * `aria-current="page"`. Every non-leaf crumb gets an `aria-hidden`
- * visual `/` separator; the leaf gets none.
- *
- * This is the primitive behind both {@link PageBreadcrumb} (static
- * routes — `items` is just the prefix) and `RegionBreadcrumb` (region
- * pages — `items` is the prefix followed by the resolved ancestor
- * walk). Callers build the `items` list; this component owns the markup
- * and a11y contract so the two breadcrumb flavors can't drift.
+ * The kicker breadcrumb markup shared by {@link PageBreadcrumb} and
+ * `RegionBreadcrumb`: `items`, then a non-link `current` leaf marked
+ * `aria-current="page"`, with an optional `right` slot.
  */
 export function BreadcrumbTrail({
   items,

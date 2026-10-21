@@ -1,8 +1,3 @@
-/**
- * Tests for the typed HTTP client. `fetch` is stubbed via `vi.stubGlobal`;
- * each test asserts the helper hits the right URL and parses the body
- * (or throws {@link ApiError} on a non-2xx response).
- */
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
@@ -388,8 +383,7 @@ describe('lookup()', () => {
       }),
     );
     // try/catch + caught: a chained `.catch` would swallow any inner
-    // `expect` throw and let the test pass silently. The pattern below
-    // mirrors the rest of the suite (see ApiError tests at L353+).
+    // `expect` throw and let the test pass silently.
     let caught: unknown;
     try {
       await lookup('99999', 'US');
@@ -402,15 +396,12 @@ describe('lookup()', () => {
   });
 
   it('URL-encodes a CA postal code that contains a space', async () => {
-    // URLSearchParams encodes a space as '+'. A future refactor that
-    // switched to encodeURIComponent (which uses '%20') would break
-    // the wire contract that the API parses.
+    // URLSearchParams encodes a space as '+'.
     fetchMock.mockResolvedValueOnce(jsonResponse(lookupBody()));
     await lookup('M5V 3A8', 'CA');
     const [url] = fetchMock.mock.calls[0]!;
     const s = String(url);
     expect(s).toContain('postal_code=M5V+3A8');
-    // Belt-and-suspenders: the literal space must not appear.
     expect(s).not.toContain('M5V 3A8');
   });
 });
@@ -814,12 +805,8 @@ describe('parseRetryAfter', () => {
 });
 
 describe('X-Atlas-Client header injection (env-gated)', () => {
-  // `apiClientSecret` is captured at module-load time from
-  // `import.meta.env.VITE_API_CLIENT_SECRET`, so each test resets the
-  // module registry, stubs the env, then dynamically re-imports `./api.ts`
-  // so the captured value reflects the stub. Without resetModules the
-  // const in `api.ts` would still hold whatever value was visible the
-  // first time the file was imported (when the test suite loaded).
+  // `apiClientSecret` is read at module load, so each test resets the
+  // module registry, stubs the env, and re-imports `./api.ts`.
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -865,13 +852,7 @@ describe('X-Atlas-Client header injection (env-gated)', () => {
   });
 
   it('does NOT inject X-Atlas-Client when env var is unset', async () => {
-    // Production has two distinct shapes for "no secret":
-    //   1. VITE_API_CLIENT_SECRET= in .env (empty string — covered above)
-    //   2. The var omitted entirely from .env (undefined — covered here)
-    // The `?? ''` fallback at api.ts:64 collapses both to empty, so the
-    // module-level apiClientSecret is '' in either case. This test pins
-    // the second branch — if the fallback ever disappears, only the
-    // unset case would break.
+    // The unset case, as opposed to the empty string above.
     vi.stubEnv('VITE_API_CLIENT_SECRET', undefined);
     const { lookup } = await import('./api.ts');
     fetchMock.mockResolvedValueOnce(jsonResponse(lookupBody()));
@@ -895,10 +876,6 @@ describe('X-Atlas-Client header injection (env-gated)', () => {
 });
 
 describe('isSupportedCountry', () => {
-  // The wire `Country` type is open (the API accepts any code the seed
-  // data defines), but the UI gates on a narrower set so a stray
-  // `?country=…` query renders an error instead of silently coercing.
-  // Keep this in lockstep with SUPPORTED_COUNTRIES in api.ts.
   it('returns true for currently-shipping countries', () => {
     expect(isSupportedCountry('US')).toBe(true);
     expect(isSupportedCountry('CA')).toBe(true);
@@ -920,11 +897,7 @@ describe('isSupportedCountry', () => {
 });
 
 describe('apiBase trailing-slash normalization (env-gated)', () => {
-  // apiBase is captured at module-load from import.meta.env.VITE_API_BASE,
-  // so each test resets the module registry, stubs the env, then
-  // dynamically re-imports `./api.ts` (same pattern as the X-Atlas-Client
-  // block above). A trailing slash on the base would otherwise produce a
-  // `//` in every derived URL — openapiUrl and the apiFetch path join.
+  // apiBase is read at module load; see the X-Atlas-Client block above.
   beforeEach(() => {
     vi.resetModules();
   });

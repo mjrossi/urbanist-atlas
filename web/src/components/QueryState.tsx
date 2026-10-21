@@ -10,38 +10,19 @@ interface Empty<T> {
 
 interface Props<T> {
   query: UseQueryResult<T, ApiError>;
-  /** Text or JSX rendered inside `<p className="results-state" role="status">` while pending. Defaults to "Loading…". */
+  /** Pending-state content. Defaults to "Loading…". */
   loading?: ReactNode;
-  /**
-   * Optional error renderer. Return JSX for a custom message (e.g.
-   * a 404 lede) — or return `undefined` to fall through to the
-   * default `<p className="results-state error" role="alert">` view.
-   */
+  /** Custom error view; return `undefined` for the default one. */
   error?: (e: ApiError) => ReactNode | undefined;
-  /** Optional empty-data state — rendered when `when(data)` is true. */
   empty?: Empty<T>;
-  /**
-   * Optional extra className appended to the default loading/error
-   * containers. Use a spacing utility (e.g. `mt-48`) when a route
-   * needs vertical breathing room above the state row.
-   */
+  /** Appended to the default loading and error containers. */
   className?: string;
-  /** Renderer for the success state. */
   children: (data: T) => ReactNode;
 }
 
 /**
- * QueryState collapses the loading / error / empty / success triad
- * that every TanStack `useQuery` consumer ends up writing by hand.
- * One definition of "what each state looks like" — the same
- * `<p className="results-state">` wrapper, the same role attributes,
- * the same `request_id` detail line on errors.
- *
- * For routes that need a custom error shape (Region.tsx and Org.tsx
- * render a full-JSX "not in the atlas yet" lede on 404), pass an
- * `error` callback that returns JSX for the special cases and
- * `undefined` for everything else — undefined falls through to the
- * default presentation.
+ * Renders a `useQuery` result's loading, error, empty or success state,
+ * with one shared look for loading and errors.
  */
 export function QueryState<T>({
   query,

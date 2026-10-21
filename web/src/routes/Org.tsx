@@ -65,9 +65,7 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
       className="mt-48"
       error={(e) =>
         e.status === 404 ? (
-          // The API owns the not-found message (problem.title/detail);
-          // we render it and add the Browse/submit links as navigation
-          // chrome rather than re-authoring the copy here.
+          // The API's problem title and detail are the not-found copy.
           <div className="lede mt-48">
             <div className="eyebrow">
               § Organization file
@@ -78,10 +76,8 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
               <span className="accent">.</span>
             </h1>
             <p className="deck">
-              {/* The fallback only renders for a 404 with no problem+json
-                  body (e.g. a proxy-injected error page). Keep it generic
-                  so it doesn't duplicate — and drift from — the API's
-                  authoritative copy. */}
+              {/* For a 404 without a problem body. Generic, so it can't
+                  drift from the API's copy. */}
               {e.problem?.detail ?? 'This page isn’t available.'}
             </p>
             <p className="deck">
@@ -99,8 +95,8 @@ function OrgBody({ query }: { query: UseQueryResult<OrgT, ApiError> }) {
 }
 
 function OrgContent({ org }: { org: OrgT }) {
-  // The dateline and country stat use any primary region; the
-  // Primary-metro affordances only render for a real metro.
+  // The dateline and country stat take any primary region; the metro
+  // affordances need a real metro.
   const displayRegion = primaryRegion(org.regions);
   const primaryMetro =
     displayRegion && isMetroKind(displayRegion.kind) ? displayRegion : undefined;
@@ -306,11 +302,7 @@ function OrgContent({ org }: { org: OrgT }) {
   );
 }
 
-/**
- * The org's website as a compact external link: the bare domain (or the
- * raw URL when it can't be parsed), opening in a new tab. Rendered in
- * both the feature header and the prose body.
- */
+/** The org's website as its bare domain, opening in a new tab. */
 function OrgWebsiteLink({ url }: { url: string }) {
   const domain = domainOf(url);
   return (

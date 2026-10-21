@@ -217,12 +217,7 @@ function ByTheNumbers({
   places: UseQueryResult<RegionSummary[], ApiError>;
   stats: UseQueryResult<Stats, ApiError>;
 }) {
-  // Counts come from `/api/v1/stats`, never from summing over
-  // `places`. `/api/v1/regions` returns only the browseable subset
-  // (metros and cities), so a sum of its direct_org_count drops every
-  // org attached solely to a state, province, borough, or multi-state
-  // region — 70 of them, which is how this panel came to advertise 166
-  // organizations against a 236-org catalog.
+  // Counts come from `/api/v1/stats`; see `getStats`.
   const totalOrgCount = stats.data?.total_org_count ?? null;
   const coveredPlaceCount = stats.data?.browse_region_count ?? null;
   const { usCount, caCount } = useMemo(() => {
@@ -232,10 +227,7 @@ function ByTheNumbers({
       rows.find((r) => r.country === code)?.region_count ?? 0;
     return { usCount: find('US'), caCount: find('CA') };
   }, [stats.data]);
-  // "Deepest coverage" is the single region whose scope contains the
-  // most orgs (org_count is the descendant walk). ListRegions already
-  // sorts by org_count DESC, so the head of the list is the answer —
-  // no scan needed.
+  // `/api/v1/regions` is sorted by org_count, descending.
   const topRegion = places.data?.[0] ?? null;
 
   return (
@@ -255,12 +247,7 @@ function ByTheNumbers({
         </div>
         <div className="stat">
           <div className="n">{formatNumber(coveredPlaceCount)}</div>
-          {/*
-            "Places with coverage", not "Regions indexed": this counts
-            the browseable metros and cities carrying at least one org,
-            not the ~628 regions in the graph. The old label claimed the
-            whole index and showed a seventh of it.
-          */}
+          {/* Browseable places with an org, not every region in the graph. */}
           <div className="label">Places with coverage</div>
           <div className="sub">
             {usCount !== null ? `${usCount} US · ${caCount} Canada` : 'Two countries, v1'}

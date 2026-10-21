@@ -75,17 +75,9 @@ describe('BroadsheetNav', () => {
 
   it('keeps the active entry as a Link so it stays keyboard-focusable', () => {
     renderWithProviders(<BroadsheetNav />, { initialEntries: ['/about'] });
-    // Active entries used to render as a <span onClick> which had no
-    // tab stop and announced no current-page state. Asserting role=link
-    // pins down that fix.
     expect(screen.getByRole('link', { name: /about/i })).toBeDefined();
   });
 
-  // The masthead tally renders on every route and previously had no
-  // test at all — which is how it shipped showing 166 orgs against a
-  // 236-org catalog. It used to sum direct_org_count over
-  // /api/v1/regions, dropping every org attached solely to a state,
-  // province, borough, or multi-state region.
   it('renders the server-side org and place totals', async () => {
     renderWithProviders(<BroadsheetNav />, { initialEntries: ['/about'] });
     await waitFor(() => {
@@ -99,9 +91,7 @@ describe('BroadsheetNav', () => {
     await waitFor(() => {
       expect(getStatsMock).toHaveBeenCalled();
     });
-    // Two claims in one: the tally can't be re-derived from the browse
-    // subset (the bug), and a route rendering no region list no longer
-    // pulls the whole browse set just to print two numbers.
+    // Summing the browse list would miss orgs outside it.
     expect(listRegionsMock).not.toHaveBeenCalled();
   });
 

@@ -30,17 +30,9 @@ import {
 import { useCountdown } from '../lib/timers.ts';
 import { useDocumentTitle } from '../lib/useDocumentTitle.ts';
 
-// Map from API field names (snake-case wire shape, see
-// SubmissionPayload + NewSubmissionRequest in openapi.yaml and the
-// API-side `errors` extension keys emitted by
-// atlas.ValidateSubmission) to the matching
-// react-hook-form field names in SubmitForm. Server fields the form
-// doesn't render are intentionally absent — they fall through to the
-// top-level `detail` banner instead of being silently swallowed.
-//
-// `region_slugs` and `short_desc` map to inputs hidden on a correction or
-// removal; an error for either then has no visible slot and surfaces in
-// the top-level banner (see deriveSubmitError).
+// API `errors` keys to form fields. A key with no entry here, or one whose
+// field is hidden for this submission type, surfaces in the top-level
+// banner instead (see deriveSubmitError).
 const FIELD_NAME_MAP: Readonly<Record<string, FieldPath<SubmitForm>>> = {
   name: 'name',
   website_url: 'website',
@@ -80,11 +72,6 @@ function noteFieldRules(field: NoteField) {
   };
 }
 
-/**
- * Per-submission-type copy. The three flavors share one layout but swap
- * hints, labels, and placeholders; a keyed table keeps the variants
- * side-by-side instead of five parallel ternary chains.
- */
 interface SubmissionCopy {
   nameHint: string;
   editorialLabel: string;
@@ -133,15 +120,9 @@ interface SubmitErrorView {
 }
 
 /**
- * Collapse a failed submission into the flags the error banners need.
- * Pulled out of the component so the precedence between per-field,
- * top-level-validation, rate-limit, and server-error states stays
- * readable.
- *
- * `unmappedFieldErrors` are API field errors with no visible home in the
- * form — an unmapped API key, or one mapped to a field this submission
- * type hides (e.g. `region_slugs`/`short_desc` on a correction/removal).
- * They'd otherwise be swallowed, so the top-level banner surfaces them.
+ * Collapses a failed submission into the flags the error banners need.
+ * `unmappedFieldErrors` are field errors with no visible slot, which the
+ * top-level banner shows so they aren't swallowed.
  */
 function deriveSubmitError(
   err: Error | null,
@@ -197,11 +178,7 @@ function FieldsetLegend({
   );
 }
 
-/**
- * The inline `field-error` slot rendered under a form control when
- * react-hook-form has an error for it. Renders nothing when the field
- * is clean — one place for the role="alert" + class contract.
- */
+/** The inline error under a form control; nothing when the field is clean. */
 function FieldErrorSlot({ error }: { error?: { message?: string } }) {
   return error ? (
     <span className="field-error" role="alert">
@@ -211,14 +188,9 @@ function FieldErrorSlot({ error }: { error?: { message?: string } }) {
 }
 
 /**
- * `/submit` — accepts an org tip, POSTs it to `/api/v1/submissions`,
- * and shows a "received" confirmation card with the short submission
- * id moderators will reference in the auto-PR. On API failure we fall
- * back to a manual GitHub-issue link so the submitter isn't stranded.
- *
- * The form schema is shared with the GitHub-issue path so a future
- * regression in the API surface doesn't lose data the submitter
- * already typed.
+ * `/submit`: posts an org tip and shows a receipt with its short id. If
+ * the API is down, it offers a pre-filled GitHub issue built from the
+ * same form values.
  */
 export function Submit() {
   useDocumentTitle('Submit an organization — Urbanist Atlas');
@@ -240,17 +212,6 @@ export function Submit() {
     shouldFocusError: false,
   });
 
-  // The form adapts to the submission type. For "new" we ask for the
-  // full org dossier; for "correction" and "removal" the org already
-  // exists in the Atlas, so we collect a smaller identification +
-  // context payload. Wire-shape stays the same — see
-  // submitForm.ts:buildNewSubmissionRequest for how the missing fields
-  // are folded into the API contract.
-  //
-  // useWatch (vs the destructured watch()) is the memoization-safe
-  // subscription per react-hook-form's API guidance; `defaultValue`
-  // covers the brief window before defaultValues propagate so we render
-  // the new-org variant rather than nothing.
   const submissionType = useWatch({ control, name: 'type', defaultValue: 'new' });
   const isNewOrg = submissionType === 'new';
   const copy = SUBMISSION_COPY[submissionType];
@@ -265,9 +226,6 @@ export function Submit() {
     mutationFn: (form) => createSubmission(buildNewSubmissionRequest(form)),
     onError: (err) => {
       if (!(err instanceof ApiError)) return;
-      // Per-field validation errors (W1.4): hand each known field
-      // to react-hook-form so the input shows its own error. The
-      // top-level fallback below renders when no field map matched.
       if (err.fieldErrors) {
         for (const [apiField, message] of Object.entries(err.fieldErrors)) {
           const formField = FIELD_NAME_MAP[apiField];
@@ -276,9 +234,7 @@ export function Submit() {
           }
         }
       }
-      // Rate-limit countdown (W1.3): start the per-second timer
-      // from the server-provided Retry-After. Static copy still
-      // renders when the header is missing.
+      // Without Retry-After, the static rate-limit copy still renders.
       if (err.status === 429 && err.retryAfterSeconds && err.retryAfterSeconds > 0) {
         setRetryAfter(err.retryAfterSeconds);
       }
@@ -294,13 +250,8 @@ export function Submit() {
     if (first) setFocus(first);
   };
 
-  // Subscribe to every form value so the GitHub-issue fallback link
-  // (rendered on 5xx) stays current when the user edits between
-  // seeing the error and clicking the link. `getValues()` inside
-  // render would snapshot at render time and go stale on subsequent
-  // keystrokes (the form uses uncontrolled inputs via register, so
-  // keystrokes don't otherwise re-render). Must be called before the
-  // mutation.isSuccess early return below to keep hook order stable.
+  // A subscription, not getValues(), so the GitHub-issue link follows
+  // edits made after the error: registered inputs don't re-render.
   const fallbackValues = useWatch({ control });
 
   if (mutation.isSuccess) {
@@ -308,11 +259,8 @@ export function Submit() {
       <SubmissionReceived
         submission={mutation.data}
         onAnother={() => {
-          // Clear react-hook-form's field state back to
-          // SUBMIT_FORM_DEFAULTS, then reset the mutation so the form
-          // (not the receipt) re-renders. mutation.reset() alone leaves
-          // the previously-typed values behind — Submit stays mounted,
-          // so useForm is never re-initialized.
+          // Submit stays mounted, so useForm keeps the typed values
+          // unless reset() clears them.
           reset();
           mutation.reset();
         }}
@@ -321,9 +269,6 @@ export function Submit() {
   }
 
   const submitErr = mutation.error;
-  // Which inline `field-error` slots actually render for this submission
-  // type — drives which API field errors have a visible home; the rest
-  // surface in the top-level banner (see deriveSubmitError).
   const visibleFieldErrorSlots = new Set<FieldPath<SubmitForm>>(
     ERROR_SLOT_FIELDS.filter((f) => isNewOrg || !NEW_ORG_ONLY_FIELDS.has(f)),
   );
