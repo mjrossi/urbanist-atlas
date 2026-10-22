@@ -390,7 +390,9 @@ func awaitShutdown(ctx context.Context, logger *slog.Logger, d shutdownDeps) err
 		}
 		// Shutdown closes the listener before draining, so this returns
 		// promptly even when the drain timed out.
-		<-d.serverErr
+		if err := <-d.serverErr; err != nil {
+			errs = append(errs, fmt.Errorf("listen: %w", err))
+		}
 		return errors.Join(errs...)
 	case err := <-d.serverErr:
 		if err != nil {
