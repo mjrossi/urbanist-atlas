@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/ctessum/polyclip-go v1.1.0
-	github.com/go-chi/chi/v5 v5.4.0
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jonas-p/go-shp v0.1.1
