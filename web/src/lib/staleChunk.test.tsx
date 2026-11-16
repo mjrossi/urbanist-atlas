@@ -54,7 +54,6 @@ describe('lazyComponent', () => {
     expect(sessionStorage.getItem(FLAG)).toBe('1');
   });
 
-  // Why lazyComponent returns the function form of `lazy`.
   describe('how React Router surfaces a rejected lazy load', () => {
     function mount(child: RouteObject) {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -74,13 +73,6 @@ describe('lazyComponent', () => {
       return router;
     }
     const reject = () => Promise.reject(new Error('gone'));
-
-    it('renders an empty route for a rejected lazy Component property', async () => {
-      const router = mount({ path: 'x', lazy: { Component: reject } });
-      await router.navigate('/x');
-      expect(router.state.errors).toBeNull();
-      expect(screen.queryByText('boundary')).toBeNull();
-    });
 
     it('reaches the error boundary for a rejected lazy function', async () => {
       const router = mount({

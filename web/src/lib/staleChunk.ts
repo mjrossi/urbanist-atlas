@@ -19,10 +19,9 @@ export class ChunkLoadError extends Error {
 }
 
 /**
- * A route `lazy` loader for one component export. It is the function
- * form, not `lazy: { Component }`: React Router drops a rejected lazy
- * `Component` property and renders the route empty, while a rejected
- * lazy function reaches the error boundary (staleChunk.test pins both).
+ * A route `lazy` loader for one component export. A rejected load
+ * reaches the route's error boundary as a ChunkLoadError
+ * (staleChunk.test pins this).
  */
 export function lazyComponent<M>(
   load: () => Promise<M>,
